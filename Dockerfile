@@ -32,8 +32,8 @@ RUN npm run build
 # ============================================================================
 FROM node:20-alpine AS runtime
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and openssl for Prisma
+RUN apk add --no-cache dumb-init openssl
 
 # Create app user (non-root)
 RUN addgroup -g 1001 -S nodejs && \
@@ -50,6 +50,9 @@ RUN npm ci --only=production && \
 
 # Copy Prisma files for migrations
 COPY prisma ./prisma/
+
+# Copy startup script
+COPY scripts/start.sh ./scripts/start.sh
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
@@ -73,5 +76,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start application
-CMD ["node", "dist/index.js"]
+# Start application (runs migrations first)
+CMD ["sh", "scripts/start.sh"]
