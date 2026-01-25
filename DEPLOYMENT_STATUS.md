@@ -1,18 +1,36 @@
 # Nubabel Deployment Status
 
-**Last Updated**: 2026-01-25  
+**Last Updated**: 2026-01-25 15:36 KST  
 **System**: Nubabel Multi-Tenant AI Automation System  
 **Domain**: `nubabel.com`
 
 ---
 
-## Current Status: Fixing Railway Deployment Issues
+## Current Status: Waiting for Railway Auto-Deploy
 
-### 🔴 Current Issue (2026-01-25 22:20 KST)
-- Build succeeds but healthcheck fails
-- Server not responding on /health endpoint
-- Root cause: app.listen() not binding to 0.0.0.0 (Railway requirement)
-- Fix in progress: Update server binding + error handling
+### 🟡 Deployment In Progress (2026-01-25 15:36 KST)
+
+**Latest Fixes Pushed**:
+1. ✅ Server binding to `0.0.0.0` (commit `0eeacfd`)
+2. ✅ Added OpenSSL to runtime stage (commit `8b490c3`)
+3. ✅ Added migration script `scripts/start.sh`
+4. ✅ Notion Settings frontend routing (commit `05fa214`)
+
+**Railway Status**: Auto-deploying from latest push
+**Expected**: Deployment should complete within 5-10 minutes
+
+**What to Check**:
+```bash
+# After Railway deployment completes, test these endpoints:
+curl https://<railway-url>/health
+curl https://<railway-url>/health/db
+curl https://<railway-url>/health/redis
+```
+
+**Look for in Railway logs**:
+- "📊 Running database migrations..."
+- "✅ Server running on port 3000"
+- "🚀 Health check endpoint: /health"
 
 ## Previous Status: Ready for Manual Deployment
 
