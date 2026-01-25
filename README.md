@@ -248,18 +248,21 @@ nubabel/
 
 ## 🎯 Current Status
 
-| Component         | Status      | Progress |
-| ----------------- | ----------- | -------- |
-| Authentication    | ✅ Complete | 100%     |
-| Database Schema   | ✅ Complete | 100%     |
-| Deployment Config | ✅ Complete | 100%     |
-| Web Dashboard     | ✅ Complete | 100%     |
-| Workflow Engine   | ✅ Complete | 100%     |
-| Notion MCP        | ✅ Complete | 100%     |
-| Slack Bot         | 📋 Planned  | 0%       |
-| AI Agents         | 📋 Planned  | 0%       |
+| Component          | Status      | Progress |
+| ------------------ | ----------- | -------- |
+| Authentication     | ✅ Complete | 100%     |
+| Database Schema    | ✅ Complete | 100%     |
+| Deployment Config  | ✅ Complete | 100%     |
+| Web Dashboard      | ✅ Complete | 100%     |
+| Workflow Engine    | ✅ Complete | 100%     |
+| Notion MCP         | ✅ Complete | 100%     |
+| Railway Deployment | ✅ Complete | 100%     |
+| Slack Bot          | 📋 Planned  | 0%       |
+| AI Agents          | 📋 Planned  | 0%       |
 
-**Overall Progress**: **~70%** (Phase 2 Week 1-8 완료, Railway 배포 대기 중)
+**Overall Progress**: **~75%** (Phase 2 Week 1-8 완료, Production 배포 완료)
+
+**🌐 Production URL**: https://auth.nubabel.com
 
 ---
 
@@ -276,8 +279,10 @@ nubabel/
 
 - [x] **Week 1-2**: Web Dashboard (Login, Dashboard, Settings) ✅
 - [x] **Week 3-4**: First automation (Manual workflow execution) ✅
-- [x] **Week 5-8**: Notion integration (Read/write tasks) ✅ 100%
+- [x] **Week 5-8**: Notion integration (Read/write tasks) ✅ **DEPLOYED 2026-01-25**
 - [ ] **Week 9-12**: Slack bot (Natural language triggers) ⏳
+
+**Live URL**: https://auth.nubabel.com
 
 ### Phase 3: Intelligence (Q2 2026 - 3 months)
 
