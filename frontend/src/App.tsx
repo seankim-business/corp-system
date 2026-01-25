@@ -4,7 +4,7 @@
  * 기획:
  * - 최상위 라우팅 설정
  * - Public Routes: /login
- * - Protected Routes: /dashboard, /workflows, /executions, /settings
+ * - Protected Routes: /dashboard, /workflows, /executions, /settings, /settings/notion
  * - 로그인 안된 유저는 /login으로 리다이렉트
  * 
  * 구조:
@@ -15,7 +15,8 @@
  *         ├── /dashboard (Protected)
  *         ├── /workflows (Protected)
  *         ├── /executions (Protected)
- *         └── /settings (Protected)
+ *         ├── /settings (Protected)
+ *         └── /settings/notion (Protected)
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -24,6 +25,7 @@ import DashboardPage from './pages/DashboardPage';
 import WorkflowsPage from './pages/WorkflowsPage';
 import ExecutionsPage from './pages/ExecutionsPage';
 import SettingsPage from './pages/SettingsPage';
+import NotionSettingsPage from './pages/NotionSettingsPage';
 import DashboardLayout from './components/layout/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -61,6 +63,14 @@ function App() {
           <ProtectedRoute>
             <DashboardLayout>
               <SettingsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/settings/notion" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <NotionSettingsPage />
             </DashboardLayout>
           </ProtectedRoute>
         } />

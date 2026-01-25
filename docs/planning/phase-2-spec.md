@@ -306,8 +306,8 @@ src/mcp-servers/notion/
 - [x] Workflow에서 Notion task 생성 ✅
 - [x] NotionSettingsPage 구현 ✅
 - [x] Database 목록 조회 기능 ✅
-- [ ] Frontend 라우팅 추가 (App.tsx에 /settings/notion 경로)
-- [ ] End-to-end 테스트
+- [x] Frontend 라우팅 추가 ✅ (App.tsx + Sidebar 업데이트 완료)
+- [ ] End-to-end 테스트 (Railway 배포 후)
 
 ### 실제 구현 내용 (2026-01-25 완료)
 
@@ -365,12 +365,18 @@ frontend/src/pages/
     ├── Connection 테스트
     ├── Database 목록 표시
     └── Default database 선택
+
+frontend/src/App.tsx           # ✅ 라우팅 추가
+└── /settings/notion → NotionSettingsPage
+
+frontend/src/components/layout/Sidebar.tsx  # ✅ 네비게이션 추가
+└── Integrations 섹션 → Notion Settings 링크
 ```
 
 ### 예상 vs 실제 시간
 - MCP Server: 8일 예상 → 1일 완료 ✅
 - Frontend: 6일 예상 → 1일 완료 ✅
-- 통합 & 테스트: 2일 예상 → 진행 중
+- 통합 & 테스트: 2일 예상 → Railway 배포 대기 중 🔄
 
 ---
 
