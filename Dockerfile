@@ -78,4 +78,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start application (runs migrations first)
-CMD ["sh", "scripts/start.sh"]
+CMD ["sh", "-c", "echo 'Starting container...' && npx prisma migrate deploy && echo 'Starting server...' && node dist/index.js"]
