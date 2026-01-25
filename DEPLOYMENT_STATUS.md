@@ -6,31 +6,45 @@
 
 ---
 
-## Current Status: Waiting for Railway Auto-Deploy
+## Current Status: Waiting for Railway Auto-Deploy (Attempt #4)
 
-### 🟡 Deployment In Progress (2026-01-25 15:36 KST)
+### 🟡 Deployment In Progress (2026-01-25 15:38 KST)
 
-**Latest Fixes Pushed**:
+**Root Cause Identified**: Prisma Client mismatch between builder and runtime stages
+
+**Latest Fixes Pushed** (commit `8ac9318`):
 1. ✅ Server binding to `0.0.0.0` (commit `0eeacfd`)
 2. ✅ Added OpenSSL to runtime stage (commit `8b490c3`)
 3. ✅ Added migration script `scripts/start.sh`
 4. ✅ Notion Settings frontend routing (commit `05fa214`)
+5. ✅ **NEW**: Generate Prisma Client in runtime stage (commit `8ac9318`)
+6. ✅ **NEW**: Enhanced startup logging for diagnostics
 
-**Railway Status**: Auto-deploying from latest push
+**Critical Change**: Instead of copying `node_modules/.prisma` from builder, we now run `npx prisma generate` in the runtime stage after `npm ci --only=production`. This ensures Prisma Client matches the runtime environment.
+
+**Railway Status**: Auto-deploying from commit `8ac9318`
 **Expected**: Deployment should complete within 5-10 minutes
 
-**What to Check**:
-```bash
-# After Railway deployment completes, test these endpoints:
-curl https://<railway-url>/health
-curl https://<railway-url>/health/db
-curl https://<railway-url>/health/redis
+**What to Check in Railway Logs**:
+```
+🚀 Initializing Nubabel Platform...
+📍 Node version: v20.x.x
+📍 Environment: production
+📍 Port: 3000
+🚀 Starting Nubabel Platform...
+📊 Running database migrations...
+✅ Migrations completed successfully
+🌐 Starting Node.js server...
+🌐 Starting server on 0.0.0.0:3000...
+✅ Server running on port 3000
+✅ Ready to accept connections
 ```
 
-**Look for in Railway logs**:
-- "📊 Running database migrations..."
-- "✅ Server running on port 3000"
-- "🚀 Health check endpoint: /health"
+**Then Test**:
+```bash
+curl https://<railway-url>/health
+# Expected: {"status":"ok","timestamp":"2026-01-25T..."}
+```
 
 ## Previous Status: Ready for Manual Deployment
 
