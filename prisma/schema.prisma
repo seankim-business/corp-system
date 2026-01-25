@@ -1,0 +1,314 @@
+// Prisma Schema for Kyndof Corp System
+// Multi-tenant SaaS with Google Workspace integration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE MULTI-TENANT TABLES
+// ============================================================================
+
+/// Organizations (Tenants)
+/// Each organization represents a separate company/workspace
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  slug      String   @unique @db.VarChar(50) // Subdomain: kyndof, clientco
+  name      String   @db.VarChar(255)
+  logoUrl   String?  @map("logo_url") @db.Text
+  settings  Json     @default("{}") @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  workspaceDomains WorkspaceDomain[]
+  memberships      Membership[]
+  agents           Agent[]
+  teams            Team[]
+  projects         Project[]
+  tasks            Task[]
+  goals            Goal[]
+  valueStreams     ValueStream[]
+  kpis             KPI[]
+
+  @@map("organizations")
+}
+
+/// Users (Global identity)
+/// One user can belong to multiple organizations
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String?  @map("password_hash") @db.VarChar(255) // NULL for Google-only users
+  googleId      String?  @unique @map("google_id") @db.VarChar(255) // Google OAuth sub
+  displayName   String?  @map("display_name") @db.VarChar(255)
+  avatarUrl     String?  @map("avatar_url") @db.Text
+  emailVerified Boolean  @default(false) @map("email_verified")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  memberships Membership[]
+  sessions    Session[]
+
+  @@index([email])
+  @@index([googleId])
+  @@map("users")
+}
+
+/// Memberships (User ↔ Organization relationship)
+/// Defines user's role and permissions within an organization
+model Membership {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  role           String    @db.VarChar(50) // owner, admin, member
+  permissions    Json      @default("{}") @db.JsonB
+  invitedBy      String?   @map("invited_by") @db.Uuid
+  invitedAt      DateTime  @default(now()) @map("invited_at") @db.Timestamptz(6)
+  joinedAt       DateTime? @map("joined_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+/// Workspace Domains (Google Workspace domains)
+/// Links Google Workspace domains to organizations
+model WorkspaceDomain {
+  id                String    @id @default(uuid()) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  domain            String    @unique @db.VarChar(255) // kyndof.com, client-company.com
+  verified          Boolean   @default(false)
+  verificationToken String?   @map("verification_token") @db.VarChar(255)
+  verifiedAt        DateTime? @map("verified_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, domain])
+  @@index([organizationId])
+  @@index([domain])
+  @@map("workspace_domains")
+}
+
+/// Sessions (Optional - JWT can be stateless)
+/// Tracks active user sessions per organization
+model Session {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  tokenHash      String   @unique @map("token_hash") @db.VarChar(255)
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt     DateTime @default(now()) @map("last_used_at") @db.Timestamptz(6)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([tokenHash])
+  @@map("sessions")
+}
+
+// ============================================================================
+// AGENT HIERARCHY TABLES (Dynamic Team Management)
+// ============================================================================
+
+/// Agents (AI Agents - both permanent and temporary)
+model Agent {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String    @db.VarChar(100) // designer-bokyung, pm-killin-it-girl
+  type           String    @db.VarChar(50) // permanent, temporary, contractor
+  role           String    @db.Text // "K-POP 무대 의상 디자이너"
+  managerId      String?   @map("manager_id") @db.Uuid // Reports to which agent
+  teamId         String?   @map("team_id") @db.Uuid
+  skills         String[]  @db.VarChar(100) // [fashion-design, clo3d, adobe-suite]
+  sessionId      String?   @map("session_id") @db.VarChar(255) // Persistent session for continuity
+  hiredAt        DateTime  @default(now()) @map("hired_at") @db.Timestamptz(6)
+  contractEnd    DateTime? @map("contract_end") @db.Timestamptz(6) // NULL for permanent
+  projectId      String?   @map("project_id") @db.Uuid // For project-based agents
+  status         String    @default("active") @db.VarChar(50) // active, inactive, archived
+  metadata       Json      @default("{}") @db.JsonB
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  manager      Agent?       @relation("AgentHierarchy", fields: [managerId], references: [id])
+  subordinates Agent[]      @relation("AgentHierarchy")
+  team         Team?        @relation(fields: [teamId], references: [id])
+
+  @@index([organizationId])
+  @@index([managerId])
+  @@index([teamId])
+  @@index([type])
+  @@index([status])
+  @@map("agents")
+}
+
+/// Teams (Groups of agents)
+model Team {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(255)
+  leaderId       String?  @map("leader_id") @db.Uuid // Team leader
+  type           String   @db.VarChar(50) // permanent, temporary, taskforce
+  maxMembers     Int?     @map("max_members")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agents       Agent[]
+
+  @@index([organizationId])
+  @@map("teams")
+}
+
+// ============================================================================
+// BUSINESS DATA TABLES (Tenant-scoped)
+// ============================================================================
+
+/// Projects
+model Project {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(255)
+  status         String   @db.VarChar(50)
+  ownerId        String?  @map("owner_id") @db.Uuid
+  startDate      DateTime? @map("start_date") @db.Date
+  dueDate        DateTime? @map("due_date") @db.Date
+  progress       Int      @default(0)
+  budget         Decimal? @db.Decimal(15, 2)
+  description    String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+
+  @@index([organizationId, id])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("projects")
+}
+
+/// Tasks (RABSIC-enabled)
+model Task {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  projectId        String?  @map("project_id") @db.Uuid
+  name             String   @db.VarChar(500)
+  status           String   @db.VarChar(50) // 1_ToDo, 2_InProgress, 5_Done
+  dueDate          DateTime? @map("due_date") @db.Date
+  urgencyScore     Int?     @map("urgency_score") @default(0)
+  importanceScore  Int?     @map("importance_score") @default(0)
+  eisenhowerQuad   String?  @map("eisenhower_quadrant") @db.VarChar(50)
+  
+  // RABSIC fields
+  responsible      String[] @db.Uuid
+  accountable      String[] @db.Uuid // Must be exactly 1
+  backup           String[] @db.Uuid
+  support          String[] @db.Uuid
+  informed         String[] @db.Uuid
+  consulted        String[] @db.Uuid
+  
+  description      String?  @db.Text
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id])
+
+  @@index([organizationId, id])
+  @@index([organizationId, status])
+  @@index([organizationId, dueDate])
+  @@map("tasks")
+}
+
+/// Goals (Hierarchical)
+model Goal {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  title            String   @db.VarChar(500)
+  status           String   @db.VarChar(50)
+  ownerPositionId  String?  @map("owner_position_id") @db.Uuid
+  dueDate          DateTime? @map("due_date") @db.Date
+  progress         Int      @default(0)
+  parentGoalId     String?  @map("parent_goal_id") @db.Uuid
+  description      String?  @db.Text
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentGoal   Goal?        @relation("GoalHierarchy", fields: [parentGoalId], references: [id])
+  subGoals     Goal[]       @relation("GoalHierarchy")
+
+  @@index([organizationId, id])
+  @@index([parentGoalId])
+  @@map("goals")
+}
+
+/// Value Streams (Business processes)
+model ValueStream {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(500)
+  functions      String   @db.VarChar(100) // MD, Fashion Design, Marketing, CS, Sales
+  type           String   @db.VarChar(50)
+  input          String?  @db.Text
+  output         String?  @db.Text
+  parentId       String?  @map("parent_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent       ValueStream?  @relation("ValueStreamHierarchy", fields: [parentId], references: [id])
+  subStreams   ValueStream[] @relation("ValueStreamHierarchy")
+
+  @@index([organizationId, id])
+  @@index([parentId])
+  @@map("value_streams")
+}
+
+/// KPIs (Key Performance Indicators)
+model KPI {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  name             String   @db.VarChar(255)
+  status           String   @db.VarChar(50)
+  ownerRoleId      String?  @map("owner_role_id") @db.Uuid
+  target           String?  @db.VarChar(255)
+  currentValue     Decimal? @map("current_value") @db.Decimal(15, 2)
+  unit             String?  @db.VarChar(50)
+  updateFrequency  String?  @map("update_frequency") @db.VarChar(50)
+  dataSource       String?  @map("data_source") @db.Text
+  upToDate         Boolean  @default(true) @map("up_to_date")
+  lastUpdated      DateTime? @map("last_updated") @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, id])
+  @@map("kpis")
+}
