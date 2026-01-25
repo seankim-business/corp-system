@@ -89,7 +89,7 @@ model Membership {
 model WorkspaceDomain {
   id                String    @id @default(uuid()) @db.Uuid
   organizationId    String    @map("organization_id") @db.Uuid
-  domain            String    @unique @db.VarChar(255) // kyndof.com, client-company.com
+  domain            String    @unique @db.VarChar(255) // nubabel.com, client-company.com
   verified          Boolean   @default(false)
   verificationToken String?   @map("verification_token") @db.VarChar(255)
   verifiedAt        DateTime? @map("verified_at") @db.Timestamptz(6)

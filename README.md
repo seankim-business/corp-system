@@ -596,10 +596,10 @@ Proprietary - Kyndof Corporation
 
 ## 문의
 
-- **팀**: Kyndof Engineering
-- **이메일**: engineering@kyndof.com
+- **팀**: Nubabel Engineering
+- **이메일**: engineering@nubabel.com
 - **Slack**: #corp-system-dev
 
 ---
 
-**Built with ❤️ by Kyndof Team**
+**Built with ❤️ by Nubabel Team**
