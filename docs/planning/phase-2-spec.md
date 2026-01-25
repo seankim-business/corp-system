@@ -19,11 +19,13 @@ Week  9-12: Slack Bot
 ## Week 1-2: Web Dashboard
 
 ### 목표
+
 로그인부터 대시보드까지 기본 UI 완성
 
 ### 상세 Task
 
 #### Day 1-2: 로그인 페이지
+
 ```
 파일:
 - src/pages/LoginPage.tsx
@@ -42,6 +44,7 @@ Week  9-12: Slack Bot
 ```
 
 #### Day 3-4: Dashboard Layout
+
 ```
 파일:
 - src/components/layout/Header.tsx
@@ -61,6 +64,7 @@ Week  9-12: Slack Bot
 ```
 
 #### Day 5-6: 조직 전환기
+
 ```
 파일:
 - src/components/OrganizationSwitcher.tsx
@@ -79,6 +83,7 @@ POST /auth/switch-org
 ```
 
 #### Day 7-10: 설정 페이지
+
 ```
 파일:
 - src/pages/SettingsPage.tsx
@@ -100,12 +105,14 @@ POST /auth/switch-org
 ```
 
 ### 성공 기준
+
 - [ ] 로그인 → Dashboard 진입
 - [ ] 조직 전환 동작
 - [ ] 설정 페이지 저장 가능
 - [ ] 모바일 반응형 동작
 
 ### 예상 시간
+
 - Frontend 개발: 8일
 - 테스트 & 버그 수정: 2일
 
@@ -114,11 +121,13 @@ POST /auth/switch-org
 ## Week 3-4: 첫 워크플로우 (수동 실행)
 
 ### 목표
+
 워크플로우 목록 보기 + 수동 실행 + 로그 확인
 
 ### Backend 추가 필요
 
 #### Workflow Table
+
 ```sql
 workflows
 ├── id
@@ -143,6 +152,7 @@ workflow_executions
 ```
 
 #### API Endpoints
+
 ```typescript
 GET    /api/workflows
 POST   /api/workflows
@@ -158,6 +168,7 @@ GET    /api/executions/:id
 ### Frontend Pages
 
 #### Day 1-3: Workflow 목록
+
 ```
 파일:
 - src/pages/WorkflowsPage.tsx
@@ -171,6 +182,7 @@ GET    /api/executions/:id
 ```
 
 #### Day 4-6: Workflow 상세 + 실행
+
 ```
 파일:
 - src/pages/WorkflowDetailPage.tsx
@@ -193,6 +205,7 @@ GET    /api/executions/:id
 ```
 
 #### Day 7-10: Execution 목록 + 상세
+
 ```
 파일:
 - src/pages/ExecutionsPage.tsx
@@ -213,12 +226,14 @@ GET    /api/executions/:id
 ```
 
 ### 성공 기준
+
 - [ ] Workflow 목록 보기
 - [ ] 버튼 클릭으로 실행
 - [ ] 실행 결과 확인 가능
 - [ ] 실패 시 에러 메시지 표시
 
 ### 예상 시간
+
 - Backend API: 4일
 - Frontend: 6일
 - 통합 테스트: 2일
@@ -228,11 +243,13 @@ GET    /api/executions/:id
 ## Week 5-8: Notion MCP 연동
 
 ### 목표
+
 Notion 데이터베이스와 실시간 연동
 
 ### MCP Server 구현
 
 #### 파일 구조
+
 ```
 src/mcp-servers/notion/
 ├── index.ts              # MCP server entry
@@ -246,6 +263,7 @@ src/mcp-servers/notion/
 ```
 
 #### MCP Tools
+
 ```typescript
 1. notion_get_tasks
    Input: { databaseId?: string, filter?: object }
@@ -267,6 +285,7 @@ src/mcp-servers/notion/
 ### Workflow 예시
 
 #### "Create Notion Task" Workflow
+
 ```json
 {
   "name": "Create Notion Task",
@@ -290,6 +309,7 @@ src/mcp-servers/notion/
 ### Frontend 추가
 
 #### Notion Settings Page
+
 ```
 파일:
 - src/pages/settings/NotionSettingsPage.tsx
@@ -302,6 +322,7 @@ src/mcp-servers/notion/
 ```
 
 ### 성공 기준
+
 - [x] Notion API Key 저장 ✅
 - [x] Workflow에서 Notion task 생성 ✅
 - [x] NotionSettingsPage 구현 ✅
@@ -312,6 +333,7 @@ src/mcp-servers/notion/
 ### 실제 구현 내용 (2026-01-25 완료)
 
 #### Backend 구현 완료
+
 ```
 src/
 ├── mcp-servers/notion/
@@ -330,6 +352,7 @@ src/
 ```
 
 #### API Endpoints 구현
+
 ```
 POST   /api/notion/connection     # ✅ Create connection
 GET    /api/notion/connection     # ✅ Get connection
@@ -340,6 +363,7 @@ POST   /api/notion/test           # ✅ Test API key
 ```
 
 #### Prisma Schema 업데이트
+
 ```prisma
 model NotionConnection {
   id                String   @id @default(uuid())
@@ -352,12 +376,14 @@ model NotionConnection {
 ```
 
 #### Workflow 실행 엔진 업데이트
+
 - ✅ `workflow.config.steps[]` 처리 로직
 - ✅ `{{input.field}}` 템플릿 변수 치환
 - ✅ `type: "mcp_call"` + `mcp: "notion"` 지원
 - ✅ NotionConnection 자동 조회 및 API Key 주입
 
 #### Frontend 구현 완료
+
 ```
 frontend/src/pages/
 └── NotionSettingsPage.tsx    # ✅ NEW
@@ -374,20 +400,40 @@ frontend/src/components/layout/Sidebar.tsx  # ✅ 네비게이션 추가
 ```
 
 ### 예상 vs 실제 시간
+
 - MCP Server: 8일 예상 → 1일 완료 ✅
 - Frontend: 6일 예상 → 1일 완료 ✅
-- 통합 & 테스트: 2일 예상 → Railway 배포 대기 중 🔄
+- 통합 & 테스트: 2일 예상 → 1일 완료 ✅
+- **Railway 배포: 2026-01-25 완료** ✅
+
+### 배포 정보
+
+- **Production URL**: https://auth.nubabel.com
+- **Railway URL**: https://2e7jyhvd.up.railway.app
+- **DNS**: auth.nubabel.com → 2e7jyhvd.up.railway.app → 66.33.22.141
+- **배포 일시**: 2026-01-25 23:19 KST
+- **최종 커밋**: f4a9efb (Railway healthcheck 설정 제거)
+
+### 배포 과정에서 해결한 문제들
+
+1. ✅ OpenSSL 의존성 누락 → openssl-dev 추가
+2. ✅ Prisma migration 파일 누락 → 20260125000000_init 생성
+3. ✅ Schema 불일치 (settings 컬럼) → 20260125010000_add_settings_column 추가
+4. ✅ Railway healthcheck timeout → Docker HEALTHCHECK로 전환
+5. ✅ DNS 설정 (루트 도메인 CNAME 불가) → auth 서브도메인 사용
 
 ---
 
 ## Week 9-12: Slack Bot
 
 ### 목표
+
 Slack에서 자연어로 워크플로우 실행
 
 ### Slack App 설정
 
 #### 1. Slack App 생성
+
 ```
 OAuth Scopes:
 - chat:write
@@ -399,6 +445,7 @@ Event Subscriptions:
 ```
 
 #### 2. Slash Command
+
 ```
 /nubabel [command]
 
@@ -409,6 +456,7 @@ Examples:
 ```
 
 #### 3. Mention
+
 ```
 @Nubabel create task "New feature"
 ```
@@ -416,6 +464,7 @@ Examples:
 ### Backend Implementation
 
 #### 파일 구조
+
 ```
 src/slack/
 ├── index.ts              # Slack Bot entry
@@ -429,6 +478,7 @@ src/slack/
 ```
 
 #### Command Flow
+
 ```
 1. Slack event 수신
    ↓
@@ -444,6 +494,7 @@ src/slack/
 ### Natural Language Parsing
 
 #### LLM Prompt
+
 ```
 User said: "create task Fix bug assigned to Sean"
 
@@ -461,12 +512,14 @@ Return JSON:
 ```
 
 ### 성공 기준
+
 - [ ] Slack에서 `/nubabel` 명령 동작
 - [ ] `@Nubabel mention` 응답
 - [ ] 자연어 → Workflow 실행
 - [ ] 결과 메시지 전송
 
 ### 예상 시간
+
 - Slack App 설정: 2일
 - Backend: 8일
 - 테스트: 2일
@@ -520,11 +573,13 @@ Sean이 회사에 출근했다.
 ## 📊 리소스
 
 ### 개발 인력
+
 - Frontend: 1명 full-time
 - Backend: 1명 full-time
 - (또는 Full-stack 1명)
 
 ### 예상 공수
+
 - 총 60일 (12주 x 5일)
 - 실제 개발: 50일
 - 버퍼: 10일 (테스트, 버그 수정)
@@ -533,12 +588,12 @@ Sean이 회사에 출근했다.
 
 ## 🚧 리스크
 
-| 리스크 | 확률 | 대응 |
-|--------|------|------|
-| Notion API 변경 | 낮음 | 공식 SDK 사용 |
-| Slack API rate limit | 중간 | Queue 시스템 |
-| LLM 파싱 오류 | 높음 | Fallback to 구조화된 명령 |
-| 일정 지연 | 중간 | MVP 범위 축소 |
+| 리스크               | 확률 | 대응                      |
+| -------------------- | ---- | ------------------------- |
+| Notion API 변경      | 낮음 | 공식 SDK 사용             |
+| Slack API rate limit | 중간 | Queue 시스템              |
+| LLM 파싱 오류        | 높음 | Fallback to 구조화된 명령 |
+| 일정 지연            | 중간 | MVP 범위 축소             |
 
 ---
 
