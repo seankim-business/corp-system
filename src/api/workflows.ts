@@ -21,6 +21,7 @@
 import { Router, Request, Response } from 'express';
 import { db as prisma } from '../db/client';
 import { requireAuth } from '../middleware/auth.middleware';
+import { executeNotionTool } from '../mcp-servers/notion';
 
 const router = Router();
 
@@ -179,23 +180,62 @@ router.post('/workflows/:id/execute', requireAuth, async (req: Request, res: Res
           },
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const config = workflow.config as any;
+        const steps = config.steps || [];
+        let finalOutputData: any = { message: 'Workflow executed successfully' };
+
+        if (steps.length > 0) {
+          const notionConnection = await prisma.notionConnection.findUnique({
+            where: { organizationId },
+          });
+
+          for (const step of steps) {
+            if (step.type === 'mcp_call' && step.mcp === 'notion') {
+              if (!notionConnection) {
+                throw new Error('Notion connection not configured');
+              }
+
+              const toolInput = { ...step.input };
+              
+              Object.keys(toolInput).forEach((key) => {
+                const value = toolInput[key];
+                if (typeof value === 'string' && value.includes('{{')) {
+                  const match = value.match(/\{\{input\.(\w+)\}\}/);
+                  if (match && inputData) {
+                    const inputKey = match[1];
+                    toolInput[key] = (inputData as any)[inputKey];
+                  }
+                }
+              });
+
+              const toolResult = await executeNotionTool(
+                notionConnection.apiKey,
+                step.tool,
+                toolInput
+              );
+
+              finalOutputData = { ...finalOutputData, ...toolResult };
+            }
+          }
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
 
         await prisma.workflowExecution.update({
           where: { id: execution.id },
           data: {
             status: 'success',
-            outputData: { message: 'Workflow executed successfully', timestamp: new Date() },
+            outputData: { ...finalOutputData, timestamp: new Date() },
             completedAt: new Date(),
           },
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Execution background error:', error);
         await prisma.workflowExecution.update({
           where: { id: execution.id },
           data: {
             status: 'failed',
-            errorMessage: 'Execution failed',
+            errorMessage: error.message || 'Execution failed',
             completedAt: new Date(),
           },
         });

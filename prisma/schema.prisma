@@ -34,8 +34,9 @@ model Organization {
   tasks            Task[]
   goals            Goal[]
   valueStreams     ValueStream[]
-  kpis             KPI[]
-  workflows        Workflow[]
+  kpis              KPI[]
+  workflows         Workflow[]
+  notionConnections NotionConnection[]
 
   @@map("organizations")
 }
@@ -355,4 +356,24 @@ model WorkflowExecution {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@map("workflow_executions")
+}
+
+// ============================================================================
+// MCP INTEGRATION TABLES (Phase 2 Week 5-8)
+// ============================================================================
+
+/// Notion Connections (Organization-level Notion integration)
+model NotionConnection {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  apiKey            String   @map("api_key") @db.VarChar(255)
+  defaultDatabaseId String?  @map("default_database_id") @db.VarChar(255)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId])
+  @@index([organizationId])
+  @@map("notion_connections")
 }
