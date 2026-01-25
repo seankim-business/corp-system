@@ -311,13 +311,11 @@ router.get('/executions/:id', requireAuth, async (req: Request, res: Response) =
     const execution = await prisma.workflowExecution.findFirst({
       where: { id },
       include: {
-        workflow: {
-          where: { organizationId },
-        },
+        workflow: true,
       },
     });
 
-    if (!execution || !execution.workflow) {
+    if (!execution || execution.workflow.organizationId !== organizationId) {
       return res.status(404).json({ error: 'Execution not found' });
     }
 

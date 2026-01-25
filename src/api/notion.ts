@@ -172,7 +172,6 @@ router.get('/notion/databases', requireAuth, async (req: Request, res: Response)
 
 router.post('/notion/test', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { organizationId } = req.user!;
     const { apiKey } = req.body;
 
     if (!apiKey) {
