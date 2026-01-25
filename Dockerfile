@@ -44,21 +44,22 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
+# Copy Prisma files for migrations
+COPY prisma ./prisma/
+
 # Install production dependencies only
 RUN npm ci --only=production && \
     npm cache clean --force
 
-# Copy Prisma files for migrations
-COPY prisma ./prisma/
-
-# Copy startup script
-COPY scripts/start.sh ./scripts/start.sh
+# Generate Prisma Client in runtime stage
+RUN npx prisma generate
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
-# Copy node_modules with Prisma Client from builder
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Copy startup script and make executable
+COPY scripts/start.sh ./scripts/start.sh
+RUN chmod +x ./scripts/start.sh
 
 # Set ownership to app user
 RUN chown -R nodejs:nodejs /app

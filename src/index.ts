@@ -9,6 +9,11 @@ import authRoutes from './auth/auth.routes';
 import workflowRoutes from './api/workflows';
 import notionRoutes from './api/notion';
 
+console.log('🚀 Initializing Nubabel Platform...');
+console.log(`📍 Node version: ${process.version}`);
+console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`📍 Port: ${process.env.PORT || '3000'}`);
+
 const app = express();
 const port = parseInt(process.env.PORT || '3000', 10);
 
@@ -68,19 +73,23 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
+console.log(`🌐 Starting server on 0.0.0.0:${port}...`);
+
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${port}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Base URL: ${process.env.BASE_URL || 'http://localhost:3000'}`);
-  console.log(`Health check: http://0.0.0.0:${port}/health`);
+  console.log(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✅ Base URL: ${process.env.BASE_URL || 'http://localhost:3000'}`);
+  console.log(`✅ Health check endpoint: /health`);
+  console.log(`✅ Ready to accept connections`);
 });
 
 server.on('error', (error: any) => {
-  console.error('❌ Server failed to start:', error);
-  console.error('Error code:', error.code);
-  console.error('Error message:', error.message);
+  console.error('❌ Server failed to start');
+  console.error(`❌ Error code: ${error.code}`);
+  console.error(`❌ Error message: ${error.message}`);
+  console.error(`❌ Stack trace:`, error.stack);
   if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is already in use`);
+    console.error(`❌ Port ${port} is already in use`);
   }
   process.exit(1);
 });
