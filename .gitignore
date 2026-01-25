@@ -63,3 +63,7 @@ temp/
 # Misc
 .cache/
 .turbo/
+
+# Embedded git repositories
+corp-system/
+oh-my-opencode/
