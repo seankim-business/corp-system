@@ -37,6 +37,7 @@ model Organization {
   kpis              KPI[]
   workflows         Workflow[]
   notionConnections NotionConnection[]
+  mcpConnections    MCPConnection[]
 
   @@map("organizations")
 }
@@ -106,16 +107,21 @@ model WorkspaceDomain {
   @@map("workspace_domains")
 }
 
-/// Sessions (Optional - JWT can be stateless)
-/// Tracks active user sessions per organization
+/// Sessions (Enhanced for Orchestrator + JWT)
+/// Tracks both authentication sessions AND orchestrator conversation sessions
 model Session {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @db.VarChar(255) // Can be UUID or ses_xxx format
   userId         String   @map("user_id") @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
-  tokenHash      String   @unique @map("token_hash") @db.VarChar(255)
+  tokenHash      String?  @unique @map("token_hash") @db.VarChar(255) // NULL for orchestrator sessions
+  source         String?  @db.VarChar(50) // slack, web, terminal, api (for orchestrator)
+  state          Json     @default("{}") @db.JsonB // Orchestrator state
+  history        Json     @default("[]") @db.JsonB // Conversation history
+  metadata       Json     @default("{}") @db.JsonB // Additional data
   expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   lastUsedAt     DateTime @default(now()) @map("last_used_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -123,6 +129,8 @@ model Session {
   @@index([userId])
   @@index([organizationId])
   @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([source])
   @@map("sessions")
 }
 
@@ -359,10 +367,29 @@ model WorkflowExecution {
 }
 
 // ============================================================================
-// MCP INTEGRATION TABLES (Phase 2 Week 5-8)
+// MCP INTEGRATION TABLES (Phase 2 Week 9-12)
 // ============================================================================
 
-/// Notion Connections (Organization-level Notion integration)
+/// Generic MCP Connections (Organization-level integrations)
+/// Supports: Notion, Linear, Jira, Asana, Airtable, etc.
+model MCPConnection {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  provider       String   @db.VarChar(100) // notion, linear, jira, asana, airtable, etc.
+  name           String   @db.VarChar(255) // User-friendly name
+  config         Json     @db.JsonB // Provider-specific config (API keys, tokens, etc.)
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([provider])
+  @@map("mcp_connections")
+}
+
+/// Legacy Notion Connections (Backward compatibility)
 model NotionConnection {
   id                String   @id @default(uuid()) @db.Uuid
   organizationId    String   @map("organization_id") @db.Uuid

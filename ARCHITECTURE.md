@@ -62,12 +62,12 @@ Kyndof Corp System은 **레이어드 아키텍처**와 **플러그인 아키텍�
 ```typescript
 // 어떤 인터페이스든 동일한 명령 객체 사용
 interface Command {
-  type: string;           // 'execute_automation', 'create_task', 'approve_request'
-  payload: unknown;       // 명령 데이터
+  type: string; // 'execute_automation', 'create_task', 'approve_request'
+  payload: unknown; // 명령 데이터
   context: {
     userId: string;
     sessionId: string;
-    source: 'slack' | 'web' | 'terminal' | 'api';
+    source: "slack" | "web" | "terminal" | "api";
   };
 }
 
@@ -115,12 +115,12 @@ interface DomainEvent {
 
 // 이벤트 발행
 eventBus.publish({
-  eventType: 'AUTOMATION_COMPLETED',
-  payload: { automationId, result }
+  eventType: "AUTOMATION_COMPLETED",
+  payload: { automationId, result },
 });
 
 // 이벤트 구독
-eventBus.subscribe('AUTOMATION_COMPLETED', async (event) => {
+eventBus.subscribe("AUTOMATION_COMPLETED", async (event) => {
   await notificationService.notify(event);
   await ssotSyncService.syncToGitHub(event);
 });
@@ -165,6 +165,7 @@ eventBus.subscribe('AUTOMATION_COMPLETED', async (event) => {
 ```
 
 **공통 책임**:
+
 - 입력 파싱 및 검증
 - Command 생성
 - 결과 포맷팅 및 응답
@@ -290,37 +291,37 @@ class Atlas {
   async orchestrate(plan: Plan, context: ExecutionContext): Promise<Result> {
     // 1. Plan 파싱
     const steps = this.parsePlan(plan);
-    
+
     // 2. 각 단계별 실행
     for (const step of steps) {
       // 2.1 Agent 선택 (Category + Skills)
       const agent = await this.selectAgent(step);
-      
+
       // 2.2 Delegation (Background or Sync)
-      const result = step.background 
+      const result = step.background
         ? await this.delegateBackground(agent, step)
         : await this.delegateSync(agent, step);
-      
+
       // 2.3 결과 검증
       if (!this.validate(result, step.expectedOutcome)) {
         await this.handleFailure(step, result);
       }
-      
+
       // 2.4 Session 저장 (재사용을 위해)
       await this.saveSession(agent.sessionId, result);
     }
-    
+
     // 3. 최종 결과 조합
     return this.aggregateResults(steps);
   }
-  
+
   private async selectAgent(step: Step): Promise<Agent> {
     // Category 기반 모델 선택
     const model = this.getModelForCategory(step.category);
-    
+
     // Skills 로딩
     const skills = await this.loadSkills(step.requiredSkills);
-    
+
     return new Agent({ model, skills });
   }
 }
@@ -333,39 +334,39 @@ class Atlas {
 ```typescript
 class PermissionEngine {
   async checkPermission(
-    user: User, 
-    action: Action, 
-    context: Context
+    user: User,
+    action: Action,
+    context: Context,
   ): Promise<PermissionResult> {
     // 1. 조직 구조에서 사용자 역할 조회
     const roles = await this.getRoles(user, context);
-    
+
     // 2. RABSIC 매트릭스 확인
     const rabsic = await this.getRabsicMatrix(action.domain);
-    
+
     // 3. 권한 확인
     for (const role of roles) {
       // Responsible: 실행 권한
       if (rabsic.responsible.includes(role)) {
         return { allowed: true, requiresApproval: false };
       }
-      
+
       // Accountable: 승인 필요
       if (rabsic.accountable.includes(role)) {
         return { allowed: true, requiresApproval: true };
       }
     }
-    
+
     // 4. Backup 체크 (Primary 부재 시)
     if (await this.isPrimaryAbsent(rabsic.responsible)) {
       if (rabsic.backup.includes(user.role)) {
         return { allowed: true, requiresApproval: false };
       }
     }
-    
+
     return { allowed: false };
   }
-  
+
   async routeApproval(request: ApprovalRequest): Promise<void> {
     // Accountable 역할자에게 승인 요청 라우팅
     const approvers = await this.getAccountable(request.domain);
@@ -374,53 +375,290 @@ class PermissionEngine {
 }
 ```
 
-### 3. Session Manager
+### 3. Session Manager (Enhanced)
 
-**책임**: 인터페이스 독립적 세션 관리
+**책임**: 인터페이스 독립적 세션 관리 + AI 대화 컨텍스트
+
+#### 2-Tier Storage Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Redis (Hot Storage)                                     │
+│  - Active sessions (< 1 hour old)                       │
+│  - TTL: 3600 seconds                                    │
+│  - Purpose: Fast read/write for active conversations    │
+└─────────────────────────────────────────────────────────┘
+                          │
+                  Async write-through
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│ PostgreSQL (Cold Storage)                               │
+│  - All sessions (permanent)                             │
+│  - Purpose: History, analytics, recovery                │
+│  - Indexed by: userId, organizationId, createdAt        │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Implementation
 
 ```typescript
+import Redis from "ioredis";
+import { PrismaClient } from "@prisma/client";
+
 class SessionManager {
+  private redis: Redis;
+  private db: PrismaClient;
+
   async createSession(context: SessionContext): Promise<Session> {
     const session = {
-      sessionId: generateId(),
+      id: `ses_${Date.now()}_${randomString(8)}`, // ses_xxx format
       userId: context.userId,
+      organizationId: context.organizationId,
       source: context.source, // 'slack' | 'web' | 'terminal' | 'api'
+
+      // AI orchestrator state
       state: {},
       history: [],
+      metadata: {
+        // Source-specific tracking
+        slackThreadTs: context.slackThreadTs,
+        userAgent: context.userAgent,
+      },
+
       createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 3600000), // 1 hour
     };
-    
-    // Redis (hot) + PostgreSQL (cold)
-    await this.redis.set(`session:${session.sessionId}`, session, 'EX', 3600);
-    await this.db.sessions.create(session);
-    
+
+    // Write to both (write-through pattern)
+    await Promise.all([
+      this.redis.setex(`session:${session.id}`, 3600, JSON.stringify(session)),
+      this.db.session.create({ data: session }),
+    ]);
+
     return session;
   }
-  
-  async restoreSession(sessionId: string): Promise<Session> {
-    // Redis 먼저 확인
-    let session = await this.redis.get(`session:${sessionId}`);
-    
-    if (!session) {
-      // PostgreSQL에서 복원
-      session = await this.db.sessions.findOne({ sessionId });
-      
-      // Redis에 다시 캐싱
-      await this.redis.set(`session:${sessionId}`, session, 'EX', 3600);
+
+  async restoreSession(sessionId: string): Promise<Session | null> {
+    // Try Redis first (hot path)
+    const cached = await this.redis.get(`session:${sessionId}`);
+    if (cached) {
+      return JSON.parse(cached);
     }
-    
+
+    // Fallback to PostgreSQL (cold path)
+    const session = await this.db.session.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) return null;
+
+    // Rehydrate to Redis (cache warm-up)
+    const ttl = Math.max(
+      0,
+      Math.floor((session.expiresAt.getTime() - Date.now()) / 1000),
+    );
+
+    if (ttl > 0) {
+      await this.redis.setex(
+        `session:${sessionId}`,
+        ttl,
+        JSON.stringify(session),
+      );
+    }
+
     return session;
   }
-  
-  async switchInterface(
-    sessionId: string, 
-    newSource: 'slack' | 'web' | 'terminal' | 'api'
+
+  async updateSessionHistory(
+    sessionId: string,
+    message: { role: "user" | "assistant"; content: string },
   ): Promise<void> {
-    // 세션 유지한 채 인터페이스만 변경
     const session = await this.restoreSession(sessionId);
+    if (!session) throw new Error("Session not found");
+
+    session.history.push(message);
+
+    // Update both storages
+    await Promise.all([
+      this.redis.setex(`session:${sessionId}`, 3600, JSON.stringify(session)),
+      this.db.session.update({
+        where: { id: sessionId },
+        data: { history: session.history },
+      }),
+    ]);
+  }
+
+  async switchInterface(
+    sessionId: string,
+    newSource: "slack" | "web" | "terminal" | "api",
+    newMetadata?: Record<string, unknown>,
+  ): Promise<void> {
+    const session = await this.restoreSession(sessionId);
+    if (!session) throw new Error("Session not found");
+
+    // Preserve conversation history, just change interface
     session.source = newSource;
+    session.metadata = { ...session.metadata, ...newMetadata };
+
     await this.saveSession(session);
   }
+
+  private async saveSession(session: Session): Promise<void> {
+    await Promise.all([
+      this.redis.setex(`session:${session.id}`, 3600, JSON.stringify(session)),
+      this.db.session.update({
+        where: { id: session.id },
+        data: session,
+      }),
+    ]);
+  }
+}
+```
+
+#### Cross-Interface Continuity
+
+**Use Case**: User starts in Slack, continues on Web
+
+```typescript
+// 1. User mentions bot in Slack
+const slackSession = await sessionManager.createSession({
+  userId: user.id,
+  organizationId: user.organizationId,
+  source: "slack",
+  slackThreadTs: event.ts,
+});
+
+// 2. Bot processes request, stores conversation
+await sessionManager.updateSessionHistory(slackSession.id, {
+  role: "user",
+  content: "Create a task in Notion",
+});
+
+await sessionManager.updateSessionHistory(slackSession.id, {
+  role: "assistant",
+  content: 'Created task "New Feature" in Notion',
+});
+
+// 3. User opens web dashboard, sees same conversation
+const webSession = await sessionManager.restoreSession(slackSession.id);
+// webSession.history contains full Slack conversation
+
+// 4. User continues in web interface
+await sessionManager.switchInterface(slackSession.id, "web", {
+  userAgent: req.headers["user-agent"],
+});
+```
+
+### 4. MCP Integration System
+
+**책임**: Model Context Protocol 기반 다중 도구 통합
+
+#### MCP Server Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Nubabel MCP Registry                                    │
+│  - Dynamic tool aggregation from multiple providers     │
+│  - Namespace management (notion__getTasks, etc.)        │
+│  - Connection health monitoring                         │
+└─────────────────────────────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+    ┌──────────┐    ┌──────────┐    ┌──────────┐
+    │ Notion   │    │ Slack    │    │ Linear   │
+    │ MCP      │    │ MCP      │    │ MCP      │
+    └──────────┘    └──────────┘    └──────────┘
+```
+
+**핵심 패턴**: Tool Aggregation & Dynamic Registration
+
+```typescript
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+
+class MCPRegistry {
+  private servers: Map<string, Server> = new Map();
+
+  async registerProvider(provider: string, config: MCPConfig): Promise<void> {
+    const server = new Server({
+      name: `nubabel-${provider}`,
+      version: "1.0.0",
+    });
+
+    // Load provider-specific tools
+    const tools = await this.loadProviderTools(provider, config);
+
+    server.setRequestHandler(ListToolsRequestSchema, () => ({
+      tools: tools.map((tool) => ({
+        ...tool,
+        name: `${provider}__${tool.name}`, // Namespace by provider
+      })),
+    }));
+
+    this.servers.set(provider, server);
+  }
+
+  async aggregateTools(organizationId: string): Promise<Tool[]> {
+    // Get active MCP connections for organization
+    const connections = await db.mcpConnection.findMany({
+      where: { organizationId, enabled: true },
+    });
+
+    // Aggregate tools from all providers
+    return connections.flatMap(
+      (conn) => this.servers.get(conn.provider)?.listTools() || [],
+    );
+  }
+
+  async callTool(name: string, args: unknown, orgId: string): Promise<unknown> {
+    const [provider, toolName] = name.split("__");
+
+    // Verify organization has access to this provider
+    const hasAccess = await this.verifyAccess(provider, orgId);
+    if (!hasAccess) throw new Error("Access denied");
+
+    const server = this.servers.get(provider);
+    return await server.callTool(toolName, args);
+  }
+}
+```
+
+#### Multi-Tenant Authentication
+
+**Per-Organization Credentials**:
+
+```typescript
+// MCPConnection table stores credentials per organization
+model MCPConnection {
+  id             String   @id @default(uuid())
+  organizationId String
+  provider       String   // 'notion', 'slack', 'linear', etc.
+  enabled        Boolean  @default(true)
+
+  // Encrypted credentials
+  apiKey         String?  // For API key auth
+  accessToken    String?  // For OAuth
+  refreshToken   String?  // For token refresh
+
+  config         Json     // Provider-specific config
+
+  @@unique([organizationId, provider])
+}
+
+// Usage in MCP server
+async function getCredentials(provider: string, orgId: string) {
+  const conn = await db.mcpConnection.findUnique({
+    where: { organizationId_provider: { organizationId: orgId, provider } },
+  });
+
+  if (!conn) throw new Error(`${provider} not connected`);
+
+  return {
+    apiKey: decrypt(conn.apiKey),
+    accessToken: decrypt(conn.accessToken),
+  };
 }
 ```
 
@@ -431,39 +669,42 @@ class SessionManager {
 ```typescript
 class WorkflowModuleSystem {
   private gateways: Map<string, WorkflowGateway> = new Map([
-    ['n8n', new N8nGateway()],
-    ['comfyui', new ComfyUIGateway()],
-    ['blender', new BlenderGateway()],
-    ['clo3d', new Clo3DGateway()],
+    ["n8n", new N8nGateway()],
+    ["comfyui", new ComfyUIGateway()],
+    ["blender", new BlenderGateway()],
+    ["clo3d", new Clo3DGateway()],
   ]);
-  
-  async executeModule(module: WorkflowModule, input: unknown): Promise<unknown> {
+
+  async executeModule(
+    module: WorkflowModule,
+    input: unknown,
+  ): Promise<unknown> {
     // 1. 모듈 유효성 확인
     this.validateModule(module);
-    
+
     // 2. Gateway 선택
     const gateway = this.gateways.get(module.engine);
-    
+
     // 3. 실행
     const result = await gateway.execute({
       workflowId: module.workflowId,
       input: input,
     });
-    
+
     // 4. 결과 변환 (표준 형식으로)
     return this.transformResult(result, module.outputSchema);
   }
-  
+
   async registerModule(definition: ModuleDefinition): Promise<void> {
     // 1. YAML 파싱
     const module = this.parseYaml(definition);
-    
+
     // 2. 스키마 검증
     this.validateSchema(module);
-    
+
     // 3. Registry 등록
     await this.registry.register(module);
-    
+
     // 4. MCP Tool로 자동 등록 (Agent가 사용 가능하도록)
     await this.mcpServer.registerTool({
       name: module.name,
@@ -471,9 +712,9 @@ class WorkflowModuleSystem {
       inputSchema: module.inputSchema,
       handler: (input) => this.executeModule(module, input),
     });
-    
+
     // 5. Hot Reload 트리거
-    this.eventBus.publish({ eventType: 'MODULE_REGISTERED', payload: module });
+    this.eventBus.publish({ eventType: "MODULE_REGISTERED", payload: module });
   }
 }
 ```
@@ -487,19 +728,19 @@ class PhysicalWorldIntegration {
   async trackProduction(workOrder: WorkOrder): Promise<ProductionCycle> {
     const cycle = await this.db.productionCycles.create({
       workOrderId: workOrder.id,
-      status: 'in_progress',
+      status: "in_progress",
       steps: [],
     });
-    
+
     // 각 단계 추적
     for (const step of workOrder.steps) {
       const stepResult = await this.executePhysicalStep(step, cycle);
       cycle.steps.push(stepResult);
-      
+
       // 품질 검사
       if (step.requiresQualityCheck) {
         const qcResult = await this.qualityInspector.inspect(stepResult);
-        
+
         if (!qcResult.passed) {
           // 학습 데이터 수집
           await this.learningSystem.recordFailure({
@@ -509,26 +750,26 @@ class PhysicalWorldIntegration {
             digitalSpec: step.spec,
             physicalResult: stepResult.measurements,
           });
-          
+
           // 재작업 or 디자인 수정
           await this.handleQualityFailure(cycle, step, qcResult);
         }
       }
     }
-    
+
     return cycle;
   }
-  
+
   async qualityInspect(image: Buffer): Promise<QualityCheckResult> {
     // AI Vision으로 결함 감지
     const defects = await this.visionModel.detectDefects(image);
-    
+
     // 측정값 추출
     const measurements = await this.visionModel.extractMeasurements(image);
-    
+
     // 품질 기준과 비교
     const passed = this.checkQualityStandards(defects, measurements);
-    
+
     return { passed, defects, measurements };
   }
 }
@@ -549,33 +790,33 @@ class LearningSystem {
       humanCorrection: feedback.humanCorrection,
       timestamp: new Date(),
     });
-    
+
     // 2. 300 사이클마다 재훈련 트리거
     const totalFeedback = await this.db.learningData.count();
     if (totalFeedback % 300 === 0) {
       await this.triggerRetraining();
     }
   }
-  
+
   async triggerRetraining(): Promise<void> {
     // 1. 학습 데이터 준비
     const trainingData = await this.prepareTrainingData();
-    
+
     // 2. Fine-tuning
     const newModel = await this.fineTune({
       baseModel: this.currentModel,
       trainingData,
       epochs: 3,
     });
-    
+
     // 3. 검증
     const accuracy = await this.validateModel(newModel);
-    
+
     // 4. 정확도 향상 시에만 배포
     if (accuracy > this.currentAccuracy) {
       await this.deployModel(newModel);
       this.currentAccuracy = accuracy;
-      
+
       // Dashboard 업데이트
       await this.updateDashboard({
         accuracy,
@@ -584,14 +825,14 @@ class LearningSystem {
       });
     }
   }
-  
+
   private async prepareTrainingData(): Promise<TrainingDataset> {
     // 사람의 수정 사항을 학습 데이터로 변환
     const corrections = await this.db.learningData.find({
-      type: 'correction',
+      type: "correction",
     });
-    
-    return corrections.map(c => ({
+
+    return corrections.map((c) => ({
       input: c.context + c.agentOutput,
       expectedOutput: c.humanCorrection,
       weight: this.calculateWeight(c), // 최근 피드백에 더 높은 가중치
@@ -728,7 +969,7 @@ Next Step
   ├─ 작업자 QR 스캔 → "봉제 시작"
   │
   ... (반복)
-  
+
   ▼
 Final QC
   │
@@ -821,27 +1062,87 @@ Dashboard Update
 └─────────┘         └─────────┘
 ```
 
-### 2. Background Job Processing
+### 2. Background Job Processing with BullMQ
 
-**긴 작업은 Background Queue로 처리**:
+**긴 작업은 BullMQ로 처리** (Slack 3초 timeout 극복):
+
+#### BullMQ Architecture
+
+```
+Slack Event → Acknowledge (< 100ms)
+            → Queue in BullMQ (Redis)
+            → Send "Processing..." message
+
+Background Worker → Execute AI Agent (30s+)
+                 → Send result to Slack thread
+```
+
+**핵심 특징**:
+
+- Redis Streams 기반 (이미 인프라에 Redis 있음)
+- Built-in retry with exponential backoff
+- Bull Board UI (내장 모니터링 대시보드)
+- Node.js native, TypeScript first-class support
+
+#### Job Queue Setup
 
 ```typescript
-// BullMQ 사용
-const queue = new Queue('workflow-execution', {
-  connection: redis,
+import { Queue, Worker } from "bullmq";
+
+const agentQueue = new Queue("ai-agent-tasks", {
+  connection: { host: "localhost", port: 6379 },
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 2000,
+      jitter: 0.5, // Add 0-50% variance to prevent thundering herd
+    },
+    removeOnComplete: 1000,
+    removeOnFail: 5000,
+  },
 });
 
-// Producer
-await queue.add('execute-comfyui', {
-  workflowId: 'product-image-gen',
-  input: {...},
+// Slack handler - acknowledge immediately
+app.event("app_mention", async ({ event, say }) => {
+  await say({ text: "🤖 Processing...", thread_ts: event.ts });
+
+  const job = await agentQueue.add("process-mention", {
+    userId: event.user,
+    channelId: event.channel,
+    threadTs: event.ts,
+    message: event.text,
+  });
 });
 
-// Worker (여러 인스턴스로 확장 가능)
-const worker = new Worker('workflow-execution', async (job) => {
-  const result = await workflowModule.execute(job.data);
-  return result;
-}, { connection: redis });
+// Worker - process in background (여러 인스턴스로 확장 가능)
+const worker = new Worker(
+  "ai-agent-tasks",
+  async (job) => {
+    const result = await executeAgentOrchestration(job.data);
+
+    await slackClient.chat.postMessage({
+      channel: job.data.channelId,
+      thread_ts: job.data.threadTs,
+      text: `✅ ${result.summary}`,
+    });
+  },
+  {
+    connection: { host: "localhost", port: 6379 },
+    concurrency: 5, // 동시 처리 작업 수
+  },
+);
+```
+
+#### Advanced Retry Strategy
+
+```typescript
+// Custom backoff for specific errors
+backoffStrategy: (attemptsMade, type, err) => {
+  if (err?.message.includes("rate_limit")) return 60000; // 1 min
+  if (err?.message.includes("invalid_auth")) return -1; // Stop retry
+  return Math.pow(2, attemptsMade - 1) * 1000; // Exponential
+};
 ```
 
 ### 3. Caching Strategy
@@ -915,14 +1216,14 @@ const slackAuth = async (event) => {
 
 // Web: JWT
 const webAuth = async (req) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.headers.authorization?.split(" ")[1];
   const payload = jwt.verify(token, SECRET);
   return payload.user;
 };
 
 // API: API Key
 const apiAuth = async (req) => {
-  const apiKey = req.headers['x-api-key'];
+  const apiKey = req.headers["x-api-key"];
   const user = await getUserByApiKey(apiKey);
   return user;
 };
@@ -945,7 +1246,7 @@ roles:
         accountable: true
       - action: execute-ads
         consulted: true
-  
+
   - name: Marketing Specialist
     rabsic:
       - action: create-campaign
@@ -966,10 +1267,13 @@ const encrypted = encrypt(sensitiveData, ENCRYPTION_KEY);
 await db.secrets.create({ data: encrypted });
 
 // In Transit: TLS/SSL
-const httpsServer = https.createServer({
-  key: fs.readFileSync('private-key.pem'),
-  cert: fs.readFileSync('certificate.pem'),
-}, app);
+const httpsServer = https.createServer(
+  {
+    key: fs.readFileSync("private-key.pem"),
+    cert: fs.readFileSync("certificate.pem"),
+  },
+  app,
+);
 ```
 
 ### 4. Audit Logging
@@ -979,8 +1283,8 @@ const httpsServer = https.createServer({
 ```typescript
 await auditLog.record({
   userId: user.id,
-  action: 'APPROVE_REQUEST',
-  resource: 'budget-request-123',
+  action: "APPROVE_REQUEST",
+  resource: "budget-request-123",
   timestamp: new Date(),
   metadata: {
     amount: 100000,
@@ -999,13 +1303,13 @@ await auditLog.record({
 
 ```typescript
 logger.info({
-  eventType: 'AGENT_EXECUTION_COMPLETED',
-  agentType: 'brand-agent',
-  sessionId: 'ses_abc123',
+  eventType: "AGENT_EXECUTION_COMPLETED",
+  agentType: "brand-agent",
+  sessionId: "ses_abc123",
   duration: 2340, // ms
   success: true,
   metadata: {
-    model: 'claude-sonnet-4.5',
+    model: "claude-sonnet-4.5",
     tokensUsed: 1234,
   },
 });
@@ -1018,19 +1322,19 @@ logger.info({
 ```typescript
 // Prometheus Metrics
 const executionDuration = new Histogram({
-  name: 'agent_execution_duration_seconds',
-  help: 'Agent execution duration',
-  labelNames: ['agent_type', 'success'],
+  name: "agent_execution_duration_seconds",
+  help: "Agent execution duration",
+  labelNames: ["agent_type", "success"],
 });
 
 const activeAgents = new Gauge({
-  name: 'active_agents_count',
-  help: 'Number of active agents',
+  name: "active_agents_count",
+  help: "Number of active agents",
 });
 
 const learningAccuracy = new Gauge({
-  name: 'learning_model_accuracy',
-  help: 'Current model accuracy',
+  name: "learning_model_accuracy",
+  help: "Current model accuracy",
 });
 ```
 
@@ -1039,12 +1343,12 @@ const learningAccuracy = new Gauge({
 **분산 추적 (OpenTelemetry)**:
 
 ```typescript
-const tracer = trace.getTracer('kyndof-corp-system');
+const tracer = trace.getTracer("kyndof-corp-system");
 
-const span = tracer.startSpan('execute-automation', {
+const span = tracer.startSpan("execute-automation", {
   attributes: {
-    'automation.id': automationId,
-    'user.id': userId,
+    "automation.id": automationId,
+    "user.id": userId,
   },
 });
 

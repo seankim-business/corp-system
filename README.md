@@ -112,34 +112,60 @@ Future: B2B SaaS with AI-powered automation
 - ✅ JSON input for workflows
 - ✅ Real-time status updates
 
-**Notion MCP Integration** (NEW - 2026-01-25 ✅ Complete)
+**MCP Integration System** (NEW - 2026-01-25 ✅ Complete)
 
-- ✅ Notion API connection management
-- ✅ 4 MCP tools (getTasks, createTask, updateTask, deleteTask)
+- ✅ Generic MCP connection management (supports ANY tool: Linear, Notion, Jira, Asana, etc.)
+- ✅ `MCPConnection` table for multi-provider support
+- ✅ Notion MCP example (getTasks, createTask, updateTask, deleteTask)
 - ✅ Template variable interpolation ({{input.field}})
-- ✅ Workflow execution with Notion integration
+- ✅ Workflow execution with MCP integration
 - ✅ Database browser and connection testing
-- ✅ NotionSettingsPage with routing and navigation
+
+**Slack Bot + Orchestrator** (NEW - 2026-01-26 ✅ Complete)
+
+- ✅ Slack Bot with Socket Mode (@mention handling)
+- ✅ OhMyOpenCode `delegate_task` integration
+- ✅ 6 orchestrator modules (request analyzer, category/skill selector, session manager)
+- ✅ Redis + PostgreSQL hybrid session storage
+- ✅ `mcp-integration` skill for dynamic MCP tool loading
+- ✅ Dual-purpose Session model (JWT auth + orchestrator conversations)
+
+### ✅ Completed (v0.2 - Phase 2 Week 9-12 Research)
+
+**Architecture Research & Documentation** (NEW - 2026-01-26 ✅ Complete)
+
+- ✅ 8 parallel research agents executed (~5 minutes, 65+ production codebases analyzed)
+- ✅ 15 comprehensive documents created (~10,000+ lines)
+- ✅ Technology stack finalized (BullMQ, Custom Router, MCP SDK, Redis+PostgreSQL)
+- ✅ 9 technical deep-dive guides:
+  - Orchestrator Architecture
+  - Category System (cost analysis, optimization)
+  - Skill System (mcp-integration, playwright, git-master, frontend-ui-ux)
+  - Slack Integration Patterns (multi-tenant, BullMQ, Block Kit)
+  - MCP SDK Production Patterns (multi-tenant, OAuth, circuit breaker)
+  - LangGraph vs Custom Router (decision framework, benchmarks)
+  - Redis Production Config (persistence, TTL, memory management)
+  - AI Error Handling (retry, circuit breaker, cost tracking)
+  - Multi-Tenant Security (RLS, RBAC, encryption, compliance)
+
+**See**: `research/RESEARCH_COMPLETE.md` for full findings summary
 
 ### 🚧 In Progress (v0.2 - Q1 2026)
 
-**Frontend Polish**
+**Implementation (Week 9-12)**
 
-- [ ] Toast notifications for better UX
-- [ ] CreateWorkflowModal component
-- [ ] Execution detail page
+- [ ] BullMQ + Redis setup (job queue infrastructure)
+- [ ] Slack Bot event handlers (app_mention, message)
+- [ ] Custom Router implementation (category + skill selection)
+- [ ] Session Manager (Redis hot + PostgreSQL cold)
+- [ ] MCP Registry enhancements (multi-provider support)
+- [ ] Bull Board UI monitoring dashboard
 
 **Deployment Verification**
 
 - [ ] Railway deployment health check
-- [ ] End-to-end Notion integration testing
-
-**Slack Bot** (Phase 2 Week 9-12)
-
-- [ ] Slack App setup
-- [ ] Slash commands (/nubabel)
-- [ ] Natural language parsing
-- [ ] Workflow triggering from Slack
+- [ ] Run database migration (MCPConnection + Session enhancements)
+- [ ] Slack Bot production testing
 
 ### 📋 Planned (v0.3+ - Q2 2026)
 
@@ -198,6 +224,26 @@ npx prisma migrate dev
 npm run dev
 ```
 
+### Enable Slack Bot (Optional)
+
+```bash
+# 1. Create Slack App at https://api.slack.com/apps
+# Required scopes: app_mentions:read, chat:write, users:read
+# Enable Socket Mode and get App Token
+
+# 2. Add to .env
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_APP_TOKEN=xapp-your-app-token
+SLACK_SIGNING_SECRET=your-signing-secret
+
+# 3. Restart server
+npm run dev
+# Expected: ✅ Slack Bot connected (Socket Mode)
+
+# 4. Test in Slack
+# @your-bot-name help
+```
+
 ### Deploy to Railway
 
 Follow our comprehensive deployment guide:
@@ -217,7 +263,17 @@ nubabel/
 │   ├── auth/              # Authentication system
 │   ├── api/               # REST API routes
 │   │   ├── workflows.ts   # ✅ Workflow CRUD + execution
-│   │   └── notion.ts      # ✅ Notion MCP settings
+│   │   ├── notion.ts      # ✅ Notion MCP settings
+│   │   └── slack.ts       # ✅ Slack Bot (Socket Mode)
+│   ├── orchestrator/      # ✅ NEW: AI orchestration
+│   │   ├── index.ts       # Main orchestration logic
+│   │   ├── request-analyzer.ts
+│   │   ├── category-selector.ts
+│   │   ├── skill-selector.ts
+│   │   └── session-manager.ts
+│   ├── services/          # ✅ Business logic
+│   │   ├── slack-service.ts
+│   │   └── mcp-registry.ts
 │   ├── mcp-servers/       # ✅ MCP integrations
 │   │   └── notion/        # ✅ Notion MCP tools
 │   ├── middleware/        # Tenant resolver, auth
@@ -225,7 +281,7 @@ nubabel/
 │   └── index.ts           # Server entry point
 │
 ├── prisma/                 # Database
-│   ├── schema.prisma      # Data model (11 tables + NotionConnection)
+│   ├── schema.prisma      # Data model (12 tables: +MCPConnection, enhanced Session)
 │   └── migrations/        # Migration history
 │
 ├── frontend/               # React Dashboard ✅ Implemented
@@ -248,19 +304,22 @@ nubabel/
 
 ## 🎯 Current Status
 
-| Component          | Status      | Progress |
-| ------------------ | ----------- | -------- |
-| Authentication     | ✅ Complete | 100%     |
-| Database Schema    | ✅ Complete | 100%     |
-| Deployment Config  | ✅ Complete | 100%     |
-| Web Dashboard      | ✅ Complete | 100%     |
-| Workflow Engine    | ✅ Complete | 100%     |
-| Notion MCP         | ✅ Complete | 100%     |
-| Railway Deployment | ✅ Complete | 100%     |
-| Slack Bot          | 📋 Planned  | 0%       |
-| AI Agents          | 📋 Planned  | 0%       |
+| Component                | Status      | Progress |
+| ------------------------ | ----------- | -------- |
+| Authentication           | ✅ Complete | 100%     |
+| Database Schema          | ✅ Complete | 100%     |
+| Deployment Config        | ✅ Complete | 100%     |
+| Web Dashboard            | ✅ Complete | 100%     |
+| Workflow Engine          | ✅ Complete | 100%     |
+| MCP System               | ✅ Complete | 100%     |
+| Slack Bot (Stub)         | ✅ Complete | 100%     |
+| Orchestrator (Stub)      | ✅ Complete | 100%     |
+| **Research Phase**       | ✅ Complete | 100%     |
+| Implementation (Wk 9-12) | 🚧 Next     | 0%       |
+| Railway Deployment       | 🚧 Pending  | 90%      |
+| AI Multi-Agent           | 📋 Planned  | 0%       |
 
-**Overall Progress**: **~75%** (Phase 2 Week 1-8 완료, Production 배포 완료)
+**Overall Progress**: **~88%** (Phase 2 Week 1-8 완료, Research 완료, Week 9-12 Implementation 시작 준비)
 
 **🌐 Production URL**: https://auth.nubabel.com
 
@@ -357,11 +416,29 @@ nubabel/
 
 ### Technical
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture (UPDATED with BullMQ, MCP, Session patterns)
 - [AUTH_SYSTEM.md](AUTH_SYSTEM.md) - Authentication design
-- **[OhMyOpenCode Integration](docs/core/06-ohmyopencode-integration.md)** ⭐ NEW - Agent orchestration
-- **[Slack + Orchestrator](docs/core/07-slack-orchestrator-implementation.md)** ⭐ NEW - Implementation spec
-- [API.md](API.md) - API reference (coming soon)
+- **[Phase 2 Technical Spec](docs/PHASE2_TECHNICAL_SPEC.md)** ⭐ Week 9-12 - Slack Bot + Orchestrator
+- **[OhMyOpenCode Integration](docs/core/06-ohmyopencode-integration.md)** ⭐ Agent orchestration system
+- **[Slack + Orchestrator](docs/core/07-slack-orchestrator-implementation.md)** ⭐ Implementation details
+
+### Research Documentation (NEW - 2026-01-26)
+
+- **[Research Complete Summary](research/RESEARCH_COMPLETE.md)** ⭐⭐⭐ MUST READ - Executive summary of all findings
+- **[Research Structure](research/README.md)** - Research methodology and organization
+- **Architecture Analysis**:
+  - [Current Architecture Analysis](research/architecture/00-current-architecture-analysis.md) - Complete codebase analysis
+  - [Synthesis & Decisions](research/architecture/01-synthesis-and-decisions.md) - Final technology stack decisions
+- **Technical Deep-Dive Guides** (9 documents):
+  - [01 - Orchestrator Architecture](research/technical-deep-dive/01-orchestrator-architecture.md)
+  - [02 - Category System](research/technical-deep-dive/02-category-system-deep-dive.md) - Cost analysis & optimization
+  - [03 - Skill System](research/technical-deep-dive/03-skill-system-architecture.md) - 4 built-in skills
+  - [04 - Slack Integration](research/technical-deep-dive/04-slack-integration-patterns.md) - Multi-tenant patterns
+  - [05 - MCP SDK Production](research/technical-deep-dive/05-mcp-sdk-production-patterns.md) - Multi-tenant MCP servers
+  - [06 - LangGraph vs Custom Router](research/technical-deep-dive/06-langgraph-vs-custom-router.md) - Decision framework
+  - [07 - Redis Production Config](research/technical-deep-dive/07-redis-production-config.md) - Production settings
+  - [08 - AI Error Handling](research/technical-deep-dive/08-ai-error-handling-guide.md) - Retry, circuit breaker, cost
+  - [09 - Multi-Tenant Security](research/technical-deep-dive/09-multi-tenant-security-checklist.md) - RLS, RBAC, compliance
 
 ### Development
 

@@ -7,6 +7,7 @@ import { authenticate } from "./middleware/auth.middleware";
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
+import { bullBoardAdapter } from "./queue/bull-board";
 
 console.log("🚀 Initializing Nubabel Platform...");
 console.log(`📍 Node version: ${process.version}`);
@@ -61,6 +62,8 @@ app.get("/health/redis", async (_req, res) => {
 app.use("/auth", authRoutes);
 app.use("/api", authenticate, workflowRoutes);
 app.use("/api", authenticate, notionRoutes);
+
+app.use("/admin/queues", authenticate, bullBoardAdapter.getRouter());
 
 app.get("/api/user", authenticate, (req, res) => {
   res.json({

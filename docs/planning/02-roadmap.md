@@ -26,12 +26,14 @@ Q3-Q4     Phase 4: Framework
 **목표**: 멀티테넌트 인프라 구축
 
 ### 완성된 것
+
 - ✅ Multi-tenant 인증 (Google Workspace OAuth)
 - ✅ Database schema with RLS
 - ✅ Docker deployment configuration
 - ✅ Railway 배포 준비 완료
 
 ### 성과
+
 - 완성도: **100%**
 - 배포만 하면 바로 사용 가능
 
@@ -44,63 +46,91 @@ Q3-Q4     Phase 4: Framework
 **기간**: 3개월 (2-4월)  
 **목표**: 사용자가 볼 수 있는 UI/UX 완성
 
-### Week 1-2: Web Dashboard
+### Week 1-2: Web Dashboard ✅ (완료)
+
 ```
 목표: 로그인 + 기본 대시보드
-├── 로그인 페이지 (Google OAuth UI)
-├── 대시보드 레이아웃
-├── 조직 전환기
-└── 설정 페이지
+├── 로그인 페이지 (Google OAuth UI) ✅
+├── 대시보드 레이아웃 (Header + Sidebar) ✅
+├── 조직 전환기 (OrganizationSwitcher) ✅
+└── 설정 페이지 (Profile, Organization, Security) ✅
 ```
 
 **결과물**:
-- 사용자가 로그인해서 대시보드 볼 수 있음
-- 조직 전환 가능
-- 프로필 설정 가능
 
-### Week 3-4: 첫 번째 워크플로우 (수동)
+- ✅ 사용자가 로그인해서 대시보드 볼 수 있음
+- ✅ 조직 전환 가능
+- ✅ 프로필 설정 가능
+
+### Week 3-4: 첫 번째 워크플로우 (수동) ✅ (완료)
+
 ```
 목표: 워크플로우 수동 실행
-├── 워크플로우 목록 보기
-├── 워크플로우 상세 보기
-├── 수동 실행 버튼
-└── 실행 로그 보기
+├── 워크플로우 목록 보기 ✅
+├── 워크플로우 상세 보기 ✅
+├── 수동 실행 버튼 (ExecuteWorkflowModal) ✅
+└── 실행 로그 보기 (ExecutionsPage) ✅
 ```
 
 **결과물**:
-- 사용자가 버튼 클릭으로 워크플로우 실행
-- 실행 결과 확인 가능
 
-### Week 5-8: Notion 연동
+- ✅ 사용자가 버튼 클릭으로 워크플로우 실행
+- ✅ 실행 결과 확인 가능 (pending → running → success/failed)
+
+### Week 5-8: Notion 연동 ✅ (완료 - 2026-01-25)
+
 ```
 목표: Notion MCP로 데이터 읽기/쓰기
-├── Notion MCP 서버 구현
-├── Task 목록 가져오기
-├── Task 생성/수정
-└── Dashboard에 표시
+├── Notion MCP 서버 구현 ✅
+├── Task 목록 가져오기 (getTasks) ✅
+├── Task 생성/수정 (createTask, updateTask) ✅
+├── Task 삭제 (deleteTask) ✅
+├── Notion API 연결 관리 ✅
+└── NotionSettingsPage UI ✅
 ```
 
 **결과물**:
-- Nubabel에서 Notion task 관리 가능
-- 양방향 동기화
 
-### Week 9-12: Slack Bot
+- ✅ Nubabel에서 Notion task 관리 가능
+- ✅ 워크플로우에서 Notion MCP 도구 사용
+- ✅ Template variable interpolation (`{{input.field}}`)
+
+### Week 9-12: Slack Bot + Orchestrator 🎯 (다음 단계)
+
 ```
-목표: Slack에서 워크플로우 실행
-├── Slack Bot 설정
+목표: Slack 자연어 → Agent 라우팅 → 워크플로우 실행
+├── Slack Bot 설정 (App 등록, 토큰)
+├── 기본 메시지 수신/응답
+├── Orchestrator 프로토타입 (OhMyOpenCode delegate_task)
+│   ├── 요청 분석 (의도 파악)
+│   ├── 라우팅 로직 (키워드 기반)
+│   └── 에이전트 실행 (category + skills)
 ├── 자연어 명령 파싱
-├── 워크플로우 트리거
-└── 결과 메시지 전송
+└── 결과 메시지 전송 (페르소나별)
 ```
 
+**기술 스택**:
+
+- **Agent Orchestration**: OhMyOpenCode `delegate_task`
+  - `category`: visual-engineering, ultrabrain, quick, etc.
+  - `load_skills`: playwright, git-master, frontend-ui-ux
+  - `session_id`: 세션 연속성
+- **Workflow**: LangGraph (향후 - 복잡한 멀티 에이전트 시)
+- **Slack SDK**: Bolt for JavaScript
+
 **결과물**:
-- Slack에서 "@nubabel 태스크 생성" 가능
+
+- Slack에서 "@company-os 태스크 생성" 가능
+- Orchestrator가 적절한 에이전트로 라우팅
+- 멀티 에이전트 협업 기초 (순차/병렬)
 - 자동화 시작점
 
 **Phase 2 성공 기준**:
-- [ ] 로그인 → 대시보드 → 워크플로우 실행 → 결과 확인
-- [ ] Notion에서 task 보임
-- [ ] Slack에서 명령 가능
+
+- [x] 로그인 → 대시보드 → 워크플로우 실행 → 결과 확인 ✅
+- [x] Notion에서 task 보임 ✅
+- [ ] Slack에서 "@company-os" 멘션으로 명령 가능 ⏳
+- [ ] Orchestrator가 요청을 분석해 적절한 에이전트로 라우팅 ⏳
 
 상세: [phase-2-spec.md](phase-2-spec.md)
 
@@ -112,6 +142,7 @@ Q3-Q4     Phase 4: Framework
 **목표**: 간단한 AI Agent 추가
 
 ### Month 1: Agent MVP
+
 ```
 단일 Function Agent
 ├── Task 정의 (JSON)
@@ -121,6 +152,7 @@ Q3-Q4     Phase 4: Framework
 ```
 
 **예시**:
+
 ```json
 {
   "task": "Create Notion task",
@@ -130,6 +162,7 @@ Q3-Q4     Phase 4: Framework
 ```
 
 ### Month 2: Background Execution
+
 ```
 Background Job Queue
 ├── Task 큐에 추가
@@ -139,6 +172,7 @@ Background Job Queue
 ```
 
 ### Month 3: Error Handling
+
 ```
 Retry & Recovery
 ├── 실패 시 재시도
@@ -148,6 +182,7 @@ Retry & Recovery
 ```
 
 **Phase 3 성공 기준**:
+
 - [ ] Agent가 자동으로 Notion task 생성
 - [ ] 실패 시 재시도
 - [ ] 로그에서 전체 과정 추적 가능
@@ -162,6 +197,7 @@ Retry & Recovery
 **목표**: Extension 시스템 완성 + 첫 외부 고객
 
 ### Q3: Extension System
+
 ```
 Plugin Architecture
 ├── Hook 시스템 구현
@@ -171,6 +207,7 @@ Plugin Architecture
 ```
 
 ### Q4: External Customer
+
 ```
 첫 외부 고객 준비
 ├── 일반화된 기능만 Core에
@@ -180,6 +217,7 @@ Plugin Architecture
 ```
 
 **Phase 4 성공 기준**:
+
 - [ ] Kyndof 특수 기능이 Extension으로 분리됨
 - [ ] 다른 회사가 자기 Extension 만들 수 있음
 - [ ] 첫 외부 고객 3개 사용 시작
@@ -194,6 +232,7 @@ Plugin Architecture
 **목표**: "Human as Training Data" 실현
 
 ### Step 1: Activity Tracking
+
 ```
 사용자 행동 기록
 ├── Screen recording (옵션)
@@ -203,6 +242,7 @@ Plugin Architecture
 ```
 
 ### Step 2: Pattern Detection
+
 ```
 패턴 감지
 ├── 반복 작업 발견
@@ -212,6 +252,7 @@ Plugin Architecture
 ```
 
 ### Step 3: Learning Loop
+
 ```
 지속적 학습
 ├── 사람 피드백 수집
@@ -221,6 +262,7 @@ Plugin Architecture
 ```
 
 **Phase 5 성공 기준**:
+
 - [ ] 사용자 작업 패턴 자동 감지
 - [ ] 자동화 제안 정확도 80%+
 - [ ] 사람 개입 < 20%
@@ -232,40 +274,66 @@ Plugin Architecture
 ## 🎯 현재 위치
 
 ```
-━━━━━━━━━━░░░░░░░░░░░░░░░░░░░░░░░░░░ 10%
+━━━━━━━━━━━━━━░░░░░░░░░░░░░░░░░░░░░░ 70%
 
 Phase 1: ████████████████████ 100% ✅
-Phase 2: ░░░░░░░░░░░░░░░░░░░░   0% 🎯
+Phase 2: ██████████████░░░░░░  70% 🎯 (Week 9-12 진행 중)
 Phase 3: ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4: ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 5: ░░░░░░░░░░░░░░░░░░░░   0%
 ```
 
-**지금**: Phase 2 Web Dashboard 개발 시작
+**완료**:
+
+- ✅ Phase 1: 멀티테넌트 인프라 (100%)
+- ✅ Phase 2 Week 1-2: Web Dashboard (100%)
+- ✅ Phase 2 Week 3-4: Workflow 시스템 (100%)
+- ✅ Phase 2 Week 5-8: Notion MCP 통합 (100%)
+
+**지금**: Phase 2 Week 9-12 - Slack Bot + Orchestrator 개발
 
 ---
 
 ## 📊 마일스톤
 
-| 시기 | 마일스톤 | 설명 |
-|------|----------|------|
-| 1월 | MVP 완성 | 인증 + DB |
-| 3월 | Dashboard 완성 | UI/UX 사용 가능 |
-| 4월 | Notion 연동 | 첫 실제 자동화 |
-| 7월 | AI Agent | 간단한 지능 추가 |
-| 12월 | Extension System | 외부 판매 준비 |
-| 2027 | Learning | 장기 비전 시작 |
+| 시기 | 마일스톤         | 설명             |
+| ---- | ---------------- | ---------------- |
+| 1월  | MVP 완성         | 인증 + DB        |
+| 3월  | Dashboard 완성   | UI/UX 사용 가능  |
+| 4월  | Notion 연동      | 첫 실제 자동화   |
+| 7월  | AI Agent         | 간단한 지능 추가 |
+| 12월 | Extension System | 외부 판매 준비   |
+| 2027 | Learning         | 장기 비전 시작   |
 
 ---
 
 ## 🚀 다음 단계
 
-**즉시**:
-1. Railway 배포 완료
-2. Frontend 개발 환경 셋업
-3. Phase 2 Week 1 시작
+**즉시 (이번 주)**:
+
+1. ~~Railway 배포 완료~~ (대기 중 - 수동 단계)
+2. **Slack Bot 개발 시작** 🎯
+   - Slack App 생성 (tokens, scopes)
+   - 기본 메시지 수신/응답 구현
+   - `@company-os` 멘션 파싱
+
+**단기 (1-2주)**: 3. **Orchestrator 프로토타입**
+
+- OhMyOpenCode `delegate_task` 통합
+- 요청 분석 로직 (의도 파악, 키워드 매칭)
+- 라우팅 규칙 정의 (category + skills)
+- 첫 에이전트 실행 (Brand Agent 또는 Notion Agent)
+
+**중기 (1개월)**: 4. **Phase 2 완료**
+
+- Slack → Orchestrator → Agent → Notion 전체 플로우
+- 멀티 에이전트 협업 (순차/병렬)
+- 사람 개입 포인트 (Human-in-the-Loop)
 
 **참조**:
+
+- **[OhMyOpenCode 통합 설계](../core/06-ohmyopencode-integration.md)** ⭐ NEW - delegate_task API, Category/Skill 시스템
+- **[Slack + Orchestrator 구현](../core/07-slack-orchestrator-implementation.md)** ⭐ NEW - 상세 구현 명세
 - [Phase 2 상세 스펙](phase-2-spec.md)
-- [Frontend 셋업](../frontend/01-setup.md)
-- [Deployment 가이드](../deployment/01-railway.md)
+- [Slack Bot 전략](../../plan/07-slack-ux/bot-strategy.md)
+- [Orchestrator 설계](../../plan/06-multi-agent/orchestrator.md)
