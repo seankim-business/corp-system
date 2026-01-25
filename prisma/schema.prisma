@@ -35,6 +35,7 @@ model Organization {
   goals            Goal[]
   valueStreams     ValueStream[]
   kpis             KPI[]
+  workflows        Workflow[]
 
   @@map("organizations")
 }
@@ -311,4 +312,47 @@ model KPI {
 
   @@index([organizationId, id])
   @@map("kpis")
+}
+
+// ============================================================================
+// WORKFLOW AUTOMATION TABLES (Phase 2 Week 3-4)
+// ============================================================================
+
+/// Workflows (Automation definitions)
+model Workflow {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(255)
+  description    String?  @db.Text
+  config         Json     @default("{}") @db.JsonB
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions   WorkflowExecution[]
+
+  @@index([organizationId])
+  @@index([organizationId, enabled])
+  @@map("workflows")
+}
+
+/// Workflow Executions (Execution history)
+model WorkflowExecution {
+  id           String    @id @default(uuid()) @db.Uuid
+  workflowId   String    @map("workflow_id") @db.Uuid
+  status       String    @db.VarChar(50)
+  inputData    Json?     @map("input_data") @db.JsonB
+  outputData   Json?     @map("output_data") @db.JsonB
+  errorMessage String?   @map("error_message") @db.Text
+  startedAt    DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("workflow_executions")
 }

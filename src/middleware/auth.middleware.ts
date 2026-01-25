@@ -39,7 +39,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return res.status(403).json({ error: 'Membership not found' });
     }
 
-    req.user = user;
+    req.user = { ...user, organizationId: payload.organizationId };
     req.membership = membership;
     req.currentOrganizationId = payload.organizationId;
 

@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { resolveTenant } from './middleware/tenant.middleware';
 import { authenticate } from './middleware/auth.middleware';
 import authRoutes from './auth/auth.routes';
+import workflowRoutes from './api/workflows';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -22,6 +23,7 @@ app.use(cookieParser());
 app.use(resolveTenant);
 
 app.use('/auth', authRoutes);
+app.use('/api', authenticate, workflowRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
