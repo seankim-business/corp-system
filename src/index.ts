@@ -3,7 +3,6 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import { resolveTenant } from "./middleware/tenant.middleware";
 import { authenticate } from "./middleware/auth.middleware";
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
@@ -58,9 +57,6 @@ app.get("/health/redis", async (_req, res) => {
       .json({ status: "error", service: "redis", error: String(error) });
   }
 });
-
-// Apply tenant resolution to all routes below
-app.use(resolveTenant);
 
 app.use("/auth", authRoutes);
 app.use("/api", authenticate, workflowRoutes);
