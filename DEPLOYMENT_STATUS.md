@@ -6,7 +6,15 @@
 
 ---
 
-## Current Status: Ready for Manual Deployment
+## Current Status: Fixing Railway Deployment Issues
+
+### 🔴 Current Issue (2026-01-25 22:20 KST)
+- Build succeeds but healthcheck fails
+- Server not responding on /health endpoint
+- Root cause: app.listen() not binding to 0.0.0.0 (Railway requirement)
+- Fix in progress: Update server binding + error handling
+
+## Previous Status: Ready for Manual Deployment
 
 ### ✅ Completed
 

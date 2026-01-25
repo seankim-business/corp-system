@@ -10,7 +10,7 @@ import workflowRoutes from './api/workflows';
 import notionRoutes from './api/notion';
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = parseInt(process.env.PORT || '3000', 10);
 
 app.use(helmet());
 app.use(cors({
@@ -68,8 +68,36 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`✅ Server running on port ${port}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Base URL: ${process.env.BASE_URL || 'http://localhost:3000'}`);
+  console.log(`Health check: http://0.0.0.0:${port}/health`);
+});
+
+server.on('error', (error: any) => {
+  console.error('❌ Server failed to start:', error);
+  console.error('Error code:', error.code);
+  console.error('Error message:', error.message);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use`);
+  }
+  process.exit(1);
+});
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
 });
