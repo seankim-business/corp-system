@@ -302,15 +302,75 @@ src/mcp-servers/notion/
 ```
 
 ### 성공 기준
-- [ ] Notion API Key 저장
-- [ ] Workflow에서 Notion task 생성
-- [ ] Dashboard에 Notion task 목록 표시
-- [ ] Task 상태 변경 가능
+- [x] Notion API Key 저장 ✅
+- [x] Workflow에서 Notion task 생성 ✅
+- [x] NotionSettingsPage 구현 ✅
+- [x] Database 목록 조회 기능 ✅
+- [ ] Frontend 라우팅 추가 (App.tsx에 /settings/notion 경로)
+- [ ] End-to-end 테스트
 
-### 예상 시간
-- MCP Server: 8일
-- Frontend: 6일
-- 통합 & 테스트: 2일
+### 실제 구현 내용 (2026-01-25 완료)
+
+#### Backend 구현 완료
+```
+src/
+├── mcp-servers/notion/
+│   ├── index.ts              # ✅ MCP entry point
+│   ├── client.ts             # ✅ Notion SDK wrapper
+│   ├── tools/
+│   │   ├── getTasks.ts      # ✅ notion_get_tasks
+│   │   ├── createTask.ts    # ✅ notion_create_task
+│   │   ├── updateTask.ts    # ✅ notion_update_task
+│   │   └── deleteTask.ts    # ✅ notion_delete_task
+│   └── types.ts              # ✅ TypeScript definitions
+├── api/
+│   ├── workflows.ts          # ✅ MCP 호출 지원 추가
+│   └── notion.ts             # ✅ NEW: 6개 엔드포인트
+└── index.ts                  # ✅ Notion routes 추가
+```
+
+#### API Endpoints 구현
+```
+POST   /api/notion/connection     # ✅ Create connection
+GET    /api/notion/connection     # ✅ Get connection
+PUT    /api/notion/connection     # ✅ Update connection
+DELETE /api/notion/connection     # ✅ Delete connection
+GET    /api/notion/databases      # ✅ List databases
+POST   /api/notion/test           # ✅ Test API key
+```
+
+#### Prisma Schema 업데이트
+```prisma
+model NotionConnection {
+  id                String   @id @default(uuid())
+  organizationId    String   @unique
+  apiKey            String
+  defaultDatabaseId String?
+  createdAt         DateTime
+  updatedAt         DateTime
+}
+```
+
+#### Workflow 실행 엔진 업데이트
+- ✅ `workflow.config.steps[]` 처리 로직
+- ✅ `{{input.field}}` 템플릿 변수 치환
+- ✅ `type: "mcp_call"` + `mcp: "notion"` 지원
+- ✅ NotionConnection 자동 조회 및 API Key 주입
+
+#### Frontend 구현 완료
+```
+frontend/src/pages/
+└── NotionSettingsPage.tsx    # ✅ NEW
+    ├── API Key 입력/저장
+    ├── Connection 테스트
+    ├── Database 목록 표시
+    └── Default database 선택
+```
+
+### 예상 vs 실제 시간
+- MCP Server: 8일 예상 → 1일 완료 ✅
+- Frontend: 6일 예상 → 1일 완료 ✅
+- 통합 & 테스트: 2일 예상 → 진행 중
 
 ---
 

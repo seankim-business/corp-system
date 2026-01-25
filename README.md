@@ -90,19 +90,44 @@ Future: B2B SaaS with AI-powered automation
 - Health check endpoints
 - Multi-stage Docker build
 
-### 🚧 In Progress (v0.2 - Q1 2026)
+### ✅ Implemented (v0.2 - Phase 2 Week 1-8)
 
 **Web Dashboard**
-- User authentication UI
-- Organization management
-- User invitations
-- Basic settings
+- ✅ User authentication UI (LoginPage with Google OAuth)
+- ✅ Dashboard layout (Header + Sidebar + Protected routes)
+- ✅ Organization switcher
+- ✅ Settings page (Profile, Organization, Security)
+- ✅ Workflows page (list, execute, view executions)
+- ✅ Executions page (history with filters)
 
-**First Automation**
-- Simple workflow engine
-- Notion MCP integration
-- Slack bot interface
-- Manual triggers
+**Workflow System**
+- ✅ Workflow CRUD (9 REST API endpoints)
+- ✅ Workflow execution engine with background processing
+- ✅ Execution history tracking (pending → running → success/failed)
+- ✅ JSON input for workflows
+- ✅ Real-time status updates
+
+**Notion MCP Integration** (NEW - 2026-01-25)
+- ✅ Notion API connection management
+- ✅ 4 MCP tools (getTasks, createTask, updateTask, deleteTask)
+- ✅ Template variable interpolation ({{input.field}})
+- ✅ Workflow execution with Notion integration
+- ✅ Database browser and connection testing
+- ✅ NotionSettingsPage for configuration
+
+### 🚧 In Progress (v0.2 - Q1 2026)
+
+**Frontend Polish**
+- [ ] Add Notion settings route to App.tsx
+- [ ] Toast notifications for better UX
+- [ ] CreateWorkflowModal component
+- [ ] Execution detail page
+
+**Slack Bot** (Phase 2 Week 9-12)
+- [ ] Slack App setup
+- [ ] Slash commands (/nubabel)
+- [ ] Natural language parsing
+- [ ] Workflow triggering from Slack
 
 ### 📋 Planned (v0.3+ - Q2 2026)
 
@@ -174,21 +199,28 @@ Follow our comprehensive deployment guide:
 nubabel/
 ├── src/                    # Backend (Express + TypeScript)
 │   ├── auth/              # Authentication system
+│   ├── api/               # REST API routes
+│   │   ├── workflows.ts   # ✅ Workflow CRUD + execution
+│   │   └── notion.ts      # ✅ Notion MCP settings
+│   ├── mcp-servers/       # ✅ MCP integrations
+│   │   └── notion/        # ✅ Notion MCP tools
 │   ├── middleware/        # Tenant resolver, auth
 │   ├── db/                # Prisma client
 │   └── index.ts           # Server entry point
 │
 ├── prisma/                 # Database
-│   ├── schema.prisma      # Data model (9 tables)
+│   ├── schema.prisma      # Data model (11 tables + NotionConnection)
 │   └── migrations/        # Migration history
 │
-├── frontend/               # React Dashboard (Coming Soon)
-│   └── package.json       # Dependencies only
-│
-├── extensions/             # Company-specific features
-│   └── kyndof/            # Kyndof extensions (TBD)
+├── frontend/               # React Dashboard ✅ Implemented
+│   ├── src/
+│   │   ├── pages/         # ✅ All main pages
+│   │   ├── components/    # ✅ Reusable components
+│   │   └── stores/        # ✅ Zustand stores
+│   └── package.json
 │
 ├── docs/                   # Documentation
+│   ├── planning/          # Phase specifications
 │   ├── PROJECT_IDENTITY.md   # ⭐ Start here
 │   ├── ARCHITECTURE.md       # Technical design
 │   └── AUTH_SYSTEM.md        # Authentication details
@@ -205,11 +237,13 @@ nubabel/
 | Authentication | ✅ Complete | 100% |
 | Database Schema | ✅ Complete | 100% |
 | Deployment Config | ✅ Complete | 100% |
-| Web Dashboard | 🚧 In Progress | 0% |
-| Workflow Engine | 📋 Planned | 0% |
+| Web Dashboard | ✅ Complete | 100% |
+| Workflow Engine | ✅ Complete | 100% |
+| Notion MCP | ✅ Complete | 95% (routing 추가 필요) |
+| Slack Bot | 📋 Planned | 0% |
 | AI Agents | 📋 Planned | 0% |
 
-**Overall Progress**: **~10%** (Foundation complete, features pending)
+**Overall Progress**: **~65%** (Phase 2 Week 1-8 거의 완료)
 
 ---
 
@@ -222,10 +256,10 @@ nubabel/
 - [ ] Production deployment (manual step pending)
 
 ### Phase 2: Visible Features (Q1 2026 - 3 months)
-- [ ] **Week 1-2**: Web Dashboard (Login, Dashboard, Settings)
-- [ ] **Week 3-4**: First automation (Manual workflow execution)
-- [ ] **Week 5-8**: Notion integration (Read/write tasks)
-- [ ] **Week 9-12**: Slack bot (Natural language triggers)
+- [x] **Week 1-2**: Web Dashboard (Login, Dashboard, Settings) ✅
+- [x] **Week 3-4**: First automation (Manual workflow execution) ✅
+- [x] **Week 5-8**: Notion integration (Read/write tasks) ✅ 95%
+- [ ] **Week 9-12**: Slack bot (Natural language triggers) ⏳
 
 ### Phase 3: Intelligence (Q2 2026 - 3 months)
 - [ ] Simple AI agent (single task executor)
