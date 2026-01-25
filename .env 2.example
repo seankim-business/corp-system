@@ -12,7 +12,7 @@ DATABASE_URL="postgresql://user:password@localhost:5432/kyndof_corp"
 # Get these from: https://console.cloud.google.com/apis/credentials
 GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="your-client-secret"
-GOOGLE_REDIRECT_URI="https://auth.nubabel.com/auth/google/callback"
+GOOGLE_REDIRECT_URI="https://auth.kyndof.com/auth/google/callback"
 
 # Optional: Service Account for Admin SDK
 GOOGLE_SERVICE_ACCOUNT_EMAIL="service-account@project.iam.gserviceaccount.com"
@@ -31,9 +31,9 @@ JWT_REFRESH_EXPIRES_IN="30d"
 # ============================================================================
 NODE_ENV="development" # development | production
 PORT="3000"
-BASE_URL="https://auth.nubabel.com"
-BASE_DOMAIN="nubabel.com"
-COOKIE_DOMAIN=".nubabel.com" # Wildcard for subdomains
+BASE_URL="https://auth.kyndof.com"
+BASE_DOMAIN="kyndof.com"
+COOKIE_DOMAIN=".kyndof.com" # Wildcard for subdomains
 
 # ============================================================================
 # REDIS (Optional - for caching)
@@ -67,4 +67,4 @@ SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_USER=""
 SMTP_PASSWORD=""
-EMAIL_FROM="noreply@nubabel.com"
+EMAIL_FROM="noreply@kyndof.com"

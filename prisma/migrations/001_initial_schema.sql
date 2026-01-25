@@ -377,7 +377,7 @@ INSERT INTO organizations (slug, name) VALUES ('kyndof', 'Kyndof Corporation');
 INSERT INTO workspace_domains (organization_id, domain, verified) 
 VALUES (
   (SELECT id FROM organizations WHERE slug = 'kyndof'),
-  'kyndof.com',
+  'nubabel.com',
   true
 );
 
