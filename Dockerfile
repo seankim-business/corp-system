@@ -7,8 +7,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install openssl for Prisma
-RUN apk add --no-cache openssl
+# Install openssl and openssl-dev for Prisma
+RUN apk add --no-cache openssl openssl-dev
 
 # Copy package files
 COPY package*.json ./
@@ -32,8 +32,8 @@ RUN npm run build
 # ============================================================================
 FROM node:20-alpine AS runtime
 
-# Install dumb-init and openssl for Prisma
-RUN apk add --no-cache dumb-init openssl
+# Install dumb-init, openssl and openssl-dev for Prisma
+RUN apk add --no-cache dumb-init openssl openssl-dev
 
 # Create app user (non-root)
 RUN addgroup -g 1001 -S nodejs && \
