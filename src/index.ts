@@ -8,6 +8,7 @@ import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { bullBoardAdapter } from "./queue/bull-board";
+import { sseRouter } from "./api/sse";
 
 console.log("🚀 Initializing Nubabel Platform...");
 console.log(`📍 Node version: ${process.version}`);
@@ -62,6 +63,7 @@ app.get("/health/redis", async (_req, res) => {
 app.use("/auth", authRoutes);
 app.use("/api", authenticate, workflowRoutes);
 app.use("/api", authenticate, notionRoutes);
+app.use("/api", sseRouter);
 
 app.use("/admin/queues", authenticate, bullBoardAdapter.getRouter());
 
@@ -96,7 +98,12 @@ const server = app.listen(port, "0.0.0.0", async () => {
     `✅ Base URL: ${process.env.BASE_URL || "http://localhost:3000"}`,
   );
   console.log(`✅ Health check endpoint: /health`);
+  console.log(`✅ SSE endpoint: /api/events`);
+  console.log(`✅ Bull Board: /admin/queues`);
   console.log(`✅ Ready to accept connections`);
+
+  await import("./workers");
+  console.log(`✅ Workers started`);
 });
 
 server.on("error", (error: any) => {

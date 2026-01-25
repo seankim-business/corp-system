@@ -89,71 +89,130 @@ app.event("app_mention", async ({ event, say, client }) => {
 
     const cleanedText = text.replace(/<@[A-Z0-9]+>/g, "").trim();
 
-    await client.chat.postMessage({
-      channel,
-      thread_ts: thread_ts || ts,
-      text: "🤔 Analyzing...",
-    });
-
-    const result = await orchestrate({
-      userRequest: cleanedText,
-      sessionId: session.id,
+    const job = await enqueueSlackEvent({
+      eventType: "app_mention",
       organizationId: organization.id,
       userId: nubabelUser.id,
+      slackUserId: user,
+      slackWorkspaceId: workspaceId,
+      channelId: channel,
+      threadTs: thread_ts || ts,
+      text: cleanedText,
+      event: event as any,
     });
 
     await say({
-      text: formatResponse(result),
+      text: `🤔 Processing your request... (Job: ${job.id?.substring(0, 8)})`,
       thread_ts: thread_ts || ts,
     });
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
 
-    logger.error(
-      "Slack mention handler error",
-      {
-        duration,
-        error: error.message,
-      },
-      error,
-    );
+    logger.info("Slack event enqueued", {
+      jobId: job.id,
+      user: nubabelUser.id,
+      organization: organization.id,
+    });
+
+    metrics.increment("slack.mention.enqueued");
+    metrics.timing("slack.mention.duration", Date.now() - startTime);
+  } catch (error: any) {
+    logger.error("Slack mention handler error", {
+      error: error.message,
+    });
 
     metrics.increment("slack.error.handler_failed");
-    metrics.timing("slack.mention.duration", duration, { status: "error" });
 
     await say({
       text: `❌ Error: ${error.message}`,
       thread_ts: event.thread_ts || event.ts,
     });
-  } finally {
-    const duration = Date.now() - startTime;
-    metrics.timing("slack.mention.duration", duration);
   }
 });
 
-app.message(async ({ message, say }) => {
+app.message(async ({ message, say, client }) => {
   if ("channel_type" in message && message.channel_type === "im") {
-    await say("Hi! Mention me in a channel with @company-os to get started!");
+    const { user, text } = message as any;
+
+    if (!user || !text) return;
+
+    try {
+      const nubabelUser = await getUserBySlackId(user);
+      if (!nubabelUser) {
+        await say("Please login at https://nubabel.com first!");
+        return;
+      }
+
+      const slackWorkspace = await client.team.info();
+      const workspaceId = slackWorkspace.team?.id;
+
+      if (!workspaceId) {
+        await say("Failed to get workspace info");
+        return;
+      }
+
+      const organization = await getOrganizationBySlackWorkspace(workspaceId);
+      if (!organization) {
+        await say(
+          "Organization not found. Please connect your Slack workspace in Settings.",
+        );
+        return;
+      }
+
+      const job = await enqueueSlackEvent({
+        eventType: "direct_message",
+        organizationId: organization.id,
+        userId: nubabelUser.id,
+        slackUserId: user,
+        slackWorkspaceId: workspaceId,
+        channelId: message.channel,
+        text,
+        event: message as any,
+      });
+
+      await say(`Processing your message... (Job: ${job.id?.substring(0, 8)})`);
+    } catch (error: any) {
+      logger.error("DM handler error", { error: error.message });
+      await say(`Error: ${error.message}`);
+    }
   }
 });
 
-function formatResponse(result: OrchestrationResult): string {
-  const emoji = getPersonaEmoji(result.metadata.category);
-  return `${emoji} *[${result.metadata.category}]* ${result.output}`;
-}
+app.command("/nubabel", async ({ command, ack, say }) => {
+  await ack();
 
-function getPersonaEmoji(category: string): string {
-  const emojiMap: Record<string, string> = {
-    "visual-engineering": "🎨",
-    ultrabrain: "🧠",
-    artistry: "✨",
-    quick: "⚡",
-    writing: "📝",
-    "unspecified-low": "🤖",
-    "unspecified-high": "🚀",
-  };
-  return emojiMap[category] || "🤖";
-}
+  try {
+    const { user_id, text, channel_id, team_id } = command;
+
+    const nubabelUser = await getUserBySlackId(user_id);
+    if (!nubabelUser) {
+      await say("Please login at https://nubabel.com first!");
+      return;
+    }
+
+    const organization = await getOrganizationBySlackWorkspace(team_id);
+    if (!organization) {
+      await say(
+        "Organization not found. Please connect your Slack workspace in Settings.",
+      );
+      return;
+    }
+
+    const job = await enqueueSlackEvent({
+      eventType: "slash_command",
+      organizationId: organization.id,
+      userId: nubabelUser.id,
+      slackUserId: user_id,
+      slackWorkspaceId: team_id,
+      channelId: channel_id,
+      text,
+      event: command as any,
+    });
+
+    await say(`Processing your command... (Job: ${job.id?.substring(0, 8)})`);
+  } catch (error: any) {
+    logger.error("Slash command error", { error: error.message });
+    await say(`Error: ${error.message}`);
+  }
+});
 
 export async function startSlackBot() {
   await app.start();
