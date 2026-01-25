@@ -98,21 +98,6 @@ const server = app.listen(port, "0.0.0.0", async () => {
   );
   console.log(`✅ Health check endpoint: /health`);
   console.log(`✅ Ready to accept connections`);
-
-  if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
-    try {
-      const { startSlackBot } = await import("./api/slack");
-      await startSlackBot();
-      console.log("✅ Slack Bot connected (Socket Mode)");
-    } catch (error) {
-      console.error("⚠️  Slack Bot failed to start:", error);
-      console.error("⚠️  Continuing without Slack integration");
-    }
-  } else {
-    console.log(
-      "ℹ️  Slack Bot disabled (missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN)",
-    );
-  }
 });
 
 server.on("error", (error: any) => {
