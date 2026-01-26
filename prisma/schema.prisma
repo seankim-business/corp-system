@@ -39,6 +39,9 @@ model Organization {
   notionConnections NotionConnection[]
   mcpConnections    MCPConnection[]
   slackIntegrations SlackIntegration[]
+  orchestratorExecutions OrchestratorExecution[]
+  featureFlagOverrides FeatureFlagOverride[]
+  featureFlagAuditLogs FeatureFlagAuditLog[]
 
   @@map("organizations")
 }
@@ -59,6 +62,8 @@ model User {
   // Relations
   memberships Membership[]
   sessions    Session[]
+  orchestratorExecutions OrchestratorExecution[]
+  featureFlagAuditLogs FeatureFlagAuditLog[]
 
   @@index([email])
   @@index([googleId])
@@ -367,6 +372,36 @@ model WorkflowExecution {
   @@map("workflow_executions")
 }
 
+/// Orchestrator Executions (Conversation / delegation history)
+/// Separate from WorkflowExecution to avoid mixing automation runs with orchestration.
+model OrchestratorExecution {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  sessionId      String   @map("session_id") @db.VarChar(255)
+
+  category String  @db.VarChar(100)
+  skills   String[] @default([]) @db.VarChar(100)
+  status   String  @db.VarChar(50)
+  duration Int     @default(0)
+
+  inputData    Json?   @map("input_data") @db.JsonB
+  outputData   Json?   @map("output_data") @db.JsonB
+  errorMessage String? @map("error_message") @db.Text
+  metadata     Json?   @default("{}") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@index([status])
+  @@map("orchestrator_executions")
+}
+
 // ============================================================================
 // MCP INTEGRATION TABLES (Phase 2 Week 9-12)
 // ============================================================================
@@ -449,4 +484,116 @@ model SlackIntegration {
   @@index([workspaceId])
   @@index([enabled])
   @@map("slack_integrations")
+}
+
+// ==========================================================================
+// FEATURE FLAGS (Safe release / rollout)
+// ==========================================================================
+
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(100) // e.g. "new_dashboard"
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  enabled     Boolean  @default(false) // Global kill switch
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rules     FeatureFlagRule[]
+  overrides FeatureFlagOverride[]
+  auditLogs FeatureFlagAuditLog[]
+
+  @@index([key])
+  @@map("feature_flags")
+}
+
+model FeatureFlagRule {
+  id            String   @id @default(uuid()) @db.Uuid
+  featureFlagId String   @map("feature_flag_id") @db.Uuid
+
+  type           String   @db.VarChar(50) // ALLOWLIST | BLOCKLIST | PERCENTAGE
+  organizationIds String[] @default([]) @map("organization_ids") @db.Uuid
+  percentage     Int      @default(0)
+  priority       Int      @default(100)
+  enabled        Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  featureFlag FeatureFlag @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
+
+  @@index([featureFlagId, priority])
+  @@index([type])
+  @@map("feature_flag_rules")
+}
+
+model FeatureFlagOverride {
+  id            String   @id @default(uuid()) @db.Uuid
+  featureFlagId String   @map("feature_flag_id") @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+
+  enabled   Boolean
+  reason    String?  @db.Text
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  featureFlag  FeatureFlag   @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([featureFlagId, organizationId])
+  @@index([organizationId])
+  @@index([expiresAt])
+  @@map("feature_flag_overrides")
+}
+
+model FeatureFlagAuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  featureFlagId String   @map("feature_flag_id") @db.Uuid
+
+  action String @db.VarChar(50) // CREATED | UPDATED | RULE_SET | OVERRIDE_SET | EVALUATED
+
+  organizationId String? @map("organization_id") @db.Uuid
+  userId         String? @map("user_id") @db.Uuid
+  metadata       Json?   @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  featureFlag  FeatureFlag   @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([featureFlagId, createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("feature_flag_audit_logs")
+}
+
+// ============================================================================
+// AUDIT LOG TABLE (System-wide action tracking)
+// ============================================================================
+
+/// AuditLog (Tracks all user/system actions)
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+
+  action       String  @db.VarChar(100) // user.login, workflow.execute, etc.
+  userId       String? @map("user_id") @db.Uuid
+  resourceType String? @map("resource_type") @db.VarChar(100)
+  resourceId   String? @map("resource_id") @db.VarChar(255)
+  details      Json?   @db.JsonB
+  ipAddress    String? @map("ip_address") @db.VarChar(45)
+  userAgent    String? @map("user_agent") @db.Text
+  success      Boolean @default(true)
+  errorMessage String? @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
 }
