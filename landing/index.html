@@ -185,6 +185,53 @@
         gap: 16px;
       }
 
+      .hero-inner {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 64px;
+        align-items: center;
+      }
+
+      .hero-image img {
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+      }
+
+      .babel-image {
+        margin-bottom: 48px;
+      }
+
+      .babel-image img {
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      .vision-image {
+        margin-bottom: 48px;
+      }
+
+      .vision-image img {
+        max-width: 800px;
+        width: 100%;
+        margin: 0 auto;
+        display: block;
+        border-radius: 12px;
+      }
+
+      .integrations-image {
+        margin-bottom: 48px;
+      }
+
+      .integrations-image img {
+        max-width: 700px;
+        width: 100%;
+        margin: 0 auto;
+        display: block;
+        border-radius: 12px;
+      }
+
       .philosophy {
         background: var(--surface);
         border-top: 1px solid var(--border);
@@ -764,6 +811,13 @@
         .hero h1 {
           font-size: 40px;
         }
+        .hero-inner {
+          grid-template-columns: 1fr;
+          gap: 40px;
+        }
+        .hero-image {
+          order: -1;
+        }
         .babel-story {
           grid-template-columns: 1fr;
         }
@@ -812,19 +866,24 @@
 
     <section class="hero">
       <div class="container">
-        <div class="hero-content">
-          <div class="hero-eyebrow">Just @mention in Slack. That's it.</div>
-          <h1>Add <span class="gradient-text">AI teammates</span> to your existing workflow.</h1>
-          <p class="hero-subtitle">
-            No new tools to learn. No migration needed. Nubabel agents join your Slack, use your
-            Notion/Drive/Jira as knowledge stores, and gradually take over repetitive work—just like
-            onboarding a brilliant new hire.
-          </p>
-          <div class="hero-cta">
-            <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
-              >Add your first AI teammate</a
-            >
-            <a href="#scenarios" class="btn btn-ghost">See 26 real scenarios →</a>
+        <div class="hero-inner">
+          <div class="hero-content">
+            <div class="hero-eyebrow">Just @mention in Slack. That's it.</div>
+            <h1>Add <span class="gradient-text">AI teammates</span> to your existing workflow.</h1>
+            <p class="hero-subtitle">
+              No new tools to learn. No migration needed. Nubabel agents join your Slack, use your
+              Notion/Drive/Jira as knowledge stores, and gradually take over repetitive work—just
+              like onboarding a brilliant new hire.
+            </p>
+            <div class="hero-cta">
+              <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
+                >Add your first AI teammate</a
+              >
+              <a href="#scenarios" class="btn btn-ghost">See 26 real scenarios →</a>
+            </div>
+          </div>
+          <div class="hero-image">
+            <img src="images/hero-slack.png" alt="AI agent in Slack conversation" />
           </div>
         </div>
       </div>
@@ -838,6 +897,10 @@
             The Tower of Babel failed because humans couldn't collaborate. AI agents don't have that
             problem.
           </p>
+        </div>
+
+        <div class="babel-image">
+          <img src="images/babel-comparison.png" alt="Tower of Babel vs Nubabel comparison" />
         </div>
 
         <div class="babel-story">
@@ -880,6 +943,10 @@
           Your agents start as assistants. They learn. They take on more. Eventually, your org chart
           has both humans and AI—working together.
         </p>
+
+        <div class="vision-image">
+          <img src="images/org-evolution.png" alt="Organization evolution from human to AI" />
+        </div>
 
         <div class="org-evolution">
           <div class="org-stage">
@@ -1497,6 +1564,10 @@
       <div class="container">
         <h2>Works with your existing tools</h2>
         <p class="integrations-subtitle">Agents connect to where your work already happens.</p>
+
+        <div class="integrations-image">
+          <img src="images/integrations-flow.png" alt="Integration flow between tools" />
+        </div>
 
         <div class="integration-grid">
           <div class="integration-item"><span class="integration-icon">💬</span> Slack</div>
