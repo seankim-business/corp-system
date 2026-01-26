@@ -59,13 +59,14 @@ logger.info("Initializing Nubabel Platform", {
 
 try {
   getEnv();
+  logger.info("✅ Environment variables validated successfully");
 } catch (error) {
   logger.error(
-    "Environment validation failed",
+    "⚠️  Environment validation failed - server will start with limited functionality",
     {},
     error instanceof Error ? error : new Error(String(error)),
   );
-  process.exit(1);
+  logger.warn("Server starting anyway to allow health checks and debugging");
 }
 
 const app = express();
