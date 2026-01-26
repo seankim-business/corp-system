@@ -1,5 +1,4 @@
 import "dotenv/config";
-import { shutdownOpenTelemetry } from "./instrumentation";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -12,7 +11,6 @@ import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
-
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter } from "./api/sse";
 import { startWorkers, stopWorkers } from "./workers";
@@ -108,7 +106,6 @@ app.get("/health/circuits", (_req, res) => {
 
 app.use("/auth", authRateLimiter, authRoutes);
 
-import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 
 app.use("/api", apiRateLimiter, authenticate, workflowRoutes);
