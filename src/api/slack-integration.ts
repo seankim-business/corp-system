@@ -1,10 +1,183 @@
 import { Router, Request, Response } from "express";
 import { WebClient } from "@slack/web-api";
+import * as crypto from "crypto";
 import { db as prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
 import { encrypt, decrypt } from "../utils/encryption";
 
 const router = Router();
+
+interface SlackOAuthResponse {
+  ok: boolean;
+  error?: string;
+  access_token?: string;
+  team?: { id: string; name: string };
+  bot_user_id?: string;
+  scope?: string;
+}
+
+const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
+const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
+const SLACK_REDIRECT_URI =
+  process.env.SLACK_REDIRECT_URI || "https://auth.nubabel.com/api/slack/oauth/callback";
+const SLACK_SCOPES = [
+  "app_mentions:read",
+  "chat:write",
+  "channels:history",
+  "groups:history",
+  "im:history",
+  "mpim:history",
+  "users:read",
+  "users:read.email",
+  "team:read",
+].join(",");
+
+function encodeState(organizationId: string, userId: string): string {
+  const payload = JSON.stringify({
+    organizationId,
+    userId,
+    nonce: crypto.randomBytes(16).toString("hex"),
+  });
+  return Buffer.from(payload).toString("base64url");
+}
+
+function decodeState(state: string): { organizationId: string; userId: string } | null {
+  try {
+    const payload = JSON.parse(Buffer.from(state, "base64url").toString("utf-8"));
+    if (!payload.organizationId || !payload.userId) return null;
+    return { organizationId: payload.organizationId, userId: payload.userId };
+  } catch {
+    return null;
+  }
+}
+
+router.get("/slack/oauth/install", requireAuth, async (req: Request, res: Response) => {
+  if (!SLACK_CLIENT_ID) {
+    return res.status(500).json({ error: "SLACK_CLIENT_ID is not configured" });
+  }
+
+  const { organizationId, id: userId } = req.user!;
+  const state = encodeState(organizationId, userId);
+
+  const authorizeUrl = new URL("https://slack.com/oauth/v2/authorize");
+  authorizeUrl.searchParams.set("client_id", SLACK_CLIENT_ID);
+  authorizeUrl.searchParams.set("scope", SLACK_SCOPES);
+  authorizeUrl.searchParams.set("redirect_uri", SLACK_REDIRECT_URI);
+  authorizeUrl.searchParams.set("state", state);
+
+  return res.redirect(authorizeUrl.toString());
+});
+
+router.get("/slack/oauth/callback", async (req: Request, res: Response) => {
+  const { code, state, error } = req.query;
+  const frontendUrl = process.env.FRONTEND_URL || "https://app.nubabel.com";
+
+  if (error) {
+    console.error("Slack OAuth error:", error);
+    return res.redirect(`${frontendUrl}/settings/slack?error=${encodeURIComponent(String(error))}`);
+  }
+
+  if (!code || !state) {
+    return res.redirect(`${frontendUrl}/settings/slack?error=missing_params`);
+  }
+
+  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+    console.error("Slack OAuth: Missing CLIENT_ID or CLIENT_SECRET");
+    return res.redirect(`${frontendUrl}/settings/slack?error=server_config`);
+  }
+
+  const stateData = decodeState(String(state));
+  if (!stateData) {
+    console.error("Slack OAuth: Invalid state parameter");
+    return res.redirect(`${frontendUrl}/settings/slack?error=invalid_state`);
+  }
+
+  try {
+    const tokenResponse = await fetch("https://slack.com/api/oauth.v2.access", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: SLACK_CLIENT_ID,
+        client_secret: SLACK_CLIENT_SECRET,
+        code: String(code),
+        redirect_uri: SLACK_REDIRECT_URI,
+      }),
+    });
+
+    const tokenData = (await tokenResponse.json()) as SlackOAuthResponse;
+
+    if (!tokenData.ok || !tokenData.access_token || !tokenData.team) {
+      console.error("Slack OAuth token exchange failed:", tokenData.error);
+      return res.redirect(
+        `${frontendUrl}/settings/slack?error=${encodeURIComponent(tokenData.error || "token_exchange_failed")}`,
+      );
+    }
+
+    const botToken = tokenData.access_token;
+    const workspaceId = tokenData.team.id;
+    const workspaceName = tokenData.team.name;
+    const botUserId = tokenData.bot_user_id;
+    const scope = tokenData.scope;
+
+    const envAppToken = process.env.SLACK_APP_TOKEN;
+    const envSigningSecret = process.env.SLACK_SIGNING_SECRET;
+
+    if (!envSigningSecret) {
+      console.error("Slack OAuth: SLACK_SIGNING_SECRET not configured");
+      return res.redirect(`${frontendUrl}/settings/slack?error=server_config`);
+    }
+
+    const encryptedBotToken = encrypt(botToken);
+    const encryptedAppToken = envAppToken ? encrypt(envAppToken) : null;
+    const encryptedSigningSecret = encrypt(envSigningSecret);
+
+    const existing = await prisma.slackIntegration.findFirst({
+      where: { organizationId: stateData.organizationId },
+    });
+
+    if (existing) {
+      await prisma.slackIntegration.update({
+        where: { id: existing.id },
+        data: {
+          workspaceId,
+          workspaceName,
+          botToken: encryptedBotToken,
+          botUserId,
+          scopes: scope ? scope.split(",") : [],
+          appToken: encryptedAppToken,
+          signingSecret: encryptedSigningSecret,
+          installedAt: new Date(),
+          healthStatus: "healthy",
+          enabled: true,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await prisma.slackIntegration.create({
+        data: {
+          organizationId: stateData.organizationId,
+          workspaceId,
+          workspaceName,
+          botToken: encryptedBotToken,
+          botUserId,
+          scopes: scope ? scope.split(",") : [],
+          appToken: encryptedAppToken,
+          signingSecret: encryptedSigningSecret,
+          installedBy: stateData.userId,
+          installedAt: new Date(),
+          healthStatus: "healthy",
+          enabled: true,
+        },
+      });
+    }
+
+    console.log(`Slack OAuth success: org=${stateData.organizationId}, workspace=${workspaceName}`);
+    return res.redirect(`${frontendUrl}/settings/slack?success=true`);
+  } catch (error) {
+    console.error("Slack OAuth callback error:", error);
+    return res.redirect(`${frontendUrl}/settings/slack?error=server_error`);
+  }
+});
 
 router.get("/slack/integration", requireAuth, async (req: Request, res: Response) => {
   try {
