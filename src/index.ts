@@ -210,53 +210,54 @@ app.get("/health/redis", async (_req, res) => {
   }
 });
 
-app.get("/health/budget", async (_req, res) => {
-  try {
-    const organizations = await db.organization.findMany({
-      select: {
-        id: true,
-        name: true,
-        monthlyBudgetCents: true,
-        currentMonthSpendCents: true,
-        budgetResetAt: true,
-      },
-    });
+// Temporarily disabled - requires budget migration to be deployed
+// app.get("/health/budget", async (_req, res) => {
+//   try {
+//     const organizations = await db.organization.findMany({
+//       select: {
+//         id: true,
+//         name: true,
+//         monthlyBudgetCents: true,
+//         currentMonthSpendCents: true,
+//         budgetResetAt: true,
+//       },
+//     });
 
-    const approaching = organizations
-      .filter((org) => org.monthlyBudgetCents != null)
-      .map((org) => {
-        const budgetCents = org.monthlyBudgetCents ?? 0;
-        const remainingCents = Math.max(0, budgetCents - org.currentMonthSpendCents);
-        const percentRemaining = budgetCents > 0 ? remainingCents / budgetCents : 0;
+//     const approaching = organizations
+//       .filter((org) => org.monthlyBudgetCents != null)
+//       .map((org) => {
+//         const budgetCents = org.monthlyBudgetCents ?? 0;
+//         const remainingCents = Math.max(0, budgetCents - org.currentMonthSpendCents);
+//         const percentRemaining = budgetCents > 0 ? remainingCents / budgetCents : 0;
 
-        return {
-          organizationId: org.id,
-          name: org.name,
-          budgetCents,
-          spendCents: org.currentMonthSpendCents,
-          remainingCents,
-          percentRemaining,
-          budgetResetAt: org.budgetResetAt,
-        };
-      })
-      .filter((org) => org.percentRemaining < 0.1);
+//         return {
+//           organizationId: org.id,
+//           name: org.name,
+//           budgetCents,
+//           spendCents: org.currentMonthSpendCents,
+//           remainingCents,
+//           percentRemaining,
+//           budgetResetAt: org.budgetResetAt,
+//         };
+//       })
+//       .filter((org) => org.percentRemaining < 0.1);
 
-    res.json({
-      status: "ok",
-      service: "budget",
-      thresholdPercent: 10,
-      organizations: approaching,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: "error",
-      service: "budget",
-      error: String(error),
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+//     res.json({
+//       status: "ok",
+//       service: "budget",
+//       thresholdPercent: 10,
+//       organizations: approaching,
+//       timestamp: new Date().toISOString(),
+//     });
+//   } catch (error) {
+//     res.status(503).json({
+//       status: "error",
+//       service: "budget",
+//       error: String(error),
+//       timestamp: new Date().toISOString(),
+//     });
+//   }
+// });
 
 app.get("/health/redis-pool", (_req, res) => {
   const stats = getPoolStats();
