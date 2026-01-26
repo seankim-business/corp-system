@@ -13,7 +13,8 @@
  * └── Database List (if connected)
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
+import { ApiError, request } from "../api/client";
 
 interface NotionConnection {
   id: string;
@@ -45,20 +46,19 @@ export default function NotionSettingsPage() {
 
   const fetchConnection = async () => {
     try {
-      const response = await fetch('/api/notion/connection', {
-        credentials: 'include',
+      const data = await request<{ connection: NotionConnection }>({
+        url: "/api/notion/connection",
+        method: "GET",
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setConnection(data.connection);
-        setDefaultDatabaseId(data.connection.defaultDatabaseId || '');
-        await fetchDatabases();
-      } else if (response.status !== 404) {
-        throw new Error('Failed to fetch connection');
-      }
+      setConnection(data.connection);
+      setDefaultDatabaseId(data.connection.defaultDatabaseId || "");
+      await fetchDatabases();
     } catch (error) {
-      console.error('Fetch connection error:', error);
+      if (error instanceof ApiError && error.status === 404) {
+        setConnection(null);
+        return;
+      }
+      console.error("Fetch connection error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -66,16 +66,13 @@ export default function NotionSettingsPage() {
 
   const fetchDatabases = async () => {
     try {
-      const response = await fetch('/api/notion/databases', {
-        credentials: 'include',
+      const data = await request<{ databases: NotionDatabase[] }>({
+        url: "/api/notion/databases",
+        method: "GET",
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDatabases(data.databases || []);
-      }
+      setDatabases(data.databases || []);
     } catch (error) {
-      console.error('Fetch databases error:', error);
+      console.error("Fetch databases error:", error);
     }
   };
 
@@ -89,93 +86,89 @@ export default function NotionSettingsPage() {
     setMessage(null);
 
     try {
-      const response = await fetch('/api/notion/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ apiKey }),
+      const data = await request<{ success: boolean; databaseCount?: number; error?: string }>({
+        url: "/api/notion/test",
+        method: "POST",
+        data: { apiKey },
       });
-
-      const data = await response.json();
 
       if (data.success) {
         setMessage({
-          type: 'success',
-          text: `Connection successful! Found ${data.databaseCount} databases.`,
+          type: "success",
+          text: `Connection successful! Found ${data.databaseCount || 0} databases.`,
         });
       } else {
-        setMessage({ type: 'error', text: data.error || 'Connection failed' });
+        setMessage({ type: "error", text: data.error || "Connection failed" });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to test connection' });
+      const text = error instanceof ApiError ? error.message : "Failed to test connection";
+      setMessage({ type: "error", text });
     } finally {
       setIsTesting(false);
     }
   };
 
-  const saveConnection = async () => {
-    if (!apiKey) {
-      setMessage({ type: 'error', text: 'Please enter an API key' });
-      return;
-    }
+   const saveConnection = async () => {
+     if (!apiKey) {
+       setMessage({ type: 'error', text: 'Please enter an API key' });
+       return;
+     }
 
-    setIsSaving(true);
-    setMessage(null);
+     setIsSaving(true);
+     setMessage(null);
 
-    try {
-      const method = connection ? 'PUT' : 'POST';
-      const response = await fetch('/api/notion/connection', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ apiKey, defaultDatabaseId }),
-      });
+     try {
+       const method = connection ? 'PUT' : 'POST';
+       interface SaveConnectionResponse {
+         connection: NotionConnection;
+         error?: string;
+       }
+       const data = await request<SaveConnectionResponse>({
+         url: '/api/notion/connection',
+         method,
+         data: { apiKey, defaultDatabaseId },
+       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnection(data.connection);
-        setMessage({ type: 'success', text: 'Notion connection saved successfully' });
-        await fetchDatabases();
-        setApiKey('');
-      } else {
-        const data = await response.json();
-        setMessage({ type: 'error', text: data.error || 'Failed to save connection' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to save connection' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+       setConnection(data.connection);
+       setMessage({ type: 'success', text: 'Notion connection saved successfully' });
+       await fetchDatabases();
+       setApiKey('');
+     } catch (error) {
+       const text = error instanceof ApiError ? error.message : 'Failed to save connection';
+       setMessage({ type: 'error', text });
+     } finally {
+       setIsSaving(false);
+     }
+   };
 
-  const deleteConnection = async () => {
-    if (!confirm('Are you sure you want to delete the Notion connection?')) {
-      return;
-    }
+   const deleteConnection = async () => {
+     if (!confirm('Are you sure you want to delete the Notion connection?')) {
+       return;
+     }
 
-    setIsSaving(true);
-    setMessage(null);
+     setIsSaving(true);
+     setMessage(null);
 
-    try {
-      const response = await fetch('/api/notion/connection', {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+     try {
+       interface DeleteConnectionResponse {
+         success: boolean;
+       }
+       await request<DeleteConnectionResponse>({
+         url: '/api/notion/connection',
+         method: 'DELETE',
+       });
 
-      if (response.ok) {
-        setConnection(null);
-        setDatabases([]);
-        setDefaultDatabaseId('');
-        setMessage({ type: 'success', text: 'Notion connection deleted' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to delete connection' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to delete connection' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+       setConnection(null);
+       setDatabases([]);
+       setDefaultDatabaseId('');
+       setMessage({ type: 'success', text: 'Notion connection deleted' });
+     } catch (error) {
+       const text = error instanceof ApiError ? error.message : 'Failed to delete connection';
+       setMessage({ type: 'error', text });
+     } finally {
+       setIsSaving(false);
+     }
+   };
 
   if (isLoading) {
     return (

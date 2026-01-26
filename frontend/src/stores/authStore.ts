@@ -23,7 +23,8 @@
  *     └── setUser()
  */
 
-import { create } from 'zustand';
+import { create } from "zustand";
+import { request } from "../api/client";
 
 interface User {
   id: string;
@@ -59,58 +60,56 @@ export const useAuthStore = create<AuthState>((set) => ({
   fetchUser: async () => {
     set({ isLoading: true });
     try {
-      const response = await fetch('/auth/me', {
-        credentials: 'include',
+      const data = await request<{
+        user: User;
+        currentOrganization: Organization | null;
+        organizations: Organization[];
+      }>({
+        url: "/auth/me",
+        method: "GET",
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        set({
-          user: data.user,
-          currentOrganization: data.currentOrganization,
-          organizations: data.organizations || [],
-          isLoading: false,
-        });
-      } else {
-        set({ user: null, currentOrganization: null, organizations: [], isLoading: false });
-      }
+
+      set({
+        user: data.user,
+        currentOrganization: data.currentOrganization,
+        organizations: data.organizations || [],
+        isLoading: false,
+      });
     } catch (error) {
-      console.error('Failed to fetch user:', error);
+      console.error("Failed to fetch user:", error);
       set({ user: null, currentOrganization: null, organizations: [], isLoading: false });
     }
   },
 
   logout: async () => {
     try {
-      await fetch('/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
+      await request<{ success: boolean }>({
+        url: "/auth/logout",
+        method: "POST",
       });
       set({ user: null, currentOrganization: null, organizations: [] });
-      window.location.href = '/login';
+      window.location.href = "/login";
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
   },
 
   switchOrganization: async (organizationId: string) => {
     try {
-      const response = await fetch('/auth/switch-org', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ organizationId }),
+      const result = await request<{ redirectUrl?: string }>({
+        url: "/auth/switch-org",
+        method: "POST",
+        data: { organizationId },
       });
 
-      if (response.ok) {
-        window.location.reload();
-      } else {
-        console.error('Failed to switch organization');
+      if (result.redirectUrl) {
+        window.location.href = result.redirectUrl;
+        return;
       }
+
+      window.location.reload();
     } catch (error) {
-      console.error('Switch organization failed:', error);
+      console.error("Switch organization failed:", error);
     }
   },
 

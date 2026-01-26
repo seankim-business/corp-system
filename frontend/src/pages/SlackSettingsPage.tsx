@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ApiError, request } from "../api/client";
 
 interface SlackIntegration {
   id: string;
@@ -48,17 +49,16 @@ export default function SlackSettingsPage() {
 
   const fetchIntegration = async () => {
     try {
-      const response = await fetch("/api/slack/integration", {
-        credentials: "include",
+      const data = await request<{ integration: SlackIntegration }>({
+        url: "/api/slack/integration",
+        method: "GET",
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setIntegration(data.integration);
-      } else if (response.status !== 404) {
-        throw new Error("Failed to fetch integration");
-      }
+      setIntegration(data.integration);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        setIntegration(null);
+        return;
+      }
       console.error("Fetch integration error:", error);
     } finally {
       setIsLoading(false);
@@ -78,17 +78,13 @@ export default function SlackSettingsPage() {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/slack/integration", {
+      await request<{ success: boolean }>({
+        url: "/api/slack/integration",
         method: "DELETE",
-        credentials: "include",
       });
 
-      if (response.ok) {
-        setIntegration(null);
-        setMessage({ type: "success", text: "Slack disconnected successfully" });
-      } else {
-        setMessage({ type: "error", text: "Failed to disconnect Slack" });
-      }
+      setIntegration(null);
+      setMessage({ type: "success", text: "Slack disconnected successfully" });
     } catch (error) {
       setMessage({ type: "error", text: "Failed to disconnect Slack" });
     } finally {

@@ -25,6 +25,7 @@
  */
 
 import { useState } from 'react';
+import { ApiError, request } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 
 export default function SettingsPage() {
@@ -32,52 +33,49 @@ export default function SettingsPage() {
   const [name, setName] = useState(user?.name || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSaveProfile = async () => {
-    setIsSaving(true);
-    try {
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ name }),
-      });
-      
-      if (response.ok) {
-        alert('Profile updated successfully');
-      } else {
-        alert('Failed to update profile');
-      }
-    } catch (error) {
-      console.error('Save failed:', error);
-      alert('Failed to update profile');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+   const handleSaveProfile = async () => {
+     setIsSaving(true);
+     try {
+       interface UpdateProfileResponse {
+         success: boolean;
+       }
+       await request<UpdateProfileResponse>({
+         url: '/api/user/profile',
+         method: 'PUT',
+         data: { name },
+       });
+       
+       alert('Profile updated successfully');
+     } catch (error) {
+       const message = error instanceof ApiError ? error.message : 'Failed to update profile';
+       console.error('Save failed:', error);
+       alert(message);
+     } finally {
+       setIsSaving(false);
+     }
+   };
 
-  const handleLogoutAll = async () => {
-    if (!confirm('Are you sure you want to logout from all devices?')) {
-      return;
-    }
+   const handleLogoutAll = async () => {
+     if (!confirm('Are you sure you want to logout from all devices?')) {
+       return;
+     }
 
-    try {
-      const response = await fetch('/api/auth/logout-all', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      if (response.ok) {
-        window.location.href = '/login';
-      } else {
-        alert('Failed to logout from all devices');
-      }
-    } catch (error) {
-      console.error('Logout all failed:', error);
-      alert('Failed to logout from all devices');
-    }
-  };
+     try {
+       interface LogoutAllResponse {
+         success: boolean;
+       }
+       await request<LogoutAllResponse>({
+         url: '/api/auth/logout-all',
+         method: 'POST',
+       });
+       
+       window.location.href = '/login';
+     } catch (error) {
+       const message = error instanceof ApiError ? error.message : 'Failed to logout from all devices';
+       console.error('Logout all failed:', error);
+       alert(message);
+     }
+   };
 
   return (
     <div className="max-w-4xl">

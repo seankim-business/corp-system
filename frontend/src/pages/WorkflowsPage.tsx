@@ -15,9 +15,10 @@
  * └── ExecuteWorkflowModal
  */
 
-import { useState, useEffect } from 'react';
-import WorkflowCard from '../components/WorkflowCard';
-import ExecuteWorkflowModal from '../components/ExecuteWorkflowModal';
+import { useEffect, useState } from "react";
+import WorkflowCard from "../components/WorkflowCard";
+import ExecuteWorkflowModal from "../components/ExecuteWorkflowModal";
+import { request } from "../api/client";
 
 interface Workflow {
   id: string;
@@ -34,15 +35,13 @@ export default function WorkflowsPage() {
 
   const fetchWorkflows = async () => {
     try {
-      const response = await fetch('/api/workflows', {
-        credentials: 'include',
+      const data = await request<{ workflows: Workflow[] }>({
+        url: "/api/workflows",
+        method: "GET",
       });
-      if (response.ok) {
-        const data = await response.json();
-        setWorkflows(data.workflows);
-      }
+      setWorkflows(data.workflows);
     } catch (error) {
-      console.error('Failed to fetch workflows:', error);
+      console.error("Failed to fetch workflows:", error);
     } finally {
       setIsLoading(false);
     }

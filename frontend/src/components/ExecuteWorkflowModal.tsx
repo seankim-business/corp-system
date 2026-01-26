@@ -27,7 +27,8 @@
  * - error: 실패
  */
 
-import { useState } from 'react';
+import { useState } from "react";
+import { ApiError, request } from "../api/client";
 
 interface ExecuteWorkflowModalProps {
   workflowId: string;
@@ -60,33 +61,26 @@ export default function ExecuteWorkflowModal({
         parsedInput = JSON.parse(inputData);
       }
 
-      const response = await fetch(`/api/workflows/${workflowId}/execute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ inputData: parsedInput }),
+      await request<{ execution: unknown }>({
+        url: `/api/workflows/${workflowId}/execute`,
+        method: "POST",
+        data: { inputData: parsedInput },
       });
 
-      if (response.ok) {
-        setStatus('success');
-        setTimeout(() => {
-          onSuccess?.();
-          onClose();
-        }, 1500);
-      } else {
-        const data = await response.json();
-        setErrorMessage(data.error || 'Execution failed');
-        setStatus('error');
-      }
+      setStatus("success");
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+      }, 1500);
     } catch (error) {
       if (error instanceof SyntaxError) {
-        setErrorMessage('Invalid JSON format');
+        setErrorMessage("Invalid JSON format");
+      } else if (error instanceof ApiError) {
+        setErrorMessage(error.message);
       } else {
-        setErrorMessage('Execution failed');
+        setErrorMessage("Execution failed");
       }
-      setStatus('error');
+      setStatus("error");
     }
   };
 

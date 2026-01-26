@@ -15,7 +15,8 @@
  *     └── ExecutionRow[]
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
+import { request } from "../api/client";
 
 interface Execution {
   id: string;
@@ -37,15 +38,13 @@ export default function ExecutionsPage() {
   useEffect(() => {
     const fetchExecutions = async () => {
       try {
-        const response = await fetch('/api/executions', {
-          credentials: 'include',
+        const data = await request<{ executions: Execution[] }>({
+          url: "/api/executions",
+          method: "GET",
         });
-        if (response.ok) {
-          const data = await response.json();
-          setExecutions(data.executions || []);
-        }
+        setExecutions(data.executions || []);
       } catch (error) {
-        console.error('Failed to fetch executions:', error);
+        console.error("Failed to fetch executions:", error);
       } finally {
         setIsLoading(false);
       }
