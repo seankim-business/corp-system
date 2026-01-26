@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nubabel — Connect Your Apps, Automate Everything</title>
+    <title>Nubabel — Your AI Workforce</title>
     <meta
       name="description"
-      content="Connect Slack, Notion, Salesforce, and 100+ apps. Build automated workflows in minutes. No coding required."
+      content="Build an AI organization that works alongside your team. Agents that learn, collaborate, and gradually take over repetitive work."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,20 +16,18 @@
     />
     <style>
       :root {
-        --bg: #050608;
-        --surface: #0a0d14;
-        --card: rgba(255, 255, 255, 0.03);
-        --card-hover: rgba(255, 255, 255, 0.06);
-        --border: rgba(255, 255, 255, 0.08);
-        --text: #f8fafc;
-        --text-secondary: rgba(255, 255, 255, 0.7);
-        --text-muted: rgba(255, 255, 255, 0.5);
-        --accent: #7c3aed;
-        --accent-glow: rgba(124, 58, 237, 0.4);
-        --green: #22c55e;
+        --bg: #030305;
+        --surface: #0a0a0f;
+        --card: rgba(255, 255, 255, 0.02);
+        --card-hover: rgba(255, 255, 255, 0.04);
+        --border: rgba(255, 255, 255, 0.06);
+        --text: #f0f0f5;
+        --text-secondary: rgba(255, 255, 255, 0.6);
+        --text-muted: rgba(255, 255, 255, 0.4);
+        --accent: #8b5cf6;
+        --accent-dim: rgba(139, 92, 246, 0.15);
+        --green: #10b981;
         --blue: #3b82f6;
-        --orange: #f97316;
-        --pink: #ec4899;
       }
 
       * {
@@ -48,24 +46,22 @@
           sans-serif;
         background: var(--bg);
         color: var(--text);
-        line-height: 1.6;
+        line-height: 1.7;
         -webkit-font-smoothing: antialiased;
       }
 
-      .bg-gradient {
+      .gradient-bg {
         position: fixed;
         inset: 0;
-        background: radial-gradient(
-          ellipse 80% 50% at 50% -20%,
-          rgba(124, 58, 237, 0.25),
-          transparent 60%
-        );
+        background:
+          radial-gradient(ellipse 100% 100% at 50% -50%, rgba(139, 92, 246, 0.12), transparent 50%),
+          radial-gradient(ellipse 80% 80% at 80% 50%, rgba(16, 185, 129, 0.06), transparent 50%);
         pointer-events: none;
         z-index: -1;
       }
 
       .container {
-        max-width: 1200px;
+        max-width: 1100px;
         margin: 0 auto;
         padding: 0 24px;
       }
@@ -75,11 +71,10 @@
         top: 0;
         left: 0;
         right: 0;
-        z-index: 1000;
-        padding: 16px 0;
-        background: rgba(5, 6, 8, 0.9);
+        z-index: 100;
+        padding: 20px 0;
+        background: rgba(3, 3, 5, 0.9);
         backdrop-filter: blur(20px);
-        border-bottom: 1px solid var(--border);
       }
 
       .nav-inner {
@@ -93,42 +88,25 @@
         align-items: center;
         gap: 10px;
         font-weight: 700;
-        font-size: 20px;
+        font-size: 18px;
         text-decoration: none;
         color: var(--text);
+        letter-spacing: -0.5px;
       }
 
       .logo-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
         background: linear-gradient(135deg, var(--accent), var(--green));
-      }
-
-      .nav-links {
-        display: flex;
-        align-items: center;
-        gap: 32px;
-      }
-      .nav-links a {
-        color: var(--text-secondary);
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 500;
-        transition: color 0.2s;
-      }
-      .nav-links a:hover {
-        color: var(--text);
       }
 
       .btn {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-weight: 600;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 500;
         font-size: 14px;
         text-decoration: none;
         transition: all 0.2s;
@@ -141,564 +119,444 @@
         color: white;
       }
       .btn-primary:hover {
-        background: #9333ea;
-        transform: translateY(-1px);
+        background: #7c4dff;
       }
 
-      .btn-secondary {
-        background: var(--card);
-        color: var(--text);
-        border: 1px solid var(--border);
+      .btn-ghost {
+        color: var(--text-secondary);
+        background: transparent;
       }
-      .btn-secondary:hover {
-        background: var(--card-hover);
+      .btn-ghost:hover {
+        color: var(--text);
       }
 
       section {
-        padding: 100px 0;
+        padding: 120px 0;
       }
 
       .hero {
         min-height: 100vh;
         display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding: 120px 0 80px;
-        text-align: center;
+        align-items: center;
+        padding-top: 100px;
+      }
+
+      .hero-content {
+        max-width: 700px;
       }
 
       .hero-eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 14px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 100px;
-        font-size: 13px;
-        color: var(--text-secondary);
+        display: inline-block;
+        padding: 6px 12px;
+        background: var(--accent-dim);
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
         margin-bottom: 24px;
       }
 
       .hero h1 {
-        font-size: clamp(40px, 6vw, 64px);
+        font-size: 56px;
         font-weight: 800;
         line-height: 1.1;
-        letter-spacing: -1.5px;
-        margin-bottom: 20px;
+        letter-spacing: -2px;
+        margin-bottom: 24px;
       }
 
-      .hero h1 span {
-        color: var(--accent);
+      .hero h1 .gradient-text {
+        background: linear-gradient(135deg, var(--accent), var(--green));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
       }
 
       .hero-subtitle {
-        font-size: 20px;
+        font-size: 18px;
         color: var(--text-secondary);
-        max-width: 600px;
-        margin: 0 auto 32px;
+        margin-bottom: 40px;
+        line-height: 1.7;
       }
 
       .hero-cta {
         display: flex;
-        gap: 12px;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-bottom: 48px;
-      }
-
-      .hero-workflow {
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 32px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-      }
-
-      .workflow-visual {
-        display: flex;
-        align-items: center;
-        justify-content: center;
         gap: 16px;
-        flex-wrap: wrap;
       }
 
-      .workflow-step {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .workflow-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 28px;
-      }
-
-      .workflow-label {
-        font-size: 12px;
-        color: var(--text-muted);
-        font-weight: 500;
-      }
-
-      .workflow-arrow {
-        font-size: 24px;
-        color: var(--accent);
-      }
-
-      .workflow-example {
-        margin-top: 24px;
-        padding: 16px 24px;
-        background: rgba(124, 58, 237, 0.1);
-        border: 1px solid rgba(124, 58, 237, 0.2);
-        border-radius: 8px;
-        font-size: 14px;
-        color: var(--text-secondary);
-      }
-
-      .workflow-example strong {
-        color: var(--text);
-      }
-
-      .section-header {
-        text-align: center;
-        margin-bottom: 64px;
-      }
-      .section-header h2 {
-        font-size: 40px;
-        font-weight: 700;
-        letter-spacing: -1px;
-        margin-bottom: 16px;
-      }
-      .section-header p {
-        font-size: 18px;
-        color: var(--text-secondary);
-        max-width: 600px;
-        margin: 0 auto;
-      }
-
-      .integrations {
+      .philosophy {
         background: var(--surface);
         border-top: 1px solid var(--border);
         border-bottom: 1px solid var(--border);
       }
 
-      .integration-categories {
-        display: flex;
-        justify-content: center;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-bottom: 48px;
-      }
-
-      .category-pill {
-        padding: 8px 16px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 100px;
-        font-size: 13px;
-        color: var(--text-secondary);
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      .category-pill:hover,
-      .category-pill.active {
-        background: var(--accent);
-        color: white;
-        border-color: var(--accent);
-      }
-
-      .integration-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 16px;
-        max-width: 900px;
-        margin: 0 auto;
-      }
-
-      .integration-card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-        padding: 24px 16px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        transition: all 0.2s;
-        cursor: pointer;
-      }
-      .integration-card:hover {
-        background: var(--card-hover);
-        border-color: rgba(255, 255, 255, 0.15);
-        transform: translateY(-2px);
-      }
-
-      .integration-logo {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-      }
-
-      .integration-card span {
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-secondary);
-      }
-
-      .integration-cta {
+      .philosophy-header {
         text-align: center;
-        margin-top: 48px;
+        margin-bottom: 80px;
       }
-      .integration-cta p {
-        color: var(--text-muted);
+
+      .philosophy-header h2 {
         font-size: 14px;
+        font-weight: 500;
+        color: var(--accent);
+        letter-spacing: 2px;
+        text-transform: uppercase;
         margin-bottom: 16px;
       }
 
-      .usecases {
-        background: linear-gradient(180deg, var(--bg) 0%, var(--surface) 100%);
+      .philosophy-header p {
+        font-size: 32px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+        max-width: 600px;
+        margin: 0 auto;
+        line-height: 1.4;
       }
 
-      .usecase-tabs {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-bottom: 48px;
-      }
-
-      .usecase-tab {
-        padding: 12px 24px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--text-secondary);
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      .usecase-tab:hover,
-      .usecase-tab.active {
-        background: var(--accent);
-        color: white;
-        border-color: var(--accent);
-      }
-
-      .usecase-content {
+      .babel-story {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 48px;
-        align-items: center;
+        align-items: start;
       }
 
-      .usecase-info h3 {
-        font-size: 28px;
-        font-weight: 700;
+      .babel-card {
+        padding: 40px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      .babel-card h3 {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        letter-spacing: 1px;
+        text-transform: uppercase;
         margin-bottom: 16px;
       }
-      .usecase-info p {
+
+      .babel-card h4 {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        letter-spacing: -0.5px;
+      }
+
+      .babel-card p {
+        font-size: 15px;
         color: var(--text-secondary);
         margin-bottom: 24px;
         line-height: 1.7;
       }
 
-      .usecase-benefits {
-        list-style: none;
-        margin-bottom: 32px;
-      }
-      .usecase-benefits li {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--border);
-        font-size: 15px;
-      }
-      .usecase-benefits li:last-child {
-        border-bottom: none;
-      }
-      .usecase-benefits .check {
-        color: var(--green);
-        font-size: 18px;
+      .babel-result {
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        font-size: 14px;
       }
 
-      .usecase-visual {
+      .babel-result .fail {
+        color: #ef4444;
+      }
+      .babel-result .success {
+        color: var(--green);
+      }
+
+      .vision {
+        text-align: center;
+      }
+
+      .vision h2 {
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .vision-subtitle {
+        font-size: 18px;
+        color: var(--text-secondary);
+        max-width: 600px;
+        margin: 0 auto 64px;
+      }
+
+      .org-evolution {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 32px;
+        flex-wrap: wrap;
+      }
+
+      .org-stage {
+        text-align: center;
+        padding: 32px;
         background: var(--card);
         border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 32px;
-      }
-
-      .usecase-workflow {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .workflow-item {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 16px;
-        background: var(--surface);
-        border: 1px solid var(--border);
         border-radius: 12px;
+        width: 200px;
       }
 
-      .workflow-item-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        flex-shrink: 0;
+      .org-stage.current {
+        border-color: var(--accent);
+        background: var(--accent-dim);
       }
 
-      .workflow-item-content h4 {
+      .org-stage-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+
+      .org-stage h4 {
         font-size: 14px;
         font-weight: 600;
-        margin-bottom: 4px;
+        margin-bottom: 8px;
       }
-      .workflow-item-content p {
+
+      .org-stage p {
         font-size: 12px;
         color: var(--text-muted);
       }
 
-      .workflow-connector {
-        width: 2px;
-        height: 20px;
-        background: var(--accent);
-        margin-left: 35px;
-      }
-
-      .features-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 24px;
-      }
-
-      .feature-card {
-        padding: 32px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        transition: all 0.3s;
-      }
-      .feature-card:hover {
-        background: var(--card-hover);
-        transform: translateY(-4px);
-      }
-
-      .feature-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+      .org-arrow {
         font-size: 24px;
-        margin-bottom: 20px;
+        color: var(--text-muted);
       }
 
-      .feature-card h3 {
-        font-size: 18px;
-        font-weight: 600;
-        margin-bottom: 12px;
-      }
-      .feature-card p {
-        font-size: 14px;
-        color: var(--text-secondary);
-        line-height: 1.6;
-      }
-
-      .templates {
+      .how-it-works {
         background: var(--surface);
         border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
       }
 
-      .templates-grid {
+      .how-header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+      .how-header h2 {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 16px;
+      }
+      .how-header p {
+        font-size: 18px;
+        color: var(--text-secondary);
+      }
+
+      .how-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: repeat(2, 1fr);
         gap: 24px;
       }
 
-      .template-card {
-        padding: 24px;
+      .how-card {
+        padding: 32px;
         background: var(--card);
         border: 1px solid var(--border);
         border-radius: 12px;
         transition: all 0.2s;
-        cursor: pointer;
-      }
-      .template-card:hover {
-        background: var(--card-hover);
-        border-color: rgba(255, 255, 255, 0.15);
       }
 
-      .template-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
+      .how-card:hover {
+        border-color: rgba(255, 255, 255, 0.1);
+        background: var(--card-hover);
       }
-      .template-icons {
-        display: flex;
-        gap: -8px;
-      }
-      .template-icon {
+
+      .how-card-number {
         width: 32px;
         height: 32px;
+        border-radius: 50%;
+        background: var(--accent-dim);
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 20px;
+      }
+
+      .how-card h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+
+      .how-card p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .capabilities {
+        text-align: center;
+      }
+
+      .capabilities h2 {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 64px;
+      }
+
+      .capability-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        text-align: left;
+      }
+
+      .capability-card {
+        padding: 28px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      .capability-icon {
+        font-size: 28px;
+        margin-bottom: 16px;
+      }
+
+      .capability-card h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .capability-card p {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      .scenario {
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .scenario-header {
+        text-align: center;
+        margin-bottom: 64px;
+      }
+      .scenario-header h2 {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 16px;
+      }
+      .scenario-header p {
+        font-size: 18px;
+        color: var(--text-secondary);
+      }
+
+      .scenario-demo {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 32px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      .scenario-step {
+        display: flex;
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .scenario-step:last-child {
+        border-bottom: none;
+      }
+
+      .scenario-step-icon {
+        width: 40px;
+        height: 40px;
         border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 16px;
-        border: 2px solid var(--surface);
-        margin-left: -8px;
-      }
-      .template-icon:first-child {
-        margin-left: 0;
+        font-size: 18px;
+        flex-shrink: 0;
       }
 
-      .template-card h3 {
-        font-size: 15px;
+      .scenario-step-content h4 {
+        font-size: 14px;
         font-weight: 600;
-        margin-bottom: 8px;
-      }
-      .template-card p {
-        font-size: 13px;
-        color: var(--text-muted);
-        margin-bottom: 16px;
-      }
-
-      .template-meta {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        font-size: 12px;
-        color: var(--text-muted);
-      }
-
-      .pricing {
-        padding: 120px 0;
-      }
-
-      .pricing-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 24px;
-        max-width: 1000px;
-        margin: 0 auto;
-      }
-
-      .pricing-card {
-        padding: 32px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-      }
-
-      .pricing-card.featured {
-        background: linear-gradient(180deg, rgba(124, 58, 237, 0.1) 0%, var(--card) 100%);
-        border-color: var(--accent);
-        transform: scale(1.02);
-      }
-
-      .pricing-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        background: var(--accent);
-        color: white;
-        font-size: 11px;
-        font-weight: 600;
-        border-radius: 100px;
-        margin-bottom: 16px;
-      }
-
-      .pricing-card h3 {
-        font-size: 20px;
-        font-weight: 600;
-        margin-bottom: 8px;
-      }
-      .pricing-card .price {
-        font-size: 40px;
-        font-weight: 800;
         margin-bottom: 4px;
       }
-      .pricing-card .price span {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--text-muted);
-      }
-      .pricing-card .price-note {
+
+      .scenario-step-content p {
         font-size: 13px;
-        color: var(--text-muted);
-        margin-bottom: 24px;
+        color: var(--text-secondary);
       }
 
-      .pricing-features {
-        list-style: none;
-        margin-bottom: 24px;
+      .integrations {
+        text-align: center;
       }
-      .pricing-features li {
+
+      .integrations h2 {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+
+      .integrations-subtitle {
+        font-size: 15px;
+        color: var(--text-secondary);
+        margin-bottom: 48px;
+      }
+
+      .integration-grid {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+
+      .integration-item {
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 10px 0;
+        padding: 12px 20px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
         font-size: 14px;
+        font-weight: 500;
         color: var(--text-secondary);
-        border-bottom: 1px solid var(--border);
-      }
-      .pricing-features li:last-child {
-        border-bottom: none;
-      }
-      .pricing-features .check {
-        color: var(--green);
       }
 
-      .pricing-card .btn {
-        width: 100%;
+      .integration-icon {
+        font-size: 20px;
       }
 
       .cta-section {
         text-align: center;
-        padding: 120px 0;
-        background: radial-gradient(
-          ellipse 60% 40% at 50% 100%,
-          rgba(124, 58, 237, 0.15),
-          transparent 60%
-        );
+        padding: 160px 0;
       }
 
       .cta-section h2 {
-        font-size: 48px;
+        font-size: 44px;
         font-weight: 800;
         letter-spacing: -1px;
         margin-bottom: 16px;
       }
+
       .cta-section p {
         font-size: 18px;
         color: var(--text-secondary);
-        margin-bottom: 32px;
+        margin-bottom: 40px;
       }
-      .cta-section .btn {
-        padding: 16px 32px;
+
+      .cta-section .btn-primary {
+        padding: 14px 32px;
         font-size: 16px;
       }
 
@@ -711,9 +569,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        flex-wrap: wrap;
-        gap: 24px;
       }
+
       .footer-links {
         display: flex;
         gap: 24px;
@@ -732,36 +589,29 @@
       }
 
       @media (max-width: 900px) {
-        .features-grid,
-        .pricing-grid {
-          grid-template-columns: 1fr;
-        }
-        .usecase-content {
-          grid-template-columns: 1fr;
-        }
-        .pricing-card.featured {
-          transform: none;
-        }
-        .nav-links {
-          display: none;
-        }
-      }
-
-      @media (max-width: 600px) {
         .hero h1 {
-          font-size: 32px;
+          font-size: 40px;
         }
-        .workflow-visual {
+        .babel-story {
+          grid-template-columns: 1fr;
+        }
+        .how-grid {
+          grid-template-columns: 1fr;
+        }
+        .capability-grid {
+          grid-template-columns: 1fr;
+        }
+        .org-evolution {
           flex-direction: column;
         }
-        .workflow-arrow {
+        .org-arrow {
           transform: rotate(90deg);
         }
       }
     </style>
   </head>
   <body>
-    <div class="bg-gradient"></div>
+    <div class="gradient-bg"></div>
 
     <nav>
       <div class="container">
@@ -770,11 +620,9 @@
             <div class="logo-icon"></div>
             <span>Nubabel</span>
           </a>
-          <div class="nav-links">
-            <a href="#integrations">Integrations</a>
-            <a href="#usecases">Use Cases</a>
-            <a href="#pricing">Pricing</a>
-            <a href="https://app.nubabel.com" class="btn btn-primary">Get Started Free</a>
+          <div style="display: flex; gap: 8px">
+            <a href="#how" class="btn btn-ghost">How it works</a>
+            <a href="https://app.nubabel.com" class="btn btn-primary">Get Started</a>
           </div>
         </div>
       </div>
@@ -782,456 +630,283 @@
 
     <section class="hero">
       <div class="container">
-        <div class="hero-eyebrow">
-          <span style="color: var(--green)">●</span>
-          100+ integrations available
+        <div class="hero-content">
+          <div class="hero-eyebrow">A new kind of organization</div>
+          <h1>
+            Build an <span class="gradient-text">AI workforce</span> that learns from your team.
+          </h1>
+          <p class="hero-subtitle">
+            Nubabel creates AI agents that become part of your organization. They learn how you
+            work, take over repetitive tasks, and gradually handle more—until your org chart has
+            both humans and agents.
+          </p>
+          <div class="hero-cta">
+            <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
+              >Start building your AI team</a
+            >
+            <a href="#how" class="btn btn-ghost">See how it works →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="philosophy">
+      <div class="container">
+        <div class="philosophy-header">
+          <h2>The Philosophy</h2>
+          <p>
+            The Tower of Babel failed because humans couldn't collaborate. AI agents don't have that
+            problem.
+          </p>
         </div>
 
-        <h1>Connect your apps.<br />Automate <span>everything</span>.</h1>
+        <div class="babel-story">
+          <div class="babel-card">
+            <h3>The Ancient Failure</h3>
+            <h4>Tower of Babel</h4>
+            <p>
+              Humans attempted to build a tower reaching the heavens. But when their languages
+              split, collaboration collapsed. Individual brilliance couldn't overcome organizational
+              chaos.
+            </p>
+            <div class="babel-result">
+              <span class="fail"
+                >✗ Different languages → Coordination failure → Tower collapsed</span
+              >
+            </div>
+          </div>
 
-        <p class="hero-subtitle">
-          Nubabel connects Slack, Notion, Salesforce, and 100+ other apps. Build automated workflows
-          in minutes. No coding required.
+          <div class="babel-card">
+            <h3>The Modern Solution</h3>
+            <h4>Nu-babel</h4>
+            <p>
+              AI agents speak the same protocol. Perfect sync. Zero miscommunication. They delegate,
+              collaborate, and execute with precision humans can't match.
+            </p>
+            <div class="babel-result">
+              <span class="success"
+                >✓ Same protocol → Perfect collaboration → Superhuman execution</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="vision">
+      <div class="container">
+        <h2>The gradual shift to an AI organization</h2>
+        <p class="vision-subtitle">
+          Your agents start as assistants. They learn. They take on more. Eventually, your org chart
+          has both humans and AI—working together.
         </p>
 
-        <div class="hero-cta">
-          <a href="https://app.nubabel.com/auth/google" class="btn btn-primary">Start free trial</a>
-          <a href="#usecases" class="btn btn-secondary">See examples</a>
-        </div>
-
-        <div class="hero-workflow">
-          <div class="workflow-visual">
-            <div class="workflow-step">
-              <div class="workflow-icon" style="background: #4a154b">📱</div>
-              <span class="workflow-label">Slack</span>
-            </div>
-            <span class="workflow-arrow">→</span>
-            <div class="workflow-step">
-              <div
-                class="workflow-icon"
-                style="background: linear-gradient(135deg, var(--accent), var(--green))"
-              >
-                ⚡
-              </div>
-              <span class="workflow-label">Nubabel</span>
-            </div>
-            <span class="workflow-arrow">→</span>
-            <div class="workflow-step">
-              <div class="workflow-icon" style="background: #000">📝</div>
-              <span class="workflow-label">Notion</span>
-            </div>
-            <span class="workflow-arrow">→</span>
-            <div class="workflow-step">
-              <div class="workflow-icon" style="background: #0052cc">📋</div>
-              <span class="workflow-label">Jira</span>
-            </div>
+        <div class="org-evolution">
+          <div class="org-stage">
+            <div class="org-stage-icon">👤</div>
+            <h4>Today</h4>
+            <p>Humans do everything. AI helps occasionally.</p>
           </div>
-          <div class="workflow-example">
-            <strong>Example:</strong> When a customer request arrives in Slack → Nubabel AI analyzes
-            it → Creates a task in Notion → Opens a ticket in Jira
+
+          <span class="org-arrow">→</span>
+
+          <div class="org-stage current">
+            <div class="org-stage-icon">👤🤖</div>
+            <h4>With Nubabel</h4>
+            <p>Agents learn and handle routine work.</p>
+          </div>
+
+          <span class="org-arrow">→</span>
+
+          <div class="org-stage">
+            <div class="org-stage-icon">🤖🤖🤖</div>
+            <h4>The Future</h4>
+            <p>AI org with human oversight.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="integrations" id="integrations">
+    <section class="how-it-works" id="how">
       <div class="container">
-        <div class="section-header">
-          <h2>100+ apps, one platform</h2>
-          <p>Connect all your favorite tools and automate workflows between them.</p>
+        <div class="how-header">
+          <h2>How your AI workforce operates</h2>
+          <p>Agents that learn, delegate, and execute—just like your best employees.</p>
         </div>
 
-        <div class="integration-categories">
-          <span class="category-pill active">All</span>
-          <span class="category-pill">Communication</span>
-          <span class="category-pill">Productivity</span>
-          <span class="category-pill">CRM & Sales</span>
-          <span class="category-pill">Project Management</span>
-          <span class="category-pill">AI & Automation</span>
+        <div class="how-grid">
+          <div class="how-card">
+            <div class="how-card-number">1</div>
+            <h3>Mention to assign</h3>
+            <p>
+              @mention an agent in Slack with a task. It analyzes the request, breaks it down, and
+              delegates to the right sub-agents in your AI org chart.
+            </p>
+          </div>
+
+          <div class="how-card">
+            <div class="how-card-number">2</div>
+            <h3>Agents collaborate</h3>
+            <p>
+              Sub-agents work together, share context, and execute in parallel. They ask for
+              approval when needed, otherwise they just get it done.
+            </p>
+          </div>
+
+          <div class="how-card">
+            <div class="how-card-number">3</div>
+            <h3>Learn and improve</h3>
+            <p>
+              Agents observe how your team works. They identify patterns, create SOPs, and gradually
+              automate what used to require human attention.
+            </p>
+          </div>
+
+          <div class="how-card">
+            <div class="how-card-number">4</div>
+            <h3>Align with goals</h3>
+            <p>
+              Agents understand your company objectives. They monitor if work aligns with goals,
+              suggest corrections, and keep everyone (human and AI) on track.
+            </p>
+          </div>
         </div>
+      </div>
+    </section>
+
+    <section class="scenario">
+      <div class="container">
+        <div class="scenario-header">
+          <h2>See it in action</h2>
+          <p>A typical workflow with your AI organization</p>
+        </div>
+
+        <div class="scenario-demo">
+          <div class="scenario-step">
+            <div class="scenario-step-icon" style="background: #4a154b">💬</div>
+            <div class="scenario-step-content">
+              <h4>You in Slack</h4>
+              <p>"@nubabel prepare the Q1 sales report and send it to the team"</p>
+            </div>
+          </div>
+
+          <div class="scenario-step">
+            <div class="scenario-step-icon" style="background: var(--accent-dim)">🧠</div>
+            <div class="scenario-step-content">
+              <h4>Orchestrator Agent analyzes</h4>
+              <p>Breaks down task → Assigns to Data Agent + Report Agent + Communication Agent</p>
+            </div>
+          </div>
+
+          <div class="scenario-step">
+            <div class="scenario-step-icon" style="background: var(--accent-dim)">📊</div>
+            <div class="scenario-step-content">
+              <h4>Data Agent pulls numbers</h4>
+              <p>Connects to Salesforce, aggregates Q1 data, validates accuracy</p>
+            </div>
+          </div>
+
+          <div class="scenario-step">
+            <div class="scenario-step-icon" style="background: var(--accent-dim)">📝</div>
+            <div class="scenario-step-content">
+              <h4>Report Agent creates document</h4>
+              <p>Generates report in Notion using your company template</p>
+            </div>
+          </div>
+
+          <div class="scenario-step">
+            <div class="scenario-step-icon" style="background: var(--accent-dim)">✅</div>
+            <div class="scenario-step-content">
+              <h4>Asks for your approval</h4>
+              <p>"Report ready. Should I send to #sales-team?" → You approve</p>
+            </div>
+          </div>
+
+          <div class="scenario-step">
+            <div class="scenario-step-icon" style="background: var(--green); color: white">📤</div>
+            <div class="scenario-step-content">
+              <h4>Communication Agent delivers</h4>
+              <p>Posts to Slack channel with summary + full report link</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="capabilities">
+      <div class="container">
+        <h2>What your AI agents can do</h2>
+
+        <div class="capability-grid">
+          <div class="capability-card">
+            <div class="capability-icon">🔀</div>
+            <h3>Intelligent delegation</h3>
+            <p>
+              Break complex tasks into subtasks and assign to specialized sub-agents automatically.
+            </p>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">📚</div>
+            <h3>Learn new skills</h3>
+            <p>
+              Agents acquire new capabilities as they observe your team and understand your
+              processes.
+            </p>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">🎯</div>
+            <h3>Goal alignment</h3>
+            <p>
+              Monitor if work aligns with company objectives. Suggest corrections when things drift.
+            </p>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">📋</div>
+            <h3>SOP creation</h3>
+            <p>Turn repetitive tasks into standard procedures. Then execute them automatically.</p>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">🔄</div>
+            <h3>Periodic execution</h3>
+            <p>Handle recurring work on schedule. Reports, updates, maintenance—all automated.</p>
+          </div>
+
+          <div class="capability-card">
+            <div class="capability-icon">🤝</div>
+            <h3>Human-in-the-loop</h3>
+            <p>Ask for approval on sensitive decisions. Escalate when confidence is low.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="integrations">
+      <div class="container">
+        <h2>Works with your existing tools</h2>
+        <p class="integrations-subtitle">Agents connect to where your work already happens.</p>
 
         <div class="integration-grid">
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #4a154b">💬</div>
-            <span>Slack</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #000">📝</div>
-            <span>Notion</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #00a4ef">📧</div>
-            <span>Gmail</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #0052cc">📋</div>
-            <span>Jira</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #5e6ad2">📊</div>
-            <span>Linear</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #ff5a5f">📁</div>
-            <span>Asana</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #00a1e0">💼</div>
-            <span>Salesforce</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #ff7a59">📈</div>
-            <span>HubSpot</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #0f9d58">📊</div>
-            <span>Google Sheets</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #4285f4">📁</div>
-            <span>Google Drive</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #6366f1">🗄️</div>
-            <span>Airtable</span>
-          </div>
-          <div class="integration-card">
-            <div class="integration-logo" style="background: #00d4aa">💳</div>
-            <span>Stripe</span>
-          </div>
-        </div>
-
-        <div class="integration-cta">
-          <p>Can't find your app? We add new integrations weekly via MCP protocol.</p>
-          <a href="mailto:engineering@nubabel.com" class="btn btn-secondary"
-            >Request an integration</a
-          >
-        </div>
-      </div>
-    </section>
-
-    <section class="usecases" id="usecases">
-      <div class="container">
-        <div class="section-header">
-          <h2>Built for every team</h2>
-          <p>See how teams use Nubabel to automate their daily work.</p>
-        </div>
-
-        <div class="usecase-tabs">
-          <span class="usecase-tab active">🎯 Sales & RevOps</span>
-          <span class="usecase-tab">📣 Marketing</span>
-          <span class="usecase-tab">🛠️ Operations</span>
-          <span class="usecase-tab">🎧 Customer Support</span>
-          <span class="usecase-tab">👥 HR & People</span>
-        </div>
-
-        <div class="usecase-content">
-          <div class="usecase-info">
-            <h3>Automate your sales pipeline</h3>
-            <p>
-              Stop spending hours on manual data entry. Nubabel automatically syncs leads between
-              your CRM, communication tools, and project management apps.
-            </p>
-            <ul class="usecase-benefits">
-              <li>
-                <span class="check">✓</span>
-                <span
-                  ><strong>Auto-capture leads</strong> from forms, emails, and chat into Salesforce
-                  or HubSpot</span
-                >
-              </li>
-              <li>
-                <span class="check">✓</span>
-                <span
-                  ><strong>Instant notifications</strong> in Slack when high-value leads come
-                  in</span
-                >
-              </li>
-              <li>
-                <span class="check">✓</span>
-                <span><strong>Auto-create tasks</strong> for follow-ups in Asana or Linear</span>
-              </li>
-              <li>
-                <span class="check">✓</span>
-                <span
-                  ><strong>Sync meeting notes</strong> from Google Meet to Notion
-                  automatically</span
-                >
-              </li>
-            </ul>
-            <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
-              >Start automating sales</a
-            >
-          </div>
-
-          <div class="usecase-visual">
-            <div class="usecase-workflow">
-              <div class="workflow-item">
-                <div class="workflow-item-icon" style="background: #ff7a59">📥</div>
-                <div class="workflow-item-content">
-                  <h4>New lead submitted</h4>
-                  <p>HubSpot form receives new lead data</p>
-                </div>
-              </div>
-              <div class="workflow-connector"></div>
-              <div class="workflow-item">
-                <div class="workflow-item-icon" style="background: var(--accent)">🤖</div>
-                <div class="workflow-item-content">
-                  <h4>AI analyzes & scores</h4>
-                  <p>Nubabel AI qualifies and prioritizes lead</p>
-                </div>
-              </div>
-              <div class="workflow-connector"></div>
-              <div class="workflow-item">
-                <div class="workflow-item-icon" style="background: #4a154b">🔔</div>
-                <div class="workflow-item-content">
-                  <h4>Team notified in Slack</h4>
-                  <p>Sales rep receives instant notification</p>
-                </div>
-              </div>
-              <div class="workflow-connector"></div>
-              <div class="workflow-item">
-                <div class="workflow-item-icon" style="background: #5e6ad2">✅</div>
-                <div class="workflow-item-content">
-                  <h4>Task created in Linear</h4>
-                  <p>Follow-up task assigned automatically</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="features" id="features">
-      <div class="container">
-        <div class="section-header">
-          <h2>Powerful features, simple to use</h2>
-          <p>Everything you need to build and manage automated workflows.</p>
-        </div>
-
-        <div class="features-grid">
-          <div class="feature-card">
-            <div
-              class="feature-icon"
-              style="background: linear-gradient(135deg, var(--accent), #9333ea)"
-            >
-              🤖
-            </div>
-            <h3>AI-Powered Workflows</h3>
-            <p>
-              Describe what you want in plain English. Our AI builds the workflow for you and
-              suggests optimizations.
-            </p>
-          </div>
-          <div class="feature-card">
-            <div
-              class="feature-icon"
-              style="background: linear-gradient(135deg, var(--green), #16a34a)"
-            >
-              💬
-            </div>
-            <h3>Slack Bot Integration</h3>
-            <p>
-              Trigger workflows directly from Slack. Just @mention and describe what you need in
-              natural language.
-            </p>
-          </div>
-          <div class="feature-card">
-            <div
-              class="feature-icon"
-              style="background: linear-gradient(135deg, var(--blue), #2563eb)"
-            >
-              🎨
-            </div>
-            <h3>Visual Builder</h3>
-            <p>
-              Drag-and-drop interface to build workflows. See your automation logic visually. No
-              coding required.
-            </p>
-          </div>
-          <div class="feature-card">
-            <div
-              class="feature-icon"
-              style="background: linear-gradient(135deg, var(--orange), #ea580c)"
-            >
-              📊
-            </div>
-            <h3>Real-Time Monitoring</h3>
-            <p>
-              Track every workflow run in real-time. View execution logs, debug failures, and
-              optimize performance.
-            </p>
-          </div>
-          <div class="feature-card">
-            <div
-              class="feature-icon"
-              style="background: linear-gradient(135deg, var(--pink), #db2777)"
-            >
-              🔐
-            </div>
-            <h3>Enterprise Security</h3>
-            <p>
-              SOC 2 Type II certified. GDPR compliant. Row-level data isolation. SSO and SCIM
-              support.
-            </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon" style="background: linear-gradient(135deg, #8b5cf6, #6366f1)">
-              🔌
-            </div>
-            <h3>MCP Protocol</h3>
-            <p>
-              Universal integration standard. Connect any app that supports MCP. Future-proof your
-              automations.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="templates" id="templates">
-      <div class="container">
-        <div class="section-header">
-          <h2>Start with a template</h2>
-          <p>Pre-built workflows you can customize and deploy in minutes.</p>
-        </div>
-
-        <div class="templates-grid">
-          <div class="template-card">
-            <div class="template-header">
-              <div class="template-icons">
-                <div class="template-icon" style="background: #4a154b">💬</div>
-                <div class="template-icon" style="background: #000">📝</div>
-                <div class="template-icon" style="background: #5e6ad2">📊</div>
-              </div>
-            </div>
-            <h3>Slack → Notion → Linear</h3>
-            <p>Turn Slack messages into Notion docs and Linear tasks automatically.</p>
-            <div class="template-meta">
-              <span>⚡ 2 min setup</span>
-              <span>👥 Used by 500+ teams</span>
-            </div>
-          </div>
-
-          <div class="template-card">
-            <div class="template-header">
-              <div class="template-icons">
-                <div class="template-icon" style="background: #ff7a59">📈</div>
-                <div class="template-icon" style="background: #4a154b">💬</div>
-                <div class="template-icon" style="background: #00a1e0">💼</div>
-              </div>
-            </div>
-            <h3>HubSpot → Slack → Salesforce</h3>
-            <p>Sync leads across CRMs and notify sales team instantly.</p>
-            <div class="template-meta">
-              <span>⚡ 3 min setup</span>
-              <span>👥 Used by 300+ teams</span>
-            </div>
-          </div>
-
-          <div class="template-card">
-            <div class="template-header">
-              <div class="template-icons">
-                <div class="template-icon" style="background: #00a4ef">📧</div>
-                <div class="template-icon" style="background: var(--accent)">🤖</div>
-                <div class="template-icon" style="background: #0052cc">📋</div>
-              </div>
-            </div>
-            <h3>Gmail → AI Analysis → Jira</h3>
-            <p>Auto-create Jira tickets from customer emails with AI categorization.</p>
-            <div class="template-meta">
-              <span>⚡ 5 min setup</span>
-              <span>👥 Used by 200+ teams</span>
-            </div>
-          </div>
-
-          <div class="template-card">
-            <div class="template-header">
-              <div class="template-icons">
-                <div class="template-icon" style="background: #4285f4">📁</div>
-                <div class="template-icon" style="background: #000">📝</div>
-                <div class="template-icon" style="background: #4a154b">💬</div>
-              </div>
-            </div>
-            <h3>Google Drive → Notion → Slack</h3>
-            <p>When files are added to Drive, create Notion pages and notify team.</p>
-            <div class="template-meta">
-              <span>⚡ 2 min setup</span>
-              <span>👥 Used by 400+ teams</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="pricing" id="pricing">
-      <div class="container">
-        <div class="section-header">
-          <h2>Simple, transparent pricing</h2>
-          <p>Start free. Upgrade as you grow.</p>
-        </div>
-
-        <div class="pricing-grid">
-          <div class="pricing-card">
-            <h3>Starter</h3>
-            <div class="price">$49<span>/mo</span></div>
-            <p class="price-note">Up to 5 users</p>
-            <ul class="pricing-features">
-              <li><span class="check">✓</span> 100 workflow runs/month</li>
-              <li><span class="check">✓</span> 50+ integrations</li>
-              <li><span class="check">✓</span> Visual workflow builder</li>
-              <li><span class="check">✓</span> Email support</li>
-            </ul>
-            <a href="https://app.nubabel.com/auth/google" class="btn btn-secondary"
-              >Start free trial</a
-            >
-          </div>
-
-          <div class="pricing-card featured">
-            <span class="pricing-badge">Most Popular</span>
-            <h3>Professional</h3>
-            <div class="price">$149<span>/mo</span></div>
-            <p class="price-note">Up to 25 users</p>
-            <ul class="pricing-features">
-              <li><span class="check">✓</span> Unlimited workflow runs</li>
-              <li><span class="check">✓</span> 100+ integrations</li>
-              <li><span class="check">✓</span> AI workflow builder</li>
-              <li><span class="check">✓</span> Slack bot included</li>
-              <li><span class="check">✓</span> Priority support</li>
-            </ul>
-            <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
-              >Start free trial</a
-            >
-          </div>
-
-          <div class="pricing-card">
-            <h3>Enterprise</h3>
-            <div class="price">Custom</div>
-            <p class="price-note">Unlimited users</p>
-            <ul class="pricing-features">
-              <li><span class="check">✓</span> Everything in Professional</li>
-              <li><span class="check">✓</span> Custom AI models</li>
-              <li><span class="check">✓</span> SSO & SCIM</li>
-              <li><span class="check">✓</span> Dedicated support</li>
-              <li><span class="check">✓</span> 99.9% SLA</li>
-            </ul>
-            <a href="mailto:sales@nubabel.com" class="btn btn-secondary">Contact sales</a>
-          </div>
+          <div class="integration-item"><span class="integration-icon">💬</span> Slack</div>
+          <div class="integration-item"><span class="integration-icon">📝</span> Notion</div>
+          <div class="integration-item"><span class="integration-icon">📊</span> Linear</div>
+          <div class="integration-item"><span class="integration-icon">📋</span> Jira</div>
+          <div class="integration-item"><span class="integration-icon">💼</span> Salesforce</div>
+          <div class="integration-item"><span class="integration-icon">📈</span> HubSpot</div>
+          <div class="integration-item"><span class="integration-icon">📁</span> Google Drive</div>
+          <div class="integration-item"><span class="integration-icon">📧</span> Gmail</div>
         </div>
       </div>
     </section>
 
     <section class="cta-section">
       <div class="container">
-        <h2>Ready to automate?</h2>
-        <p>Join 10,000+ teams shipping faster with Nubabel.</p>
-        <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
-          >Start your free trial</a
-        >
-        <p style="margin-top: 16px; font-size: 14px; color: var(--text-muted)">
-          No credit card required · 14-day free trial
-        </p>
+        <h2>Start building your AI organization</h2>
+        <p>The future belongs to companies with both human and AI teams.</p>
+        <a href="https://app.nubabel.com/auth/google" class="btn btn-primary">Get started free</a>
       </div>
     </section>
 
@@ -1243,10 +918,9 @@
             <span>Nubabel</span>
           </a>
           <div class="footer-links">
-            <a href="#integrations">Integrations</a>
-            <a href="#usecases">Use Cases</a>
-            <a href="#pricing">Pricing</a>
             <a href="mailto:engineering@nubabel.com">Contact</a>
+            <a href="#">Privacy</a>
+            <a href="#">Terms</a>
           </div>
           <span class="footer-copy">© 2026 Kyndof Corporation</span>
         </div>
