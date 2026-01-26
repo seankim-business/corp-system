@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { shutdownOpenTelemetry } from "./instrumentation";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -6,19 +7,30 @@ import cookieParser from "cookie-parser";
 import { authenticate } from "./middleware/auth.middleware";
 import { authRateLimiter, apiRateLimiter } from "./middleware/rate-limiter.middleware";
 import { getAllCircuitBreakers } from "./utils/circuit-breaker";
+import { getEnv } from "./utils/env";
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
-import slackIntegrationRoutes from "./api/slack-integration";
+import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
+
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter } from "./api/sse";
 import { startWorkers, stopWorkers } from "./workers";
 import { startSlackBot, stopSlackBot } from "./api/slack";
+import { disconnectRedis } from "./db/redis";
+import { db } from "./db/client";
 
 console.log("🚀 Initializing Nubabel Platform...");
 console.log(`📍 Node version: ${process.version}`);
 console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
 console.log(`📍 Port: ${process.env.PORT || "3000"}`);
+
+try {
+  getEnv();
+} catch (error) {
+  console.error(String(error));
+  process.exit(1);
+}
 
 const app = express();
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -95,9 +107,13 @@ app.get("/health/circuits", (_req, res) => {
 });
 
 app.use("/auth", authRateLimiter, authRoutes);
+
+import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
+app.use("/api", apiRateLimiter, slackOAuthRouter);
+
 app.use("/api", apiRateLimiter, authenticate, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, notionRoutes);
-app.use("/api", apiRateLimiter, authenticate, slackIntegrationRoutes);
+app.use("/api", apiRateLimiter, authenticate, slackIntegrationRouter);
 app.use("/api", sseRouter);
 
 app.use("/admin/queues", authenticate, bullBoardAdapter.getRouter());
@@ -156,6 +172,8 @@ process.on("SIGTERM", async () => {
   console.log("SIGTERM signal received: closing HTTP server");
   await stopSlackBot();
   await stopWorkers();
+  await disconnectRedis();
+  await db.$disconnect();
   server.close(() => {
     console.log("HTTP server closed");
     process.exit(0);
@@ -166,6 +184,8 @@ process.on("SIGINT", async () => {
   console.log("SIGINT signal received: closing HTTP server");
   await stopSlackBot();
   await stopWorkers();
+  await disconnectRedis();
+  await db.$disconnect();
   server.close(() => {
     console.log("HTTP server closed");
     process.exit(0);
