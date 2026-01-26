@@ -2372,6 +2372,395 @@
       .evolution-cta strong {
         color: var(--text);
       }
+
+      /* ========== AGENT SPAWNING VISUAL ========== */
+      .spawn-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 48px;
+        align-items: center;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      .spawn-terminal {
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        overflow: hidden;
+        font-family: "SF Mono", "Fira Code", monospace;
+      }
+
+      .spawn-terminal-header {
+        background: #161b22;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #30363d;
+      }
+
+      .spawn-terminal-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+
+      .spawn-terminal-dot.red {
+        background: #ff5f56;
+      }
+      .spawn-terminal-dot.yellow {
+        background: #ffbd2e;
+      }
+      .spawn-terminal-dot.green {
+        background: #27c93f;
+      }
+
+      .spawn-terminal-title {
+        margin-left: 8px;
+        font-size: 12px;
+        color: #8b949e;
+      }
+
+      .spawn-terminal-body {
+        padding: 20px;
+        min-height: 280px;
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      .spawn-line {
+        opacity: 0;
+        animation: spawnLineAppear 0.3s ease forwards;
+      }
+
+      .spawn-line:nth-child(1) {
+        animation-delay: 0.2s;
+      }
+      .spawn-line:nth-child(2) {
+        animation-delay: 0.6s;
+      }
+      .spawn-line:nth-child(3) {
+        animation-delay: 1s;
+      }
+      .spawn-line:nth-child(4) {
+        animation-delay: 1.4s;
+      }
+      .spawn-line:nth-child(5) {
+        animation-delay: 1.8s;
+      }
+      .spawn-line:nth-child(6) {
+        animation-delay: 2.2s;
+      }
+      .spawn-line:nth-child(7) {
+        animation-delay: 2.6s;
+      }
+      .spawn-line:nth-child(8) {
+        animation-delay: 3s;
+      }
+
+      @keyframes spawnLineAppear {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .spawn-prompt {
+        color: #58a6ff;
+      }
+
+      .spawn-command {
+        color: #c9d1d9;
+      }
+
+      .spawn-success {
+        color: #3fb950;
+      }
+
+      .spawn-info {
+        color: #8b949e;
+      }
+
+      .spawn-highlight {
+        color: #f0883e;
+      }
+
+      .spawn-agent-name {
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .spawn-explanation {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .spawn-explanation h3 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .spawn-explanation p {
+        font-size: 15px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .spawn-features {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .spawn-feature {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .spawn-feature-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--accent-dim);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .spawn-feature-text {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+
+      .spawn-feature-text strong {
+        color: var(--text);
+        display: block;
+        margin-bottom: 2px;
+      }
+
+      /* ========== SKILL TREE VISUAL ========== */
+      .skill-tree-container {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .skill-tree {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        position: relative;
+        padding: 40px 0;
+      }
+
+      .skill-tree-level {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        position: relative;
+      }
+
+      .skill-node {
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 20px;
+        text-align: center;
+        min-width: 120px;
+        transition: all 0.3s ease;
+        position: relative;
+        opacity: 0.4;
+      }
+
+      .skill-node.unlocked {
+        opacity: 1;
+        border-color: var(--accent);
+        background: var(--accent-dim);
+      }
+
+      .skill-node.learning {
+        opacity: 1;
+        border-color: var(--green);
+        animation: skillPulse 2s ease-in-out infinite;
+      }
+
+      @keyframes skillPulse {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+        }
+        50% {
+          box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.2);
+        }
+      }
+
+      .skill-node.locked {
+        opacity: 0.3;
+      }
+
+      .skill-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+
+      .skill-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 4px;
+      }
+
+      .skill-status {
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .skill-node.unlocked .skill-status {
+        color: var(--accent);
+      }
+
+      .skill-node.learning .skill-status {
+        color: var(--green);
+      }
+
+      .skill-connector {
+        position: absolute;
+        width: 2px;
+        height: 24px;
+        background: var(--border);
+        top: -24px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .skill-node.unlocked .skill-connector,
+      .skill-node.learning .skill-connector {
+        background: var(--accent);
+      }
+
+      .skill-tree-legend {
+        display: flex;
+        justify-content: center;
+        gap: 32px;
+        margin-top: 32px;
+        flex-wrap: wrap;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 4px;
+      }
+
+      .legend-dot.unlocked {
+        background: var(--accent);
+      }
+
+      .legend-dot.learning {
+        background: var(--green);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      .legend-dot.locked {
+        background: var(--border);
+        opacity: 0.5;
+      }
+
+      .skill-progress-bar {
+        margin-top: 40px;
+        text-align: center;
+      }
+
+      .progress-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+      }
+
+      .progress-track {
+        width: 100%;
+        max-width: 400px;
+        height: 8px;
+        background: var(--border);
+        border-radius: 4px;
+        margin: 0 auto;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), var(--green));
+        border-radius: 4px;
+        width: 65%;
+        animation: progressGrow 2s ease-out forwards;
+      }
+
+      @keyframes progressGrow {
+        from {
+          width: 0;
+        }
+        to {
+          width: 65%;
+        }
+      }
+
+      .progress-stats {
+        display: flex;
+        justify-content: center;
+        gap: 32px;
+        margin-top: 16px;
+      }
+
+      .progress-stat {
+        text-align: center;
+      }
+
+      .progress-stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .progress-stat-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      @media (max-width: 900px) {
+        .spawn-container {
+          grid-template-columns: 1fr;
+        }
+        .spawn-terminal {
+          order: 2;
+        }
+        .spawn-explanation {
+          order: 1;
+        }
+      }
     </style>
   </head>
   <body>
@@ -2423,50 +2812,142 @@
                   <div class="slack-msg-content">
                     <div class="slack-msg-header">
                       <span class="slack-username">You</span>
-                      <span class="slack-timestamp">Just now</span>
+                      <span class="slack-timestamp">9:00 AM</span>
                     </div>
                     <div class="slack-msg-text">
-                      <span class="slack-mention">@nubabel</span> what's on my plate today?
+                      <span class="slack-mention">@nubabel</span> prepare the weekly sales report
                     </div>
                   </div>
                 </div>
                 <div class="slack-message animate-scale-in delay-1">
-                  <div class="slack-avatar bot">🤖</div>
+                  <div class="slack-avatar bot">🧠</div>
                   <div class="slack-msg-content">
                     <div class="slack-msg-header">
                       <span class="slack-username">Nubabel</span>
-                      <span class="slack-app-badge">APP</span>
-                      <span class="slack-timestamp">Just now</span>
+                      <span class="slack-app-badge">ORCHESTRATOR</span>
+                      <span class="slack-timestamp">9:00 AM</span>
                     </div>
-                    <div class="slack-msg-text">Checking Linear, Notion, and your calendar...</div>
+                    <div class="slack-msg-text">On it! Delegating to my team...</div>
+                    <div
+                      class="slack-msg-attachment"
+                      style="border-left-color: var(--accent); background: rgba(139, 92, 246, 0.1)"
+                    >
+                      <div style="font-size: 11px; color: #9b9a97; margin-bottom: 8px">
+                        DELEGATION
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 6px">
+                        <div style="display: flex; align-items: center; gap: 8px">
+                          <span style="font-size: 14px">📊</span>
+                          <span style="color: #1d9bd1; font-weight: 500">Data Agent</span>
+                          <span style="color: #616061; font-size: 12px"
+                            >→ Pull metrics from Sheets</span
+                          >
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px">
+                          <span style="font-size: 14px">📝</span>
+                          <span style="color: var(--accent); font-weight: 500">Report Agent</span>
+                          <span style="color: #616061; font-size: 12px">→ Create Notion doc</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px">
+                          <span style="font-size: 14px">📤</span>
+                          <span style="color: var(--green); font-weight: 500">Comms Agent</span>
+                          <span style="color: #616061; font-size: 12px"
+                            >→ Prepare distribution</span
+                          >
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="slack-message animate-scale-in delay-2">
-                  <div class="slack-avatar bot">🤖</div>
+                <div
+                  class="slack-message animate-scale-in delay-2"
+                  style="margin-left: 24px; border-left: 2px solid #35373b; padding-left: 12px"
+                >
+                  <div
+                    class="slack-avatar bot"
+                    style="
+                      background: linear-gradient(135deg, #1d9bd1, #0ea5e9);
+                      width: 28px;
+                      height: 28px;
+                      font-size: 14px;
+                    "
+                  >
+                    📊
+                  </div>
+                  <div class="slack-msg-content">
+                    <div class="slack-msg-header">
+                      <span class="slack-username" style="font-size: 13px">Data Agent</span>
+                      <span style="font-size: 10px; color: #616061"
+                        >→ delegated to Search + Analyze</span
+                      >
+                    </div>
+                    <div class="slack-msg-text" style="font-size: 13px; color: #9b9a97">
+                      ✓ Q4 metrics: $2.4M revenue, 127 deals closed
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="slack-message animate-scale-in delay-3"
+                  style="margin-left: 24px; border-left: 2px solid #35373b; padding-left: 12px"
+                >
+                  <div
+                    class="slack-avatar bot"
+                    style="
+                      background: linear-gradient(135deg, var(--accent), #a78bfa);
+                      width: 28px;
+                      height: 28px;
+                      font-size: 14px;
+                    "
+                  >
+                    📝
+                  </div>
+                  <div class="slack-msg-content">
+                    <div class="slack-msg-header">
+                      <span class="slack-username" style="font-size: 13px">Report Agent</span>
+                      <span style="font-size: 10px; color: #616061"
+                        >→ delegated to Draft + Format</span
+                      >
+                    </div>
+                    <div class="slack-msg-text" style="font-size: 13px; color: #9b9a97">
+                      ✓ Report created with charts and insights
+                    </div>
+                  </div>
+                </div>
+                <div class="slack-message animate-scale-in delay-4">
+                  <div class="slack-avatar bot">🧠</div>
                   <div class="slack-msg-content">
                     <div class="slack-msg-header">
                       <span class="slack-username">Nubabel</span>
                       <span class="slack-app-badge">APP</span>
-                      <span class="slack-timestamp">Just now</span>
+                      <span class="slack-timestamp">9:01 AM</span>
                     </div>
-                    <div class="slack-msg-text">Here's your day:</div>
-                    <div class="slack-msg-attachment">
-                      <div style="margin-bottom: 8px">
-                        <span style="color: #f76363">●</span>
-                        <strong style="color: #fff">ENG-142</strong> Fix auth bug
-                        <span style="color: #616061">— due today</span>
-                      </div>
-                      <div style="margin-bottom: 8px">
-                        <span style="color: #f59e0b">●</span>
-                        <strong style="color: #fff">Review PR #847</strong>
-                        <span style="color: #616061">— Emily waiting</span>
-                      </div>
-                      <div style="margin-bottom: 8px">
-                        <span style="color: #22d3ee">●</span>
-                        <strong style="color: #fff">11:00 AM</strong> Sprint planning
-                      </div>
-                      <div style="margin-top: 12px; font-size: 12px; color: #1d9bd1">
-                        Want me to block focus time for the auth bug?
+                    <div class="slack-msg-text">
+                      <strong style="color: var(--green)">✅ Weekly report ready!</strong>
+                    </div>
+                    <div class="slack-msg-attachment" style="border-left-color: var(--green)">
+                      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                        <span
+                          style="
+                            background: #1a3b5c;
+                            color: #60a5fa;
+                            padding: 4px 10px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            cursor: pointer;
+                          "
+                          >📄 View in Notion</span
+                        >
+                        <span
+                          style="
+                            background: #14532d;
+                            color: #4ade80;
+                            padding: 4px 10px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            cursor: pointer;
+                          "
+                          >📤 Share to #sales</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -2693,84 +3174,90 @@
     <section class="non-invasive">
       <div class="container">
         <div class="non-invasive-header">
-          <h2>Non-invasive by design</h2>
+          <h2>Agents spawn when you need them</h2>
           <p class="non-invasive-subtitle">
-            Agents live inside your existing tools. No migration. No new apps. They work where you
-            already work.
+            No pre-configuration. No workflow builders. Just describe what you need—agents
+            materialize automatically.
           </p>
         </div>
 
-        <div class="tool-integration-grid">
-          <div class="tool-window-mini">
-            <div class="tool-window-header">
-              <div class="tool-logo slack">💬</div>
-              <span class="tool-name">Slack</span>
+        <div class="spawn-container">
+          <div class="spawn-explanation">
+            <div>
+              <h3>Dynamic agent creation</h3>
+              <p>
+                When you make a request, Nubabel analyzes the task and spawns the exact agents
+                needed. No setup required—the right team assembles itself.
+              </p>
             </div>
-            <div class="tool-window-content">
-              <div class="tool-mock-line"></div>
-              <div class="tool-mock-line short"></div>
-              <div class="tool-mock-line medium"></div>
-              <div class="agent-presence">
-                <div class="agent-presence-dot"></div>
-                <span class="agent-presence-text">Agent active</span>
+            <div class="spawn-features">
+              <div class="spawn-feature">
+                <div class="spawn-feature-icon">🎯</div>
+                <div class="spawn-feature-text">
+                  <strong>Task-aware spawning</strong>
+                  Agents are created based on what you need, not pre-built templates.
+                </div>
+              </div>
+              <div class="spawn-feature">
+                <div class="spawn-feature-icon">⚡</div>
+                <div class="spawn-feature-text">
+                  <strong>Instant specialization</strong>
+                  Each agent inherits the right skills and tool access automatically.
+                </div>
+              </div>
+              <div class="spawn-feature">
+                <div class="spawn-feature-icon">🔄</div>
+                <div class="spawn-feature-text">
+                  <strong>Self-organizing teams</strong>
+                  Agents coordinate, delegate sub-tasks, and work in parallel.
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="tool-window-mini">
-            <div class="tool-window-header">
-              <div class="tool-logo notion">📄</div>
-              <span class="tool-name">Notion</span>
+          <div class="spawn-terminal">
+            <div class="spawn-terminal-header">
+              <div class="spawn-terminal-dot red"></div>
+              <div class="spawn-terminal-dot yellow"></div>
+              <div class="spawn-terminal-dot green"></div>
+              <span class="spawn-terminal-title">nubabel orchestrator</span>
             </div>
-            <div class="tool-window-content">
-              <div class="tool-mock-line medium"></div>
-              <div class="tool-mock-line"></div>
-              <div class="tool-mock-line short"></div>
-              <div class="agent-presence">
-                <div class="agent-presence-dot"></div>
-                <span class="agent-presence-text">Agent active</span>
+            <div class="spawn-terminal-body">
+              <div class="spawn-line">
+                <span class="spawn-prompt">▶</span>
+                <span class="spawn-command">Task received: "prepare weekly report"</span>
+              </div>
+              <div class="spawn-line">
+                <span class="spawn-info"> Analyzing requirements...</span>
+              </div>
+              <div class="spawn-line">
+                <span class="spawn-success">✓</span> <span class="spawn-info">Spawning</span>
+                <span class="spawn-agent-name">Data Agent</span>
+                <span class="spawn-highlight">[sheets, analytics]</span>
+              </div>
+              <div class="spawn-line">
+                <span class="spawn-success">✓</span> <span class="spawn-info">Spawning</span>
+                <span class="spawn-agent-name">Report Agent</span>
+                <span class="spawn-highlight">[notion, formatting]</span>
+              </div>
+              <div class="spawn-line">
+                <span class="spawn-success">✓</span> <span class="spawn-info">Spawning</span>
+                <span class="spawn-agent-name">Comms Agent</span>
+                <span class="spawn-highlight">[slack, email]</span>
+              </div>
+              <div class="spawn-line">
+                <span class="spawn-info"> Establishing delegation hierarchy...</span>
+              </div>
+              <div class="spawn-line">
+                <span class="spawn-success">✓</span>
+                <span class="spawn-command">3 agents ready, executing in parallel</span>
+              </div>
+              <div class="spawn-line">
+                <span class="spawn-prompt">▶</span>
+                <span class="spawn-success">Task complete in 47s</span>
               </div>
             </div>
           </div>
-
-          <div class="tool-window-mini">
-            <div class="tool-window-header">
-              <div class="tool-logo linear">📋</div>
-              <span class="tool-name">Linear</span>
-            </div>
-            <div class="tool-window-content">
-              <div class="tool-mock-line short"></div>
-              <div class="tool-mock-line"></div>
-              <div class="tool-mock-line medium"></div>
-              <div class="agent-presence">
-                <div class="agent-presence-dot"></div>
-                <span class="agent-presence-text">Agent active</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="tool-window-mini">
-            <div class="tool-window-header">
-              <div class="tool-logo sheets">📊</div>
-              <span class="tool-name">Sheets</span>
-            </div>
-            <div class="tool-window-content">
-              <div class="tool-mock-line"></div>
-              <div class="tool-mock-line short"></div>
-              <div class="tool-mock-line"></div>
-              <div class="agent-presence">
-                <div class="agent-presence-dot"></div>
-                <span class="agent-presence-text">Agent active</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="tool-integration-footer">
-          <p>
-            <strong>Your tools stay yours.</strong> Agents read and write to them just like a human
-            colleague would— no APIs to configure, no workflows to rebuild.
-          </p>
         </div>
       </div>
     </section>
@@ -2778,94 +3265,142 @@
     <section class="org-evolution-section">
       <div class="container">
         <div class="evolution-header">
-          <h2>The gradual evolution to an AI-powered organization</h2>
+          <h2>Skills that grow with your organization</h2>
           <p class="evolution-subtitle">
-            Nubabel doesn't flip a switch. It gradually learns your workflows, takes over routine
-            tasks, and transforms your organization—while humans stay in control.
+            Agents learn by observing your team. Every workflow becomes a skill. Every pattern
+            becomes automation.
           </p>
         </div>
 
-        <div class="evolution-timeline">
-          <div class="evolution-stage">
-            <div class="evolution-stage-number">1</div>
-            <div class="evolution-org-visual">
-              <span class="evolution-icon human">👤</span>
-              <span class="evolution-icon human">👤</span>
-              <span class="evolution-icon human">👤</span>
-              <span class="evolution-icon human">👤</span>
+        <div class="skill-tree-container">
+          <div class="skill-tree">
+            <div class="skill-tree-level">
+              <div class="skill-node unlocked">
+                <div class="skill-icon">🧠</div>
+                <div class="skill-name">Core Understanding</div>
+                <div class="skill-status">Mastered</div>
+              </div>
             </div>
-            <div class="evolution-stage-title">100% Human</div>
-            <div class="evolution-stage-desc">Your team handles everything manually</div>
-            <div class="evolution-functions">
-              <span class="evolution-function-tag">All tasks</span>
+
+            <div class="skill-tree-level">
+              <div class="skill-node unlocked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">💬</div>
+                <div class="skill-name">Slack Integration</div>
+                <div class="skill-status">Mastered</div>
+              </div>
+              <div class="skill-node unlocked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">📄</div>
+                <div class="skill-name">Notion Docs</div>
+                <div class="skill-status">Mastered</div>
+              </div>
+              <div class="skill-node unlocked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">📊</div>
+                <div class="skill-name">Data Analysis</div>
+                <div class="skill-status">Mastered</div>
+              </div>
+            </div>
+
+            <div class="skill-tree-level">
+              <div class="skill-node unlocked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">📅</div>
+                <div class="skill-name">Meeting Prep</div>
+                <div class="skill-status">Mastered</div>
+              </div>
+              <div class="skill-node learning">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">📈</div>
+                <div class="skill-name">Weekly Reports</div>
+                <div class="skill-status">Learning...</div>
+              </div>
+              <div class="skill-node learning">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">🔄</div>
+                <div class="skill-name">Status Updates</div>
+                <div class="skill-status">Learning...</div>
+              </div>
+              <div class="skill-node unlocked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">🔍</div>
+                <div class="skill-name">Search & Find</div>
+                <div class="skill-status">Mastered</div>
+              </div>
+            </div>
+
+            <div class="skill-tree-level">
+              <div class="skill-node locked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">🎯</div>
+                <div class="skill-name">OKR Tracking</div>
+                <div class="skill-status">Locked</div>
+              </div>
+              <div class="skill-node locked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">📋</div>
+                <div class="skill-name">Sprint Planning</div>
+                <div class="skill-status">Locked</div>
+              </div>
+              <div class="skill-node locked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">🤝</div>
+                <div class="skill-name">Client Comms</div>
+                <div class="skill-status">Locked</div>
+              </div>
+              <div class="skill-node locked">
+                <div class="skill-connector"></div>
+                <div class="skill-icon">💰</div>
+                <div class="skill-name">Budget Reports</div>
+                <div class="skill-status">Locked</div>
+              </div>
             </div>
           </div>
 
-          <div class="evolution-arrow">→</div>
-
-          <div class="evolution-stage active">
-            <div class="evolution-stage-number">2</div>
-            <div class="evolution-org-visual">
-              <span class="evolution-icon human">👤</span>
-              <span class="evolution-icon human">👤</span>
-              <span class="evolution-icon ai">🤖</span>
-              <span class="evolution-icon human">👤</span>
+          <div class="skill-tree-legend">
+            <div class="legend-item">
+              <div class="legend-dot unlocked"></div>
+              <span>Mastered</span>
             </div>
-            <div class="evolution-stage-title">AI Joins</div>
-            <div class="evolution-stage-desc">First agent joins as a teammate</div>
-            <div class="evolution-functions">
-              <span class="evolution-function-tag">Scheduling</span>
-              <span class="evolution-function-tag">Reminders</span>
+            <div class="legend-item">
+              <div class="legend-dot learning"></div>
+              <span>Currently learning</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot locked"></div>
+              <span>Will unlock next</span>
             </div>
           </div>
 
-          <div class="evolution-arrow">→</div>
-
-          <div class="evolution-stage future">
-            <div class="evolution-stage-number">3</div>
-            <div class="evolution-org-visual">
-              <span class="evolution-icon human">👤</span>
-              <span class="evolution-icon ai">🤖</span>
-              <span class="evolution-icon ai">🤖</span>
-              <span class="evolution-icon ai">🤖</span>
+          <div class="skill-progress-bar">
+            <div class="progress-label">Your AI workforce capability</div>
+            <div class="progress-track">
+              <div class="progress-fill"></div>
             </div>
-            <div class="evolution-stage-title">AI Handles Routine</div>
-            <div class="evolution-stage-desc">Agents take over repetitive work</div>
-            <div class="evolution-functions">
-              <span class="evolution-function-tag">Reports</span>
-              <span class="evolution-function-tag">Data entry</span>
-              <span class="evolution-function-tag">Updates</span>
-            </div>
-          </div>
-
-          <div class="evolution-arrow">→</div>
-
-          <div class="evolution-stage future">
-            <div class="evolution-stage-number">4</div>
-            <div class="evolution-org-visual">
-              <span class="evolution-icon ai">🤖</span>
-              <span class="evolution-icon ai">🤖</span>
-              <span class="evolution-icon ai">🤖</span>
-              <span class="evolution-icon oversight">👤</span>
-            </div>
-            <div class="evolution-stage-title">AI Organization</div>
-            <div class="evolution-stage-desc">AI executes, humans oversee</div>
-            <div class="evolution-functions">
-              <span class="evolution-function-tag">Strategy</span>
-              <span class="evolution-function-tag">Approval</span>
-              <span class="evolution-function-tag">Exceptions</span>
+            <div class="progress-stats">
+              <div class="progress-stat">
+                <div class="progress-stat-value">8</div>
+                <div class="progress-stat-label">Skills mastered</div>
+              </div>
+              <div class="progress-stat">
+                <div class="progress-stat-value">2</div>
+                <div class="progress-stat-label">Learning now</div>
+              </div>
+              <div class="progress-stat">
+                <div class="progress-stat-value">4</div>
+                <div class="progress-stat-label">Coming next</div>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="evolution-cta">
           <p>
-            <strong>Start small, grow gradually.</strong> Begin with a single agent handling simple
-            tasks. As it learns your processes, delegate more—at your own pace.
+            <strong>Your agents get smarter every day.</strong> They observe how your team works,
+            identify patterns, and automatically learn new skills—no training required.
           </p>
-          <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
-            >Start your evolution</a
-          >
+          <a href="https://app.nubabel.com/auth/google" class="btn btn-primary">Start learning</a>
         </div>
       </div>
     </section>
