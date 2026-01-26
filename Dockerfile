@@ -27,12 +27,6 @@ COPY src ./src
 # Build TypeScript
 RUN npm run build
 
-# Build frontend
-COPY frontend ./frontend/
-WORKDIR /app/frontend
-RUN npm ci && npm run build
-WORKDIR /app
-
 # ============================================================================
 # Stage 2: Production Runtime
 # ============================================================================
@@ -62,7 +56,8 @@ RUN npx prisma generate
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/frontend/dist ./frontend/dist
+
+COPY frontend/dist ./frontend/dist
 
 # Copy startup script and make executable
 COPY scripts/start.sh ./scripts/start.sh
