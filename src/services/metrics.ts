@@ -286,6 +286,14 @@ metricsCollector.describeMetric("mcp_pool_evictions_total", {
   help: "Total MCP connection pool evictions",
   type: "counter",
 });
+metricsCollector.describeMetric("mcp_cache_hits_total", {
+  help: "Total MCP response cache hits",
+  type: "counter",
+});
+metricsCollector.describeMetric("mcp_cache_misses_total", {
+  help: "Total MCP response cache misses",
+  type: "counter",
+});
 
 export class Gauge {
   private name: string;
@@ -329,6 +337,26 @@ export const mcpPoolSize = new Gauge({
   help: "Current MCP connection pool size",
   labelNames: ["provider", "state"],
 });
+
+export const mcpCacheHitRate = new Gauge({
+  name: "mcp_cache_hit_rate",
+  help: "MCP response cache hit rate",
+  labelNames: ["provider"],
+});
+
+export const mcpCacheSizeBytes = new Gauge({
+  name: "mcp_cache_size_bytes",
+  help: "Estimated MCP response cache size in bytes",
+  labelNames: ["provider"],
+});
+
+type McpCacheStats = {
+  hits: number;
+  misses: number;
+  sizeBytes: number;
+};
+
+const mcpCacheStats = new Map<string, McpCacheStats>();
 
 setInterval(() => {
   if (!shouldRecordMetrics()) {
@@ -538,6 +566,82 @@ export function recordMcpPoolSize(provider: string, active: number, idle: number
 
   mcpPoolSize.set(active, { provider, state: "active" });
   mcpPoolSize.set(idle, { provider, state: "idle" });
+}
+
+export function recordMcpCacheHit(provider: string, tool: string): void {
+  const stats = getMcpCacheStatsEntry(provider);
+  stats.hits += 1;
+
+  if (shouldRecordMetrics()) {
+    metricsCollector.incrementCounter("mcp_cache_hits_total", {
+      provider,
+      tool,
+    });
+  }
+
+  updateMcpCacheHitRate(provider, stats);
+}
+
+export function recordMcpCacheMiss(provider: string, tool: string): void {
+  const stats = getMcpCacheStatsEntry(provider);
+  stats.misses += 1;
+
+  if (shouldRecordMetrics()) {
+    metricsCollector.incrementCounter("mcp_cache_misses_total", {
+      provider,
+      tool,
+    });
+  }
+
+  updateMcpCacheHitRate(provider, stats);
+}
+
+export function recordMcpCacheSize(provider: string, sizeBytes: number): void {
+  const stats = getMcpCacheStatsEntry(provider);
+  stats.sizeBytes = sizeBytes;
+
+  if (shouldRecordMetrics()) {
+    mcpCacheSizeBytes.set(sizeBytes, { provider });
+  }
+}
+
+export function getMcpCacheStats(): Array<{
+  provider: string;
+  hits: number;
+  misses: number;
+  hitRate: number;
+  sizeBytes: number;
+}> {
+  return Array.from(mcpCacheStats.entries()).map(([provider, stats]) => {
+    const total = stats.hits + stats.misses;
+    const hitRate = total === 0 ? 0 : stats.hits / total;
+    return {
+      provider,
+      hits: stats.hits,
+      misses: stats.misses,
+      hitRate,
+      sizeBytes: stats.sizeBytes,
+    };
+  });
+}
+
+function getMcpCacheStatsEntry(provider: string): McpCacheStats {
+  const existing = mcpCacheStats.get(provider);
+  if (existing) {
+    return existing;
+  }
+
+  const stats = { hits: 0, misses: 0, sizeBytes: 0 };
+  mcpCacheStats.set(provider, stats);
+  return stats;
+}
+
+function updateMcpCacheHitRate(provider: string, stats: McpCacheStats): void {
+  const total = stats.hits + stats.misses;
+  const hitRate = total === 0 ? 0 : stats.hits / total;
+  if (shouldRecordMetrics()) {
+    mcpCacheHitRate.set(hitRate, { provider });
+  }
 }
 
 function normalizePath(path: string): string {

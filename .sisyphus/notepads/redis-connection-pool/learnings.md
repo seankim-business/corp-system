@@ -2,3 +2,5 @@
 - Queue pool configured at min 5/max 10; worker pool min 5/max 15 for isolated workloads.
 - Added async getQueue/WorkerConnection plus sync variants for BullMQ constructors.
 - Added MCP client pooling keyed by provider+organization+credentials hash (min 2/max 5, 5s acquire timeout, 15m idle eviction) with per-request context updates and Prometheus counters/gauges.
+- Added MCP response caching with stable hash keys (provider/tool/args/org), TTL classification, and in-flight de-dupe to reduce redundant external calls.
+- Exposed MCP cache hit/miss metrics plus /health/mcp-cache stats for monitoring.

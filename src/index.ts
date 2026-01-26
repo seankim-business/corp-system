@@ -48,7 +48,7 @@ import { disconnectRedis } from "./db/redis";
 import { db } from "./db/client";
 import { shutdownOpenTelemetry } from "./instrumentation";
 import { logger } from "./utils/logger";
-import { calculateSLI, createMetricsRouter } from "./services/metrics";
+import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
 import { errorHandler } from "./middleware/error-handler";
 
 logger.info("Initializing Nubabel Platform", {
@@ -207,6 +207,46 @@ app.get("/health/redis-pool", (_req, res) => {
   res.status(healthy ? 200 : 503).json({
     status: healthy ? "healthy" : "unhealthy",
     pools: stats,
+  });
+});
+
+app.get("/health/mcp-cache", (_req, res) => {
+  const stats = getMcpCacheStats();
+  const totals = stats.reduce(
+    (acc, entry) => {
+      acc.hits += entry.hits;
+      acc.misses += entry.misses;
+      acc.sizeBytes += entry.sizeBytes;
+      return acc;
+    },
+    { hits: 0, misses: 0, sizeBytes: 0 },
+  );
+
+  const totalRequests = totals.hits + totals.misses;
+  const hitRate = totalRequests === 0 ? 0 : totals.hits / totalRequests;
+  const missRate = totalRequests === 0 ? 0 : totals.misses / totalRequests;
+
+  res.json({
+    status: "ok",
+    service: "mcp-cache",
+    totals: {
+      hits: totals.hits,
+      misses: totals.misses,
+      hitRate,
+      missRate,
+      sizeBytes: totals.sizeBytes,
+    },
+    providers: stats.map((entry) => {
+      const providerTotal = entry.hits + entry.misses;
+      return {
+        provider: entry.provider,
+        hits: entry.hits,
+        misses: entry.misses,
+        hitRate: entry.hitRate,
+        missRate: providerTotal === 0 ? 0 : entry.misses / providerTotal,
+        sizeBytes: entry.sizeBytes,
+      };
+    }),
   });
 });
 

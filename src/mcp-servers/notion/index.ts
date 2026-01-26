@@ -13,7 +13,11 @@ import { getTasksTool } from "./tools/getTasks";
 import { createTaskTool } from "./tools/createTask";
 import { updateTaskTool } from "./tools/updateTask";
 import { deleteTaskTool } from "./tools/deleteTask";
-import { validateToolAccess } from "../../services/mcp-registry";
+import {
+  MCPExecuteToolOptions,
+  executeTool,
+  validateToolAccess,
+} from "../../services/mcp-registry";
 import { MCPConnection } from "../../orchestrator/types";
 
 const legacyToolMap: Record<string, string> = {
@@ -34,28 +38,41 @@ export async function executeNotionTool(
   organizationId: string,
   connection: MCPConnection,
   userId?: string,
+  options?: MCPExecuteToolOptions,
 ): Promise<any> {
   const parsed = validateToolAccess(toolName, "notion", organizationId, connection);
   const resolvedToolName = parsed.isLegacy
     ? (legacyToolMap[parsed.toolName] ?? parsed.toolName)
     : parsed.toolName;
 
-  switch (resolvedToolName) {
-    case "getTasks":
-      return await getTasksTool(apiKey, input, connection, userId);
+  return executeTool({
+    provider: "notion",
+    toolName: resolvedToolName,
+    args: input,
+    organizationId,
+    skipCache: options?.skipCache,
+    ttlSeconds: options?.ttlSeconds,
+    dataType: options?.dataType,
+    sensitive: options?.sensitive,
+    execute: async () => {
+      switch (resolvedToolName) {
+        case "getTasks":
+          return await getTasksTool(apiKey, input, connection, userId);
 
-    case "createTask":
-      return await createTaskTool(apiKey, input, connection, userId);
+        case "createTask":
+          return await createTaskTool(apiKey, input, connection, userId);
 
-    case "updateTask":
-      return await updateTaskTool(apiKey, input, connection, userId);
+        case "updateTask":
+          return await updateTaskTool(apiKey, input, connection, userId);
 
-    case "deleteTask":
-      return await deleteTaskTool(apiKey, input, connection, userId);
+        case "deleteTask":
+          return await deleteTaskTool(apiKey, input, connection, userId);
 
-    default:
-      throw new Error(`Unknown Notion tool: ${toolName}`);
-  }
+        default:
+          throw new Error(`Unknown Notion tool: ${toolName}`);
+      }
+    },
+  });
 }
 
 export { NotionClient, getNotionClient } from "./client";

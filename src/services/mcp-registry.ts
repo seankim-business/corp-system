@@ -14,6 +14,11 @@ import {
   OAuthRefreshError,
 } from "./oauth-refresh";
 import { mcpConnectionPool } from "./mcp-connection-pool";
+import {
+  MCPResponseCacheDataType,
+  MCPResponseCacheOptions,
+  mcpResponseCache,
+} from "./mcp-response-cache";
 
 type ToolExecutionRequest = {
   params: {
@@ -29,7 +34,25 @@ type ParsedToolName = {
   isLegacy: boolean;
 };
 
+export type MCPExecuteToolOptions = {
+  skipCache?: boolean;
+  ttlSeconds?: number;
+  dataType?: MCPResponseCacheDataType;
+  sensitive?: boolean;
+};
+
 const getProviderNamespace = (provider: string): string => provider.trim().toLowerCase();
+
+const MUTATION_TOOL_PATTERN = /^(create|update|delete|modify)/i;
+const SENSITIVE_KEY_PATTERNS = [
+  /token/i,
+  /secret/i,
+  /password/i,
+  /apiKey/i,
+  /accessToken/i,
+  /refreshToken/i,
+  /clientSecret/i,
+];
 
 const parseToolName = (toolName: string, provider: string): ParsedToolName => {
   const providerNamespace = getProviderNamespace(provider);
@@ -495,6 +518,7 @@ export async function createMCPConnection(params: {
     data: {
       organizationId: params.organizationId,
       provider: params.provider,
+      namespace: getProviderNamespace(params.provider),
       name: params.name,
       config: params.config,
       enabled: true,
@@ -560,6 +584,44 @@ export function validateToolAccess(
   return parsed;
 }
 
+export async function executeTool<T>(
+  params: {
+    provider: string;
+    toolName: string;
+    args?: unknown;
+    organizationId: string;
+    execute: () => Promise<T>;
+  } & MCPExecuteToolOptions,
+): Promise<T> {
+  const provider = getProviderNamespace(params.provider);
+  const cacheOptions: MCPResponseCacheOptions = {
+    ttlSeconds: params.ttlSeconds,
+    dataType: params.dataType,
+  };
+
+  // Avoid caching mutations or sensitive payloads (no encryption-at-rest for cache values).
+  const shouldSkipCache =
+    params.skipCache === true ||
+    params.sensitive === true ||
+    MUTATION_TOOL_PATTERN.test(params.toolName) ||
+    containsSensitiveArgs(params.args);
+
+  if (shouldSkipCache) {
+    return params.execute();
+  }
+
+  return mcpResponseCache.getOrSet(
+    {
+      provider,
+      toolName: params.toolName,
+      args: params.args,
+      organizationId: params.organizationId,
+    },
+    params.execute,
+    cacheOptions,
+  );
+}
+
 export function executeToolWithIsolation(
   request: ToolExecutionRequest,
   namespace: string,
@@ -582,4 +644,32 @@ export function executeToolWithIsolation(
     toolName: parsed.toolName,
     toolArguments: request.params.arguments,
   };
+}
+
+function containsSensitiveArgs(value: unknown, visited = new Set<unknown>()): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  if (visited.has(value)) {
+    return false;
+  }
+
+  visited.add(value);
+
+  if (Array.isArray(value)) {
+    return value.some((entry) => containsSensitiveArgs(entry, visited));
+  }
+
+  const record = value as Record<string, unknown>;
+  for (const [key, entry] of Object.entries(record)) {
+    if (SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key))) {
+      return true;
+    }
+    if (containsSensitiveArgs(entry, visited)) {
+      return true;
+    }
+  }
+
+  return false;
 }

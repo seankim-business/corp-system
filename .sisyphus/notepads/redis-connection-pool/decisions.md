@@ -1,2 +1,5 @@
 - Chose dual pool strategy (queue vs worker) to isolate BullMQ workloads and avoid contention.
 - Kept sync connection accessors for BullMQ constructors and async accessors for general usage.
+- Namespaced MCP response cache keys via Redis env prefixing (no extra env in cache key).
+- Using TTL-only eviction for MCP response cache with optional manual invalidation helpers.
+- No cache warming at startup; rely on in-flight de-dupe to prevent stampede.
