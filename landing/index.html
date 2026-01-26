@@ -3204,6 +3204,224 @@
         font-size: 12px;
         color: var(--text-muted);
       }
+
+      /* ========== ENHANCED HERO ========== */
+      .hero-eyebrow-enhanced {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 16px;
+        background: linear-gradient(90deg, var(--accent-dim), rgba(16, 185, 129, 0.1));
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 24px;
+        margin-bottom: 24px;
+        animation: eyebrowGlow 3s ease-in-out infinite;
+      }
+
+      @keyframes eyebrowGlow {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.2);
+        }
+        50% {
+          box-shadow: 0 0 20px 4px rgba(139, 92, 246, 0.1);
+        }
+      }
+
+      .hero-eyebrow-icon {
+        font-size: 18px;
+        animation: bounce 2s ease-in-out infinite;
+      }
+
+      @keyframes bounce {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-4px);
+        }
+      }
+
+      .hero-eyebrow-text {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text);
+        letter-spacing: 0.3px;
+      }
+
+      .hero-eyebrow-text .highlight {
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .hero-tools-showcase {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin: 32px 0;
+        flex-wrap: wrap;
+      }
+
+      .hero-tool-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        animation: toolFadeIn 0.5s ease-out forwards;
+        opacity: 0;
+      }
+
+      .hero-tool-badge:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .hero-tool-badge:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .hero-tool-badge:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      .hero-tool-badge:nth-child(4) {
+        animation-delay: 0.4s;
+      }
+      .hero-tool-badge:nth-child(5) {
+        animation-delay: 0.5s;
+      }
+
+      @keyframes toolFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .hero-tool-badge:hover {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+        background: var(--card-hover);
+      }
+
+      .hero-tool-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+      }
+
+      .hero-tool-icon.slack {
+        background: linear-gradient(135deg, #4a154b, #611f69);
+      }
+      .hero-tool-icon.notion {
+        background: #191919;
+        border: 1px solid #333;
+      }
+      .hero-tool-icon.drive {
+        background: linear-gradient(135deg, #4285f4, #34a853);
+      }
+      .hero-tool-icon.linear {
+        background: linear-gradient(135deg, #5e6ad2, #8f95ee);
+      }
+      .hero-tool-icon.jira {
+        background: linear-gradient(135deg, #0052cc, #2684ff);
+      }
+
+      .hero-tool-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+
+      .hero-tool-status {
+        width: 6px;
+        height: 6px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      .hero-subtitle-enhanced {
+        font-size: 18px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+        line-height: 1.7;
+      }
+
+      .hero-subtitle-enhanced .typed-text {
+        display: inline;
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .hero-features-mini {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+      }
+
+      .hero-feature-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--text-secondary);
+        opacity: 0;
+        animation: featureFadeIn 0.4s ease-out forwards;
+      }
+
+      .hero-feature-item:nth-child(1) {
+        animation-delay: 0.6s;
+      }
+      .hero-feature-item:nth-child(2) {
+        animation-delay: 0.8s;
+      }
+      .hero-feature-item:nth-child(3) {
+        animation-delay: 1s;
+      }
+
+      @keyframes featureFadeIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .hero-feature-check {
+        width: 18px;
+        height: 18px;
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: var(--green);
+      }
+
+      @media (max-width: 900px) {
+        .hero-tools-showcase {
+          justify-content: center;
+        }
+        .hero-features-mini {
+          justify-content: center;
+        }
+      }
     </style>
   </head>
   <body>
@@ -3228,18 +3446,69 @@
       <div class="container">
         <div class="hero-inner">
           <div class="hero-content">
-            <div class="hero-eyebrow">Just @mention in Slack. That's it.</div>
+            <div class="hero-eyebrow-enhanced">
+              <span class="hero-eyebrow-icon">💬</span>
+              <span class="hero-eyebrow-text"
+                >Just <span class="highlight">@mention</span> in Slack. That's it.</span
+              >
+            </div>
             <h1>Add <span class="gradient-text">AI teammates</span> to your existing workflow.</h1>
-            <p class="hero-subtitle">
-              No new tools to learn. No migration needed. Nubabel agents join your Slack, use your
-              Notion/Drive/Jira as knowledge stores, and gradually take over repetitive work—just
-              like onboarding a brilliant new hire.
+
+            <div class="hero-tools-showcase">
+              <div class="hero-tool-badge">
+                <div class="hero-tool-icon slack">💬</div>
+                <span class="hero-tool-name">Slack</span>
+                <div class="hero-tool-status"></div>
+              </div>
+              <div class="hero-tool-badge">
+                <div class="hero-tool-icon notion">📄</div>
+                <span class="hero-tool-name">Notion</span>
+                <div class="hero-tool-status"></div>
+              </div>
+              <div class="hero-tool-badge">
+                <div class="hero-tool-icon drive">📁</div>
+                <span class="hero-tool-name">Drive</span>
+                <div class="hero-tool-status"></div>
+              </div>
+              <div class="hero-tool-badge">
+                <div class="hero-tool-icon linear">📋</div>
+                <span class="hero-tool-name">Linear</span>
+                <div class="hero-tool-status"></div>
+              </div>
+              <div class="hero-tool-badge">
+                <div class="hero-tool-icon jira">🎫</div>
+                <span class="hero-tool-name">Jira</span>
+                <div class="hero-tool-status"></div>
+              </div>
+            </div>
+
+            <p class="hero-subtitle-enhanced">
+              No new tools to learn. No migration needed.
+              <span class="typed-text"
+                >Agents join your team and gradually take over repetitive work</span
+              >—just like onboarding a brilliant new hire.
             </p>
+
+            <div class="hero-features-mini">
+              <div class="hero-feature-item">
+                <div class="hero-feature-check">✓</div>
+                <span>No setup required</span>
+              </div>
+              <div class="hero-feature-item">
+                <div class="hero-feature-check">✓</div>
+                <span>Works with your tools</span>
+              </div>
+              <div class="hero-feature-item">
+                <div class="hero-feature-check">✓</div>
+                <span>Learns as it goes</span>
+              </div>
+            </div>
+
             <div class="hero-cta">
               <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
                 >Add your first AI teammate</a
               >
-              <a href="#demos" class="btn btn-ghost">See it in action →</a>
+              <a href="#how" class="btn btn-ghost">See it in action →</a>
             </div>
           </div>
           <div class="hero-demo">
@@ -3607,230 +3876,6 @@
               <div class="command-stat-label">Agents deployed</div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-
-        <div class="spawn-container">
-          <div class="spawn-explanation">
-            <div>
-              <h3>Dynamic agent creation</h3>
-              <p>
-                When you make a request, Nubabel analyzes the task and spawns the exact agents
-                needed. No setup required—the right team assembles itself.
-              </p>
-            </div>
-            <div class="spawn-features">
-              <div class="spawn-feature">
-                <div class="spawn-feature-icon">🎯</div>
-                <div class="spawn-feature-text">
-                  <strong>Task-aware spawning</strong>
-                  Agents are created based on what you need, not pre-built templates.
-                </div>
-              </div>
-              <div class="spawn-feature">
-                <div class="spawn-feature-icon">⚡</div>
-                <div class="spawn-feature-text">
-                  <strong>Instant specialization</strong>
-                  Each agent inherits the right skills and tool access automatically.
-                </div>
-              </div>
-              <div class="spawn-feature">
-                <div class="spawn-feature-icon">🔄</div>
-                <div class="spawn-feature-text">
-                  <strong>Self-organizing teams</strong>
-                  Agents coordinate, delegate sub-tasks, and work in parallel.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="spawn-terminal">
-            <div class="spawn-terminal-header">
-              <div class="spawn-terminal-dot red"></div>
-              <div class="spawn-terminal-dot yellow"></div>
-              <div class="spawn-terminal-dot green"></div>
-              <span class="spawn-terminal-title">nubabel orchestrator</span>
-            </div>
-            <div class="spawn-terminal-body">
-              <div class="spawn-line">
-                <span class="spawn-prompt">▶</span>
-                <span class="spawn-command">Task received: "prepare weekly report"</span>
-              </div>
-              <div class="spawn-line">
-                <span class="spawn-info"> Analyzing requirements...</span>
-              </div>
-              <div class="spawn-line">
-                <span class="spawn-success">✓</span> <span class="spawn-info">Spawning</span>
-                <span class="spawn-agent-name">Data Agent</span>
-                <span class="spawn-highlight">[sheets, analytics]</span>
-              </div>
-              <div class="spawn-line">
-                <span class="spawn-success">✓</span> <span class="spawn-info">Spawning</span>
-                <span class="spawn-agent-name">Report Agent</span>
-                <span class="spawn-highlight">[notion, formatting]</span>
-              </div>
-              <div class="spawn-line">
-                <span class="spawn-success">✓</span> <span class="spawn-info">Spawning</span>
-                <span class="spawn-agent-name">Comms Agent</span>
-                <span class="spawn-highlight">[slack, email]</span>
-              </div>
-              <div class="spawn-line">
-                <span class="spawn-info"> Establishing delegation hierarchy...</span>
-              </div>
-              <div class="spawn-line">
-                <span class="spawn-success">✓</span>
-                <span class="spawn-command">3 agents ready, executing in parallel</span>
-              </div>
-              <div class="spawn-line">
-                <span class="spawn-prompt">▶</span>
-                <span class="spawn-success">Task complete in 47s</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="org-evolution-section">
-      <div class="container">
-        <div class="evolution-header">
-          <h2>Skills that grow with your organization</h2>
-          <p class="evolution-subtitle">
-            Agents learn by observing your team. Every workflow becomes a skill. Every pattern
-            becomes automation.
-          </p>
-        </div>
-
-        <div class="skill-tree-container">
-          <div class="skill-tree">
-            <div class="skill-tree-level">
-              <div class="skill-node unlocked">
-                <div class="skill-icon">🧠</div>
-                <div class="skill-name">Core Understanding</div>
-                <div class="skill-status">Mastered</div>
-              </div>
-            </div>
-
-            <div class="skill-tree-level">
-              <div class="skill-node unlocked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">💬</div>
-                <div class="skill-name">Slack Integration</div>
-                <div class="skill-status">Mastered</div>
-              </div>
-              <div class="skill-node unlocked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">📄</div>
-                <div class="skill-name">Notion Docs</div>
-                <div class="skill-status">Mastered</div>
-              </div>
-              <div class="skill-node unlocked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">📊</div>
-                <div class="skill-name">Data Analysis</div>
-                <div class="skill-status">Mastered</div>
-              </div>
-            </div>
-
-            <div class="skill-tree-level">
-              <div class="skill-node unlocked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">📅</div>
-                <div class="skill-name">Meeting Prep</div>
-                <div class="skill-status">Mastered</div>
-              </div>
-              <div class="skill-node learning">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">📈</div>
-                <div class="skill-name">Weekly Reports</div>
-                <div class="skill-status">Learning...</div>
-              </div>
-              <div class="skill-node learning">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">🔄</div>
-                <div class="skill-name">Status Updates</div>
-                <div class="skill-status">Learning...</div>
-              </div>
-              <div class="skill-node unlocked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">🔍</div>
-                <div class="skill-name">Search & Find</div>
-                <div class="skill-status">Mastered</div>
-              </div>
-            </div>
-
-            <div class="skill-tree-level">
-              <div class="skill-node locked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">🎯</div>
-                <div class="skill-name">OKR Tracking</div>
-                <div class="skill-status">Locked</div>
-              </div>
-              <div class="skill-node locked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">📋</div>
-                <div class="skill-name">Sprint Planning</div>
-                <div class="skill-status">Locked</div>
-              </div>
-              <div class="skill-node locked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">🤝</div>
-                <div class="skill-name">Client Comms</div>
-                <div class="skill-status">Locked</div>
-              </div>
-              <div class="skill-node locked">
-                <div class="skill-connector"></div>
-                <div class="skill-icon">💰</div>
-                <div class="skill-name">Budget Reports</div>
-                <div class="skill-status">Locked</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="skill-tree-legend">
-            <div class="legend-item">
-              <div class="legend-dot unlocked"></div>
-              <span>Mastered</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-dot learning"></div>
-              <span>Currently learning</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-dot locked"></div>
-              <span>Will unlock next</span>
-            </div>
-          </div>
-
-          <div class="skill-progress-bar">
-            <div class="progress-label">Your AI workforce capability</div>
-            <div class="progress-track">
-              <div class="progress-fill"></div>
-            </div>
-            <div class="progress-stats">
-              <div class="progress-stat">
-                <div class="progress-stat-value">8</div>
-                <div class="progress-stat-label">Skills mastered</div>
-              </div>
-              <div class="progress-stat">
-                <div class="progress-stat-value">2</div>
-                <div class="progress-stat-label">Learning now</div>
-              </div>
-              <div class="progress-stat">
-                <div class="progress-stat-value">4</div>
-                <div class="progress-stat-label">Coming next</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="evolution-cta">
-          <p>
-            <strong>Your agents get smarter every day.</strong> They observe how your team works,
-            identify patterns, and automatically learn new skills—no training required.
-          </p>
-          <a href="https://app.nubabel.com/auth/google" class="btn btn-primary">Start learning</a>
         </div>
       </div>
     </section>
