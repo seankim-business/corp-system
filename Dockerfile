@@ -28,13 +28,10 @@ COPY src ./src
 RUN npm run build
 
 # Build frontend
-COPY frontend/package*.json ./frontend/
-COPY frontend/tsconfig*.json ./frontend/
-COPY frontend/vite.config.ts ./frontend/
-COPY frontend/index.html ./frontend/
-COPY frontend/public ./frontend/public/
-COPY frontend/src ./frontend/src/
-RUN cd frontend && npm ci && npm run build
+COPY frontend ./frontend/
+WORKDIR /app/frontend
+RUN npm ci && npm run build
+WORKDIR /app
 
 # ============================================================================
 # Stage 2: Production Runtime
