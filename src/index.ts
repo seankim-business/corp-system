@@ -152,7 +152,17 @@ app.get("/health/ready", async (_req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      DATABASE_URL: process.env.DATABASE_URL ? "SET" : "MISSING",
+      REDIS_URL: process.env.REDIS_URL ? "SET" : "MISSING",
+      BASE_URL: process.env.BASE_URL || "NOT_SET",
+    },
+  });
 });
 
 if (process.env.NODE_ENV === "development") {
@@ -339,10 +349,13 @@ if (process.env.NODE_ENV === "production") {
 logger.info("Starting server", { port, host: "0.0.0.0" });
 
 const server = app.listen(port, "0.0.0.0", async () => {
-  logger.info("Server ready", {
+  logger.info("✅ Server listening successfully", {
     port,
     environment: process.env.NODE_ENV || "development",
     baseUrl: process.env.BASE_URL || "http://localhost:3000",
+  });
+  
+  logger.info("Server ready - endpoints available", {
     endpoints: {
       health: "/health",
       sse: "/api/events",
