@@ -33,6 +33,8 @@ const SKILL_KEYWORDS: Record<Skill, string[]> = {
     "jira",
     "지라",
     "asana",
+    "airtable",
+    "에어테이블",
     "trello",
     "integration",
     "연동",

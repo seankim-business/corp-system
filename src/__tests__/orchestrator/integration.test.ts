@@ -13,7 +13,7 @@ describe("Orchestrator Integration Tests", () => {
 
       expect(analysis.intent).toContain("update");
       expect(analysis.entities.target).toBe("linear");
-      expect(category).toBe("quick");
+      expect(category.category).toBe("quick");
       expect(skills).toContain("mcp-integration");
     });
 
@@ -26,7 +26,7 @@ describe("Orchestrator Integration Tests", () => {
 
       expect(analysis.intent).toContain("create");
       expect(analysis.entities.target).toBe("notion");
-      expect(category).toBe("quick");
+      expect(category.category).toBe("quick");
       expect(skills).toContain("mcp-integration");
     });
 
@@ -48,7 +48,7 @@ describe("Orchestrator Integration Tests", () => {
       const category = selectCategory(userRequest, analysis);
       const skills = selectSkills(userRequest);
 
-      expect(category).toBe("visual-engineering");
+      expect(category.category).toBe("visual-engineering");
       expect(skills).toContain("frontend-ui-ux");
     });
 
@@ -59,7 +59,7 @@ describe("Orchestrator Integration Tests", () => {
       const category = selectCategory(userRequest, analysis);
       const skills = selectSkills(userRequest);
 
-      expect(category).toBe("quick");
+      expect(category.category).toBe("quick");
       expect(skills).toContain("git-master");
     });
 
@@ -88,15 +88,14 @@ describe("Orchestrator Integration Tests", () => {
       for (const { request, expectedCategory } of testCases) {
         const analysis = await analyzeRequest(request);
         const category = selectCategory(request, analysis);
-        expect(category).toBe(expectedCategory);
+        expect(category.category).toBe(expectedCategory);
       }
     });
   });
 
   describe("Skill Selection Logic", () => {
     it("should select multiple skills when needed", async () => {
-      const userRequest =
-        "Linear 이슈를 브라우저에서 확인하고 스크린샷 찍어서 Notion에 저장해줘";
+      const userRequest = "Linear 이슈를 브라우저에서 확인하고 스크린샷 찍어서 Notion에 저장해줘";
       const skills = selectSkills(userRequest);
 
       expect(skills.length).toBeGreaterThan(1);

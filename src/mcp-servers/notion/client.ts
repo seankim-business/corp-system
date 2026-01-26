@@ -1,33 +1,26 @@
-/**
- * Notion Client Wrapper
- * 
- * 기획:
- * - Notion SDK를 감싸서 사용하기 쉽게 만든 클라이언트
- * - Organization별 API Key 관리
- * - 공통 에러 핸들링
- * 
- * 구조:
- * - NotionClient 클래스
- * - Task CRUD 메서드
- * - Database 조회 메서드
- */
-
-import { Client } from '@notionhq/client';
-import { NotionTask, NotionDatabase } from './types';
+import { Client } from "@notionhq/client";
+import { NotionTask, NotionDatabase } from "./types";
+import { getCircuitBreaker } from "../../utils/circuit-breaker";
 
 export class NotionClient {
   private client: Client;
+  private circuitBreaker = getCircuitBreaker("notion-api", {
+    failureThreshold: 5,
+    successThreshold: 2,
+    timeout: 30000,
+    resetTimeout: 60000,
+  });
 
   constructor(apiKey: string) {
     this.client = new Client({ auth: apiKey });
   }
 
   async getDatabases(): Promise<NotionDatabase[]> {
-    try {
+    return this.circuitBreaker.execute(async () => {
       const response: any = await this.client.search({
         filter: {
-          property: 'object',
-          value: 'database',
+          property: "object",
+          value: "database",
         } as any,
       });
 
@@ -37,30 +30,27 @@ export class NotionClient {
         url: db.url,
         properties: db.properties,
       }));
-    } catch (error) {
-      console.error('Get databases error:', error);
-      throw new Error('Failed to fetch databases from Notion');
-    }
+    });
   }
 
   async getTasks(
     databaseId: string,
     filter?: { status?: string; assignee?: string },
-    limit = 50
+    limit = 50,
   ): Promise<{ tasks: NotionTask[]; hasMore: boolean; nextCursor?: string }> {
-    try {
+    return this.circuitBreaker.execute(async () => {
       const notionFilter: any = { and: [] };
 
       if (filter?.status) {
         notionFilter.and.push({
-          property: 'Status',
+          property: "Status",
           status: { equals: filter.status },
         });
       }
 
       if (filter?.assignee) {
         notionFilter.and.push({
-          property: 'Assignee',
+          property: "Assignee",
           people: { contains: filter.assignee },
         });
       }
@@ -78,10 +68,7 @@ export class NotionClient {
         hasMore: response.has_more,
         nextCursor: response.next_cursor || undefined,
       };
-    } catch (error) {
-      console.error('Get tasks error:', error);
-      throw new Error('Failed to fetch tasks from Notion');
-    }
+    });
   }
 
   async createTask(
@@ -92,9 +79,9 @@ export class NotionClient {
       assignee?: string;
       dueDate?: string;
       [key: string]: any;
-    }
+    },
   ): Promise<NotionTask> {
-    try {
+    return this.circuitBreaker.execute(async () => {
       const pageProperties: any = {
         Name: {
           title: [{ text: { content: title } }],
@@ -114,7 +101,7 @@ export class NotionClient {
       }
 
       if (properties?.dueDate) {
-        pageProperties['Due Date'] = {
+        pageProperties["Due Date"] = {
           date: { start: properties.dueDate },
         };
       }
@@ -125,10 +112,7 @@ export class NotionClient {
       });
 
       return this.pageToTask(response);
-    } catch (error) {
-      console.error('Create task error:', error);
-      throw new Error('Failed to create task in Notion');
-    }
+    });
   }
 
   async updateTask(
@@ -139,9 +123,9 @@ export class NotionClient {
       assignee?: string;
       dueDate?: string;
       [key: string]: any;
-    }
+    },
   ): Promise<NotionTask> {
-    try {
+    return this.circuitBreaker.execute(async () => {
       const properties: any = {};
 
       if (updates.title) {
@@ -163,7 +147,7 @@ export class NotionClient {
       }
 
       if (updates.dueDate) {
-        properties['Due Date'] = {
+        properties["Due Date"] = {
           date: { start: updates.dueDate },
         };
       }
@@ -174,33 +158,27 @@ export class NotionClient {
       });
 
       return this.pageToTask(response);
-    } catch (error) {
-      console.error('Update task error:', error);
-      throw new Error('Failed to update task in Notion');
-    }
+    });
   }
 
   async deleteTask(taskId: string): Promise<boolean> {
-    try {
+    return this.circuitBreaker.execute(async () => {
       await this.client.pages.update({
         page_id: taskId,
         archived: true,
       });
 
       return true;
-    } catch (error) {
-      console.error('Delete task error:', error);
-      throw new Error('Failed to delete task in Notion');
-    }
+    });
   }
 
   private pageToTask(page: any): NotionTask {
     const properties = page.properties || {};
-    
+
     const title = this.extractTitle(properties.Name || properties.Title);
     const status = properties.Status?.status?.name || undefined;
     const assignee = properties.Assignee?.people?.[0]?.name || undefined;
-    const dueDate = properties['Due Date']?.date?.start || undefined;
+    const dueDate = properties["Due Date"]?.date?.start || undefined;
 
     return {
       id: page.id,
@@ -216,16 +194,16 @@ export class NotionClient {
   }
 
   private extractTitle(titleProperty: any): string {
-    if (!titleProperty) return 'Untitled';
-    
+    if (!titleProperty) return "Untitled";
+
     if (titleProperty.title) {
-      return titleProperty.title.map((t: any) => t.plain_text).join('');
-    }
-    
-    if (Array.isArray(titleProperty)) {
-      return titleProperty.map((t: any) => t.plain_text).join('');
+      return titleProperty.title.map((t: any) => t.plain_text).join("");
     }
 
-    return 'Untitled';
+    if (Array.isArray(titleProperty)) {
+      return titleProperty.map((t: any) => t.plain_text).join("");
+    }
+
+    return "Untitled";
   }
 }

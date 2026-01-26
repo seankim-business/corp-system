@@ -1,9 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 // Singleton pattern for Prisma Client
 let prisma: PrismaClient;
 
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === "production") {
   prisma = new PrismaClient();
 } else {
   // Prevent multiple instances in development
@@ -13,7 +13,7 @@ if (process.env.NODE_ENV === 'production') {
 
   if (!globalWithPrisma.prisma) {
     globalWithPrisma.prisma = new PrismaClient({
-      log: ['warn', 'error'],
+      log: ["warn", "error"],
     });
   }
 

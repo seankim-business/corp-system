@@ -1,10 +1,10 @@
 /**
  * Notion MCP Types
- * 
+ *
  * 기획:
  * - Notion API와 통신하기 위한 타입 정의
  * - Task, Database, Property 타입
- * 
+ *
  * 구조:
  * - NotionTask: Notion 페이지를 Task로 표현
  * - NotionDatabase: Notion 데이터베이스 정보

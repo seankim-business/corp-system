@@ -98,7 +98,18 @@ function detectIntentWithConfidence(
 ): { intent: string; confidence: number } {
   const intentPatterns: Record<string, string[]> = {
     create_task: ["생성", "만들", "추가", "작성", "create", "add"],
-    update_task: ["수정", "변경", "업데이트", "update", "modify", "change"],
+    update_task: [
+      "수정",
+      "변경",
+      "업데이트",
+      "완료",
+      "update",
+      "modify",
+      "change",
+      "complete",
+      "done",
+      "finish",
+    ],
     delete_task: ["삭제", "제거", "delete", "remove"],
     query_data: ["조회", "확인", "보여", "알려", "show", "list", "get"],
     generate_content: ["콘셉트", "아이디어", "디자인", "generate", "design"],
@@ -176,6 +187,12 @@ function extractEntities(
   }
   if (text.includes("jira") || text.includes("지라")) {
     entities.target = "jira";
+  }
+  if (text.includes("asana") || text.includes("아사나")) {
+    entities.target = "asana";
+  }
+  if (text.includes("airtable") || text.includes("에어테이블")) {
+    entities.target = "airtable";
   }
 
   if (text.includes("생성") || text.includes("만들") || text.includes("create")) {
@@ -289,7 +306,9 @@ function extractEntitiesEnhanced(text: string): {
         };
       }
     }
-  } catch (error) {}
+  } catch (error) {
+    void error;
+  }
 
   const priorityPatterns = [
     { regex: /\b(긴급|urgent|critical|high)\b/i, value: "high", confidence: 0.9 },
@@ -314,7 +333,31 @@ function extractEntitiesEnhanced(text: string): {
 }
 
 function detectMultiAgentNeed(text: string): boolean {
-  if (text.match(/하고.*해/) || text.match(/and.*then/)) {
+  if (
+    text.match(/하고.*(해|보내|전송|작성|저장|만들|추가|수정|변경|업데이트|삭제|조회)/) ||
+    text.match(/and.*then/)
+  ) {
+    return true;
+  }
+
+  const providerKeywords: Array<[string, string[]]> = [
+    ["notion", ["notion", "노션"]],
+    ["slack", ["slack", "슬랙"]],
+    ["github", ["github", "깃허브", "깃헙"]],
+    ["linear", ["linear", "리니어"]],
+    ["jira", ["jira", "지라"]],
+    ["asana", ["asana", "아사나"]],
+    ["airtable", ["airtable", "에어테이블"]],
+  ];
+
+  const mentioned = new Set<string>();
+  for (const [provider, keywords] of providerKeywords) {
+    if (keywords.some((k) => text.includes(k))) {
+      mentioned.add(provider);
+    }
+  }
+
+  if (mentioned.size >= 2) {
     return true;
   }
 

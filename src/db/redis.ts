@@ -95,4 +95,65 @@ export const redis = {
       return false;
     }
   },
+
+  async lpush(key: string, value: string): Promise<number> {
+    try {
+      const client = await getRedisClient();
+      return await client.lPush(key, value);
+    } catch (error: unknown) {
+      logger.error(`Redis LPUSH error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  },
+
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    try {
+      const client = await getRedisClient();
+      return await client.lRange(key, start, stop);
+    } catch (error: unknown) {
+      logger.error(`Redis LRANGE error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  },
+
+  async expire(key: string, seconds: number): Promise<boolean> {
+    try {
+      const client = await getRedisClient();
+      const result = await client.expire(key, seconds);
+      return result === 1;
+    } catch (error: unknown) {
+      logger.error(`Redis EXPIRE error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  },
+
+  async hincrby(key: string, field: string, increment: number): Promise<number> {
+    try {
+      const client = await getRedisClient();
+      return await client.hIncrBy(key, field, increment);
+    } catch (error: unknown) {
+      logger.error(`Redis HINCRBY error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  },
+
+  async hgetall(key: string): Promise<Record<string, string>> {
+    try {
+      const client = await getRedisClient();
+      return await client.hGetAll(key);
+    } catch (error: unknown) {
+      logger.error(`Redis HGETALL error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
+  },
 };

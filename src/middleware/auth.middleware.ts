@@ -4,14 +4,9 @@ import { db } from "../db/client";
 
 const authService = new AuthService();
 
-export async function authenticate(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
-    const token =
-      req.cookies.session || req.headers.authorization?.split(" ")[1];
+    const token = req.cookies.session || req.headers.authorization?.split(" ")[1];
 
     if (!token) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -62,13 +57,26 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   return next();
 }
 
-export function requireOrganization(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+export function requireOrganization(req: Request, res: Response, next: NextFunction) {
   if (!req.organization) {
     return res.status(400).json({ error: "Organization required" });
   }
+  return next();
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  if (!req.membership) {
+    return res.status(403).json({ error: "Membership required" });
+  }
+
+  const role = req.membership.role;
+  if (role !== "owner" && role !== "admin") {
+    return res.status(403).json({ error: "Admin role required" });
+  }
+
   return next();
 }

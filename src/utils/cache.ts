@@ -51,11 +51,7 @@ class CacheManager {
     }
   }
 
-  async remember<T>(
-    key: string,
-    fn: () => Promise<T>,
-    options?: CacheOptions,
-  ): Promise<T> {
+  async remember<T>(key: string, fn: () => Promise<T>, options?: CacheOptions): Promise<T> {
     const cached = await this.get<T>(key, options);
 
     if (cached !== null) {

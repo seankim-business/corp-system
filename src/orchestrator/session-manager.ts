@@ -89,9 +89,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
 /**
  * Slack 스레드로 세션 조회
  */
-export async function getSessionBySlackThread(
-  threadTs: string,
-): Promise<Session | null> {
+export async function getSessionBySlackThread(threadTs: string): Promise<Session | null> {
   const dbSession = await prisma.session.findFirst({
     where: {
       source: "slack",
@@ -128,11 +126,7 @@ export async function updateSession(
   };
 
   // Redis 업데이트
-  await redis.setex(
-    `session:${sessionId}`,
-    3600,
-    JSON.stringify(updatedSession),
-  );
+  await redis.setex(`session:${sessionId}`, 3600, JSON.stringify(updatedSession));
 
   // PostgreSQL 업데이트
   await prisma.session.update({

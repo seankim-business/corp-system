@@ -1,4 +1,4 @@
-import { Organization, User, Membership } from '@prisma/client';
+import { Organization, User, Membership } from "@prisma/client";
 
 declare global {
   namespace Express {
@@ -7,6 +7,7 @@ declare global {
       user?: User & { organizationId: string };
       membership?: Membership;
       currentOrganizationId?: string;
+      rawBody?: Buffer;
     }
   }
 }

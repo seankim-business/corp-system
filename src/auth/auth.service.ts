@@ -81,9 +81,7 @@ export class AuthService {
     }
 
     if (!organization) {
-      throw new Error(
-        "Unable to determine organization. Please contact admin.",
-      );
+      throw new Error("Unable to determine organization. Please contact admin.");
     }
 
     let membership = await db.membership.findUnique({
@@ -217,8 +215,7 @@ export class AuthService {
       },
     });
 
-    if (!membership)
-      throw new Error("User is not a member of any organization");
+    if (!membership) throw new Error("User is not a member of any organization");
 
     const sessionToken = this.createSessionToken({
       userId: user.id,
@@ -237,11 +234,7 @@ export class AuthService {
     };
   }
 
-  createSessionToken(payload: {
-    userId: string;
-    organizationId: string;
-    role: string;
-  }) {
+  createSessionToken(payload: { userId: string; organizationId: string; role: string }) {
     const options: any = {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d",
     };

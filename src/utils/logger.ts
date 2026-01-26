@@ -12,9 +12,7 @@ class Logger {
   private logLevel: LogLevel;
 
   constructor() {
-    const envLevel = (
-      process.env.LOG_LEVEL || "info"
-    ).toLowerCase() as LogLevel;
+    const envLevel = (process.env.LOG_LEVEL || "info").toLowerCase() as LogLevel;
     this.logLevel = envLevel;
   }
 
@@ -40,12 +38,7 @@ class Logger {
     return log;
   }
 
-  private log(
-    level: LogLevel,
-    message: string,
-    context?: Record<string, any>,
-    error?: Error,
-  ) {
+  private log(level: LogLevel, message: string, context?: Record<string, any>, error?: Error) {
     if (!this.shouldLog(level)) return;
 
     const entry: LogEntry = {

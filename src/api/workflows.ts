@@ -22,6 +22,8 @@ import { Router, Request, Response } from "express";
 import { db as prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
 import { executeNotionTool } from "../mcp-servers/notion";
+import { executeLinearTool } from "../mcp-servers/linear";
+import { executeGitHubTool } from "../mcp-servers/github";
 import {
   validate,
   uuidParamSchema,
@@ -219,12 +221,12 @@ router.post(
               where: { organizationId },
             });
 
-            for (const step of steps) {
-              if (step.type === "mcp_call" && step.mcp === "notion") {
-                if (!notionConnection) {
-                  throw new Error("Notion connection not configured");
-                }
+            const linearConnection = await prisma.mCPConnection.findFirst({
+              where: { organizationId, provider: "linear", enabled: true },
+            });
 
+            for (const step of steps) {
+              if (step.type === "mcp_call") {
                 const toolInput = { ...step.input };
 
                 Object.keys(toolInput).forEach((key) => {
@@ -238,13 +240,44 @@ router.post(
                   }
                 });
 
-                const toolResult = await executeNotionTool(
-                  notionConnection.apiKey,
-                  step.tool,
-                  toolInput,
-                );
-
-                finalOutputData = { ...finalOutputData, ...toolResult };
+                if (step.mcp === "notion") {
+                  if (!notionConnection) {
+                    throw new Error("Notion connection not configured");
+                  }
+                  const toolResult = await executeNotionTool(
+                    notionConnection.apiKey,
+                    step.tool,
+                    toolInput,
+                  );
+                  finalOutputData = { ...finalOutputData, ...toolResult };
+                } else if (step.mcp === "linear") {
+                  if (!linearConnection) {
+                    throw new Error("Linear connection not configured");
+                  }
+                  const config = linearConnection.config as { apiKey: string };
+                  if (!config.apiKey) {
+                    throw new Error("Linear API key not configured");
+                  }
+                  const toolResult = await executeLinearTool(config.apiKey, step.tool, toolInput);
+                  finalOutputData = { ...finalOutputData, ...toolResult };
+                } else if (step.mcp === "github") {
+                  const githubConnection = await prisma.mCPConnection.findFirst({
+                    where: { organizationId, provider: "github", enabled: true },
+                  });
+                  if (!githubConnection) {
+                    throw new Error("GitHub connection not configured");
+                  }
+                  const config = githubConnection.config as { accessToken: string };
+                  if (!config.accessToken) {
+                    throw new Error("GitHub access token not configured");
+                  }
+                  const toolResult = await executeGitHubTool(
+                    config.accessToken,
+                    step.tool,
+                    toolInput,
+                  );
+                  finalOutputData = { ...finalOutputData, ...toolResult };
+                }
               }
             }
           } else {

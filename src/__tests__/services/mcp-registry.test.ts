@@ -7,6 +7,12 @@ import {
 } from "../../services/mcp-registry";
 import { db as prisma } from "../../db/client";
 
+jest.mock("../../utils/cache", () => ({
+  cache: {
+    remember: async (_key: string, fn: () => Promise<any>) => fn(),
+  },
+}));
+
 jest.mock("../../db/client", () => ({
   db: {
     mCPConnection: {
@@ -40,9 +46,7 @@ describe("MCP Registry Service", () => {
         },
       ];
 
-      (prisma.mCPConnection.findMany as jest.Mock).mockResolvedValue(
-        mockConnections,
-      );
+      (prisma.mCPConnection.findMany as jest.Mock).mockResolvedValue(mockConnections);
 
       const result = await getActiveMCPConnections(mockOrgId);
 
@@ -82,9 +86,7 @@ describe("MCP Registry Service", () => {
         },
       ];
 
-      (prisma.mCPConnection.findMany as jest.Mock).mockResolvedValue(
-        mockConnections,
-      );
+      (prisma.mCPConnection.findMany as jest.Mock).mockResolvedValue(mockConnections);
 
       const result = await getMCPConnectionsByProvider(mockOrgId, "linear");
 

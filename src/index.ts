@@ -7,10 +7,14 @@ import { authenticate } from "./middleware/auth.middleware";
 import { authRateLimiter, apiRateLimiter } from "./middleware/rate-limiter.middleware";
 import { getAllCircuitBreakers } from "./utils/circuit-breaker";
 import { getEnv } from "./utils/env";
+import { getRedisClient } from "./db/redis";
+import { getRedisConnection } from "./queue/base.queue";
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
+import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
+import { webhooksRouter } from "./api/webhooks";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter } from "./api/sse";
 import { startWorkers, stopWorkers } from "./workers";
@@ -40,11 +44,46 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      const r = req as unknown as { rawBody?: Buffer };
+      r.rawBody = buf;
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Health check endpoints (no auth required)
+app.get("/health/live", (_req, res) => {
+  res.json({ status: "ok", service: "live", timestamp: new Date().toISOString() });
+});
+
+app.get("/health/ready", async (_req, res) => {
+  try {
+    await db.$queryRaw`SELECT 1`;
+    const redisClient = await getRedisClient();
+    await redisClient.ping();
+    const bullRedis = getRedisConnection();
+    await bullRedis.ping();
+
+    res.json({
+      status: "ok",
+      service: "ready",
+      checks: { database: true, redis: true, bullmqRedis: true },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "error",
+      service: "ready",
+      error: String(error),
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
@@ -106,11 +145,16 @@ app.get("/health/circuits", (_req, res) => {
 
 app.use("/auth", authRateLimiter, authRoutes);
 
+// Webhooks must be reachable without auth; signatures are verified in-route.
+app.use("/api", apiRateLimiter, webhooksRouter);
+
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 
 app.use("/api", apiRateLimiter, authenticate, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, notionRoutes);
 app.use("/api", apiRateLimiter, authenticate, slackIntegrationRouter);
+app.use("/api", apiRateLimiter, authenticate, featureFlagsRouter);
+app.use("/api", apiRateLimiter, authenticate, featureFlagsAdminRouter);
 app.use("/api", sseRouter);
 
 app.use("/admin/queues", authenticate, bullBoardAdapter.getRouter());

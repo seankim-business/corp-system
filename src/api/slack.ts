@@ -7,6 +7,7 @@ import { logger } from "../utils/logger";
 import { metrics } from "../utils/metrics";
 import { randomUUID } from "crypto";
 import { getSlackIntegrationByWorkspace } from "./slack-integration";
+import { redis } from "../db/redis";
 
 let slackApp: App | null = null;
 
@@ -75,8 +76,23 @@ function setupEventHandlers(app: App): void {
   app.event("app_mention", async ({ event, say, client }) => {
     const startTime = Date.now();
 
+    let dedupeKey: string | null = null;
+
     try {
       const { user, text, channel, thread_ts, ts } = event;
+
+      const messageTs = thread_ts || ts;
+      dedupeKey = `slack:dedupe:app_mention:${channel}:${messageTs}`;
+      const alreadyProcessed = await redis.exists(dedupeKey);
+      if (alreadyProcessed) {
+        logger.debug("Duplicate Slack app_mention event skipped", {
+          channel,
+          ts: messageTs,
+        });
+        return;
+      }
+
+      await redis.set(dedupeKey, "1", 300);
 
       logger.info("Slack mention received", {
         user,
@@ -140,26 +156,26 @@ function setupEventHandlers(app: App): void {
         });
       }
 
-      const cleanedText = text.replace(/<@[A-Z0-9]+>/g, "").trim();
+       const cleanedText = text.replace(/<@[A-Z0-9]+>/g, "").trim();
 
       const eventId = randomUUID();
 
-      await slackEventQueue.enqueueEvent({
-        type: "app_mention",
-        channel,
-        user,
-        text: cleanedText,
-        ts: thread_ts || ts,
-        organizationId: organization.id,
-        userId: nubabelUser.id,
-        sessionId: session.id,
-        eventId,
-      });
+       await slackEventQueue.enqueueEvent({
+         type: "app_mention",
+         channel,
+         user,
+         text: cleanedText,
+         ts: messageTs,
+         organizationId: organization.id,
+         userId: nubabelUser.id,
+         sessionId: session.id,
+         eventId,
+       });
 
-      await say({
-        text: `🤔 Processing your request...`,
-        thread_ts: thread_ts || ts,
-      });
+       await say({
+         text: `🤔 Processing your request...`,
+         thread_ts: messageTs,
+       });
 
       logger.info("Slack event enqueued", {
         eventId,
@@ -170,6 +186,10 @@ function setupEventHandlers(app: App): void {
       metrics.increment("slack.mention.enqueued");
       metrics.timing("slack.mention.duration", Date.now() - startTime);
     } catch (error: unknown) {
+      if (dedupeKey) {
+        await redis.del(dedupeKey);
+      }
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("Slack mention handler error", {
         error: errorMessage,
@@ -189,6 +209,18 @@ function setupEventHandlers(app: App): void {
       const msg = message as { user?: string; text?: string; channel: string; ts: string };
 
       if (!msg.user || !msg.text) return;
+
+      const dedupeKey = `slack:dedupe:direct_message:${msg.channel}:${msg.ts}`;
+      const alreadyProcessed = await redis.exists(dedupeKey);
+      if (alreadyProcessed) {
+        logger.debug("Duplicate Slack direct message skipped", {
+          channel: msg.channel,
+          ts: msg.ts,
+        });
+        return;
+      }
+
+      await redis.set(dedupeKey, "1", 300);
 
       try {
         const nubabelUser = await getUserBySlackId(msg.user, client as WebClient);
@@ -240,6 +272,7 @@ function setupEventHandlers(app: App): void {
 
         await say(`🤔 Processing your message...`);
       } catch (error: unknown) {
+        await redis.del(dedupeKey);
         const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error("DM handler error", { error: errorMessage });
         await say(`Error: ${errorMessage}`);
@@ -249,6 +282,18 @@ function setupEventHandlers(app: App): void {
 
   app.command("/nubabel", async ({ command, ack, say, client }) => {
     await ack();
+
+    const dedupeKey = `slack:dedupe:slash_command:${command.team_id}:${command.channel_id}:${command.trigger_id}`;
+    const alreadyProcessed = await redis.exists(dedupeKey);
+    if (alreadyProcessed) {
+      logger.debug("Duplicate Slack slash command skipped", {
+        teamId: command.team_id,
+        channelId: command.channel_id,
+      });
+      return;
+    }
+
+    await redis.set(dedupeKey, "1", 300);
 
     try {
       const { user_id, text, channel_id, team_id } = command;
@@ -294,6 +339,7 @@ function setupEventHandlers(app: App): void {
 
       await say(`🤔 Processing your command...`);
     } catch (error: unknown) {
+      await redis.del(dedupeKey);
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("Slash command error", { error: errorMessage });
       await say(`Error: ${errorMessage}`);

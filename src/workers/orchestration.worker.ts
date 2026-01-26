@@ -6,6 +6,7 @@ import { deadLetterQueue } from "../queue/dead-letter.queue";
 import { orchestrate } from "../orchestrator";
 import { logger } from "../utils/logger";
 import { buildSuccessMessage, buildErrorMessage } from "../services/slack-block-kit";
+import { emitOrgEvent } from "../services/sse-service";
 
 export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
   constructor() {
@@ -58,6 +59,13 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         userId,
         eventId,
       });
+
+      emitOrgEvent(organizationId, "orchestration.completed", {
+        eventId,
+        sessionId,
+        status: result.status,
+        duration,
+      });
     } catch (error: any) {
       logger.error(`Orchestration failed for event ${eventId}:`, error);
 
@@ -74,6 +82,12 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         organizationId,
         userId,
         eventId,
+      });
+
+      emitOrgEvent(organizationId, "orchestration.failed", {
+        eventId,
+        sessionId,
+        error: error.message,
       });
 
       if (job.attemptsMade >= (job.opts.attempts || 2)) {

@@ -2,9 +2,7 @@ import { db as prisma } from "../db/client";
 import { MCPConnection } from "../orchestrator/types";
 import { cache } from "../utils/cache";
 
-export async function getActiveMCPConnections(
-  organizationId: string,
-): Promise<MCPConnection[]> {
+export async function getActiveMCPConnections(organizationId: string): Promise<MCPConnection[]> {
   return cache.remember(
     `mcp:${organizationId}`,
     async () => {
@@ -15,16 +13,27 @@ export async function getActiveMCPConnections(
         },
       });
 
-      return connections.map((conn) => ({
-        id: conn.id,
-        organizationId: conn.organizationId,
-        provider: conn.provider,
-        name: conn.name,
-        config: conn.config as Record<string, any>,
-        enabled: conn.enabled,
-        createdAt: conn.createdAt,
-        updatedAt: conn.updatedAt,
-      }));
+      return connections.map(
+        (conn: {
+          id: string;
+          organizationId: string;
+          provider: string;
+          name: string;
+          config: unknown;
+          enabled: boolean;
+          createdAt: Date;
+          updatedAt: Date;
+        }) => ({
+          id: conn.id,
+          organizationId: conn.organizationId,
+          provider: conn.provider,
+          name: conn.name,
+          config: conn.config as Record<string, unknown>,
+          enabled: conn.enabled,
+          createdAt: conn.createdAt,
+          updatedAt: conn.updatedAt,
+        }),
+      );
     },
     { ttl: 300, prefix: "mcp-connections" },
   );

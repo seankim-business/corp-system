@@ -213,46 +213,23 @@ function parseMultiAgentTasks(userRequest: string): string[] {
 }
 
 async function saveExecution(data: any) {
-  // Create a dummy workflow if needed for tracking orchestrator executions
-  // In the future, this should reference an actual workflow or have a separate OrchestratorExecution table
-  const dummyWorkflow = await prisma.workflow.findFirst({
-    where: {
-      organizationId: data.organizationId,
-      name: "Slack Orchestrator (Auto-created)",
-    },
-  });
-
-  let workflowId = dummyWorkflow?.id;
-
-  if (!workflowId) {
-    const newWorkflow = await prisma.workflow.create({
-      data: {
-        organizationId: data.organizationId,
-        name: "Slack Orchestrator (Auto-created)",
-        description: "Auto-created workflow for tracking orchestrator executions",
-        config: {
-          type: "orchestrator",
-          source: "slack",
-        },
-        enabled: true,
-      },
-    });
-    workflowId = newWorkflow.id;
-  }
-
-  await prisma.workflowExecution.create({
+  await prisma.orchestratorExecution.create({
     data: {
-      workflowId: workflowId,
+      organizationId: data.organizationId,
+      userId: data.userId,
+      sessionId: data.sessionId,
+      category: data.category,
+      skills: Array.isArray(data.skills) ? data.skills : [],
       status: data.status,
+      duration: typeof data.duration === "number" ? data.duration : 0,
       inputData: {
         prompt: data.prompt,
-        organizationId: data.organizationId,
-        userId: data.userId,
       },
-      outputData: { result: data.result },
-      startedAt: new Date(Date.now() - data.duration),
-      completedAt: new Date(),
+      outputData: {
+        result: data.result,
+      },
       errorMessage: data.error,
+      metadata: data.metadata || {},
     },
   });
 }

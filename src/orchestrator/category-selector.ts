@@ -401,7 +401,9 @@ export async function selectCategoryHybrid(
           ...parsedCache,
           method: "keyword",
         };
-      } catch {}
+      } catch (error) {
+        void error;
+      }
     }
   }
 

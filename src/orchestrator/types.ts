@@ -7,11 +7,7 @@ export type Category =
   | "unspecified-high"
   | "writing";
 
-export type Skill =
-  | "playwright"
-  | "git-master"
-  | "frontend-ui-ux"
-  | "mcp-integration";
+export type Skill = "playwright" | "git-master" | "frontend-ui-ux" | "mcp-integration";
 
 export interface OrchestrationRequest {
   userRequest: string;

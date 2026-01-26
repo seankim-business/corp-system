@@ -3,6 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 import rateLimit from "express-rate-limit";
 import { AuthService } from "./auth.service";
 import { authenticate, requireAuth } from "../middleware/auth.middleware";
+import { db } from "../db/client";
 
 const router = express.Router();
 const authService = new AuthService();
@@ -68,8 +69,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
 });
 
 router.post("/register", loginLimiter, async (req: Request, res: Response) => {
-  const { email, password, displayName, organizationName, organizationSlug } =
-    req.body;
+  const { email, password, displayName, organizationName, organizationSlug } = req.body;
 
   if (!email || !password || !organizationName || !organizationSlug) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -138,43 +138,54 @@ router.post("/logout", (_req: Request, res: Response) => {
   return res.json({ success: true });
 });
 
-router.post(
-  "/switch-org",
-  authenticate,
-  async (req: Request, res: Response) => {
-    const { organizationId } = req.body;
+router.post("/switch-org", authenticate, async (req: Request, res: Response) => {
+  const { organizationId } = req.body;
 
-    if (!organizationId) {
-      return res.status(400).json({ error: "Organization ID required" });
-    }
+  if (!organizationId) {
+    return res.status(400).json({ error: "Organization ID required" });
+  }
 
-    try {
-      const result = await authService.switchOrganization(
-        req.user!.id,
-        organizationId,
-      );
+  try {
+    const result = await authService.switchOrganization(req.user!.id, organizationId);
 
-      res.cookie("session", result.sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        domain: process.env.COOKIE_DOMAIN,
-      });
+    res.cookie("session", result.sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      domain: process.env.COOKIE_DOMAIN,
+    });
 
-      const redirectUrl = `https://${result.organization.slug}.${process.env.BASE_DOMAIN}/dashboard`;
-      return res.json({ redirectUrl });
-    } catch (error) {
-      console.error("Switch org error:", error);
-      return res.status(403).json({ error: (error as Error).message });
-    }
-  },
-);
+    const redirectUrl = `https://${result.organization.slug}.${process.env.BASE_DOMAIN}/dashboard`;
+    return res.json({ redirectUrl });
+  } catch (error) {
+    console.error("Switch org error:", error);
+    return res.status(403).json({ error: (error as Error).message });
+  }
+});
 
-router.get("/me", authenticate, requireAuth, (req: Request, res: Response) => {
+router.get("/me", authenticate, requireAuth, async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const currentOrganizationId = req.user!.organizationId;
+
+  const memberships = await db.membership.findMany({
+    where: { userId },
+    include: { organization: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const organizations = memberships.map((m) => ({
+    id: m.organization.id,
+    name: m.organization.name,
+    domain: m.organization.slug,
+  }));
+
+  const currentOrganization = organizations.find((o) => o.id === currentOrganizationId) || null;
+
   res.json({
     user: req.user,
-    organization: req.organization,
+    currentOrganization,
+    organizations,
     membership: req.membership,
   });
 });

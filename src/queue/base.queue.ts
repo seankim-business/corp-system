@@ -32,6 +32,22 @@ export function getRedisConnection(): IORedis {
   return redisConnection;
 }
 
+export async function closeRedisConnection(): Promise<void> {
+  if (!redisConnection) return;
+  const conn = redisConnection;
+  redisConnection = null;
+
+  try {
+    await conn.quit();
+  } catch (error) {
+    try {
+      conn.disconnect();
+    } catch (disconnectError) {
+      void disconnectError;
+    }
+  }
+}
+
 export interface BaseQueueOptions {
   name: string;
   defaultJobOptions?: {
