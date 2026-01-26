@@ -210,6 +210,54 @@ app.get("/health/redis", async (_req, res) => {
   }
 });
 
+app.get("/health/budget", async (_req, res) => {
+  try {
+    const organizations = await db.organization.findMany({
+      select: {
+        id: true,
+        name: true,
+        monthlyBudgetCents: true,
+        currentMonthSpendCents: true,
+        budgetResetAt: true,
+      },
+    });
+
+    const approaching = organizations
+      .filter((org) => org.monthlyBudgetCents != null)
+      .map((org) => {
+        const budgetCents = org.monthlyBudgetCents ?? 0;
+        const remainingCents = Math.max(0, budgetCents - org.currentMonthSpendCents);
+        const percentRemaining = budgetCents > 0 ? remainingCents / budgetCents : 0;
+
+        return {
+          organizationId: org.id,
+          name: org.name,
+          budgetCents,
+          spendCents: org.currentMonthSpendCents,
+          remainingCents,
+          percentRemaining,
+          budgetResetAt: org.budgetResetAt,
+        };
+      })
+      .filter((org) => org.percentRemaining < 0.1);
+
+    res.json({
+      status: "ok",
+      service: "budget",
+      thresholdPercent: 10,
+      organizations: approaching,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "error",
+      service: "budget",
+      error: String(error),
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 app.get("/health/redis-pool", (_req, res) => {
   const stats = getPoolStats();
   const healthy = stats.queue.available > 0 && stats.worker.available > 0;
@@ -341,7 +389,7 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(frontendPath));
 
   // SPA fallback - send index.html for all non-API routes
-  app.get("*", (_req, res) => {
+  app.get("/*", (_req, res) => {
     res.sendFile(path.join(frontendPath, "index.html"));
   });
 }
@@ -354,7 +402,7 @@ const server = app.listen(port, "0.0.0.0", async () => {
     environment: process.env.NODE_ENV || "development",
     baseUrl: process.env.BASE_URL || "http://localhost:3000",
   });
-  
+
   logger.info("Server ready - endpoints available", {
     endpoints: {
       health: "/health",
