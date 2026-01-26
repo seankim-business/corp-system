@@ -1805,6 +1805,572 @@
         .scenario-category {
           padding: 24px;
         }
+        .hierarchy-viz {
+          flex-direction: column;
+        }
+        .hierarchy-level {
+          flex-direction: column;
+          gap: 16px;
+        }
+        .hierarchy-sublevel {
+          flex-direction: column;
+          gap: 8px;
+        }
+        .tool-integration-grid {
+          grid-template-columns: 1fr;
+        }
+        .evolution-timeline {
+          flex-direction: column;
+          gap: 32px;
+        }
+        .evolution-arrow {
+          transform: rotate(90deg);
+        }
+        .evolution-stage {
+          width: 100%;
+          max-width: 280px;
+        }
+      }
+
+      /* ========== HIERARCHICAL DELEGATION VISUAL ========== */
+      .hierarchy-viz {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+        padding: 40px 0;
+      }
+
+      .hierarchy-level {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 32px;
+        position: relative;
+      }
+
+      .hierarchy-node {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+      }
+
+      .hierarchy-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px 28px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: default;
+        min-width: 140px;
+      }
+
+      .hierarchy-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(139, 92, 246, 0.2);
+      }
+
+      .hierarchy-card.user-card {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+        border-color: rgba(102, 126, 234, 0.4);
+      }
+
+      .hierarchy-card.orchestrator-card {
+        background: var(--accent-dim);
+        border-color: var(--accent);
+        min-width: 180px;
+      }
+
+      .hierarchy-card.agent-card-l2 {
+        min-width: 130px;
+        padding: 16px 20px;
+      }
+
+      .hierarchy-card.agent-card-l3 {
+        min-width: 100px;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .hierarchy-icon {
+        font-size: 36px;
+        margin-bottom: 8px;
+      }
+
+      .hierarchy-card.agent-card-l2 .hierarchy-icon {
+        font-size: 28px;
+      }
+
+      .hierarchy-card.agent-card-l3 .hierarchy-icon {
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+
+      .hierarchy-title {
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--text);
+        margin-bottom: 4px;
+      }
+
+      .hierarchy-card.agent-card-l3 .hierarchy-title {
+        font-size: 12px;
+      }
+
+      .hierarchy-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .hierarchy-card.agent-card-l3 .hierarchy-desc {
+        font-size: 10px;
+      }
+
+      .hierarchy-connector {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 48px;
+        position: relative;
+      }
+
+      .hierarchy-connector svg {
+        width: 2px;
+        height: 100%;
+      }
+
+      .hierarchy-connector-line {
+        stroke: var(--accent);
+        stroke-width: 2;
+        stroke-dasharray: 6 4;
+        animation: dashMove 1s linear infinite;
+      }
+
+      @keyframes dashMove {
+        to {
+          stroke-dashoffset: -10;
+        }
+      }
+
+      .hierarchy-branches {
+        display: flex;
+        justify-content: center;
+        position: relative;
+        height: 48px;
+        width: 100%;
+        max-width: 600px;
+      }
+
+      .hierarchy-branches svg {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      .hierarchy-branch-line {
+        stroke: var(--border);
+        stroke-width: 2;
+        fill: none;
+      }
+
+      .hierarchy-branch-line.active {
+        stroke: var(--accent);
+        stroke-dasharray: 6 4;
+        animation: dashMove 1s linear infinite;
+      }
+
+      .hierarchy-sublevel {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 8px;
+      }
+
+      .parallel-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 20px;
+        margin-top: 32px;
+      }
+
+      .parallel-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      .parallel-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .parallel-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      .parallel-text {
+        font-size: 13px;
+        color: var(--green);
+        font-weight: 500;
+      }
+
+      /* ========== TOOL INTEGRATION VISUAL ========== */
+      .tool-integration-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .tool-window-mini {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+
+      .tool-window-mini:hover {
+        border-color: var(--accent);
+        transform: translateY(-4px);
+      }
+
+      .tool-window-header {
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .tool-logo {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+
+      .tool-logo.slack {
+        background: linear-gradient(135deg, #4a154b, #611f69);
+      }
+
+      .tool-logo.notion {
+        background: #191919;
+        border: 1px solid #333;
+      }
+
+      .tool-logo.linear {
+        background: linear-gradient(135deg, #5e6ad2, #8f95ee);
+      }
+
+      .tool-logo.sheets {
+        background: linear-gradient(135deg, #0f9d58, #34a853);
+      }
+
+      .tool-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .tool-window-content {
+        padding: 16px;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        position: relative;
+      }
+
+      .tool-mock-line {
+        height: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+      }
+
+      .tool-mock-line.short {
+        width: 60%;
+      }
+
+      .tool-mock-line.medium {
+        width: 80%;
+      }
+
+      .agent-presence {
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        background: rgba(139, 92, 246, 0.15);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 16px;
+      }
+
+      .agent-presence-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--accent);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      .agent-presence-text {
+        font-size: 10px;
+        color: var(--accent);
+        font-weight: 500;
+      }
+
+      .tool-integration-footer {
+        text-align: center;
+        margin-top: 40px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+      }
+
+      .tool-integration-footer p {
+        font-size: 15px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .tool-integration-footer strong {
+        color: var(--text);
+      }
+
+      /* ========== AI ORG EVOLUTION SECTION ========== */
+      .org-evolution-section {
+        padding: 120px 0;
+        background: var(--bg);
+      }
+
+      .evolution-header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+
+      .evolution-header h2 {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 16px;
+      }
+
+      .evolution-subtitle {
+        font-size: 18px;
+        color: var(--text-secondary);
+        max-width: 700px;
+        margin: 0 auto;
+      }
+
+      .evolution-timeline {
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .evolution-stage {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px 24px;
+        width: 220px;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        opacity: 0;
+        animation: stageReveal 0.5s ease forwards;
+      }
+
+      .evolution-stage:nth-child(1) {
+        animation-delay: 0s;
+      }
+      .evolution-stage:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      .evolution-stage:nth-child(5) {
+        animation-delay: 0.6s;
+      }
+      .evolution-stage:nth-child(7) {
+        animation-delay: 0.9s;
+      }
+
+      @keyframes stageReveal {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .evolution-stage.active {
+        border-color: var(--accent);
+        background: var(--accent-dim);
+      }
+
+      .evolution-stage.future {
+        opacity: 0.6;
+      }
+
+      .evolution-stage-number {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 24px;
+        height: 24px;
+        background: var(--surface);
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+      }
+
+      .evolution-stage.active .evolution-stage-number {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+      }
+
+      .evolution-org-visual {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: 16px;
+        min-height: 40px;
+        align-items: center;
+      }
+
+      .evolution-icon {
+        font-size: 24px;
+        transition: all 0.3s ease;
+      }
+
+      .evolution-icon.human {
+        filter: none;
+      }
+
+      .evolution-icon.ai {
+        filter: drop-shadow(0 0 4px var(--accent));
+      }
+
+      .evolution-icon.oversight {
+        position: relative;
+      }
+
+      .evolution-icon.oversight::after {
+        content: "👁";
+        position: absolute;
+        font-size: 10px;
+        top: -8px;
+        right: -8px;
+      }
+
+      .evolution-stage-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 8px;
+      }
+
+      .evolution-stage-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+
+      .evolution-functions {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+      }
+
+      .evolution-function-tag {
+        padding: 2px 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        font-size: 10px;
+        color: var(--text-secondary);
+      }
+
+      .evolution-stage.active .evolution-function-tag {
+        background: rgba(139, 92, 246, 0.2);
+        color: var(--accent);
+      }
+
+      .evolution-arrow {
+        display: flex;
+        align-items: center;
+        color: var(--text-muted);
+        font-size: 20px;
+        opacity: 0;
+        animation: arrowFade 0.3s ease forwards;
+      }
+
+      .evolution-arrow:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .evolution-arrow:nth-child(4) {
+        animation-delay: 0.45s;
+      }
+      .evolution-arrow:nth-child(6) {
+        animation-delay: 0.75s;
+      }
+
+      @keyframes arrowFade {
+        to {
+          opacity: 0.5;
+        }
+      }
+
+      .evolution-cta {
+        text-align: center;
+        margin-top: 48px;
+        padding: 24px;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(16, 185, 129, 0.1));
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .evolution-cta p {
+        font-size: 15px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+      }
+
+      .evolution-cta strong {
+        color: var(--text);
       }
     </style>
   </head>
@@ -2011,44 +2577,114 @@
       <div class="container">
         <div class="how-header">
           <h2>How your AI workforce operates</h2>
-          <p>Agents that learn, delegate, and execute—just like your best employees.</p>
+          <p>
+            A hierarchical system that delegates, executes in parallel, and learns—just like your
+            best team.
+          </p>
         </div>
 
-        <div class="how-grid">
-          <div class="how-card">
-            <div class="how-card-number">1</div>
-            <h3>Mention to assign</h3>
-            <p>
-              @mention an agent in Slack with a task. It analyzes the request, breaks it down, and
-              delegates to the right sub-agents in your AI org chart.
-            </p>
+        <div class="hierarchy-viz">
+          <!-- Level 1: User -->
+          <div class="hierarchy-level">
+            <div class="hierarchy-node">
+              <div class="hierarchy-card user-card">
+                <div class="hierarchy-icon">👤</div>
+                <div class="hierarchy-title">You</div>
+                <div class="hierarchy-desc">@mention in Slack</div>
+              </div>
+            </div>
           </div>
 
-          <div class="how-card">
-            <div class="how-card-number">2</div>
-            <h3>Agents collaborate</h3>
-            <p>
-              Sub-agents work together, share context, and execute in parallel. They ask for
-              approval when needed, otherwise they just get it done.
-            </p>
+          <!-- Connector to Orchestrator -->
+          <div class="hierarchy-connector">
+            <svg viewBox="0 0 2 48">
+              <line x1="1" y1="0" x2="1" y2="48" class="hierarchy-connector-line" />
+            </svg>
           </div>
 
-          <div class="how-card">
-            <div class="how-card-number">3</div>
-            <h3>Learn and improve</h3>
-            <p>
-              Agents observe how your team works. They identify patterns, create SOPs, and gradually
-              automate what used to require human attention.
-            </p>
+          <!-- Level 2: Orchestrator -->
+          <div class="hierarchy-level">
+            <div class="hierarchy-node">
+              <div class="hierarchy-card orchestrator-card">
+                <div class="hierarchy-icon">🧠</div>
+                <div class="hierarchy-title">Orchestrator</div>
+                <div class="hierarchy-desc">Analyzes, plans & delegates</div>
+              </div>
+            </div>
           </div>
 
-          <div class="how-card">
-            <div class="how-card-number">4</div>
-            <h3>Align with goals</h3>
-            <p>
-              Agents understand your company objectives. They monitor if work aligns with goals,
-              suggest corrections, and keep everyone (human and AI) on track.
-            </p>
+          <!-- Branch lines to sub-agents -->
+          <div class="hierarchy-branches">
+            <svg viewBox="0 0 600 48" preserveAspectRatio="none">
+              <path d="M300,0 L300,24 L100,24 L100,48" class="hierarchy-branch-line active" />
+              <path d="M300,0 L300,48" class="hierarchy-branch-line active" />
+              <path d="M300,0 L300,24 L500,24 L500,48" class="hierarchy-branch-line active" />
+            </svg>
+          </div>
+
+          <!-- Level 3: Sub-agents -->
+          <div class="hierarchy-level">
+            <div class="hierarchy-node">
+              <div class="hierarchy-card agent-card-l2" style="border-color: #1d9bd1">
+                <div class="hierarchy-icon">📊</div>
+                <div class="hierarchy-title">Data Agent</div>
+                <div class="hierarchy-desc">Fetches & analyzes</div>
+              </div>
+              <div class="hierarchy-sublevel">
+                <div class="hierarchy-card agent-card-l3">
+                  <div class="hierarchy-icon">🔍</div>
+                  <div class="hierarchy-title">Search</div>
+                </div>
+                <div class="hierarchy-card agent-card-l3">
+                  <div class="hierarchy-icon">📈</div>
+                  <div class="hierarchy-title">Analyze</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hierarchy-node">
+              <div class="hierarchy-card agent-card-l2" style="border-color: var(--accent)">
+                <div class="hierarchy-icon">📝</div>
+                <div class="hierarchy-title">Report Agent</div>
+                <div class="hierarchy-desc">Creates documents</div>
+              </div>
+              <div class="hierarchy-sublevel">
+                <div class="hierarchy-card agent-card-l3">
+                  <div class="hierarchy-icon">✍️</div>
+                  <div class="hierarchy-title">Draft</div>
+                </div>
+                <div class="hierarchy-card agent-card-l3">
+                  <div class="hierarchy-icon">🎨</div>
+                  <div class="hierarchy-title">Format</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hierarchy-node">
+              <div class="hierarchy-card agent-card-l2" style="border-color: var(--green)">
+                <div class="hierarchy-icon">📤</div>
+                <div class="hierarchy-title">Comms Agent</div>
+                <div class="hierarchy-desc">Shares & notifies</div>
+              </div>
+              <div class="hierarchy-sublevel">
+                <div class="hierarchy-card agent-card-l3">
+                  <div class="hierarchy-icon">💬</div>
+                  <div class="hierarchy-title">Slack</div>
+                </div>
+                <div class="hierarchy-card agent-card-l3">
+                  <div class="hierarchy-icon">📧</div>
+                  <div class="hierarchy-title">Email</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Parallel execution indicator -->
+          <div class="parallel-indicator">
+            <div class="parallel-dot"></div>
+            <div class="parallel-dot"></div>
+            <div class="parallel-dot"></div>
+            <span class="parallel-text">All agents execute in parallel</span>
           </div>
         </div>
       </div>
@@ -2059,38 +2695,177 @@
         <div class="non-invasive-header">
           <h2>Non-invasive by design</h2>
           <p class="non-invasive-subtitle">
-            Nubabel doesn't replace your tools. It works within them—like adding a brilliant new
-            team member who already knows how to use everything.
+            Agents live inside your existing tools. No migration. No new apps. They work where you
+            already work.
           </p>
         </div>
 
-        <div class="non-invasive-grid">
-          <div class="non-invasive-card">
-            <div class="non-invasive-icon">💬</div>
-            <h3>Slack is the interface</h3>
-            <p>
-              Just @mention your agent in the channel where work happens. No new app to learn. No
-              context switching. Your agents live where your team already communicates.
-            </p>
+        <div class="tool-integration-grid">
+          <div class="tool-window-mini">
+            <div class="tool-window-header">
+              <div class="tool-logo slack">💬</div>
+              <span class="tool-name">Slack</span>
+            </div>
+            <div class="tool-window-content">
+              <div class="tool-mock-line"></div>
+              <div class="tool-mock-line short"></div>
+              <div class="tool-mock-line medium"></div>
+              <div class="agent-presence">
+                <div class="agent-presence-dot"></div>
+                <span class="agent-presence-text">Agent active</span>
+              </div>
+            </div>
           </div>
 
-          <div class="non-invasive-card">
-            <div class="non-invasive-icon">📁</div>
-            <h3>Your tools, unchanged</h3>
-            <p>
-              Notion stays your wiki. Google Drive stays your file storage. Jira stays your issue
-              tracker. Agents read and write to them—just like a human colleague would.
-            </p>
+          <div class="tool-window-mini">
+            <div class="tool-window-header">
+              <div class="tool-logo notion">📄</div>
+              <span class="tool-name">Notion</span>
+            </div>
+            <div class="tool-window-content">
+              <div class="tool-mock-line medium"></div>
+              <div class="tool-mock-line"></div>
+              <div class="tool-mock-line short"></div>
+              <div class="agent-presence">
+                <div class="agent-presence-dot"></div>
+                <span class="agent-presence-text">Agent active</span>
+              </div>
+            </div>
           </div>
 
-          <div class="non-invasive-card">
-            <div class="non-invasive-icon">👋</div>
-            <h3>Like onboarding a new hire</h3>
-            <p>
-              Your agent joins, observes how the team works, asks clarifying questions, and starts
-              taking on small tasks. Over time, they handle more—naturally.
-            </p>
+          <div class="tool-window-mini">
+            <div class="tool-window-header">
+              <div class="tool-logo linear">📋</div>
+              <span class="tool-name">Linear</span>
+            </div>
+            <div class="tool-window-content">
+              <div class="tool-mock-line short"></div>
+              <div class="tool-mock-line"></div>
+              <div class="tool-mock-line medium"></div>
+              <div class="agent-presence">
+                <div class="agent-presence-dot"></div>
+                <span class="agent-presence-text">Agent active</span>
+              </div>
+            </div>
           </div>
+
+          <div class="tool-window-mini">
+            <div class="tool-window-header">
+              <div class="tool-logo sheets">📊</div>
+              <span class="tool-name">Sheets</span>
+            </div>
+            <div class="tool-window-content">
+              <div class="tool-mock-line"></div>
+              <div class="tool-mock-line short"></div>
+              <div class="tool-mock-line"></div>
+              <div class="agent-presence">
+                <div class="agent-presence-dot"></div>
+                <span class="agent-presence-text">Agent active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool-integration-footer">
+          <p>
+            <strong>Your tools stay yours.</strong> Agents read and write to them just like a human
+            colleague would— no APIs to configure, no workflows to rebuild.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="org-evolution-section">
+      <div class="container">
+        <div class="evolution-header">
+          <h2>The gradual evolution to an AI-powered organization</h2>
+          <p class="evolution-subtitle">
+            Nubabel doesn't flip a switch. It gradually learns your workflows, takes over routine
+            tasks, and transforms your organization—while humans stay in control.
+          </p>
+        </div>
+
+        <div class="evolution-timeline">
+          <div class="evolution-stage">
+            <div class="evolution-stage-number">1</div>
+            <div class="evolution-org-visual">
+              <span class="evolution-icon human">👤</span>
+              <span class="evolution-icon human">👤</span>
+              <span class="evolution-icon human">👤</span>
+              <span class="evolution-icon human">👤</span>
+            </div>
+            <div class="evolution-stage-title">100% Human</div>
+            <div class="evolution-stage-desc">Your team handles everything manually</div>
+            <div class="evolution-functions">
+              <span class="evolution-function-tag">All tasks</span>
+            </div>
+          </div>
+
+          <div class="evolution-arrow">→</div>
+
+          <div class="evolution-stage active">
+            <div class="evolution-stage-number">2</div>
+            <div class="evolution-org-visual">
+              <span class="evolution-icon human">👤</span>
+              <span class="evolution-icon human">👤</span>
+              <span class="evolution-icon ai">🤖</span>
+              <span class="evolution-icon human">👤</span>
+            </div>
+            <div class="evolution-stage-title">AI Joins</div>
+            <div class="evolution-stage-desc">First agent joins as a teammate</div>
+            <div class="evolution-functions">
+              <span class="evolution-function-tag">Scheduling</span>
+              <span class="evolution-function-tag">Reminders</span>
+            </div>
+          </div>
+
+          <div class="evolution-arrow">→</div>
+
+          <div class="evolution-stage future">
+            <div class="evolution-stage-number">3</div>
+            <div class="evolution-org-visual">
+              <span class="evolution-icon human">👤</span>
+              <span class="evolution-icon ai">🤖</span>
+              <span class="evolution-icon ai">🤖</span>
+              <span class="evolution-icon ai">🤖</span>
+            </div>
+            <div class="evolution-stage-title">AI Handles Routine</div>
+            <div class="evolution-stage-desc">Agents take over repetitive work</div>
+            <div class="evolution-functions">
+              <span class="evolution-function-tag">Reports</span>
+              <span class="evolution-function-tag">Data entry</span>
+              <span class="evolution-function-tag">Updates</span>
+            </div>
+          </div>
+
+          <div class="evolution-arrow">→</div>
+
+          <div class="evolution-stage future">
+            <div class="evolution-stage-number">4</div>
+            <div class="evolution-org-visual">
+              <span class="evolution-icon ai">🤖</span>
+              <span class="evolution-icon ai">🤖</span>
+              <span class="evolution-icon ai">🤖</span>
+              <span class="evolution-icon oversight">👤</span>
+            </div>
+            <div class="evolution-stage-title">AI Organization</div>
+            <div class="evolution-stage-desc">AI executes, humans oversee</div>
+            <div class="evolution-functions">
+              <span class="evolution-function-tag">Strategy</span>
+              <span class="evolution-function-tag">Approval</span>
+              <span class="evolution-function-tag">Exceptions</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="evolution-cta">
+          <p>
+            <strong>Start small, grow gradually.</strong> Begin with a single agent handling simple
+            tasks. As it learns your processes, delegate more—at your own pace.
+          </p>
+          <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
+            >Start your evolution</a
+          >
         </div>
       </div>
     </section>
