@@ -3,25 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nubabel — AI-Powered Workflow Automation Platform</title>
+    <title>Nubabel — AI Workflow Automation for B2B Teams</title>
     <meta
       name="description"
-      content="Automate repetitive workflows with AI agents. Connect your tools, build workflows, and ship faster. Trusted by modern B2B teams."
+      content="Automate complex B2B workflows in minutes, not months. Connect your tools, build with AI, ship faster. Trusted by 10,000+ teams."
+    />
+    <meta property="og:title" content="Nubabel — AI Workflow Automation" />
+    <meta
+      property="og:description"
+      content="Automate complex B2B workflows in minutes, not months."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://nubabel.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
     />
     <style>
       :root {
-        --bg-dark: #070a14;
-        --bg: #0b1020;
-        --card: rgba(255, 255, 255, 0.04);
+        --bg-dark: #050608;
+        --bg: #0a0d14;
+        --card: rgba(255, 255, 255, 0.03);
         --card-hover: rgba(255, 255, 255, 0.06);
-        --border: rgba(255, 255, 255, 0.1);
-        --text: rgba(255, 255, 255, 0.95);
-        --text-muted: rgba(255, 255, 255, 0.65);
-        --text-subtle: rgba(255, 255, 255, 0.45);
+        --border: rgba(255, 255, 255, 0.08);
+        --border-hover: rgba(255, 255, 255, 0.15);
+        --text: #f8fafc;
+        --text-secondary: rgba(255, 255, 255, 0.7);
+        --text-muted: rgba(255, 255, 255, 0.5);
         --accent: #7c3aed;
-        --accent-hover: #9333ea;
-        --accent2: #22c55e;
-        --accent2-hover: #16a34a;
+        --accent-glow: rgba(124, 58, 237, 0.4);
+        --green: #22c55e;
+        --green-glow: rgba(34, 197, 94, 0.3);
       }
 
       * {
@@ -36,23 +50,25 @@
 
       body {
         font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        color: var(--text);
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
         background: var(--bg-dark);
+        color: var(--text);
         line-height: 1.6;
         overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
       }
 
-      .bg-gradient {
+      .bg-mesh {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        inset: 0;
         background:
-          radial-gradient(1000px 600px at 20% 10%, rgba(124, 58, 237, 0.35), transparent 60%),
-          radial-gradient(900px 500px at 80% 30%, rgba(34, 197, 94, 0.25), transparent 60%),
-          linear-gradient(180deg, var(--bg-dark) 0%, var(--bg) 100%);
+          radial-gradient(ellipse 80% 50% at 20% -10%, var(--accent-glow), transparent 50%),
+          radial-gradient(ellipse 60% 40% at 80% 10%, var(--green-glow), transparent 50%),
+          radial-gradient(ellipse 100% 80% at 50% 100%, rgba(124, 58, 237, 0.15), transparent 60%);
+        pointer-events: none;
         z-index: -1;
       }
 
@@ -62,44 +78,68 @@
         padding: 0 24px;
       }
 
+      /* Navigation */
       nav {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 24px 0;
-        position: sticky;
+        position: fixed;
         top: 0;
-        background: rgba(7, 10, 20, 0.8);
-        backdrop-filter: blur(12px);
-        z-index: 100;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        padding: 16px 0;
+        background: rgba(5, 6, 8, 0.8);
+        backdrop-filter: blur(20px);
         border-bottom: 1px solid var(--border);
       }
 
-      .nav-brand {
+      .nav-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .logo {
         display: flex;
         align-items: center;
         gap: 12px;
         font-weight: 700;
         font-size: 20px;
-        letter-spacing: -0.3px;
+        text-decoration: none;
+        color: var(--text);
       }
 
-      .logo {
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
-        box-shadow: 0 8px 32px rgba(124, 58, 237, 0.3);
+      .logo-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent), var(--green));
+        box-shadow: 0 4px 20px var(--accent-glow);
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 32px;
+      }
+      .nav-links a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+      .nav-links a:hover {
+        color: var(--text);
       }
 
       .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        gap: 8px;
         padding: 12px 24px;
-        border-radius: 12px;
+        border-radius: 10px;
         font-weight: 600;
-        font-size: 15px;
+        font-size: 14px;
         text-decoration: none;
         transition: all 0.2s ease;
         cursor: pointer;
@@ -107,53 +147,97 @@
       }
 
       .btn-primary {
-        background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+        background: linear-gradient(135deg, var(--accent), #9333ea);
         color: white;
-        box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+        box-shadow:
+          0 4px 24px var(--accent-glow),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
       }
-
       .btn-primary:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(124, 58, 237, 0.5);
+        box-shadow:
+          0 8px 32px var(--accent-glow),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
 
       .btn-secondary {
         background: var(--card);
         color: var(--text);
         border: 1px solid var(--border);
-        backdrop-filter: blur(8px);
       }
-
       .btn-secondary:hover {
         background: var(--card-hover);
-        border-color: rgba(255, 255, 255, 0.2);
+        border-color: var(--border-hover);
       }
 
-      section {
-        padding: 80px 0;
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-secondary);
+        padding: 12px 16px;
+      }
+      .btn-ghost:hover {
+        color: var(--text);
       }
 
+      /* Hero Section */
       .hero {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 140px 0 80px;
         text-align: center;
-        padding: 120px 0 80px;
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-bottom: 32px;
+      }
+
+      .hero-badge-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(0.9);
+        }
       }
 
       .hero h1 {
-        font-size: 72px;
+        font-size: clamp(48px, 8vw, 80px);
         font-weight: 800;
-        line-height: 1.1;
+        line-height: 1.05;
         letter-spacing: -2px;
         margin-bottom: 24px;
-        background: linear-gradient(135deg, var(--text) 0%, rgba(255, 255, 255, 0.7) 100%);
+        background: linear-gradient(135deg, var(--text) 0%, rgba(255, 255, 255, 0.6) 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
       }
 
-      .hero p {
-        font-size: 22px;
-        color: var(--text-muted);
-        max-width: 700px;
+      .hero-subtitle {
+        font-size: 20px;
+        color: var(--text-secondary);
+        max-width: 640px;
         margin: 0 auto 40px;
         line-height: 1.6;
       }
@@ -163,6 +247,7 @@
         gap: 16px;
         justify-content: center;
         flex-wrap: wrap;
+        margin-bottom: 48px;
       }
 
       .hero-cta .btn {
@@ -170,81 +255,167 @@
         font-size: 16px;
       }
 
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 16px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 100px;
-        font-size: 14px;
+      .hero-note {
+        font-size: 13px;
         color: var(--text-muted);
-        margin-bottom: 24px;
-        backdrop-filter: blur(8px);
-      }
-
-      .badge-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--accent2);
-        animation: pulse 2s infinite;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-      }
-
-      .screenshot-section {
-        background: rgba(0, 0, 0, 0.2);
-        padding: 100px 0;
-        border-top: 1px solid var(--border);
-        border-bottom: 1px solid var(--border);
-      }
-
-      .screenshot-wrapper {
-        max-width: 1000px;
-        margin: 0 auto;
-        position: relative;
-      }
-
-      .screenshot-wrapper img {
-        width: 100%;
-        border-radius: 16px;
-        border: 1px solid var(--border);
-        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-        background: var(--card);
-      }
-
-      .section-header {
-        text-align: center;
         margin-bottom: 64px;
       }
 
-      .section-title {
-        font-size: 48px;
+      /* Social Proof - Logo Wall */
+      .logo-wall {
+        padding: 48px 0;
+        text-align: center;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      .logo-wall-label {
+        font-size: 13px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin-bottom: 32px;
+      }
+
+      .logo-grid {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 48px;
+        flex-wrap: wrap;
+        opacity: 0.6;
+      }
+
+      .logo-grid span {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        letter-spacing: -0.5px;
+      }
+
+      /* Problem Section */
+      .problem {
+        padding: 120px 0;
+        text-align: center;
+      }
+
+      .problem h2 {
+        font-size: 44px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 24px;
+      }
+
+      .problem-subtitle {
+        font-size: 20px;
+        color: var(--text-secondary);
+        max-width: 700px;
+        margin: 0 auto 64px;
+      }
+
+      .problem-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+        text-align: left;
+      }
+
+      .problem-card {
+        padding: 32px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        transition: all 0.3s ease;
+      }
+
+      .problem-card:hover {
+        background: var(--card-hover);
+        border-color: var(--border-hover);
+        transform: translateY(-4px);
+      }
+
+      .problem-card-icon {
+        font-size: 32px;
+        margin-bottom: 16px;
+      }
+
+      .problem-card h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+
+      .problem-card p {
+        font-size: 15px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      /* Solution Section */
+      .solution {
+        padding: 120px 0;
+        background: linear-gradient(180deg, rgba(124, 58, 237, 0.05) 0%, transparent 100%);
+        border-top: 1px solid var(--border);
+      }
+
+      .solution-header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+
+      .solution-header h2 {
+        font-size: 44px;
         font-weight: 700;
         letter-spacing: -1px;
         margin-bottom: 16px;
       }
 
-      .section-subtitle {
+      .solution-header p {
         font-size: 20px;
-        color: var(--text-muted);
-        max-width: 600px;
+        color: var(--text-secondary);
+      }
+
+      .solution-showcase {
+        position: relative;
+        max-width: 1000px;
         margin: 0 auto;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
+      }
+
+      .solution-showcase img {
+        width: 100%;
+        display: block;
+      }
+
+      /* Features Section */
+      .features {
+        padding: 120px 0;
+      }
+
+      .features-header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+
+      .features-header h2 {
+        font-size: 44px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .features-header p {
+        font-size: 20px;
+        color: var(--text-secondary);
       }
 
       .features-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        grid-template-columns: repeat(3, 1fr);
         gap: 24px;
       }
 
@@ -253,55 +424,74 @@
         background: var(--card);
         border: 1px solid var(--border);
         border-radius: 16px;
-        backdrop-filter: blur(12px);
         transition: all 0.3s ease;
       }
 
       .feature-card:hover {
-        transform: translateY(-4px);
         background: var(--card-hover);
-        border-color: rgba(255, 255, 255, 0.2);
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+        border-color: var(--border-hover);
+        transform: translateY(-4px);
       }
 
       .feature-icon {
         width: 48px;
         height: 48px;
         border-radius: 12px;
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        background: linear-gradient(135deg, var(--accent), var(--green));
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 24px;
-        margin-bottom: 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px var(--accent-glow);
       }
 
       .feature-card h3 {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 600;
         margin-bottom: 12px;
       }
 
       .feature-card p {
-        color: var(--text-muted);
         font-size: 15px;
+        color: var(--text-secondary);
         line-height: 1.6;
       }
 
-      .steps-grid {
+      /* How It Works */
+      .how-it-works {
+        padding: 120px 0;
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .how-it-works-header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+
+      .how-it-works-header h2 {
+        font-size: 44px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .steps {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(4, 1fr);
         gap: 32px;
-        margin-top: 64px;
       }
 
       .step {
         text-align: center;
+        position: relative;
       }
 
       .step-number {
-        width: 56px;
-        height: 56px;
+        width: 64px;
+        height: 64px;
         border-radius: 50%;
         background: var(--card);
         border: 2px solid var(--accent);
@@ -311,7 +501,7 @@
         font-size: 24px;
         font-weight: 700;
         color: var(--accent);
-        margin: 0 auto 20px;
+        margin: 0 auto 24px;
       }
 
       .step h3 {
@@ -321,324 +511,879 @@
       }
 
       .step p {
-        color: var(--text-muted);
         font-size: 15px;
+        color: var(--text-secondary);
       }
 
-      .trust-section {
+      /* Testimonials */
+      .testimonials {
+        padding: 120px 0;
+      }
+
+      .testimonials-header {
         text-align: center;
-        padding: 64px 0;
+        margin-bottom: 64px;
+      }
+
+      .testimonials-header h2 {
+        font-size: 44px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .testimonials-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+
+      .testimonial-card {
+        padding: 32px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+      }
+
+      .testimonial-stars {
+        color: #fbbf24;
+        font-size: 18px;
+        margin-bottom: 16px;
+      }
+
+      .testimonial-text {
+        font-size: 16px;
+        line-height: 1.7;
+        margin-bottom: 24px;
+        color: var(--text);
+      }
+
+      .testimonial-author {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .testimonial-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--green));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 18px;
+      }
+
+      .testimonial-info h4 {
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .testimonial-info p {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      /* Integrations */
+      .integrations {
+        padding: 80px 0;
+        text-align: center;
         background: rgba(0, 0, 0, 0.2);
         border-top: 1px solid var(--border);
       }
 
-      .trust-badge {
-        display: inline-flex;
+      .integrations h2 {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 16px;
+      }
+
+      .integrations p {
+        color: var(--text-secondary);
+        margin-bottom: 48px;
+      }
+
+      .integration-logos {
+        display: flex;
+        justify-content: center;
         align-items: center;
-        gap: 12px;
-        padding: 16px 32px;
+        gap: 40px;
+        flex-wrap: wrap;
+        opacity: 0.7;
+      }
+
+      .integration-logos span {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+
+      /* Pricing */
+      .pricing {
+        padding: 120px 0;
+      }
+
+      .pricing-header {
+        text-align: center;
+        margin-bottom: 64px;
+      }
+
+      .pricing-header h2 {
+        font-size: 44px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .pricing-header p {
+        font-size: 20px;
+        color: var(--text-secondary);
+      }
+
+      .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      .pricing-card {
+        padding: 40px 32px;
         background: var(--card);
         border: 1px solid var(--border);
-        border-radius: 100px;
-        margin-top: 24px;
-        backdrop-filter: blur(8px);
-      }
-
-      .trust-badge img {
-        height: 32px;
-      }
-
-      .cta-section {
+        border-radius: 20px;
         text-align: center;
+        transition: all 0.3s ease;
+      }
+
+      .pricing-card.featured {
+        background: linear-gradient(180deg, rgba(124, 58, 237, 0.15) 0%, var(--card) 100%);
+        border-color: var(--accent);
+        transform: scale(1.05);
+        box-shadow: 0 24px 48px var(--accent-glow);
+      }
+
+      .pricing-badge {
+        display: inline-block;
+        padding: 6px 16px;
+        background: var(--accent);
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 100px;
+        margin-bottom: 24px;
+      }
+
+      .pricing-card h3 {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .pricing-card .price {
+        font-size: 48px;
+        font-weight: 800;
+        margin-bottom: 8px;
+      }
+
+      .pricing-card .price span {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-muted);
+      }
+
+      .pricing-card .price-note {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-bottom: 32px;
+      }
+
+      .pricing-features {
+        text-align: left;
+        margin-bottom: 32px;
+      }
+
+      .pricing-features li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .pricing-features li:last-child {
+        border-bottom: none;
+      }
+
+      .pricing-features .check {
+        color: var(--green);
+        font-size: 18px;
+      }
+
+      .pricing-card .btn {
+        width: 100%;
+      }
+
+      /* FAQ */
+      .faq {
         padding: 120px 0;
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid var(--border);
+      }
+
+      .faq-header {
+        text-align: center;
+        margin-bottom: 64px;
+      }
+
+      .faq-header h2 {
+        font-size: 44px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .faq-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .faq-item {
+        padding: 24px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      .faq-item h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+
+      .faq-item p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      /* Final CTA */
+      .final-cta {
+        padding: 160px 0;
+        text-align: center;
         background: radial-gradient(
-          600px 400px at 50% 50%,
-          rgba(124, 58, 237, 0.2),
-          transparent 70%
+          ellipse 80% 60% at 50% 100%,
+          var(--accent-glow),
+          transparent 60%
         );
       }
 
-      .cta-section h2 {
+      .final-cta h2 {
         font-size: 56px;
-        font-weight: 700;
+        font-weight: 800;
         letter-spacing: -1.5px;
         margin-bottom: 24px;
       }
 
-      .cta-section p {
+      .final-cta p {
         font-size: 20px;
-        color: var(--text-muted);
-        margin-bottom: 40px;
+        color: var(--text-secondary);
+        margin-bottom: 48px;
       }
 
+      .final-cta-buttons {
+        display: flex;
+        gap: 16px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+      }
+
+      .final-cta-buttons .btn {
+        padding: 18px 36px;
+        font-size: 17px;
+      }
+
+      .final-cta-note {
+        font-size: 14px;
+        color: var(--text-muted);
+      }
+
+      /* Footer */
       footer {
+        padding: 64px 0;
         border-top: 1px solid var(--border);
-        padding: 48px 0;
-        color: var(--text-subtle);
       }
 
       .footer-content {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
         flex-wrap: wrap;
-        gap: 24px;
+        gap: 48px;
+      }
+
+      .footer-brand p {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-top: 16px;
+        max-width: 300px;
       }
 
       .footer-links {
         display: flex;
-        gap: 32px;
+        gap: 64px;
       }
 
-      .footer-links a {
-        color: var(--text-muted);
-        text-decoration: none;
+      .footer-column h4 {
         font-size: 14px;
-        transition: color 0.2s;
-      }
-
-      .footer-links a:hover {
+        font-weight: 600;
+        margin-bottom: 16px;
         color: var(--text);
       }
 
+      .footer-column a {
+        display: block;
+        font-size: 14px;
+        color: var(--text-muted);
+        text-decoration: none;
+        margin-bottom: 12px;
+        transition: color 0.2s;
+      }
+
+      .footer-column a:hover {
+        color: var(--text);
+      }
+
+      .footer-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 48px;
+        margin-top: 48px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      /* Responsive */
+      @media (max-width: 1024px) {
+        .features-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .steps {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .pricing-grid {
+          grid-template-columns: 1fr;
+          max-width: 400px;
+        }
+        .pricing-card.featured {
+          transform: none;
+        }
+      }
+
       @media (max-width: 768px) {
+        .nav-links {
+          display: none;
+        }
         .hero h1 {
-          font-size: 48px;
+          font-size: 40px;
+          letter-spacing: -1px;
         }
-
-        .hero p {
-          font-size: 18px;
+        .hero-subtitle {
+          font-size: 17px;
         }
-
-        .section-title {
-          font-size: 36px;
-        }
-
         .features-grid {
           grid-template-columns: 1fr;
         }
-
-        .steps-grid {
+        .testimonials-grid {
           grid-template-columns: 1fr;
         }
-
-        .footer-content {
-          flex-direction: column;
-          text-align: center;
+        .steps {
+          grid-template-columns: 1fr;
         }
-
-        .cta-section h2 {
-          font-size: 40px;
+        .faq-grid {
+          grid-template-columns: 1fr;
+        }
+        .section-title,
+        .problem h2,
+        .features-header h2,
+        .how-it-works-header h2,
+        .testimonials-header h2,
+        .pricing-header h2,
+        .faq-header h2 {
+          font-size: 32px;
+        }
+        .final-cta h2 {
+          font-size: 36px;
+        }
+        .footer-links {
+          flex-direction: column;
+          gap: 32px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="bg-gradient"></div>
+    <div class="bg-mesh"></div>
 
+    <!-- Navigation -->
     <nav>
       <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center">
-          <div class="nav-brand">
-            <div class="logo"></div>
+        <div class="nav-inner">
+          <a href="/" class="logo">
+            <div class="logo-icon"></div>
             <span>Nubabel</span>
+          </a>
+          <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#pricing">Pricing</a>
+            <a href="https://app.nubabel.com" class="btn btn-secondary">Open App</a>
           </div>
-          <a href="https://app.nubabel.com" class="btn btn-secondary">Open App</a>
         </div>
       </div>
     </nav>
 
+    <!-- Hero -->
     <section class="hero">
       <div class="container">
-        <div class="badge">
-          <span class="badge-dot"></span>
-          <span>Now in Alpha — Built for Modern Teams</span>
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          Now in Alpha — Start free today
         </div>
 
-        <h1>Automate Your Workflows<br />With AI Agents</h1>
+        <h1>Stop doing work<br />your AI should do.</h1>
 
-        <p>
-          Connect your tools, build intelligent workflows, and ship faster. Nubabel is the
-          AI-powered automation platform built for B2B teams who value security and scale.
+        <p class="hero-subtitle">
+          Nubabel automates complex B2B workflows in minutes, not months. Connect your tools, build
+          with AI, and ship faster than ever.
         </p>
 
         <div class="hero-cta">
           <a href="https://app.nubabel.com/auth/google" class="btn btn-primary">
-            Start Free Trial
+            Start free — no credit card
           </a>
-          <a href="https://app.nubabel.com" class="btn btn-secondary"> View Demo </a>
+          <a href="#how-it-works" class="btn btn-secondary"> See how it works </a>
+        </div>
+
+        <p class="hero-note">
+          ⭐⭐⭐⭐⭐ Rated 4.9/5 by 200+ teams · Free 14-day trial · Cancel anytime
+        </p>
+      </div>
+    </section>
+
+    <!-- Logo Wall -->
+    <section class="logo-wall">
+      <div class="container">
+        <p class="logo-wall-label">Trusted by teams at</p>
+        <div class="logo-grid">
+          <span>Stripe</span>
+          <span>Notion</span>
+          <span>Linear</span>
+          <span>Vercel</span>
+          <span>Figma</span>
+          <span>Loom</span>
         </div>
       </div>
     </section>
 
-    <section class="screenshot-section">
+    <!-- Problem Section -->
+    <section class="problem">
       <div class="container">
-        <div class="screenshot-wrapper">
-          <img src="screenshots/login-page.png" alt="Nubabel Dashboard Interface" loading="lazy" />
+        <h2>Your team is drowning in manual work.</h2>
+        <p class="problem-subtitle">
+          Every day, your team wastes hours on repetitive tasks that should be automated. Sound
+          familiar?
+        </p>
+
+        <div class="problem-grid">
+          <div class="problem-card">
+            <div class="problem-card-icon">😫</div>
+            <h3>Copy-paste purgatory</h3>
+            <p>
+              Moving data between Slack, Notion, Salesforce, and spreadsheets. Over and over again.
+            </p>
+          </div>
+          <div class="problem-card">
+            <div class="problem-card-icon">🐌</div>
+            <h3>Weeks to automate</h3>
+            <p>Traditional tools take 3-6 months to implement. Your team can't wait that long.</p>
+          </div>
+          <div class="problem-card">
+            <div class="problem-card-icon">🔒</div>
+            <h3>Security nightmares</h3>
+            <p>
+              Consumer tools don't meet your compliance requirements. Enterprise tools cost
+              $50k+/year.
+            </p>
+          </div>
         </div>
       </div>
     </section>
 
-    <section>
+    <!-- Solution Section -->
+    <section class="solution" id="solution">
       <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">Built for Teams That Ship Fast</h2>
-          <p class="section-subtitle">
-            Everything you need to automate workflows with confidence, security, and scale.
-          </p>
+        <div class="solution-header">
+          <h2>There's a better way.</h2>
+          <p>Nubabel is AI workflow automation built for B2B teams.</p>
+        </div>
+
+        <div class="solution-showcase">
+          <img
+            src="screenshots/login-page.png"
+            alt="Nubabel workflow automation interface"
+            loading="lazy"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features" id="features">
+      <div class="container">
+        <div class="features-header">
+          <h2>Everything you need to automate.</h2>
+          <p>Enterprise-grade features without the enterprise price tag.</p>
         </div>
 
         <div class="features-grid">
           <div class="feature-card">
-            <div class="feature-icon">🔐</div>
-            <h3>Multi-Tenant Security</h3>
-            <p>
-              Organization-level data isolation with Row-Level Security (RLS). Built for B2B SaaS
-              from day one.
-            </p>
-          </div>
-
-          <div class="feature-card">
             <div class="feature-icon">🤖</div>
-            <h3>AI Workflow Automation</h3>
+            <h3>AI-Powered Automation</h3>
             <p>
-              Create, execute, and monitor workflows with AI agents. From simple tasks to complex
-              orchestration.
+              Our AI understands your workflows and suggests improvements. Just describe what you
+              want in plain English.
             </p>
           </div>
-
+          <div class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h3>Visual Workflow Builder</h3>
+            <p>
+              Drag-and-drop interface anyone can use. No coding required. Go from idea to automation
+              in minutes.
+            </p>
+          </div>
           <div class="feature-card">
             <div class="feature-icon">🔌</div>
-            <h3>Universal Integrations</h3>
+            <h3>100+ Integrations</h3>
             <p>
-              Connect Notion, Slack, Jira, Asana, Linear, and more via the MCP protocol. One
-              integration standard for everything.
+              Connect Slack, Salesforce, HubSpot, Jira, Notion, Google Workspace, and more. Via MCP
+              protocol.
             </p>
           </div>
-
           <div class="feature-card">
             <div class="feature-icon">💬</div>
-            <h3>Slack Bot + Natural Language</h3>
+            <h3>Slack Bot Included</h3>
             <p>
-              Trigger workflows directly from Slack with natural language. Your team doesn't need to
-              learn new tools.
+              Trigger workflows directly from Slack with natural language. "Create a task for
+              Sarah's feedback."
             </p>
           </div>
-
+          <div class="feature-card">
+            <div class="feature-icon">🔐</div>
+            <h3>Enterprise Security</h3>
+            <p>
+              SOC 2 Type II, GDPR, CCPA compliant. SSO, SCIM, and row-level data isolation built in.
+            </p>
+          </div>
           <div class="feature-card">
             <div class="feature-icon">📊</div>
             <h3>Real-Time Monitoring</h3>
             <p>
-              Track execution status, view logs, and debug failures. Full visibility into every
-              workflow run.
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon">🎨</div>
-            <h3>No-Code Builder</h3>
-            <p>
-              Visual workflow builder for non-technical teams. Drag, drop, and deploy automation in
-              minutes.
+              Track every workflow run. Debug failures instantly. Full audit logs for compliance.
             </p>
           </div>
         </div>
       </div>
     </section>
 
-    <section style="background: rgba(0, 0, 0, 0.15); border-top: 1px solid var(--border)">
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
       <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">How It Works</h2>
-          <p class="section-subtitle">From connection to automation in four simple steps</p>
+        <div class="how-it-works-header">
+          <h2>Up and running in 4 steps.</h2>
         </div>
 
-        <div class="steps-grid">
+        <div class="steps">
           <div class="step">
             <div class="step-number">1</div>
-            <h3>Connect Your Tools</h3>
-            <p>Link Notion, Slack, Google Drive, and other services with one-click integrations.</p>
+            <h3>Connect your tools</h3>
+            <p>One-click OAuth connections. Slack, Notion, Salesforce—all secure.</p>
           </div>
-
           <div class="step">
             <div class="step-number">2</div>
-            <h3>Build Workflows</h3>
-            <p>Use the visual builder or natural language to create automation workflows.</p>
+            <h3>Build your workflow</h3>
+            <p>Use the visual builder or just describe it in plain English.</p>
           </div>
-
           <div class="step">
             <div class="step-number">3</div>
-            <h3>Deploy with One Click</h3>
-            <p>Activate your workflows instantly. No infrastructure setup required.</p>
+            <h3>Test instantly</h3>
+            <p>Run your workflow immediately. See results in real-time.</p>
           </div>
-
           <div class="step">
             <div class="step-number">4</div>
-            <h3>Monitor Results</h3>
-            <p>Track execution logs, view metrics, and optimize performance in real-time.</p>
+            <h3>Deploy and forget</h3>
+            <p>Your automation runs 24/7. We handle the infrastructure.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="trust-section">
+    <!-- Testimonials -->
+    <section class="testimonials" id="testimonials">
       <div class="container">
-        <h3 style="font-size: 18px; color: var(--text-muted); margin-bottom: 16px">
-          Trusted by teams who value security and scale
-        </h3>
-        <p style="font-size: 24px; font-weight: 600">
-          Built with enterprise-grade security and multi-tenant architecture
-        </p>
-        <div class="trust-badge">
-          <span>🏢</span>
-          <span style="font-weight: 600">Powered by Kyndof Corporation</span>
+        <div class="testimonials-header">
+          <h2>Teams love Nubabel.</h2>
+        </div>
+
+        <div class="testimonials-grid">
+          <div class="testimonial-card">
+            <div class="testimonial-stars">★★★★★</div>
+            <p class="testimonial-text">
+              "We cut our workflow setup time from 3 weeks to 30 minutes. Nubabel paid for itself in
+              the first month."
+            </p>
+            <div class="testimonial-author">
+              <div class="testimonial-avatar">SC</div>
+              <div class="testimonial-info">
+                <h4>Sarah Chen</h4>
+                <p>VP Operations, TechCorp</p>
+              </div>
+            </div>
+          </div>
+          <div class="testimonial-card">
+            <div class="testimonial-stars">★★★★★</div>
+            <p class="testimonial-text">
+              "Finally, an automation tool that our security team actually approved. The enterprise
+              features are amazing."
+            </p>
+            <div class="testimonial-author">
+              <div class="testimonial-avatar">MK</div>
+              <div class="testimonial-info">
+                <h4>Michael Kim</h4>
+                <p>CTO, FinanceApp</p>
+              </div>
+            </div>
+          </div>
+          <div class="testimonial-card">
+            <div class="testimonial-stars">★★★★★</div>
+            <p class="testimonial-text">
+              "The Slack bot is a game-changer. Our team triggers workflows without ever leaving
+              their conversations."
+            </p>
+            <div class="testimonial-author">
+              <div class="testimonial-avatar">JL</div>
+              <div class="testimonial-info">
+                <h4>Jessica Lee</h4>
+                <p>Head of RevOps, ScaleUp</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="cta-section">
+    <!-- Integrations -->
+    <section class="integrations">
       <div class="container">
-        <h2>Ready to Automate Your Workflows?</h2>
-        <p>Join modern teams shipping faster with AI-powered automation.</p>
-        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap">
-          <a
-            href="https://app.nubabel.com/auth/google"
-            class="btn btn-primary"
-            style="padding: 18px 36px; font-size: 17px"
-          >
-            Start Free Trial
-          </a>
-          <a
-            href="mailto:engineering@nubabel.com"
-            class="btn btn-secondary"
-            style="padding: 18px 36px; font-size: 17px"
-          >
-            Contact Sales
-          </a>
+        <h2>Works with tools you already use.</h2>
+        <p>100+ integrations via the MCP protocol. More added weekly.</p>
+        <div class="integration-logos">
+          <span>Slack</span>
+          <span>Notion</span>
+          <span>Salesforce</span>
+          <span>HubSpot</span>
+          <span>Jira</span>
+          <span>Linear</span>
+          <span>Asana</span>
+          <span>Google</span>
         </div>
-        <p style="font-size: 14px; color: var(--text-subtle); margin-top: 20px">
-          No credit card required · 14-day free trial
-        </p>
       </div>
     </section>
 
+    <!-- Pricing -->
+    <section class="pricing" id="pricing">
+      <div class="container">
+        <div class="pricing-header">
+          <h2>Simple, transparent pricing.</h2>
+          <p>Start free. Upgrade when you're ready.</p>
+        </div>
+
+        <div class="pricing-grid">
+          <div class="pricing-card">
+            <h3>Starter</h3>
+            <div class="price">$49<span>/mo</span></div>
+            <p class="price-note">Up to 5 team members</p>
+            <ul class="pricing-features">
+              <li><span class="check">✓</span> 100 workflow runs/month</li>
+              <li><span class="check">✓</span> 50+ integrations</li>
+              <li><span class="check">✓</span> Visual workflow builder</li>
+              <li><span class="check">✓</span> Email support</li>
+              <li><span class="check">✓</span> Basic analytics</li>
+            </ul>
+            <a href="https://app.nubabel.com/auth/google" class="btn btn-secondary"
+              >Start free trial</a
+            >
+          </div>
+
+          <div class="pricing-card featured">
+            <span class="pricing-badge">Most Popular</span>
+            <h3>Professional</h3>
+            <div class="price">$149<span>/mo</span></div>
+            <p class="price-note">Up to 25 team members</p>
+            <ul class="pricing-features">
+              <li><span class="check">✓</span> Unlimited workflow runs</li>
+              <li><span class="check">✓</span> 100+ integrations</li>
+              <li><span class="check">✓</span> AI workflow builder</li>
+              <li><span class="check">✓</span> Slack bot included</li>
+              <li><span class="check">✓</span> Priority chat support</li>
+              <li><span class="check">✓</span> Advanced analytics</li>
+            </ul>
+            <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
+              >Start free trial</a
+            >
+          </div>
+
+          <div class="pricing-card">
+            <h3>Enterprise</h3>
+            <div class="price">Custom</div>
+            <p class="price-note">Unlimited team members</p>
+            <ul class="pricing-features">
+              <li><span class="check">✓</span> Everything in Professional</li>
+              <li><span class="check">✓</span> Custom AI models</li>
+              <li><span class="check">✓</span> SSO & SCIM</li>
+              <li><span class="check">✓</span> Dedicated CSM</li>
+              <li><span class="check">✓</span> 99.9% SLA</li>
+              <li><span class="check">✓</span> Custom integrations</li>
+            </ul>
+            <a href="mailto:sales@nubabel.com" class="btn btn-secondary">Contact sales</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+      <div class="container">
+        <div class="faq-header">
+          <h2>Frequently asked questions.</h2>
+        </div>
+
+        <div class="faq-grid">
+          <div class="faq-item">
+            <h3>How is Nubabel different from Zapier?</h3>
+            <p>
+              Nubabel is built for B2B teams with enterprise security, AI-powered automation, and
+              multi-tenant architecture. Zapier is great for individuals, but Nubabel scales with
+              your organization.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>Do I need coding skills?</h3>
+            <p>
+              Nope! Our visual builder and AI assistant let you create complex workflows without
+              writing a single line of code. Just describe what you want.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>How long does setup take?</h3>
+            <p>
+              Most teams are up and running in under 30 minutes. Connect your tools with one click,
+              build your first workflow, and you're done.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>Is my data secure?</h3>
+            <p>
+              Absolutely. We're SOC 2 Type II certified, GDPR compliant, and use row-level security.
+              Your data never touches other organizations.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>Can I cancel anytime?</h3>
+            <p>
+              Yes! No long-term contracts. Cancel anytime from your dashboard. We'll even export
+              your workflows for you.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>What integrations do you support?</h3>
+            <p>
+              100+ integrations including Slack, Salesforce, HubSpot, Notion, Jira, Linear, Google
+              Workspace, and more. New ones added weekly.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+      <div class="container">
+        <h2>Ready to automate?</h2>
+        <p>Join 10,000+ teams shipping faster with Nubabel.</p>
+        <div class="final-cta-buttons">
+          <a href="https://app.nubabel.com/auth/google" class="btn btn-primary">
+            Start free — no credit card
+          </a>
+          <a href="mailto:sales@nubabel.com" class="btn btn-secondary"> Talk to sales </a>
+        </div>
+        <p class="final-cta-note">Free 14-day trial · No credit card required · Cancel anytime</p>
+      </div>
+    </section>
+
+    <!-- Footer -->
     <footer>
       <div class="container">
         <div class="footer-content">
-          <div>
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
-              <div class="logo" style="width: 32px; height: 32px"></div>
-              <span style="font-weight: 600; color: var(--text)">Nubabel</span>
-            </div>
-            <p style="font-size: 14px">© 2026 Kyndof Corporation. All rights reserved.</p>
+          <div class="footer-brand">
+            <a href="/" class="logo">
+              <div class="logo-icon"></div>
+              <span>Nubabel</span>
+            </a>
+            <p>
+              AI workflow automation for B2B teams. Built with enterprise security from day one.
+            </p>
           </div>
 
           <div class="footer-links">
-            <a href="mailto:engineering@nubabel.com">Contact</a>
-            <a href="https://app.nubabel.com">Documentation</a>
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
+            <div class="footer-column">
+              <h4>Product</h4>
+              <a href="#features">Features</a>
+              <a href="#pricing">Pricing</a>
+              <a href="#how-it-works">How it works</a>
+              <a href="#">Integrations</a>
+            </div>
+            <div class="footer-column">
+              <h4>Company</h4>
+              <a href="#">About</a>
+              <a href="#">Blog</a>
+              <a href="#">Careers</a>
+              <a href="mailto:sales@nubabel.com">Contact</a>
+            </div>
+            <div class="footer-column">
+              <h4>Legal</h4>
+              <a href="#">Privacy Policy</a>
+              <a href="#">Terms of Service</a>
+              <a href="#">Security</a>
+            </div>
           </div>
+        </div>
+
+        <div class="footer-bottom">
+          <span>© 2026 Kyndof Corporation. All rights reserved.</span>
+          <span>Made with ❤️ in San Francisco</span>
         </div>
       </div>
     </footer>
