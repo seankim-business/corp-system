@@ -557,6 +557,30 @@
         border: 1px solid var(--border);
         border-radius: 16px;
         overflow: hidden;
+        transition: all 0.3s ease;
+      }
+
+      .demo-scenario:hover {
+        border-color: rgba(139, 92, 246, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      .demo-scenario:hover .slack-message {
+        animation: none;
+      }
+
+      .demo-scenario:hover .slack-avatar.bot {
+        animation: botGlow 1.5s ease-in-out infinite;
+      }
+
+      @keyframes botGlow {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+        }
+        50% {
+          box-shadow: 0 0 12px 4px rgba(139, 92, 246, 0.3);
+        }
       }
 
       .demo-title {
@@ -1401,46 +1425,638 @@
         line-height: 1.7;
       }
 
-      .capabilities {
-        text-align: center;
+      /* ========== INTERACTIVE CAPABILITIES ========== */
+      .capabilities-interactive {
+        padding: 120px 0;
+        background: var(--bg);
       }
 
-      .capabilities h2 {
+      .cap-header {
+        text-align: center;
+        margin-bottom: 48px;
+      }
+
+      .cap-header h2 {
         font-size: 36px;
         font-weight: 700;
         letter-spacing: -0.5px;
-        margin-bottom: 64px;
+        margin-bottom: 12px;
       }
 
-      .capability-grid {
+      .cap-header p {
+        font-size: 16px;
+        color: var(--text-secondary);
+      }
+
+      .cap-showcase {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 24px;
-        text-align: left;
-      }
-
-      .capability-card {
-        padding: 28px;
+        grid-template-columns: 280px 1fr;
+        gap: 32px;
         background: var(--card);
         border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+
+      .cap-tabs {
+        display: flex;
+        flex-direction: column;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 16px;
+        gap: 8px;
+      }
+
+      .cap-tab {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: var(--text-secondary);
+      }
+
+      .cap-tab:hover {
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+      }
+
+      .cap-tab.active {
+        background: var(--accent-dim);
+        border-color: var(--accent);
+        color: var(--text);
+      }
+
+      .cap-tab-icon {
+        font-size: 20px;
+      }
+
+      .cap-tab-text {
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .cap-demo-area {
+        padding: 32px;
+        min-height: 400px;
+      }
+
+      .cap-demo {
+        display: none;
+        height: 100%;
+      }
+
+      .cap-demo.active {
+        display: flex;
+        flex-direction: column;
+        animation: demoFadeIn 0.4s ease-out;
+      }
+
+      @keyframes demoFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .demo-animation {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        padding: 32px;
+        background: rgba(0, 0, 0, 0.3);
         border-radius: 12px;
+        margin-bottom: 24px;
       }
 
-      .capability-icon {
-        font-size: 28px;
-        margin-bottom: 16px;
-      }
-
-      .capability-card h3 {
-        font-size: 16px;
+      .demo-description h4 {
+        font-size: 18px;
         font-weight: 600;
         margin-bottom: 8px;
       }
 
-      .capability-card p {
-        font-size: 13px;
+      .demo-description p {
+        font-size: 14px;
         color: var(--text-secondary);
         line-height: 1.6;
+      }
+
+      /* Delegation animation */
+      .delegation-anim {
+        gap: 20px;
+      }
+
+      .anim-request .anim-bubble {
+        padding: 12px 20px;
+        background: rgba(102, 126, 234, 0.2);
+        border: 1px solid rgba(102, 126, 234, 0.4);
+        border-radius: 12px;
+        font-size: 14px;
+        color: var(--text);
+        animation: bubbleIn 0.5s ease-out;
+      }
+
+      @keyframes bubbleIn {
+        from {
+          opacity: 0;
+          transform: scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .anim-orchestrator {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        animation: fadeIn 0.5s ease-out 0.3s both;
+      }
+
+      .anim-brain {
+        width: 48px;
+        height: 48px;
+        background: var(--accent-dim);
+        border: 2px solid var(--accent);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        animation: brainPulse 2s ease-in-out infinite;
+      }
+
+      .anim-thinking {
+        font-size: 13px;
+        color: var(--accent);
+      }
+
+      .anim-delegation-flow {
+        display: flex;
+        gap: 24px;
+      }
+
+      .anim-agent {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        animation: agentAppear 0.4s ease-out calc(0.5s + var(--delay, 0s)) forwards;
+      }
+
+      @keyframes agentAppear {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .anim-agent-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+      }
+
+      .anim-agent-label {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .anim-task-line {
+        width: 60px;
+        height: 3px;
+        background: var(--border);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .anim-task-line::after {
+        content: "";
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: var(--accent);
+        animation: taskProgress 2s ease-in-out infinite;
+      }
+
+      @keyframes taskProgress {
+        0% {
+          transform: translateX(-100%);
+        }
+        50% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      .anim-result {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 20px;
+        font-size: 13px;
+        color: var(--green);
+        opacity: 0;
+        animation: resultAppear 0.5s ease-out 1.5s forwards;
+      }
+
+      @keyframes resultAppear {
+        from {
+          opacity: 0;
+          transform: scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .anim-checkmark {
+        width: 20px;
+        height: 20px;
+        background: var(--green);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: white;
+      }
+
+      /* Learning animation */
+      .skill-progress-visual {
+        width: 100%;
+        max-width: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .skill-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        opacity: 0;
+        animation: skillIn 0.4s ease-out calc(var(--delay, 0s)) forwards;
+      }
+
+      .skill-item.locked {
+        opacity: 0.4;
+        animation: skillIn 0.4s ease-out 0.9s forwards;
+      }
+
+      .skill-item.locked .skill-fill {
+        background: var(--border);
+      }
+
+      @keyframes skillIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .skill-icon {
+        font-size: 20px;
+      }
+
+      .skill-name {
+        font-size: 13px;
+        color: var(--text);
+        width: 80px;
+      }
+
+      .skill-bar {
+        flex: 1;
+        height: 8px;
+        background: var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .skill-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), var(--green));
+        border-radius: 4px;
+        width: 0;
+        animation: skillFill 1.5s ease-out calc(0.5s + var(--delay, 0s)) forwards;
+      }
+
+      @keyframes skillFill {
+        to {
+          width: var(--fill);
+        }
+      }
+
+      .learning-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--green);
+      }
+
+      .learning-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      /* SOP animation */
+      .sop-flow {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .sop-observe,
+      .sop-generate,
+      .sop-execute {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 20px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .sop-icon {
+        font-size: 24px;
+      }
+
+      .sop-arrow {
+        color: var(--accent);
+        font-size: 20px;
+        animation: arrowPulse 1s ease-in-out infinite;
+      }
+
+      @keyframes arrowPulse {
+        0%,
+        100% {
+          opacity: 0.5;
+          transform: translateX(0);
+        }
+        50% {
+          opacity: 1;
+          transform: translateX(4px);
+        }
+      }
+
+      .sop-doc {
+        width: 50px;
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .sop-line {
+        height: 4px;
+        background: var(--accent);
+        border-radius: 2px;
+        animation: lineGrow 0.5s ease-out forwards;
+      }
+
+      .sop-line.short {
+        width: 60%;
+      }
+
+      @keyframes lineGrow {
+        from {
+          width: 0;
+        }
+      }
+
+      /* Periodic animation */
+      .schedule-visual {
+        width: 100%;
+        max-width: 320px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .schedule-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 13px;
+      }
+
+      .schedule-item.active {
+        border-color: var(--green);
+        background: rgba(16, 185, 129, 0.1);
+      }
+
+      .schedule-time {
+        color: var(--text-muted);
+        font-size: 11px;
+        width: 80px;
+      }
+
+      .schedule-task {
+        flex: 1;
+        color: var(--text);
+      }
+
+      .schedule-status {
+        color: var(--green);
+      }
+
+      .schedule-status.pending {
+        color: var(--text-muted);
+      }
+
+      .periodic-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .clock-icon {
+        animation: clockTick 1s steps(12) infinite;
+      }
+
+      @keyframes clockTick {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Human-in-the-loop animation */
+      .approval-visual {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .approval-request {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-radius: 12px;
+        animation: approvalPulse 2s ease-in-out infinite;
+      }
+
+      @keyframes approvalPulse {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+        }
+        50% {
+          box-shadow: 0 0 20px 4px rgba(245, 158, 11, 0.1);
+        }
+      }
+
+      .approval-icon {
+        font-size: 24px;
+      }
+
+      .approval-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .approval-text strong {
+        font-size: 14px;
+        color: #f59e0b;
+      }
+
+      .approval-text span {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .approval-buttons {
+        display: flex;
+        gap: 12px;
+      }
+
+      .approve-btn,
+      .reject-btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .approve-btn {
+        background: var(--green);
+        color: white;
+      }
+
+      .approve-btn:hover {
+        background: #059669;
+      }
+
+      .reject-btn {
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+
+      .reject-btn:hover {
+        border-color: #ef4444;
+        color: #ef4444;
+      }
+
+      .approval-note {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      @media (max-width: 900px) {
+        .cap-showcase {
+          grid-template-columns: 1fr;
+        }
+
+        .cap-tabs {
+          flex-direction: row;
+          overflow-x: auto;
+          padding: 12px;
+        }
+
+        .cap-tab {
+          flex-shrink: 0;
+          padding: 10px 14px;
+        }
+
+        .cap-tab-text {
+          display: none;
+        }
+
+        .cap-demo-area {
+          padding: 20px;
+        }
+
+        .anim-delegation-flow {
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .sop-flow {
+          flex-direction: column;
+        }
+
+        .sop-arrow {
+          transform: rotate(90deg);
+        }
       }
 
       .scenario {
@@ -2873,30 +3489,88 @@
         padding: 40px;
       }
 
-      .command-flow {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 24px;
-        margin-bottom: 48px;
-      }
-
-      .command-node {
+      .command-flow-vertical {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
+        margin-bottom: 32px;
+      }
+
+      .flow-row {
+        display: flex;
+        justify-content: center;
+      }
+
+      .command-node-v {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 24px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        opacity: 0;
+        animation: nodeAppear 0.5s ease-out forwards;
+      }
+
+      .user-row .command-node-v {
+        animation-delay: 0.1s;
+      }
+
+      .brain-row .command-node-v {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes nodeAppear {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .command-node-v.orchestrator-v {
+        background: var(--accent-dim);
+        border-color: var(--accent);
+        position: relative;
+        padding: 20px 32px;
+      }
+
+      .brain-glow {
+        position: absolute;
+        inset: -2px;
+        background: radial-gradient(circle at center, rgba(139, 92, 246, 0.3), transparent 70%);
+        border-radius: 18px;
+        animation: brainPulse 2s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      @keyframes brainPulse {
+        0%,
+        100% {
+          opacity: 0.5;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.05);
+        }
       }
 
       .command-node-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
-        transition: all 0.3s ease;
+        font-size: 26px;
+        flex-shrink: 0;
+        position: relative;
+        z-index: 1;
       }
 
       .command-node-icon.user {
@@ -2905,41 +3579,97 @@
       }
 
       .command-node-icon.orchestrator {
-        background: var(--accent-dim);
-        border: 2px solid var(--accent);
-        box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+        background: var(--accent);
+        border: none;
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+      }
+
+      .command-node-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        position: relative;
+        z-index: 1;
       }
 
       .command-node-label {
-        font-size: 13px;
+        font-size: 16px;
         font-weight: 600;
         color: var(--text);
       }
 
       .command-node-sublabel {
-        font-size: 11px;
+        font-size: 12px;
         color: var(--text-muted);
       }
 
-      .command-flow-arrow {
-        color: var(--accent);
-        font-size: 24px;
-        opacity: 0.6;
-      }
-
-      .command-flow-branches {
+      .thinking-indicator {
         display: flex;
-        flex-direction: column;
-        align-items: center;
+        gap: 4px;
+        margin-left: 16px;
+        position: relative;
+        z-index: 1;
       }
 
-      .command-flow-branches svg {
-        width: 100%;
-        max-width: 500px;
+      .thinking-indicator span {
+        width: 8px;
+        height: 8px;
+        background: var(--accent);
+        border-radius: 50%;
+        animation: thinkBounce 1.4s ease-in-out infinite;
+      }
+
+      .thinking-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .thinking-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes thinkBounce {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.4;
+        }
+        30% {
+          transform: translateY(-8px);
+          opacity: 1;
+        }
+      }
+
+      .flow-connector-v {
         height: 40px;
+        display: flex;
+        justify-content: center;
+        opacity: 0;
+        animation: fadeIn 0.3s ease-out 0.2s forwards;
       }
 
-      .command-branch-line {
+      @keyframes fadeIn {
+        to {
+          opacity: 1;
+        }
+      }
+
+      .dash-animate {
+        animation: dashMove 1s linear infinite;
+      }
+
+      .flow-branches-v {
+        width: 100%;
+        max-width: 600px;
+        opacity: 0;
+        animation: fadeIn 0.3s ease-out 0.6s forwards;
+      }
+
+      .flow-branches-v svg {
+        width: 100%;
+        height: 50px;
+      }
+
+      .branch-line-v {
         stroke: var(--accent);
         stroke-width: 2;
         stroke-dasharray: 6 4;
@@ -2962,6 +3692,32 @@
         transition: all 0.3s ease;
         position: relative;
         overflow: hidden;
+        opacity: 0;
+        animation: agentSlideUp 0.5s ease-out forwards;
+      }
+
+      .command-agent:nth-child(1) {
+        animation-delay: 0.7s;
+      }
+      .command-agent:nth-child(2) {
+        animation-delay: 0.85s;
+      }
+      .command-agent:nth-child(3) {
+        animation-delay: 1s;
+      }
+      .command-agent:nth-child(4) {
+        animation-delay: 1.15s;
+      }
+
+      @keyframes agentSlideUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
 
       .command-agent::before {
@@ -2977,6 +3733,7 @@
       .command-agent:hover {
         border-color: var(--agent-color, var(--accent));
         transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
       }
 
       .command-agent-header {
@@ -3255,44 +4012,89 @@
         font-weight: 600;
       }
 
-      .hero-tools-showcase {
+      .hero-tools-compact {
         display: flex;
         align-items: center;
-        gap: 24px;
-        margin: 32px 0;
+        gap: 16px;
+        margin: 24px 0;
         flex-wrap: wrap;
       }
 
-      .hero-tool-badge {
-        display: flex;
+      .tool-check {
+        display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 10px 16px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        transition: all 0.3s ease;
-        animation: toolFadeIn 0.5s ease-out forwards;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text-secondary);
         opacity: 0;
+        animation: toolCheckIn 0.3s ease-out forwards;
       }
 
-      .hero-tool-badge:nth-child(1) {
+      .tool-check:nth-child(1) {
         animation-delay: 0.1s;
       }
-      .hero-tool-badge:nth-child(2) {
+      .tool-check:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .tool-check:nth-child(3) {
         animation-delay: 0.2s;
       }
-      .hero-tool-badge:nth-child(3) {
+      .tool-check:nth-child(4) {
+        animation-delay: 0.25s;
+      }
+      .tool-check:nth-child(5) {
         animation-delay: 0.3s;
       }
-      .hero-tool-badge:nth-child(4) {
-        animation-delay: 0.4s;
-      }
-      .hero-tool-badge:nth-child(5) {
-        animation-delay: 0.5s;
+
+      .tool-check .check-icon {
+        width: 16px;
+        height: 16px;
+        background: rgba(16, 185, 129, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: var(--green);
       }
 
-      @keyframes toolFadeIn {
+      .tool-more {
+        font-size: 12px;
+        color: var(--text-muted);
+        padding: 4px 10px;
+        background: var(--card);
+        border-radius: 12px;
+        opacity: 0;
+        animation: toolCheckIn 0.3s ease-out 0.35s forwards;
+      }
+
+      @keyframes toolCheckIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .hero-value-props {
+        display: flex;
+        gap: 24px;
+        margin: 28px 0 32px;
+        flex-wrap: wrap;
+      }
+
+      .value-prop {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        opacity: 0;
+        animation: valuePropIn 0.5s ease-out forwards;
+      }
+
+      @keyframes valuePropIn {
         from {
           opacity: 0;
           transform: translateY(10px);
@@ -3303,15 +4105,110 @@
         }
       }
 
-      .hero-tool-badge:hover {
-        border-color: var(--accent);
-        transform: translateY(-2px);
-        background: var(--card-hover);
+      .value-icon {
+        width: 36px;
+        height: 36px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
       }
 
-      .hero-tool-icon {
-        width: 24px;
-        height: 24px;
+      .value-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .value-text strong {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .value-text span {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      /* ========== DELEGATION PANEL IN HERO ========== */
+      .delegation-panel {
+        margin-top: 12px;
+        background: rgba(139, 92, 246, 0.08);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .delegation-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.2);
+        border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+      }
+
+      .delegation-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--accent);
+        letter-spacing: 0.5px;
+      }
+
+      .delegation-status {
+        font-size: 10px;
+        color: var(--green);
+      }
+
+      .delegation-agents {
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .mini-agent-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        border-left: 3px solid var(--agent-accent, var(--accent));
+        opacity: 0;
+        animation: agentCardIn 0.4s ease-out forwards;
+      }
+
+      .mini-agent-card:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .mini-agent-card:nth-child(2) {
+        animation-delay: 0.25s;
+      }
+      .mini-agent-card:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes agentCardIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .mini-agent-icon {
+        width: 28px;
+        height: 28px;
+        background: rgba(255, 255, 255, 0.05);
         border-radius: 6px;
         display: flex;
         align-items: center;
@@ -3319,35 +4216,41 @@
         font-size: 14px;
       }
 
-      .hero-tool-icon.slack {
-        background: linear-gradient(135deg, #4a154b, #611f69);
-      }
-      .hero-tool-icon.notion {
-        background: #191919;
-        border: 1px solid #333;
-      }
-      .hero-tool-icon.drive {
-        background: linear-gradient(135deg, #4285f4, #34a853);
-      }
-      .hero-tool-icon.linear {
-        background: linear-gradient(135deg, #5e6ad2, #8f95ee);
-      }
-      .hero-tool-icon.jira {
-        background: linear-gradient(135deg, #0052cc, #2684ff);
+      .mini-agent-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
       }
 
-      .hero-tool-name {
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-secondary);
+      .mini-agent-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--agent-accent, #fff);
       }
 
-      .hero-tool-status {
-        width: 6px;
-        height: 6px;
-        background: var(--green);
+      .mini-agent-task {
+        font-size: 11px;
+        color: #9b9a97;
+      }
+
+      .mini-agent-status {
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
-        animation: pulse 2s ease-in-out infinite;
+      }
+
+      .mini-agent-status.working {
+        background: var(--accent);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      .mini-agent-status.waiting {
+        background: var(--text-muted);
+      }
+
+      .mini-agent-status.done {
+        background: var(--green);
       }
 
       .hero-subtitle-enhanced {
@@ -3415,11 +4318,17 @@
       }
 
       @media (max-width: 900px) {
-        .hero-tools-showcase {
+        .hero-tools-compact {
           justify-content: center;
         }
-        .hero-features-mini {
+        .hero-value-props {
           justify-content: center;
+        }
+        .command-flow-vertical {
+          padding: 0 16px;
+        }
+        .flow-branches-v {
+          display: none;
         }
       }
     </style>
@@ -3454,32 +4363,13 @@
             </div>
             <h1>Add <span class="gradient-text">AI teammates</span> to your existing workflow.</h1>
 
-            <div class="hero-tools-showcase">
-              <div class="hero-tool-badge">
-                <div class="hero-tool-icon slack">💬</div>
-                <span class="hero-tool-name">Slack</span>
-                <div class="hero-tool-status"></div>
-              </div>
-              <div class="hero-tool-badge">
-                <div class="hero-tool-icon notion">📄</div>
-                <span class="hero-tool-name">Notion</span>
-                <div class="hero-tool-status"></div>
-              </div>
-              <div class="hero-tool-badge">
-                <div class="hero-tool-icon drive">📁</div>
-                <span class="hero-tool-name">Drive</span>
-                <div class="hero-tool-status"></div>
-              </div>
-              <div class="hero-tool-badge">
-                <div class="hero-tool-icon linear">📋</div>
-                <span class="hero-tool-name">Linear</span>
-                <div class="hero-tool-status"></div>
-              </div>
-              <div class="hero-tool-badge">
-                <div class="hero-tool-icon jira">🎫</div>
-                <span class="hero-tool-name">Jira</span>
-                <div class="hero-tool-status"></div>
-              </div>
+            <div class="hero-tools-compact">
+              <span class="tool-check"><span class="check-icon">✓</span> Slack</span>
+              <span class="tool-check"><span class="check-icon">✓</span> Notion</span>
+              <span class="tool-check"><span class="check-icon">✓</span> Drive</span>
+              <span class="tool-check"><span class="check-icon">✓</span> Linear</span>
+              <span class="tool-check"><span class="check-icon">✓</span> Jira</span>
+              <span class="tool-more">+12 more</span>
             </div>
 
             <p class="hero-subtitle-enhanced">
@@ -3489,18 +4379,27 @@
               >—just like onboarding a brilliant new hire.
             </p>
 
-            <div class="hero-features-mini">
-              <div class="hero-feature-item">
-                <div class="hero-feature-check">✓</div>
-                <span>No setup required</span>
+            <div class="hero-value-props">
+              <div class="value-prop" style="animation-delay: 0.2s">
+                <div class="value-icon">🚀</div>
+                <div class="value-text">
+                  <strong>No setup required</strong>
+                  <span>Connect in 2 minutes</span>
+                </div>
               </div>
-              <div class="hero-feature-item">
-                <div class="hero-feature-check">✓</div>
-                <span>Works with your tools</span>
+              <div class="value-prop" style="animation-delay: 0.4s">
+                <div class="value-icon">🔗</div>
+                <div class="value-text">
+                  <strong>Works with your tools</strong>
+                  <span>Not another app to manage</span>
+                </div>
               </div>
-              <div class="hero-feature-item">
-                <div class="hero-feature-check">✓</div>
-                <span>Learns as it goes</span>
+              <div class="value-prop" style="animation-delay: 0.6s">
+                <div class="value-icon">🧠</div>
+                <div class="value-text">
+                  <strong>Learns as it goes</strong>
+                  <span>Gets smarter over time</span>
+                </div>
               </div>
             </div>
 
@@ -3540,32 +4439,35 @@
                       <span class="slack-timestamp">9:00 AM</span>
                     </div>
                     <div class="slack-msg-text">On it! Delegating to my team...</div>
-                    <div
-                      class="slack-msg-attachment"
-                      style="border-left-color: var(--accent); background: rgba(139, 92, 246, 0.1)"
-                    >
-                      <div style="font-size: 11px; color: #9b9a97; margin-bottom: 8px">
-                        DELEGATION
+                    <div class="delegation-panel">
+                      <div class="delegation-header">
+                        <span class="delegation-label">DELEGATING TO TEAM</span>
+                        <span class="delegation-status">⚡ Parallel execution</span>
                       </div>
-                      <div style="display: flex; flex-direction: column; gap: 6px">
-                        <div style="display: flex; align-items: center; gap: 8px">
-                          <span style="font-size: 14px">📊</span>
-                          <span style="color: #1d9bd1; font-weight: 500">Data Agent</span>
-                          <span style="color: #616061; font-size: 12px"
-                            >→ Pull metrics from Sheets</span
-                          >
+                      <div class="delegation-agents">
+                        <div class="mini-agent-card" style="--agent-accent: #1d9bd1">
+                          <div class="mini-agent-icon">📊</div>
+                          <div class="mini-agent-info">
+                            <span class="mini-agent-name">Data Agent</span>
+                            <span class="mini-agent-task">Pull metrics from Sheets</span>
+                          </div>
+                          <div class="mini-agent-status working"></div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px">
-                          <span style="font-size: 14px">📝</span>
-                          <span style="color: var(--accent); font-weight: 500">Report Agent</span>
-                          <span style="color: #616061; font-size: 12px">→ Create Notion doc</span>
+                        <div class="mini-agent-card" style="--agent-accent: var(--accent)">
+                          <div class="mini-agent-icon">📝</div>
+                          <div class="mini-agent-info">
+                            <span class="mini-agent-name">Report Agent</span>
+                            <span class="mini-agent-task">Create Notion doc</span>
+                          </div>
+                          <div class="mini-agent-status working"></div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px">
-                          <span style="font-size: 14px">📤</span>
-                          <span style="color: var(--green); font-weight: 500">Comms Agent</span>
-                          <span style="color: #616061; font-size: 12px"
-                            >→ Prepare distribution</span
-                          >
+                        <div class="mini-agent-card" style="--agent-accent: var(--green)">
+                          <div class="mini-agent-icon">📤</div>
+                          <div class="mini-agent-info">
+                            <span class="mini-agent-name">Comms Agent</span>
+                            <span class="mini-agent-task">Prepare distribution</span>
+                          </div>
+                          <div class="mini-agent-status waiting"></div>
                         </div>
                       </div>
                     </div>
@@ -3697,43 +4599,59 @@
           </div>
 
           <div class="command-body">
-            <div class="command-flow">
-              <div class="command-node">
-                <div class="command-node-icon user">👤</div>
-                <div class="command-node-label">You</div>
-                <div class="command-node-sublabel">@mention in Slack</div>
+            <div class="command-flow-vertical">
+              <!-- User Request -->
+              <div class="flow-row user-row">
+                <div class="command-node-v">
+                  <div class="command-node-icon user">👤</div>
+                  <div class="command-node-info">
+                    <div class="command-node-label">You</div>
+                    <div class="command-node-sublabel">@mention in Slack</div>
+                  </div>
+                </div>
               </div>
 
-              <div class="command-flow-arrow">→</div>
-
-              <div class="command-node">
-                <div class="command-node-icon orchestrator">🧠</div>
-                <div class="command-node-label">Orchestrator</div>
-                <div class="command-node-sublabel">Analyzes & delegates</div>
+              <!-- Animated connector -->
+              <div class="flow-connector-v">
+                <svg width="4" height="40" class="connector-line">
+                  <line
+                    x1="2"
+                    y1="0"
+                    x2="2"
+                    y2="40"
+                    stroke="var(--accent)"
+                    stroke-width="2"
+                    stroke-dasharray="6 4"
+                    class="dash-animate"
+                  />
+                </svg>
               </div>
 
-              <div class="command-flow-branches">
-                <svg viewBox="0 0 300 40" preserveAspectRatio="none">
-                  <path
-                    d="M0,0 L0,20 L-100,20 L-100,40"
-                    class="command-branch-line"
-                    transform="translate(150,0)"
-                  />
-                  <path
-                    d="M0,0 L0,20 L-33,20 L-33,40"
-                    class="command-branch-line"
-                    transform="translate(150,0)"
-                  />
-                  <path
-                    d="M0,0 L0,20 L33,20 L33,40"
-                    class="command-branch-line"
-                    transform="translate(150,0)"
-                  />
-                  <path
-                    d="M0,0 L0,20 L100,20 L100,40"
-                    class="command-branch-line"
-                    transform="translate(150,0)"
-                  />
+              <!-- Orchestrator Brain -->
+              <div class="flow-row brain-row">
+                <div class="command-node-v orchestrator-v">
+                  <div class="brain-glow"></div>
+                  <div class="command-node-icon orchestrator">🧠</div>
+                  <div class="command-node-info">
+                    <div class="command-node-label">Orchestrator</div>
+                    <div class="command-node-sublabel">Analyzes & delegates</div>
+                  </div>
+                  <div class="thinking-indicator"><span></span><span></span><span></span></div>
+                </div>
+              </div>
+
+              <!-- Branch lines going down -->
+              <div class="flow-branches-v">
+                <svg
+                  width="100%"
+                  height="50"
+                  viewBox="0 0 600 50"
+                  preserveAspectRatio="xMidYMin meet"
+                >
+                  <path d="M300,0 L300,20 L75,20 L75,50" class="branch-line-v" />
+                  <path d="M300,0 L300,20 L225,20 L225,50" class="branch-line-v" />
+                  <path d="M300,0 L300,20 L375,20 L375,50" class="branch-line-v" />
+                  <path d="M300,0 L300,20 L525,20 L525,50" class="branch-line-v" />
                 </svg>
               </div>
             </div>
@@ -5138,204 +6056,209 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
 
-          <div class="demo-scenario">
-            <div class="demo-title">
-              <span class="demo-badge">Multi-Agent</span>
-              <h3>Scenario: Complex coordinated workflow</h3>
-            </div>
-            <div class="demo-content" style="grid-template-columns: 1fr">
-              <div class="demo-panel" style="padding: 32px; background: #0d0d0d">
-                <div style="max-width: 900px; margin: 0 auto">
-                  <div style="text-align: center; margin-bottom: 32px">
-                    <div style="font-size: 14px; color: var(--accent); margin-bottom: 8px">
-                      User Request
-                    </div>
-                    <div
-                      style="
-                        background: #1a1d21;
-                        padding: 16px 24px;
-                        border-radius: 8px;
-                        display: inline-block;
-                      "
-                    >
-                      <span style="font-size: 16px; color: #fff"
-                        >"<span class="slack-mention">@nubabel</span> prepare Q1 board presentation
-                        with financials, metrics, and team highlights"</span
-                      >
-                    </div>
+    <section class="capabilities-interactive" id="capabilities">
+      <div class="container">
+        <div class="cap-header">
+          <h2>What your AI agents can do</h2>
+          <p>Click each capability to see it in action</p>
+        </div>
+
+        <div class="cap-showcase">
+          <div class="cap-tabs">
+            <button class="cap-tab active" data-cap="delegation">
+              <span class="cap-tab-icon">🔀</span>
+              <span class="cap-tab-text">Intelligent delegation</span>
+            </button>
+            <button class="cap-tab" data-cap="learning">
+              <span class="cap-tab-icon">📚</span>
+              <span class="cap-tab-text">Learn new skills</span>
+            </button>
+            <button class="cap-tab" data-cap="sop">
+              <span class="cap-tab-icon">📋</span>
+              <span class="cap-tab-text">SOP creation</span>
+            </button>
+            <button class="cap-tab" data-cap="periodic">
+              <span class="cap-tab-icon">🔄</span>
+              <span class="cap-tab-text">Periodic execution</span>
+            </button>
+            <button class="cap-tab" data-cap="human">
+              <span class="cap-tab-icon">🤝</span>
+              <span class="cap-tab-text">Human-in-the-loop</span>
+            </button>
+          </div>
+
+          <div class="cap-demo-area">
+            <div class="cap-demo active" id="demo-delegation">
+              <div class="demo-animation delegation-anim">
+                <div class="anim-request">
+                  <div class="anim-bubble user-bubble">"Prepare quarterly report"</div>
+                </div>
+                <div class="anim-orchestrator">
+                  <div class="anim-brain">🧠</div>
+                  <div class="anim-thinking">Analyzing...</div>
+                </div>
+                <div class="anim-delegation-flow">
+                  <div class="anim-agent" style="--delay: 0.2s">
+                    <span class="anim-agent-icon">📊</span>
+                    <span class="anim-agent-label">Data</span>
+                    <div class="anim-task-line"></div>
                   </div>
-                  <div style="display: flex; justify-content: center; margin-bottom: 24px">
-                    <svg width="2" height="40" style="overflow: visible">
-                      <line
-                        x1="1"
-                        y1="0"
-                        x2="1"
-                        y2="40"
-                        stroke="var(--accent)"
-                        stroke-width="2"
-                        stroke-dasharray="4,4"
-                      />
-                    </svg>
+                  <div class="anim-agent" style="--delay: 0.4s">
+                    <span class="anim-agent-icon">📝</span>
+                    <span class="anim-agent-label">Writer</span>
+                    <div class="anim-task-line"></div>
                   </div>
-                  <div style="display: flex; justify-content: center; margin-bottom: 24px">
-                    <div
-                      style="
-                        background: var(--accent-dim);
-                        border: 2px solid var(--accent);
-                        border-radius: 12px;
-                        padding: 16px 32px;
-                        text-align: center;
-                      "
-                    >
-                      <div style="font-size: 24px; margin-bottom: 4px">🧠</div>
-                      <div style="font-weight: 600">Orchestrator</div>
-                      <div style="font-size: 12px; color: var(--text-muted)">
-                        Breaks down into 4 subtasks
-                      </div>
-                    </div>
-                  </div>
-                  <div style="display: flex; justify-content: center; gap: 60px; flex-wrap: wrap">
-                    <div style="text-align: center">
-                      <div
-                        style="
-                          width: 2px;
-                          height: 30px;
-                          background: var(--border);
-                          margin: 0 auto 12px;
-                        "
-                      ></div>
-                      <div
-                        style="
-                          background: #161616;
-                          border: 1px solid #262626;
-                          border-radius: 8px;
-                          padding: 16px 20px;
-                          min-width: 140px;
-                        "
-                      >
-                        <div style="font-size: 20px; margin-bottom: 8px">💰</div>
-                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
-                          Finance Agent
-                        </div>
-                        <div style="font-size: 11px; color: #666">QuickBooks, Sheets</div>
-                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
-                          ✓ Revenue data
-                        </div>
-                      </div>
-                    </div>
-                    <div style="text-align: center">
-                      <div
-                        style="
-                          width: 2px;
-                          height: 30px;
-                          background: var(--border);
-                          margin: 0 auto 12px;
-                        "
-                      ></div>
-                      <div
-                        style="
-                          background: #161616;
-                          border: 1px solid #262626;
-                          border-radius: 8px;
-                          padding: 16px 20px;
-                          min-width: 140px;
-                        "
-                      >
-                        <div style="font-size: 20px; margin-bottom: 8px">📊</div>
-                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
-                          Analytics Agent
-                        </div>
-                        <div style="font-size: 11px; color: #666">Amplitude, Mixpanel</div>
-                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
-                          ✓ KPI metrics
-                        </div>
-                      </div>
-                    </div>
-                    <div style="text-align: center">
-                      <div
-                        style="
-                          width: 2px;
-                          height: 30px;
-                          background: var(--border);
-                          margin: 0 auto 12px;
-                        "
-                      ></div>
-                      <div
-                        style="
-                          background: #161616;
-                          border: 1px solid #262626;
-                          border-radius: 8px;
-                          padding: 16px 20px;
-                          min-width: 140px;
-                        "
-                      >
-                        <div style="font-size: 20px; margin-bottom: 8px">👥</div>
-                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
-                          HR Agent
-                        </div>
-                        <div style="font-size: 11px; color: #666">Linear, Slack</div>
-                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
-                          ✓ Team highlights
-                        </div>
-                      </div>
-                    </div>
-                    <div style="text-align: center">
-                      <div
-                        style="
-                          width: 2px;
-                          height: 30px;
-                          background: var(--border);
-                          margin: 0 auto 12px;
-                        "
-                      ></div>
-                      <div
-                        style="
-                          background: #161616;
-                          border: 1px solid #262626;
-                          border-radius: 8px;
-                          padding: 16px 20px;
-                          min-width: 140px;
-                        "
-                      >
-                        <div style="font-size: 20px; margin-bottom: 8px">🎨</div>
-                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
-                          Design Agent
-                        </div>
-                        <div style="font-size: 11px; color: #666">Figma, Slides</div>
-                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
-                          ✓ Deck layout
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div style="display: flex; justify-content: center; margin-top: 24px">
-                    <svg width="2" height="30" style="overflow: visible">
-                      <line x1="1" y1="0" x2="1" y2="30" stroke="var(--green)" stroke-width="2" />
-                    </svg>
-                  </div>
-                  <div style="display: flex; justify-content: center; margin-top: 12px">
-                    <div
-                      style="
-                        background: linear-gradient(
-                          135deg,
-                          rgba(16, 185, 129, 0.15),
-                          rgba(139, 92, 246, 0.15)
-                        );
-                        border: 1px solid var(--green);
-                        border-radius: 12px;
-                        padding: 20px 40px;
-                        text-align: center;
-                      "
-                    >
-                      <div style="font-size: 24px; margin-bottom: 8px">✅</div>
-                      <div style="font-weight: 600; color: var(--green)">Board Deck Ready</div>
-                      <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px">
-                        24 slides • Generated in 3 minutes
-                      </div>
-                    </div>
+                  <div class="anim-agent" style="--delay: 0.6s">
+                    <span class="anim-agent-icon">🎨</span>
+                    <span class="anim-agent-label">Design</span>
+                    <div class="anim-task-line"></div>
                   </div>
                 </div>
+                <div class="anim-result">
+                  <div class="anim-checkmark">✓</div>
+                  <span>Report ready in 2 min</span>
+                </div>
+              </div>
+              <div class="demo-description">
+                <h4>Intelligent delegation</h4>
+                <p>
+                  Complex tasks are automatically broken down and assigned to specialized sub-agents
+                  who work in parallel.
+                </p>
+              </div>
+            </div>
+
+            <div class="cap-demo" id="demo-learning">
+              <div class="demo-animation learning-anim">
+                <div class="skill-progress-visual">
+                  <div class="skill-item unlocking">
+                    <span class="skill-icon">📊</span>
+                    <span class="skill-name">Analytics</span>
+                    <div class="skill-bar"><div class="skill-fill" style="--fill: 100%"></div></div>
+                  </div>
+                  <div class="skill-item unlocking" style="--delay: 0.3s">
+                    <span class="skill-icon">📝</span>
+                    <span class="skill-name">Reports</span>
+                    <div class="skill-bar"><div class="skill-fill" style="--fill: 75%"></div></div>
+                  </div>
+                  <div class="skill-item unlocking" style="--delay: 0.6s">
+                    <span class="skill-icon">🔍</span>
+                    <span class="skill-name">Research</span>
+                    <div class="skill-bar"><div class="skill-fill" style="--fill: 45%"></div></div>
+                  </div>
+                  <div class="skill-item locked">
+                    <span class="skill-icon">🎯</span>
+                    <span class="skill-name">Strategy</span>
+                    <div class="skill-bar"><div class="skill-fill" style="--fill: 0%"></div></div>
+                  </div>
+                </div>
+                <div class="learning-indicator">
+                  <div class="learning-dot"></div>
+                  <span>Learning from your workflows...</span>
+                </div>
+              </div>
+              <div class="demo-description">
+                <h4>Learn new skills</h4>
+                <p>
+                  Agents observe your team's patterns and gradually acquire new capabilities. The
+                  more they work, the smarter they get.
+                </p>
+              </div>
+            </div>
+
+            <div class="cap-demo" id="demo-sop">
+              <div class="demo-animation sop-anim">
+                <div class="sop-flow">
+                  <div class="sop-observe">
+                    <div class="sop-icon">👁️</div>
+                    <span>Observing 12 onboardings...</span>
+                  </div>
+                  <div class="sop-arrow">→</div>
+                  <div class="sop-generate">
+                    <div class="sop-doc">
+                      <div class="sop-line"></div>
+                      <div class="sop-line short"></div>
+                      <div class="sop-line"></div>
+                      <div class="sop-line short"></div>
+                    </div>
+                    <span>SOP Generated</span>
+                  </div>
+                  <div class="sop-arrow">→</div>
+                  <div class="sop-execute">
+                    <div class="sop-icon">⚡</div>
+                    <span>Auto-execute</span>
+                  </div>
+                </div>
+              </div>
+              <div class="demo-description">
+                <h4>SOP creation</h4>
+                <p>
+                  Watch how your team works, extract patterns, and create standard procedures that
+                  run automatically.
+                </p>
+              </div>
+            </div>
+
+            <div class="cap-demo" id="demo-periodic">
+              <div class="demo-animation periodic-anim">
+                <div class="schedule-visual">
+                  <div class="schedule-item active">
+                    <span class="schedule-time">Mon 9am</span>
+                    <span class="schedule-task">Weekly standup prep</span>
+                    <span class="schedule-status">✓</span>
+                  </div>
+                  <div class="schedule-item">
+                    <span class="schedule-time">Fri 5pm</span>
+                    <span class="schedule-task">Team report</span>
+                    <span class="schedule-status pending">⏳</span>
+                  </div>
+                  <div class="schedule-item">
+                    <span class="schedule-time">1st of month</span>
+                    <span class="schedule-task">Metrics review</span>
+                    <span class="schedule-status pending">⏳</span>
+                  </div>
+                </div>
+                <div class="periodic-indicator">
+                  <div class="clock-icon">🕐</div>
+                  <span>Runs on autopilot</span>
+                </div>
+              </div>
+              <div class="demo-description">
+                <h4>Periodic execution</h4>
+                <p>
+                  Schedule recurring tasks and forget about them. Reports, updates, and maintenance
+                  happen automatically.
+                </p>
+              </div>
+            </div>
+
+            <div class="cap-demo" id="demo-human">
+              <div class="demo-animation human-anim">
+                <div class="approval-visual">
+                  <div class="approval-request">
+                    <div class="approval-icon">⚠️</div>
+                    <div class="approval-text">
+                      <strong>Approval needed</strong>
+                      <span>Payment: $4,250 to AWS</span>
+                    </div>
+                  </div>
+                  <div class="approval-buttons">
+                    <button class="approve-btn">✓ Approve</button>
+                    <button class="reject-btn">✗ Reject</button>
+                  </div>
+                  <div class="approval-note">Sensitive actions always require human approval</div>
+                </div>
+              </div>
+              <div class="demo-description">
+                <h4>Human-in-the-loop</h4>
+                <p>
+                  For sensitive decisions like payments, contracts, or personnel changes, agents
+                  always ask for human approval first.
+                </p>
               </div>
             </div>
           </div>
@@ -5343,56 +6266,17 @@
       </div>
     </section>
 
-    <section class="capabilities">
-      <div class="container">
-        <h2>What your AI agents can do</h2>
-
-        <div class="capability-grid">
-          <div class="capability-card">
-            <div class="capability-icon">🔀</div>
-            <h3>Intelligent delegation</h3>
-            <p>
-              Break complex tasks into subtasks and assign to specialized sub-agents automatically.
-            </p>
-          </div>
-
-          <div class="capability-card">
-            <div class="capability-icon">📚</div>
-            <h3>Learn new skills</h3>
-            <p>
-              Agents acquire new capabilities as they observe your team and understand your
-              processes.
-            </p>
-          </div>
-
-          <div class="capability-card">
-            <div class="capability-icon">🎯</div>
-            <h3>Goal alignment</h3>
-            <p>
-              Monitor if work aligns with company objectives. Suggest corrections when things drift.
-            </p>
-          </div>
-
-          <div class="capability-card">
-            <div class="capability-icon">📋</div>
-            <h3>SOP creation</h3>
-            <p>Turn repetitive tasks into standard procedures. Then execute them automatically.</p>
-          </div>
-
-          <div class="capability-card">
-            <div class="capability-icon">🔄</div>
-            <h3>Periodic execution</h3>
-            <p>Handle recurring work on schedule. Reports, updates, maintenance—all automated.</p>
-          </div>
-
-          <div class="capability-card">
-            <div class="capability-icon">🤝</div>
-            <h3>Human-in-the-loop</h3>
-            <p>Ask for approval on sensitive decisions. Escalate when confidence is low.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+    <script>
+      document.querySelectorAll(".cap-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".cap-tab").forEach((t) => t.classList.remove("active"));
+          document.querySelectorAll(".cap-demo").forEach((d) => d.classList.remove("active"));
+          tab.classList.add("active");
+          const demoId = "demo-" + tab.dataset.cap;
+          document.getElementById(demoId).classList.add("active");
+        });
+      });
+    </script>
 
     <section class="integrations">
       <div class="container">
