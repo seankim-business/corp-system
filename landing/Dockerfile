@@ -1,8 +1,13 @@
 FROM nginx:alpine
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY . /usr/share/nginx/html
+COPY index.html /usr/share/nginx/html/
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-EXPOSE 80
+# Railway provides PORT env var (default to 80 for local)
+ENV PORT=80
+ENV NGINX_PORT=$PORT
 
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE $PORT
+
+# Use envsubst to replace $PORT in nginx config, then start nginx
+CMD ["sh", "-c", "envsubst '$$PORT' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
