@@ -1,6 +1,7 @@
 FROM nginx:alpine
 
 COPY index.html /usr/share/nginx/html/
+COPY images/ /usr/share/nginx/html/images/
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # Railway provides PORT env var (default to 80 for local)
