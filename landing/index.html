@@ -588,6 +588,178 @@
         color: var(--text-muted);
       }
 
+      .non-invasive {
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .non-invasive-header {
+        text-align: center;
+        margin-bottom: 64px;
+      }
+
+      .non-invasive-header h2 {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 16px;
+      }
+
+      .non-invasive-subtitle {
+        font-size: 18px;
+        color: var(--text-secondary);
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .non-invasive-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+
+      .non-invasive-card {
+        padding: 32px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        text-align: center;
+      }
+
+      .non-invasive-icon {
+        font-size: 40px;
+        margin-bottom: 20px;
+      }
+
+      .non-invasive-card h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+
+      .non-invasive-card p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .scenarios {
+        padding: 120px 0;
+      }
+
+      .scenarios-header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+
+      .scenarios-header h2 {
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .scenarios-subtitle {
+        font-size: 18px;
+        color: var(--text-secondary);
+        max-width: 700px;
+        margin: 0 auto;
+      }
+
+      .scenario-categories {
+        display: flex;
+        flex-direction: column;
+        gap: 64px;
+      }
+
+      .scenario-category {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 40px;
+      }
+
+      .category-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 32px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .category-icon {
+        font-size: 24px;
+      }
+
+      .scenario-list {
+        display: grid;
+        gap: 24px;
+      }
+
+      .scenario-item {
+        display: flex;
+        gap: 20px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+        transition: all 0.2s;
+      }
+
+      .scenario-item:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .scenario-number {
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--accent-dim);
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .scenario-content h4 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        font-family: monospace;
+        background: rgba(139, 92, 246, 0.1);
+        padding: 8px 12px;
+        border-radius: 6px;
+        display: inline-block;
+      }
+
+      .scenario-content > p:first-of-type {
+        margin-bottom: 8px;
+      }
+
+      .tool-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--blue);
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        margin-right: 4px;
+        margin-bottom: 4px;
+      }
+
+      .scenario-desc {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
       @media (max-width: 900px) {
         .hero h1 {
           font-size: 40px;
@@ -606,6 +778,16 @@
         }
         .org-arrow {
           transform: rotate(90deg);
+        }
+        .non-invasive-grid {
+          grid-template-columns: 1fr;
+        }
+        .scenario-item {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .scenario-category {
+          padding: 24px;
         }
       }
     </style>
@@ -631,20 +813,18 @@
     <section class="hero">
       <div class="container">
         <div class="hero-content">
-          <div class="hero-eyebrow">A new kind of organization</div>
-          <h1>
-            Build an <span class="gradient-text">AI workforce</span> that learns from your team.
-          </h1>
+          <div class="hero-eyebrow">Just @mention in Slack. That's it.</div>
+          <h1>Add <span class="gradient-text">AI teammates</span> to your existing workflow.</h1>
           <p class="hero-subtitle">
-            Nubabel creates AI agents that become part of your organization. They learn how you
-            work, take over repetitive tasks, and gradually handle more—until your org chart has
-            both humans and agents.
+            No new tools to learn. No migration needed. Nubabel agents join your Slack, use your
+            Notion/Drive/Jira as knowledge stores, and gradually take over repetitive work—just like
+            onboarding a brilliant new hire.
           </p>
           <div class="hero-cta">
             <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
-              >Start building your AI team</a
+              >Add your first AI teammate</a
             >
-            <a href="#how" class="btn btn-ghost">See how it works →</a>
+            <a href="#scenarios" class="btn btn-ghost">See 26 real scenarios →</a>
           </div>
         </div>
       </div>
@@ -774,59 +954,488 @@
       </div>
     </section>
 
-    <section class="scenario">
+    <section class="non-invasive">
       <div class="container">
-        <div class="scenario-header">
-          <h2>See it in action</h2>
-          <p>A typical workflow with your AI organization</p>
+        <div class="non-invasive-header">
+          <h2>Non-invasive by design</h2>
+          <p class="non-invasive-subtitle">
+            Nubabel doesn't replace your tools. It works within them—like adding a brilliant new
+            team member who already knows how to use everything.
+          </p>
         </div>
 
-        <div class="scenario-demo">
-          <div class="scenario-step">
-            <div class="scenario-step-icon" style="background: #4a154b">💬</div>
-            <div class="scenario-step-content">
-              <h4>You in Slack</h4>
-              <p>"@nubabel prepare the Q1 sales report and send it to the team"</p>
+        <div class="non-invasive-grid">
+          <div class="non-invasive-card">
+            <div class="non-invasive-icon">💬</div>
+            <h3>Slack is the interface</h3>
+            <p>
+              Just @mention your agent in the channel where work happens. No new app to learn. No
+              context switching. Your agents live where your team already communicates.
+            </p>
+          </div>
+
+          <div class="non-invasive-card">
+            <div class="non-invasive-icon">📁</div>
+            <h3>Your tools, unchanged</h3>
+            <p>
+              Notion stays your wiki. Google Drive stays your file storage. Jira stays your issue
+              tracker. Agents read and write to them—just like a human colleague would.
+            </p>
+          </div>
+
+          <div class="non-invasive-card">
+            <div class="non-invasive-icon">👋</div>
+            <h3>Like onboarding a new hire</h3>
+            <p>
+              Your agent joins, observes how the team works, asks clarifying questions, and starts
+              taking on small tasks. Over time, they handle more—naturally.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scenarios" id="scenarios">
+      <div class="container">
+        <div class="scenarios-header">
+          <h2>26 ways agents work for you</h2>
+          <p class="scenarios-subtitle">
+            Real scenarios powered by Slack, Notion, Linear, Jira, Google Drive, and more. Every
+            scenario connects to actually implemented features.
+          </p>
+        </div>
+
+        <div class="scenario-categories">
+          <!-- Category 1: Daily Work -->
+          <div class="scenario-category">
+            <h3 class="category-title">
+              <span class="category-icon">☀️</span> Daily Work Automation
+            </h3>
+            <div class="scenario-list">
+              <div class="scenario-item">
+                <div class="scenario-number">01</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 오늘 할 일 정리해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Notion</span> <span class="tool-badge">Linear</span>
+                    <span class="tool-badge">Google Calendar</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Agent scans your Notion tasks, Linear issues assigned to you, and today's
+                    calendar. Returns a prioritized daily plan in Slack thread.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">02</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 이번 주 팀 미팅 회의록 작성해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Slack</span> <span class="tool-badge">Notion</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Listens to meeting discussion, extracts action items, creates a structured
+                    meeting note in Notion, and assigns follow-up tasks.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">03</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 지난 주 내가 완료한 업무 요약해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Linear</span> <span class="tool-badge">GitHub</span>
+                    <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Aggregates closed Linear issues, merged PRs, and Slack threads. Generates a
+                    weekly accomplishment report for standups or 1:1s.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="scenario-step">
-            <div class="scenario-step-icon" style="background: var(--accent-dim)">🧠</div>
-            <div class="scenario-step-content">
-              <h4>Orchestrator Agent analyzes</h4>
-              <p>Breaks down task → Assigns to Data Agent + Report Agent + Communication Agent</p>
+          <!-- Category 2: Cross-Platform Info Gathering -->
+          <div class="scenario-category">
+            <h3 class="category-title">
+              <span class="category-icon">🔍</span> Cross-Platform Information Gathering
+            </h3>
+            <div class="scenario-list">
+              <div class="scenario-item">
+                <div class="scenario-number">04</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel ProjectX 관련 모든 문서 찾아줘"</h4>
+                  <p>
+                    <span class="tool-badge">Notion</span>
+                    <span class="tool-badge">Google Drive</span>
+                    <span class="tool-badge">Confluence</span>
+                    <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Searches across all connected knowledge stores. Returns a curated list with
+                    links: specs in Notion, contracts in Drive, discussions in Slack.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">05</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 고객 A사와의 히스토리 알려줘"</h4>
+                  <p>
+                    <span class="tool-badge">Salesforce</span> <span class="tool-badge">Gmail</span>
+                    <span class="tool-badge">Slack</span>
+                    <span class="tool-badge">Google Drive</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Pulls CRM records, email threads, Slack mentions, and shared documents. Creates
+                    a comprehensive customer timeline.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">06</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 인증 시스템 어떻게 구현되어 있어?"</h4>
+                  <p>
+                    <span class="tool-badge">GitHub</span> <span class="tool-badge">Notion</span>
+                    <span class="tool-badge">Confluence</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Reads codebase, architecture docs, and technical specs. Explains the auth flow
+                    with references to actual files and documentation.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">07</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 지난 분기 마케팅 성과 데이터 모아줘"</h4>
+                  <p>
+                    <span class="tool-badge">Google Sheets</span>
+                    <span class="tool-badge">HubSpot</span>
+                    <span class="tool-badge">Google Analytics</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Aggregates data from multiple sources. Creates a unified report with charts in
+                    Google Sheets or Notion.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="scenario-step">
-            <div class="scenario-step-icon" style="background: var(--accent-dim)">📊</div>
-            <div class="scenario-step-content">
-              <h4>Data Agent pulls numbers</h4>
-              <p>Connects to Salesforce, aggregates Q1 data, validates accuracy</p>
+          <!-- Category 3: Task & Project Management -->
+          <div class="scenario-category">
+            <h3 class="category-title">
+              <span class="category-icon">📋</span> Task & Project Management
+            </h3>
+            <div class="scenario-list">
+              <div class="scenario-item">
+                <div class="scenario-number">08</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 이 버그 Linear에 등록해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Linear</span> <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Creates a Linear issue from Slack context. Auto-fills title, description,
+                    labels, and assigns to the right team based on content analysis.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">09</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel Sprint 진행 상황 알려줘"</h4>
+                  <p><span class="tool-badge">Linear</span> <span class="tool-badge">Jira</span></p>
+                  <p class="scenario-desc">
+                    Calculates sprint velocity, remaining story points, blockers, and at-risk items.
+                    Posts a visual progress update.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">10</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 마감 임박한 태스크 알림 설정해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Notion</span> <span class="tool-badge">Linear</span>
+                    <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Monitors deadlines across platforms. Sends proactive reminders to task owners
+                    24h and 2h before due.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">11</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 이 Notion 페이지 기반으로 Jira 에픽 만들어줘"</h4>
+                  <p><span class="tool-badge">Notion</span> <span class="tool-badge">Jira</span></p>
+                  <p class="scenario-desc">
+                    Reads PRD in Notion, extracts requirements, creates Jira epic with child stories
+                    and acceptance criteria.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="scenario-step">
-            <div class="scenario-step-icon" style="background: var(--accent-dim)">📝</div>
-            <div class="scenario-step-content">
-              <h4>Report Agent creates document</h4>
-              <p>Generates report in Notion using your company template</p>
+          <!-- Category 4: Learning & SOP Creation -->
+          <div class="scenario-category">
+            <h3 class="category-title">
+              <span class="category-icon">📚</span> Self-Learning & SOP Creation
+            </h3>
+            <div class="scenario-list">
+              <div class="scenario-item">
+                <div class="scenario-number">12</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 온보딩 프로세스 SOP로 정리해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Slack History</span>
+                    <span class="tool-badge">Notion</span>
+                    <span class="tool-badge">Google Drive</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Analyzes past onboarding conversations, existing docs, and checklists. Creates a
+                    standardized SOP document with steps, owners, and timelines.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">13</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 내가 매주 하는 리포트 작업 배워서 대신해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Google Sheets</span>
+                    <span class="tool-badge">Notion</span>
+                    <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Observes your reporting workflow for 2-3 cycles. Creates an SOP and proposes
+                    automation: "I can do this every Friday at 9am. Approve?"
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">14</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 우리 팀 코드리뷰 컨벤션 학습해"</h4>
+                  <p>
+                    <span class="tool-badge">GitHub</span> <span class="tool-badge">Notion</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Analyzes PR comments, review patterns, and style guides. Learns your team's
+                    conventions and can later assist with code reviews.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">15</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 고객 문의 응대 패턴 분석해서 FAQ 만들어"</h4>
+                  <p>
+                    <span class="tool-badge">Zendesk</span> <span class="tool-badge">Slack</span>
+                    <span class="tool-badge">Notion</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Reviews support tickets, identifies common questions, generates FAQ document,
+                    and suggests response templates.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="scenario-step">
-            <div class="scenario-step-icon" style="background: var(--accent-dim)">✅</div>
-            <div class="scenario-step-content">
-              <h4>Asks for your approval</h4>
-              <p>"Report ready. Should I send to #sales-team?" → You approve</p>
+          <!-- Category 5: Gradual Work Takeover -->
+          <div class="scenario-category">
+            <h3 class="category-title">
+              <span class="category-icon">🔄</span> Gradual Work Distribution & Takeover
+            </h3>
+            <div class="scenario-list">
+              <div class="scenario-item">
+                <div class="scenario-number">16</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 업무 분장표 현황 보여줘"</h4>
+                  <p>
+                    <span class="tool-badge">All Connected Tools</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Shows which tasks are handled by humans vs agents. Suggests candidates for next
+                    automation: "Invoice processing is 80% manual—want me to learn it?"
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">17</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 신규 입사자 온보딩 진행해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Notion</span> <span class="tool-badge">Slack</span>
+                    <span class="tool-badge">Google Workspace</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Executes the learned onboarding SOP. Creates accounts, shares docs, schedules
+                    meetings, assigns mentors—with human checkpoints for sensitive steps.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">18</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 매주 금요일 위클리 리포트 자동화해"</h4>
+                  <p>
+                    <span class="tool-badge">Linear</span> <span class="tool-badge">GitHub</span>
+                    <span class="tool-badge">Notion</span>
+                    <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Every Friday at 5pm: aggregates week's progress, generates report in Notion,
+                    asks for approval, then posts to #team-updates.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">19</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel PR 머지되면 자동으로 Linear 이슈 완료 처리해"</h4>
+                  <p>
+                    <span class="tool-badge">GitHub</span> <span class="tool-badge">Linear</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Watches for merged PRs, updates linked Linear issues to "Done", posts completion
+                    summary to relevant Slack channel.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="scenario-step">
-            <div class="scenario-step-icon" style="background: var(--green); color: white">📤</div>
-            <div class="scenario-step-content">
-              <h4>Communication Agent delivers</h4>
-              <p>Posts to Slack channel with summary + full report link</p>
+          <!-- Category 6: Communication & Collaboration -->
+          <div class="scenario-category">
+            <h3 class="category-title">
+              <span class="category-icon">🤝</span> Communication & Team Collaboration
+            </h3>
+            <div class="scenario-list">
+              <div class="scenario-item">
+                <div class="scenario-number">20</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 디자인팀에 이 요청 전달해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Slack</span> <span class="tool-badge">Notion</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Formats the request properly, creates a Notion brief, posts to #design-requests
+                    with context, and tracks the request status.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">21</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 이 결정에 대해 관련자들 의견 수렴해줘"</h4>
+                  <p><span class="tool-badge">Slack</span></p>
+                  <p class="scenario-desc">
+                    Identifies stakeholders, DMs each with context, collects responses, and
+                    summarizes consensus with dissenting views.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">22</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 다음 주 팀 스케줄 조율해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Google Calendar</span>
+                    <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Checks everyone's availability, proposes meeting times, sends calendar invites
+                    once confirmed.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">23</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel 이 Slack 스레드 요약해서 Notion에 정리해"</h4>
+                  <p>
+                    <span class="tool-badge">Slack</span> <span class="tool-badge">Notion</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Extracts key decisions, action items, and participants from a long thread.
+                    Creates a clean summary page in Notion.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category 7: Goal Alignment & Monitoring -->
+          <div class="scenario-category">
+            <h3 class="category-title">
+              <span class="category-icon">🎯</span> Goal Alignment & Proactive Monitoring
+            </h3>
+            <div class="scenario-list">
+              <div class="scenario-item">
+                <div class="scenario-number">24</div>
+                <div class="scenario-content">
+                  <h4>"@nubabel OKR 진행 상황 체크해줘"</h4>
+                  <p>
+                    <span class="tool-badge">Notion</span> <span class="tool-badge">Linear</span>
+                    <span class="tool-badge">Google Sheets</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Maps completed work to OKR key results. Shows progress percentages, at-risk
+                    objectives, and suggests focus areas.
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">25</div>
+                <div class="scenario-content">
+                  <h4>Proactive: "이 작업이 Q1 목표와 어긋나는 것 같아요"</h4>
+                  <p><span class="tool-badge">All Tools</span></p>
+                  <p class="scenario-desc">
+                    Agent notices a task doesn't align with stated objectives. Politely flags it:
+                    "This seems outside our Q1 focus. Want me to check with the lead?"
+                  </p>
+                </div>
+              </div>
+
+              <div class="scenario-item">
+                <div class="scenario-number">26</div>
+                <div class="scenario-content">
+                  <h4>Proactive: "마감이 3일 남았는데 진행률이 40%예요"</h4>
+                  <p>
+                    <span class="tool-badge">Linear</span> <span class="tool-badge">Slack</span>
+                  </p>
+                  <p class="scenario-desc">
+                    Monitors project health. Alerts when timeline is at risk, suggests resource
+                    reallocation or scope adjustment.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
