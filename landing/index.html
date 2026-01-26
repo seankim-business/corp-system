@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nubabel — AI Workflow Automation</title>
+    <meta name="description" content="Nubabel helps teams automate workflows with AI agents." />
+    <style>
+      :root {
+        --bg: #0b1020;
+        --card: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.12);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.65);
+        --accent: #7c3aed;
+        --accent2: #22c55e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Helvetica,
+          Arial,
+          "Apple Color Emoji",
+          "Segoe UI Emoji";
+        color: var(--text);
+        background:
+          radial-gradient(900px 500px at 20% 10%, rgba(124, 58, 237, 0.45), transparent 60%),
+          radial-gradient(800px 450px at 80% 30%, rgba(34, 197, 94, 0.3), transparent 60%),
+          linear-gradient(180deg, #070a14 0%, var(--bg) 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 20px;
+      }
+      .container {
+        width: 100%;
+        max-width: 980px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 28px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+      }
+      .logo {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(34, 197, 94, 1));
+        box-shadow: 0 12px 50px rgba(124, 58, 237, 0.25);
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 28px;
+        backdrop-filter: blur(10px);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 46px;
+        line-height: 1.05;
+        letter-spacing: -0.8px;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.6;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+      .ctaRow {
+        display: flex;
+        gap: 12px;
+        margin-top: 18px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .btn.primary {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(124, 58, 237, 0.85));
+        border-color: rgba(124, 58, 237, 0.5);
+      }
+      .btn.secondary {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 1), rgba(34, 197, 94, 0.85));
+        border-color: rgba(34, 197, 94, 0.5);
+      }
+      .grid {
+        display: grid;
+        gap: 10px;
+      }
+      .feature {
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(0, 0, 0, 0.14);
+      }
+      .feature b {
+        display: block;
+        margin-bottom: 6px;
+      }
+      .footer {
+        margin-top: 18px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      @media (max-width: 900px) {
+        h1 {
+          font-size: 38px;
+        }
+        .hero {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="nav">
+        <div class="brand">
+          <span class="logo" aria-hidden="true"></span>
+          <span>Nubabel</span>
+        </div>
+        <a class="btn" href="https://app.nubabel.com" rel="noopener">Open App</a>
+      </div>
+
+      <div class="hero">
+        <div class="card">
+          <h1>AI workflow automation for teams.</h1>
+          <p>
+            Nubabel helps your team automate repetitive work with AI agents—connect tools, build
+            workflows, and ship faster.
+          </p>
+          <div class="ctaRow">
+            <a class="btn secondary" href="https://app.nubabel.com" rel="noopener">Open App</a>
+            <a class="btn primary" href="https://app.nubabel.com/auth/google" rel="noopener"
+              >Sign in with Google</a
+            >
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="feature">
+            <b>Connect your tools</b>
+            <p>Notion, Slack, and more via MCP integrations.</p>
+          </div>
+          <div class="feature">
+            <b>Build workflows</b>
+            <p>Create, execute, and monitor automation with audit trails.</p>
+          </div>
+          <div class="feature">
+            <b>Multi-tenant by default</b>
+            <p>Organization isolation designed for B2B SaaS.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>© 2026 Kyndof Corporation</span>
+        <span>Contact: engineering@nubabel.com</span>
+      </div>
+    </div>
+  </body>
+</html>
