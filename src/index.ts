@@ -217,6 +217,19 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
+// Serve frontend static files (production)
+if (process.env.NODE_ENV === "production") {
+  const path = require("path");
+  const frontendPath = path.join(__dirname, "../frontend/dist");
+  
+  app.use(express.static(frontendPath));
+  
+  // SPA fallback - send index.html for all non-API routes
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendPath, "index.html"));
+  });
+}
+
 logger.info("Starting server", { port, host: "0.0.0.0" });
 
 const server = app.listen(port, "0.0.0.0", async () => {

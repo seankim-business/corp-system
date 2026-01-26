@@ -27,6 +27,15 @@ COPY src ./src
 # Build TypeScript
 RUN npm run build
 
+# Build frontend
+COPY frontend/package*.json ./frontend/
+COPY frontend/tsconfig*.json ./frontend/
+COPY frontend/vite.config.ts ./frontend/
+COPY frontend/index.html ./frontend/
+COPY frontend/public ./frontend/public/
+COPY frontend/src ./frontend/src/
+RUN cd frontend && npm ci && npm run build
+
 # ============================================================================
 # Stage 2: Production Runtime
 # ============================================================================
@@ -56,6 +65,7 @@ RUN npx prisma generate
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/frontend/dist ./frontend/dist
 
 # Copy startup script and make executable
 COPY scripts/start.sh ./scripts/start.sh
