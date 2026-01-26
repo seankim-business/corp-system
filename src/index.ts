@@ -26,16 +26,22 @@ import { startSlackBot, stopSlackBot } from "./api/slack";
 import { disconnectRedis } from "./db/redis";
 import { db } from "./db/client";
 import { shutdownOpenTelemetry } from "./instrumentation";
+import { logger } from "./utils/logger";
 
-console.log("🚀 Initializing Nubabel Platform...");
-console.log(`📍 Node version: ${process.version}`);
-console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
-console.log(`📍 Port: ${process.env.PORT || "3000"}`);
+logger.info("Initializing Nubabel Platform", {
+  nodeVersion: process.version,
+  environment: process.env.NODE_ENV || "development",
+  port: process.env.PORT || "3000",
+});
 
 try {
   getEnv();
 } catch (error) {
-  console.error(String(error));
+  logger.error(
+    "Environment validation failed",
+    {},
+    error instanceof Error ? error : new Error(String(error)),
+  );
   process.exit(1);
 }
 
@@ -188,106 +194,121 @@ app.get("/api/user", authenticate, (req, res) => {
 });
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("Error:", err);
-  res.status(err.status || 500).json({
-    error: err.message || "Internal server error",
+  logger.error("Internal server error", { message: err.message }, err);
+  res.status(500).json({
+    error: "Internal server error",
+    message: err.message,
   });
 });
 
-console.log(`🌐 Starting server on 0.0.0.0:${port}...`);
+logger.info("Starting server", { port, host: "0.0.0.0" });
 
 const server = app.listen(port, "0.0.0.0", async () => {
-  console.log(`✅ Server running on port ${port}`);
-  console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`✅ Base URL: ${process.env.BASE_URL || "http://localhost:3000"}`);
-  console.log(`✅ Health check endpoint: /health`);
-  console.log(`✅ SSE endpoint: /api/events`);
-  console.log(`✅ Bull Board: /admin/queues`);
-  console.log(`✅ Ready to accept connections`);
+  logger.info("Server ready", {
+    port,
+    environment: process.env.NODE_ENV || "development",
+    baseUrl: process.env.BASE_URL || "http://localhost:3000",
+    endpoints: {
+      health: "/health",
+      sse: "/api/events",
+      bullBoard: "/admin/queues",
+    },
+  });
 
-  await startWorkers();
-  console.log(`✅ BullMQ workers started`);
+  try {
+    await startWorkers();
+    logger.info("✅ BullMQ workers started");
+  } catch (error) {
+    logger.warn("⚠️  Failed to start BullMQ workers (continuing without background jobs)", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
-  if (process.env.SLACK_ENABLED === "true") {
-    try {
-      await startSlackBot();
-      console.log(`✅ Slack Bot started`);
-    } catch (error) {
-      console.error(`⚠️ Failed to start Slack Bot:`, error);
-    }
+  try {
+    await startSlackBot();
+    logger.info("✅ Slack Bot started");
+  } catch (error) {
+    logger.warn("⚠️  Failed to start Slack Bot (continuing without Slack integration)", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 });
 
 server.on("error", (error: any) => {
-  console.error("❌ Server failed to start");
-  console.error(`❌ Error code: ${error.code}`);
-  console.error(`❌ Error message: ${error.message}`);
-  console.error(`❌ Stack trace:`, error.stack);
-  if (error.code === "EADDRINUSE") {
-    console.error(`❌ Port ${port} is already in use`);
-  }
+  logger.error(
+    "Server failed to start",
+    {
+      code: error.code,
+      port: error.code === "EADDRINUSE" ? port : undefined,
+    },
+    error,
+  );
   process.exit(1);
 });
 
 async function gracefulShutdown(signal: string) {
   if (isShuttingDown) {
-    console.log("Shutdown already in progress");
+    logger.info("Shutdown already in progress");
     return;
   }
 
-  console.log(`\n${signal} received, starting graceful shutdown...`);
+  logger.info("Starting graceful shutdown", { signal });
   isShuttingDown = true;
 
   const shutdownTimeout = setTimeout(() => {
-    console.error("⚠️  Graceful shutdown timeout (30s), forcing exit");
+    logger.error("Graceful shutdown timeout (30s), forcing exit");
     process.exit(1);
   }, 30000);
 
   try {
-    console.log("1. Closing HTTP server (stop accepting new connections)...");
+    logger.info("Closing HTTP server (stop accepting new connections)");
     server.close();
 
-    console.log(`2. Waiting for ${activeRequests} active requests to complete...`);
+    logger.info("Waiting for active requests to complete", { activeRequests, maxWait: 20000 });
     const maxWait = 20000;
     const startTime = Date.now();
     while (activeRequests > 0 && Date.now() - startTime < maxWait) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     if (activeRequests > 0) {
-      console.warn(`⚠️  ${activeRequests} requests still active after timeout`);
+      logger.warn("Some requests still active after timeout", { activeRequests });
     } else {
-      console.log("   ✓ All requests completed");
+      logger.info("All requests completed");
     }
 
-    console.log("3. Closing SSE connections...");
+    logger.info("Closing SSE connections");
     await shutdownSSE();
-    console.log("   ✓ SSE closed");
+    logger.info("SSE closed");
 
-    console.log("4. Stopping Slack Bot...");
+    logger.info("Stopping Slack Bot");
     await stopSlackBot();
-    console.log("   ✓ Slack Bot stopped");
+    logger.info("Slack Bot stopped");
 
-    console.log("5. Stopping BullMQ workers...");
+    logger.info("Stopping BullMQ workers");
     await stopWorkers();
-    console.log("   ✓ Workers stopped");
+    logger.info("Workers stopped");
 
-    console.log("6. Closing Redis connections...");
+    logger.info("Closing Redis connections");
     await disconnectRedis();
-    console.log("   ✓ Redis closed");
+    logger.info("Redis closed");
 
-    console.log("7. Disconnecting Prisma...");
+    logger.info("Disconnecting Prisma");
     await db.$disconnect();
-    console.log("   ✓ Prisma disconnected");
+    logger.info("Prisma disconnected");
 
-    console.log("8. Shutting down OpenTelemetry...");
+    logger.info("Shutting down OpenTelemetry");
     await shutdownOpenTelemetry();
-    console.log("   ✓ OpenTelemetry shut down");
+    logger.info("OpenTelemetry shut down");
 
     clearTimeout(shutdownTimeout);
-    console.log("✅ Graceful shutdown complete");
+    logger.info("Graceful shutdown complete");
     process.exit(0);
   } catch (error) {
-    console.error("❌ Error during graceful shutdown:", error);
+    logger.error(
+      "Error during graceful shutdown",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
     clearTimeout(shutdownTimeout);
     process.exit(1);
   }
@@ -297,10 +318,10 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  logger.error("Unhandled Rejection", { reason: String(reason), promise: String(promise) });
 });
 
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
+  logger.error("Uncaught Exception", {}, error);
   process.exit(1);
 });

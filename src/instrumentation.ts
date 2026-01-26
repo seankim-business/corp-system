@@ -15,48 +15,54 @@ const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 let sdk: NodeSDK | null = null;
 
 if (otlpEndpoint) {
-  const exporter = new OTLPTraceExporter({
-    url: otlpEndpoint,
-    headers: process.env.OTEL_EXPORTER_OTLP_HEADERS
-      ? Object.fromEntries(
-          process.env.OTEL_EXPORTER_OTLP_HEADERS.split(",")
-            .map((kv) => kv.trim())
-            .filter(Boolean)
-            .map((kv) => {
-              const [k, ...rest] = kv.split("=");
-              return [k, rest.join("=")];
-            }),
-        )
-      : undefined,
-  });
+  try {
+    const exporter = new OTLPTraceExporter({
+      url: otlpEndpoint,
+      headers: process.env.OTEL_EXPORTER_OTLP_HEADERS
+        ? Object.fromEntries(
+            process.env.OTEL_EXPORTER_OTLP_HEADERS.split(",")
+              .map((kv) => kv.trim())
+              .filter(Boolean)
+              .map((kv) => {
+                const [k, ...rest] = kv.split("=");
+                return [k, rest.join("=")];
+              }),
+          )
+        : undefined,
+    });
 
-  sdk = new NodeSDK({
-    resource: resourceFromAttributes({
-      [SEMRESATTRS_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || "nubabel-backend",
-      [SEMRESATTRS_SERVICE_VERSION]: process.env.npm_package_version || "1.0.0",
-      [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || "development",
-    }),
-    spanProcessor: new BatchSpanProcessor(exporter, {
-      maxQueueSize: 2048,
-      scheduledDelayMillis: 5000,
-      exportTimeoutMillis: 30000,
-      maxExportBatchSize: 512,
-    }),
-    instrumentations: [
-      getNodeAutoInstrumentations({
-        "@opentelemetry/instrumentation-fs": { enabled: false },
-        "@opentelemetry/instrumentation-express": { enabled: true },
-        "@opentelemetry/instrumentation-http": { enabled: true },
-        "@opentelemetry/instrumentation-ioredis": {
-          enabled: true,
-          requireParentSpan: true,
-        },
+    sdk = new NodeSDK({
+      resource: resourceFromAttributes({
+        [SEMRESATTRS_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || "nubabel-backend",
+        [SEMRESATTRS_SERVICE_VERSION]: process.env.npm_package_version || "1.0.0",
+        [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || "development",
       }),
-      new PrismaInstrumentation(),
-    ],
-  });
+      spanProcessor: new BatchSpanProcessor(exporter, {
+        maxQueueSize: 2048,
+        scheduledDelayMillis: 5000,
+        exportTimeoutMillis: 30000,
+        maxExportBatchSize: 512,
+      }),
+      instrumentations: [
+        getNodeAutoInstrumentations({
+          "@opentelemetry/instrumentation-fs": { enabled: false },
+          "@opentelemetry/instrumentation-express": { enabled: true },
+          "@opentelemetry/instrumentation-http": { enabled: true },
+          "@opentelemetry/instrumentation-ioredis": {
+            enabled: true,
+            requireParentSpan: true,
+          },
+        }),
+        new PrismaInstrumentation(),
+      ],
+    });
 
-  sdk.start();
+    sdk.start();
+    console.log("✅ OpenTelemetry instrumentation started");
+  } catch (error) {
+    console.warn("⚠️  OpenTelemetry initialization failed (non-fatal):", error);
+    sdk = null;
+  }
 }
 
 export async function shutdownOpenTelemetry() {

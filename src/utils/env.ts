@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logger } from "./logger";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).optional().default("development"),
@@ -29,13 +30,15 @@ export type AppEnv = z.infer<typeof envSchema>;
 export function getEnv(): AppEnv {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
-    console.error("❌ Invalid environment variables:");
-    const issues = parsed.error.issues
-      .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
-      .join("\n");
-    console.error(issues);
-    console.error("\nNote: Webhook secrets follow the pattern WEBHOOK_SECRET_<PROVIDER>");
-    console.error("Example: WEBHOOK_SECRET_STRIPE, WEBHOOK_SECRET_GITHUB");
+    logger.error("Invalid environment variables", {
+      errorCount: parsed.error.issues.length,
+      issues: parsed.error.issues.map((i) => ({
+        path: i.path.join("."),
+        message: i.message,
+      })),
+    });
+    logger.error("Note: Webhook secrets follow the pattern WEBHOOK_SECRET_<PROVIDER>");
+    logger.error("Example: WEBHOOK_SECRET_STRIPE, WEBHOOK_SECRET_GITHUB");
     throw new Error(
       `Invalid environment variables: ${parsed.error.issues.length} validation error(s)`,
     );
@@ -44,22 +47,16 @@ export function getEnv(): AppEnv {
   const data = parsed.data;
 
   if (data.NODE_ENV === "production") {
-    const productionRequired = [];
-
     if (!data.OTEL_EXPORTER_OTLP_ENDPOINT) {
-      console.warn(
-        "⚠️  OTEL_EXPORTER_OTLP_ENDPOINT not set - OpenTelemetry traces will not be exported",
+      logger.warn(
+        "OTEL_EXPORTER_OTLP_ENDPOINT not set - OpenTelemetry traces will not be exported",
       );
     }
 
     if (!data.GOOGLE_CLIENT_ID || !data.GOOGLE_CLIENT_SECRET) {
-      productionRequired.push("Google OAuth (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)");
-    }
-
-    if (productionRequired.length > 0) {
-      console.error("❌ Production environment requires:");
-      productionRequired.forEach((req) => console.error(`  - ${req}`));
-      throw new Error("Missing required production environment variables");
+      logger.warn(
+        "Google OAuth not configured - authentication will fail. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET",
+      );
     }
   }
 
