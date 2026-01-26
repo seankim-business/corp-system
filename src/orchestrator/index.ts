@@ -12,16 +12,7 @@ import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
 import { metrics, measureTime } from "../utils/metrics";
 import { getActiveMCPConnections } from "../services/mcp-registry";
-
-interface DelegateTaskParams {
-  category: string;
-  load_skills: string[];
-  prompt: string;
-  session_id: string;
-  context?: Record<string, any>;
-}
-
-declare function delegate_task(params: DelegateTaskParams): Promise<any>;
+import { delegateTask } from "./delegate-task";
 
 export async function orchestrate(request: OrchestrationRequest): Promise<OrchestrationResult> {
   const { userRequest, sessionId, organizationId, userId } = request;
@@ -113,7 +104,7 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
     };
 
     const startTime = Date.now();
-    const result = await delegate_task({
+    const result = await delegateTask({
       category: categorySelection.category,
       load_skills: skills,
       prompt: userRequest,

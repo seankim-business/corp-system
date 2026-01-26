@@ -1,11 +1,9 @@
 import { db as prisma } from "../db/client";
 import { WebClient } from "@slack/web-api";
 
-const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
-
-export async function getUserBySlackId(slackUserId: string) {
+export async function getUserBySlackId(slackUserId: string, client: WebClient) {
   try {
-    const slackUser = await slackClient.users.info({ user: slackUserId });
+    const slackUser = await client.users.info({ user: slackUserId });
     const email = slackUser.user?.profile?.email;
 
     if (!email) {
@@ -17,13 +15,23 @@ export async function getUserBySlackId(slackUserId: string) {
     });
 
     return user;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("getUserBySlackId error:", error);
-    throw new Error(`Failed to get user: ${error.message}`);
+    throw new Error(`Failed to get user: ${errorMessage}`);
   }
 }
 
 export async function getOrganizationBySlackWorkspace(workspaceId: string) {
+  const integration = await prisma.slackIntegration.findUnique({
+    where: { workspaceId },
+    include: { organization: true },
+  });
+
+  if (integration) {
+    return integration.organization;
+  }
+
   const org = await prisma.organization.findFirst({
     where: {
       settings: {

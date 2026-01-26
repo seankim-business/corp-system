@@ -4,12 +4,16 @@ import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { authenticate } from "./middleware/auth.middleware";
+import { authRateLimiter, apiRateLimiter } from "./middleware/rate-limiter.middleware";
+import { getAllCircuitBreakers } from "./utils/circuit-breaker";
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
+import slackIntegrationRoutes from "./api/slack-integration";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter } from "./api/sse";
 import { startWorkers, stopWorkers } from "./workers";
+import { startSlackBot, stopSlackBot } from "./api/slack";
 
 console.log("🚀 Initializing Nubabel Platform...");
 console.log(`📍 Node version: ${process.version}`);
@@ -73,9 +77,27 @@ app.get("/health/redis", async (_req, res) => {
   }
 });
 
-app.use("/auth", authRoutes);
-app.use("/api", authenticate, workflowRoutes);
-app.use("/api", authenticate, notionRoutes);
+app.get("/health/circuits", (_req, res) => {
+  const breakers = getAllCircuitBreakers();
+  const circuits: Record<string, any> = {};
+
+  breakers.forEach((breaker, name) => {
+    circuits[name] = breaker.getStats();
+  });
+
+  const hasOpenCircuit = Object.values(circuits).some((c: any) => c.state === "OPEN");
+
+  res.status(hasOpenCircuit ? 503 : 200).json({
+    status: hasOpenCircuit ? "degraded" : "ok",
+    service: "circuit-breakers",
+    circuits,
+  });
+});
+
+app.use("/auth", authRateLimiter, authRoutes);
+app.use("/api", apiRateLimiter, authenticate, workflowRoutes);
+app.use("/api", apiRateLimiter, authenticate, notionRoutes);
+app.use("/api", apiRateLimiter, authenticate, slackIntegrationRoutes);
 app.use("/api", sseRouter);
 
 app.use("/admin/queues", authenticate, bullBoardAdapter.getRouter());
@@ -108,6 +130,15 @@ const server = app.listen(port, "0.0.0.0", async () => {
 
   await startWorkers();
   console.log(`✅ BullMQ workers started`);
+
+  if (process.env.SLACK_ENABLED === "true") {
+    try {
+      await startSlackBot();
+      console.log(`✅ Slack Bot started`);
+    } catch (error) {
+      console.error(`⚠️ Failed to start Slack Bot:`, error);
+    }
+  }
 });
 
 server.on("error", (error: any) => {
@@ -123,6 +154,7 @@ server.on("error", (error: any) => {
 
 process.on("SIGTERM", async () => {
   console.log("SIGTERM signal received: closing HTTP server");
+  await stopSlackBot();
   await stopWorkers();
   server.close(() => {
     console.log("HTTP server closed");
@@ -132,6 +164,7 @@ process.on("SIGTERM", async () => {
 
 process.on("SIGINT", async () => {
   console.log("SIGINT signal received: closing HTTP server");
+  await stopSlackBot();
   await stopWorkers();
   server.close(() => {
     console.log("HTTP server closed");
