@@ -3,198 +3,644 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nubabel — AI Workflow Automation</title>
-    <meta name="description" content="Nubabel helps teams automate workflows with AI agents." />
+    <title>Nubabel — AI-Powered Workflow Automation Platform</title>
+    <meta
+      name="description"
+      content="Automate repetitive workflows with AI agents. Connect your tools, build workflows, and ship faster. Trusted by modern B2B teams."
+    />
     <style>
       :root {
+        --bg-dark: #070a14;
         --bg: #0b1020;
-        --card: rgba(255, 255, 255, 0.06);
-        --border: rgba(255, 255, 255, 0.12);
-        --text: rgba(255, 255, 255, 0.92);
-        --muted: rgba(255, 255, 255, 0.65);
+        --card: rgba(255, 255, 255, 0.04);
+        --card-hover: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.1);
+        --text: rgba(255, 255, 255, 0.95);
+        --text-muted: rgba(255, 255, 255, 0.65);
+        --text-subtle: rgba(255, 255, 255, 0.45);
         --accent: #7c3aed;
+        --accent-hover: #9333ea;
         --accent2: #22c55e;
+        --accent2-hover: #16a34a;
       }
+
       * {
         box-sizing: border-box;
-      }
-      body {
         margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
         font-family:
-          ui-sans-serif,
-          system-ui,
-          -apple-system,
-          Segoe UI,
-          Roboto,
-          Helvetica,
-          Arial,
-          "Apple Color Emoji",
-          "Segoe UI Emoji";
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         color: var(--text);
+        background: var(--bg-dark);
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+
+      .bg-gradient {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
         background:
-          radial-gradient(900px 500px at 20% 10%, rgba(124, 58, 237, 0.45), transparent 60%),
-          radial-gradient(800px 450px at 80% 30%, rgba(34, 197, 94, 0.3), transparent 60%),
-          linear-gradient(180deg, #070a14 0%, var(--bg) 100%);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 48px 20px;
+          radial-gradient(1000px 600px at 20% 10%, rgba(124, 58, 237, 0.35), transparent 60%),
+          radial-gradient(900px 500px at 80% 30%, rgba(34, 197, 94, 0.25), transparent 60%),
+          linear-gradient(180deg, var(--bg-dark) 0%, var(--bg) 100%);
+        z-index: -1;
       }
+
       .container {
-        width: 100%;
-        max-width: 980px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 24px;
       }
-      .nav {
+
+      nav {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 28px;
+        padding: 24px 0;
+        position: sticky;
+        top: 0;
+        background: rgba(7, 10, 20, 0.8);
+        backdrop-filter: blur(12px);
+        z-index: 100;
+        border-bottom: 1px solid var(--border);
       }
-      .brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        font-weight: 700;
-        letter-spacing: 0.2px;
-      }
-      .logo {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(34, 197, 94, 1));
-        box-shadow: 0 12px 50px rgba(124, 58, 237, 0.25);
-      }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 28px;
-        backdrop-filter: blur(10px);
-      }
-      h1 {
-        margin: 0 0 10px;
-        font-size: 46px;
-        line-height: 1.05;
-        letter-spacing: -0.8px;
-      }
-      p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 17px;
-        line-height: 1.6;
-      }
-      .hero {
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 18px;
-        align-items: stretch;
-      }
-      .ctaRow {
+
+      .nav-brand {
         display: flex;
+        align-items: center;
         gap: 12px;
-        margin-top: 18px;
-        flex-wrap: wrap;
+        font-weight: 700;
+        font-size: 20px;
+        letter-spacing: -0.3px;
       }
+
+      .logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        box-shadow: 0 8px 32px rgba(124, 58, 237, 0.3);
+      }
+
       .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 12px 14px;
+        padding: 12px 24px;
         border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        color: var(--text);
-        text-decoration: none;
         font-weight: 600;
-        font-size: 14px;
-        background: rgba(255, 255, 255, 0.06);
+        font-size: 15px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border: none;
       }
-      .btn.primary {
-        background: linear-gradient(135deg, rgba(124, 58, 237, 1), rgba(124, 58, 237, 0.85));
-        border-color: rgba(124, 58, 237, 0.5);
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+        color: white;
+        box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
       }
-      .btn.secondary {
-        background: linear-gradient(135deg, rgba(34, 197, 94, 1), rgba(34, 197, 94, 0.85));
-        border-color: rgba(34, 197, 94, 0.5);
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(124, 58, 237, 0.5);
       }
-      .grid {
-        display: grid;
-        gap: 10px;
+
+      .btn-secondary {
+        background: var(--card);
+        color: var(--text);
+        border: 1px solid var(--border);
+        backdrop-filter: blur(8px);
       }
-      .feature {
-        padding: 14px;
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(0, 0, 0, 0.14);
+
+      .btn-secondary:hover {
+        background: var(--card-hover);
+        border-color: rgba(255, 255, 255, 0.2);
       }
-      .feature b {
-        display: block;
-        margin-bottom: 6px;
+
+      section {
+        padding: 80px 0;
       }
-      .footer {
-        margin-top: 18px;
-        color: rgba(255, 255, 255, 0.55);
-        font-size: 12px;
+
+      .hero {
+        text-align: center;
+        padding: 120px 0 80px;
+      }
+
+      .hero h1 {
+        font-size: 72px;
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -2px;
+        margin-bottom: 24px;
+        background: linear-gradient(135deg, var(--text) 0%, rgba(255, 255, 255, 0.7) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .hero p {
+        font-size: 22px;
+        color: var(--text-muted);
+        max-width: 700px;
+        margin: 0 auto 40px;
+        line-height: 1.6;
+      }
+
+      .hero-cta {
         display: flex;
-        justify-content: space-between;
-        gap: 12px;
+        gap: 16px;
+        justify-content: center;
         flex-wrap: wrap;
       }
-      @media (max-width: 900px) {
-        h1 {
-          font-size: 38px;
+
+      .hero-cta .btn {
+        padding: 16px 32px;
+        font-size: 16px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-bottom: 24px;
+        backdrop-filter: blur(8px);
+      }
+
+      .badge-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent2);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
         }
-        .hero {
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .screenshot-section {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 100px 0;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .screenshot-wrapper {
+        max-width: 1000px;
+        margin: 0 auto;
+        position: relative;
+      }
+
+      .screenshot-wrapper img {
+        width: 100%;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+        background: var(--card);
+      }
+
+      .section-header {
+        text-align: center;
+        margin-bottom: 64px;
+      }
+
+      .section-title {
+        font-size: 48px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .section-subtitle {
+        font-size: 20px;
+        color: var(--text-muted);
+        max-width: 600px;
+        margin: 0 auto;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 24px;
+      }
+
+      .feature-card {
+        padding: 32px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        backdrop-filter: blur(12px);
+        transition: all 0.3s ease;
+      }
+
+      .feature-card:hover {
+        transform: translateY(-4px);
+        background: var(--card-hover);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      .feature-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin-bottom: 16px;
+      }
+
+      .feature-card h3 {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+
+      .feature-card p {
+        color: var(--text-muted);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      .steps-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 32px;
+        margin-top: 64px;
+      }
+
+      .step {
+        text-align: center;
+      }
+
+      .step-number {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--card);
+        border: 2px solid var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--accent);
+        margin: 0 auto 20px;
+      }
+
+      .step h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+
+      .step p {
+        color: var(--text-muted);
+        font-size: 15px;
+      }
+
+      .trust-section {
+        text-align: center;
+        padding: 64px 0;
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid var(--border);
+      }
+
+      .trust-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 32px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        margin-top: 24px;
+        backdrop-filter: blur(8px);
+      }
+
+      .trust-badge img {
+        height: 32px;
+      }
+
+      .cta-section {
+        text-align: center;
+        padding: 120px 0;
+        background: radial-gradient(
+          600px 400px at 50% 50%,
+          rgba(124, 58, 237, 0.2),
+          transparent 70%
+        );
+      }
+
+      .cta-section h2 {
+        font-size: 56px;
+        font-weight: 700;
+        letter-spacing: -1.5px;
+        margin-bottom: 24px;
+      }
+
+      .cta-section p {
+        font-size: 20px;
+        color: var(--text-muted);
+        margin-bottom: 40px;
+      }
+
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 48px 0;
+        color: var(--text-subtle);
+      }
+
+      .footer-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 24px;
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 32px;
+      }
+
+      .footer-links a {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 14px;
+        transition: color 0.2s;
+      }
+
+      .footer-links a:hover {
+        color: var(--text);
+      }
+
+      @media (max-width: 768px) {
+        .hero h1 {
+          font-size: 48px;
+        }
+
+        .hero p {
+          font-size: 18px;
+        }
+
+        .section-title {
+          font-size: 36px;
+        }
+
+        .features-grid {
           grid-template-columns: 1fr;
+        }
+
+        .steps-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .footer-content {
+          flex-direction: column;
+          text-align: center;
+        }
+
+        .cta-section h2 {
+          font-size: 40px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <div class="nav">
-        <div class="brand">
-          <span class="logo" aria-hidden="true"></span>
-          <span>Nubabel</span>
-        </div>
-        <a class="btn" href="https://app.nubabel.com" rel="noopener">Open App</a>
-      </div>
+    <div class="bg-gradient"></div>
 
-      <div class="hero">
-        <div class="card">
-          <h1>AI workflow automation for teams.</h1>
-          <p>
-            Nubabel helps your team automate repetitive work with AI agents—connect tools, build
-            workflows, and ship faster.
+    <nav>
+      <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <div class="nav-brand">
+            <div class="logo"></div>
+            <span>Nubabel</span>
+          </div>
+          <a href="https://app.nubabel.com" class="btn btn-secondary">Open App</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="container">
+        <div class="badge">
+          <span class="badge-dot"></span>
+          <span>Now in Alpha — Built for Modern Teams</span>
+        </div>
+
+        <h1>Automate Your Workflows<br />With AI Agents</h1>
+
+        <p>
+          Connect your tools, build intelligent workflows, and ship faster. Nubabel is the
+          AI-powered automation platform built for B2B teams who value security and scale.
+        </p>
+
+        <div class="hero-cta">
+          <a href="https://app.nubabel.com/auth/google" class="btn btn-primary">
+            Start Free Trial
+          </a>
+          <a href="https://app.nubabel.com" class="btn btn-secondary"> View Demo </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="screenshot-section">
+      <div class="container">
+        <div class="screenshot-wrapper">
+          <img src="screenshots/login-page.png" alt="Nubabel Dashboard Interface" loading="lazy" />
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">Built for Teams That Ship Fast</h2>
+          <p class="section-subtitle">
+            Everything you need to automate workflows with confidence, security, and scale.
           </p>
-          <div class="ctaRow">
-            <a class="btn secondary" href="https://app.nubabel.com" rel="noopener">Open App</a>
-            <a class="btn primary" href="https://app.nubabel.com/auth/google" rel="noopener"
-              >Sign in with Google</a
-            >
-          </div>
         </div>
 
-        <div class="grid">
-          <div class="feature">
-            <b>Connect your tools</b>
-            <p>Notion, Slack, and more via MCP integrations.</p>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">🔐</div>
+            <h3>Multi-Tenant Security</h3>
+            <p>
+              Organization-level data isolation with Row-Level Security (RLS). Built for B2B SaaS
+              from day one.
+            </p>
           </div>
-          <div class="feature">
-            <b>Build workflows</b>
-            <p>Create, execute, and monitor automation with audit trails.</p>
+
+          <div class="feature-card">
+            <div class="feature-icon">🤖</div>
+            <h3>AI Workflow Automation</h3>
+            <p>
+              Create, execute, and monitor workflows with AI agents. From simple tasks to complex
+              orchestration.
+            </p>
           </div>
-          <div class="feature">
-            <b>Multi-tenant by default</b>
-            <p>Organization isolation designed for B2B SaaS.</p>
+
+          <div class="feature-card">
+            <div class="feature-icon">🔌</div>
+            <h3>Universal Integrations</h3>
+            <p>
+              Connect Notion, Slack, Jira, Asana, Linear, and more via the MCP protocol. One
+              integration standard for everything.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">💬</div>
+            <h3>Slack Bot + Natural Language</h3>
+            <p>
+              Trigger workflows directly from Slack with natural language. Your team doesn't need to
+              learn new tools.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Real-Time Monitoring</h3>
+            <p>
+              Track execution status, view logs, and debug failures. Full visibility into every
+              workflow run.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h3>No-Code Builder</h3>
+            <p>
+              Visual workflow builder for non-technical teams. Drag, drop, and deploy automation in
+              minutes.
+            </p>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="footer">
-        <span>© 2026 Kyndof Corporation</span>
-        <span>Contact: engineering@nubabel.com</span>
+    <section style="background: rgba(0, 0, 0, 0.15); border-top: 1px solid var(--border)">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">How It Works</h2>
+          <p class="section-subtitle">From connection to automation in four simple steps</p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step">
+            <div class="step-number">1</div>
+            <h3>Connect Your Tools</h3>
+            <p>Link Notion, Slack, Google Drive, and other services with one-click integrations.</p>
+          </div>
+
+          <div class="step">
+            <div class="step-number">2</div>
+            <h3>Build Workflows</h3>
+            <p>Use the visual builder or natural language to create automation workflows.</p>
+          </div>
+
+          <div class="step">
+            <div class="step-number">3</div>
+            <h3>Deploy with One Click</h3>
+            <p>Activate your workflows instantly. No infrastructure setup required.</p>
+          </div>
+
+          <div class="step">
+            <div class="step-number">4</div>
+            <h3>Monitor Results</h3>
+            <p>Track execution logs, view metrics, and optimize performance in real-time.</p>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <section class="trust-section">
+      <div class="container">
+        <h3 style="font-size: 18px; color: var(--text-muted); margin-bottom: 16px">
+          Trusted by teams who value security and scale
+        </h3>
+        <p style="font-size: 24px; font-weight: 600">
+          Built with enterprise-grade security and multi-tenant architecture
+        </p>
+        <div class="trust-badge">
+          <span>🏢</span>
+          <span style="font-weight: 600">Powered by Kyndof Corporation</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="container">
+        <h2>Ready to Automate Your Workflows?</h2>
+        <p>Join modern teams shipping faster with AI-powered automation.</p>
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap">
+          <a
+            href="https://app.nubabel.com/auth/google"
+            class="btn btn-primary"
+            style="padding: 18px 36px; font-size: 17px"
+          >
+            Start Free Trial
+          </a>
+          <a
+            href="mailto:engineering@nubabel.com"
+            class="btn btn-secondary"
+            style="padding: 18px 36px; font-size: 17px"
+          >
+            Contact Sales
+          </a>
+        </div>
+        <p style="font-size: 14px; color: var(--text-subtle); margin-top: 20px">
+          No credit card required · 14-day free trial
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        <div class="footer-content">
+          <div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
+              <div class="logo" style="width: 32px; height: 32px"></div>
+              <span style="font-weight: 600; color: var(--text)">Nubabel</span>
+            </div>
+            <p style="font-size: 14px">© 2026 Kyndof Corporation. All rights reserved.</p>
+          </div>
+
+          <div class="footer-links">
+            <a href="mailto:engineering@nubabel.com">Contact</a>
+            <a href="https://app.nubabel.com">Documentation</a>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Service</a>
+          </div>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>
