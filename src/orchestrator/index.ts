@@ -1,6 +1,12 @@
 import { analyzeRequest } from "./request-analyzer";
-import { selectCategory } from "./category-selector";
-import { selectSkills } from "./skill-selector";
+import { selectCategoryHybrid } from "./category-selector";
+import { selectSkillsEnhanced } from "./skill-selector";
+import {
+  getSessionState,
+  updateSessionState,
+  isFollowUpQuery,
+  applyContextBoost,
+} from "./session-state";
 import { OrchestrationRequest, OrchestrationResult } from "./types";
 import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
@@ -17,9 +23,7 @@ interface DelegateTaskParams {
 
 declare function delegate_task(params: DelegateTaskParams): Promise<any>;
 
-export async function orchestrate(
-  request: OrchestrationRequest,
-): Promise<OrchestrationResult> {
+export async function orchestrate(request: OrchestrationRequest): Promise<OrchestrationResult> {
   const { userRequest, sessionId, organizationId, userId } = request;
 
   logger.info("Orchestration started", {
@@ -34,18 +38,66 @@ export async function orchestrate(
   });
 
   try {
-    const analysis = await measureTime("orchestration.analysis", () =>
-      analyzeRequest(userRequest),
-    );
+    const sessionState = await getSessionState(sessionId);
+    const isFollowUp = isFollowUpQuery(userRequest);
 
-    const category = selectCategory(userRequest, analysis);
-    const skills = selectSkills(userRequest);
+    const analysis = await measureTime("orchestration.analysis", () => analyzeRequest(userRequest));
+
+    let categorySelection = await selectCategoryHybrid(userRequest, analysis, {
+      minConfidence: 0.7,
+      enableLLM: true,
+      enableCache: true,
+    });
+
+    if (isFollowUp) {
+      const boostedConfidence = applyContextBoost(
+        categorySelection.confidence,
+        sessionState,
+        isFollowUp,
+      );
+      if (boostedConfidence !== categorySelection.confidence) {
+        logger.debug("Applied context boost", {
+          originalConfidence: categorySelection.confidence,
+          boostedConfidence,
+          lastCategory: sessionState?.lastCategory,
+        });
+        categorySelection = {
+          ...categorySelection,
+          confidence: boostedConfidence,
+        };
+      }
+    }
+
+    const skillSelection = selectSkillsEnhanced(userRequest, {
+      minScore: 1,
+      includeDependencies: true,
+    });
+
+    const skills = skillSelection.skills;
 
     logger.debug("Request analyzed", {
-      category,
-      skills,
+      sessionDepth: sessionState?.conversationDepth || 0,
+      isFollowUp,
+      lastCategory: sessionState?.lastCategory,
+      category: categorySelection.category,
+      categoryConfidence: categorySelection.confidence,
+      categoryMethod: categorySelection.method,
+      categoryKeywords: categorySelection.matchedKeywords,
+      skills: skillSelection.skills,
+      skillScores: skillSelection.scores,
+      skillDependencies: skillSelection.dependencies,
+      skillConflicts: skillSelection.conflicts,
       intent: analysis.intent,
       complexity: analysis.complexity,
+    });
+
+    metrics.increment("orchestration.category_selected", {
+      category: categorySelection.category,
+      method: categorySelection.method,
+    });
+
+    metrics.histogram("orchestration.category_confidence", categorySelection.confidence, {
+      category: categorySelection.category,
     });
 
     const mcpConnections = await getActiveMCPConnections(organizationId);
@@ -62,7 +114,7 @@ export async function orchestrate(
 
     const startTime = Date.now();
     const result = await delegate_task({
-      category,
+      category: categorySelection.category,
       load_skills: skills,
       prompt: userRequest,
       session_id: sessionId,
@@ -70,24 +122,39 @@ export async function orchestrate(
     });
     const duration = Date.now() - startTime;
 
+    await updateSessionState(sessionId, {
+      lastCategory: categorySelection.category,
+      lastIntent: analysis.intent,
+      metadata: {
+        lastSkills: skills,
+        lastComplexity: analysis.complexity,
+      },
+    });
+
     await saveExecution({
       organizationId,
       userId,
       sessionId,
-      category,
+      category: categorySelection.category,
       skills,
       prompt: userRequest,
       result: result.output,
       status: result.status,
       duration,
-      metadata: result.metadata,
+      metadata: {
+        ...result.metadata,
+        categoryConfidence: categorySelection.confidence,
+        categoryMethod: categorySelection.method,
+        sessionDepth: sessionState?.conversationDepth || 0,
+        isFollowUp,
+      },
     });
 
     return {
       output: result.output,
       status: result.status,
       metadata: {
-        category,
+        category: categorySelection.category,
         skills,
         duration,
         model: result.metadata.model,
@@ -171,8 +238,7 @@ async function saveExecution(data: any) {
       data: {
         organizationId: data.organizationId,
         name: "Slack Orchestrator (Auto-created)",
-        description:
-          "Auto-created workflow for tracking orchestrator executions",
+        description: "Auto-created workflow for tracking orchestrator executions",
         config: {
           type: "orchestrator",
           source: "slack",

@@ -1,146 +1,96 @@
-import { Worker, Job } from "bullmq";
-import { createRedisConnection } from "../queue/base.queue";
-import { OrchestrationJobData } from "../queue/orchestration.queue";
-import { sendSlackThreadReply } from "../queue/notification.queue";
-import { moveToDLQ } from "../queue/dead-letter.queue";
+import { Job } from "bullmq";
+import { BaseWorker } from "../queue/base.queue";
+import { OrchestrationData } from "../queue/orchestration.queue";
+import { notificationQueue } from "../queue/notification.queue";
+import { deadLetterQueue } from "../queue/dead-letter.queue";
 import { orchestrate } from "../orchestrator";
 import { logger } from "../utils/logger";
-import { metrics } from "../utils/metrics";
+import { buildSuccessMessage, buildErrorMessage } from "../services/slack-block-kit";
 
-const concurrency = parseInt(
-  process.env.QUEUE_ORCHESTRATION_CONCURRENCY || "3",
-  10,
-);
+export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
+  constructor() {
+    super("orchestration", {
+      concurrency: 3,
+    });
+  }
 
-export const orchestrationWorker = new Worker<OrchestrationJobData>(
-  "orchestration",
-  async (job: Job<OrchestrationJobData>) => {
-    const startTime = Date.now();
-    const { organizationId, userId, sessionId, userRequest, metadata } =
+  async process(job: Job<OrchestrationData>): Promise<void> {
+    const { userRequest, sessionId, organizationId, userId, eventId, slackChannel, slackThreadTs } =
       job.data;
 
-    logger.info("Processing orchestration", {
-      jobId: job.id,
-      organizationId,
-      userId,
+    logger.info(`Executing orchestration for event ${eventId}`, {
       sessionId,
-      source: metadata.source,
+      organizationId,
+      requestPreview: userRequest.substring(0, 50),
     });
 
-    await job.updateProgress(10);
-
     try {
+      const startTime = Date.now();
+
       const result = await orchestrate({
+        userRequest,
+        sessionId,
         organizationId,
         userId,
-        sessionId,
-        userRequest,
       });
 
-      await job.updateProgress(90);
+      const duration = Date.now() - startTime;
 
-      logger.info("Orchestration completed", {
-        jobId: job.id,
+      logger.info(`Orchestration completed for event ${eventId}`, {
+        duration,
         status: result.status,
+      });
+
+      const message = buildSuccessMessage({
+        output: result.output,
         category: result.metadata.category,
         skills: result.metadata.skills,
-        duration: result.metadata.duration,
+        duration,
+        model: result.metadata.model,
       });
 
-      if (
-        metadata.source === "slack" &&
-        metadata.channelId &&
-        metadata.threadTs
-      ) {
-        await sendSlackThreadReply(
-          organizationId,
-          userId,
-          metadata.channelId,
-          metadata.threadTs,
-          result.output,
-          undefined,
-          job.id,
-        );
-      }
-
-      metrics.increment("orchestration.completed", {
+      await notificationQueue.enqueueNotification({
+        channel: slackChannel,
+        threadTs: slackThreadTs,
+        text: result.output,
+        blocks: message.blocks,
         organizationId,
-        category: result.metadata.category,
-        status: result.status,
+        userId,
+        eventId,
       });
-
-      metrics.timing("orchestration.duration", Date.now() - startTime, {
-        category: result.metadata.category,
-      });
-
-      await job.updateProgress(100);
-
-      return result;
     } catch (error: any) {
-      logger.error("Orchestration failed", {
-        jobId: job.id,
+      logger.error(`Orchestration failed for event ${eventId}:`, error);
+
+      const errorMessage = buildErrorMessage({
         error: error.message,
-        organizationId,
+        eventId,
       });
 
-      metrics.increment("orchestration.failed", {
+      await notificationQueue.enqueueNotification({
+        channel: slackChannel,
+        threadTs: slackThreadTs,
+        text: `Error: ${error.message}`,
+        blocks: errorMessage.blocks,
         organizationId,
+        userId,
+        eventId,
       });
+
+      if (job.attemptsMade >= (job.opts.attempts || 2)) {
+        await deadLetterQueue.enqueueFailedJob({
+          originalQueue: "orchestration",
+          originalJobId: job.id || "",
+          jobName: job.name || "",
+          jobData: job.data,
+          failedReason: error.message,
+          attempts: job.attemptsMade,
+          timestamp: Date.now(),
+        });
+      }
 
       throw error;
     }
-  },
-  {
-    connection: createRedisConnection(),
-    concurrency,
-  },
-);
-
-orchestrationWorker.on("completed", (job) => {
-  logger.debug("Orchestration worker completed", {
-    jobId: job.id,
-    category: job.returnvalue?.metadata?.category,
-    duration: job.returnvalue?.metadata?.duration,
-  });
-});
-
-orchestrationWorker.on("failed", async (job, err) => {
-  if (!job) return;
-
-  logger.error("Orchestration worker failed", {
-    jobId: job.id,
-    error: err.message,
-    attemptsMade: job.attemptsMade,
-  });
-
-  if (job.attemptsMade >= 3) {
-    await moveToDLQ(job, "orchestration", err.message);
-
-    if (
-      job.data.metadata.source === "slack" &&
-      job.data.metadata.channelId &&
-      job.data.metadata.threadTs
-    ) {
-      await sendSlackThreadReply(
-        job.data.organizationId,
-        job.data.userId,
-        job.data.metadata.channelId,
-        job.data.metadata.threadTs,
-        `❌ I encountered an error while processing your request:\n\n${err.message}\n\nPlease try again or contact support if the issue persists.`,
-      );
-    }
   }
-});
+}
 
-orchestrationWorker.on("progress", (job, progress) => {
-  logger.debug("Orchestration progress", {
-    jobId: job.id,
-    progress,
-  });
-});
-
-orchestrationWorker.on("error", (err) => {
-  logger.error("Orchestration worker error", { error: err.message });
-});
-
-logger.info("Orchestration worker started", { concurrency });
+export const orchestrationWorker = new OrchestrationWorker();

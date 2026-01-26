@@ -52,6 +52,10 @@ class MetricsCollector {
     this.record(`${name}.gauge`, value, tags);
   }
 
+  histogram(name: string, value: number, tags?: Record<string, string>) {
+    this.record(`${name}.histogram`, value, tags);
+  }
+
   private flush() {
     if (this.metrics.length === 0) return;
 

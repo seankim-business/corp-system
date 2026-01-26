@@ -7,8 +7,9 @@ import { authenticate } from "./middleware/auth.middleware";
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
-import { bullBoardAdapter } from "./queue/bull-board";
+import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter } from "./api/sse";
+import { startWorkers, stopWorkers } from "./workers";
 
 console.log("🚀 Initializing Nubabel Platform...");
 console.log(`📍 Node version: ${process.version}`);
@@ -40,23 +41,35 @@ app.get("/health/db", async (_req, res) => {
     await db.$queryRaw`SELECT 1`;
     res.json({ status: "ok", service: "database" });
   } catch (error) {
-    res
-      .status(503)
-      .json({ status: "error", service: "database", error: String(error) });
+    res.status(503).json({ status: "error", service: "database", error: String(error) });
   }
 });
 
 app.get("/health/redis", async (_req, res) => {
   try {
-    const Redis = (await import("ioredis")).default;
-    const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
-    await redis.ping();
-    await redis.quit();
-    res.json({ status: "ok", service: "redis" });
+    const { getRedisConnection } = await import("./queue/base.queue");
+    const redis = getRedisConnection();
+
+    const pingResult = await redis.ping();
+    const info = await redis.info("server");
+    const memoryInfo = await redis.info("memory");
+
+    const uptimeMatch = info.match(/uptime_in_seconds:(\d+)/);
+    const memoryUsedMatch = memoryInfo.match(/used_memory_human:(.+)/);
+
+    res.json({
+      status: "ok",
+      service: "redis",
+      ping: pingResult,
+      uptime: uptimeMatch ? parseInt(uptimeMatch[1]) : null,
+      memoryUsed: memoryUsedMatch ? memoryUsedMatch[1].trim() : null,
+    });
   } catch (error) {
-    res
-      .status(503)
-      .json({ status: "error", service: "redis", error: String(error) });
+    res.status(503).json({
+      status: "error",
+      service: "redis",
+      error: String(error),
+    });
   }
 });
 
@@ -75,35 +88,26 @@ app.get("/api/user", authenticate, (req, res) => {
   });
 });
 
-app.use(
-  (
-    err: any,
-    _req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction,
-  ) => {
-    console.error("Error:", err);
-    res.status(err.status || 500).json({
-      error: err.message || "Internal server error",
-    });
-  },
-);
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("Error:", err);
+  res.status(err.status || 500).json({
+    error: err.message || "Internal server error",
+  });
+});
 
 console.log(`🌐 Starting server on 0.0.0.0:${port}...`);
 
 const server = app.listen(port, "0.0.0.0", async () => {
   console.log(`✅ Server running on port ${port}`);
   console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(
-    `✅ Base URL: ${process.env.BASE_URL || "http://localhost:3000"}`,
-  );
+  console.log(`✅ Base URL: ${process.env.BASE_URL || "http://localhost:3000"}`);
   console.log(`✅ Health check endpoint: /health`);
   console.log(`✅ SSE endpoint: /api/events`);
   console.log(`✅ Bull Board: /admin/queues`);
   console.log(`✅ Ready to accept connections`);
 
-  await import("./workers");
-  console.log(`✅ Workers started`);
+  await startWorkers();
+  console.log(`✅ BullMQ workers started`);
 });
 
 server.on("error", (error: any) => {
@@ -117,8 +121,18 @@ server.on("error", (error: any) => {
   process.exit(1);
 });
 
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   console.log("SIGTERM signal received: closing HTTP server");
+  await stopWorkers();
+  server.close(() => {
+    console.log("HTTP server closed");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", async () => {
+  console.log("SIGINT signal received: closing HTTP server");
+  await stopWorkers();
   server.close(() => {
     console.log("HTTP server closed");
     process.exit(0);

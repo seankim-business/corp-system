@@ -1,15 +1,10 @@
 import { App, LogLevel } from "@slack/bolt";
-import { enqueueSlackEvent } from "../queue/slack-event.queue";
-import {
-  createSession,
-  getSessionBySlackThread,
-} from "../orchestrator/session-manager";
-import {
-  getUserBySlackId,
-  getOrganizationBySlackWorkspace,
-} from "../services/slack-service";
+import { slackEventQueue } from "../queue/slack-event.queue";
+import { createSession, getSessionBySlackThread } from "../orchestrator/session-manager";
+import { getUserBySlackId, getOrganizationBySlackWorkspace } from "../services/slack-service";
 import { logger } from "../utils/logger";
 import { metrics } from "../utils/metrics";
+import { randomUUID } from "crypto";
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -89,25 +84,27 @@ app.event("app_mention", async ({ event, say, client }) => {
 
     const cleanedText = text.replace(/<@[A-Z0-9]+>/g, "").trim();
 
-    const job = await enqueueSlackEvent({
-      eventType: "app_mention",
+    const eventId = randomUUID();
+
+    await slackEventQueue.enqueueEvent({
+      type: "app_mention",
+      channel,
+      user,
+      text: cleanedText,
+      ts: thread_ts || ts,
       organizationId: organization.id,
       userId: nubabelUser.id,
-      slackUserId: user,
-      slackWorkspaceId: workspaceId,
-      channelId: channel,
-      threadTs: thread_ts || ts,
-      text: cleanedText,
-      event: event as any,
+      sessionId: session.id,
+      eventId,
     });
 
     await say({
-      text: `🤔 Processing your request... (Job: ${job.id?.substring(0, 8)})`,
+      text: `🤔 Processing your request...`,
       thread_ts: thread_ts || ts,
     });
 
     logger.info("Slack event enqueued", {
-      jobId: job.id,
+      eventId,
       user: nubabelUser.id,
       organization: organization.id,
     });
@@ -151,24 +148,38 @@ app.message(async ({ message, say, client }) => {
 
       const organization = await getOrganizationBySlackWorkspace(workspaceId);
       if (!organization) {
-        await say(
-          "Organization not found. Please connect your Slack workspace in Settings.",
-        );
+        await say("Organization not found. Please connect your Slack workspace in Settings.");
         return;
       }
 
-      const job = await enqueueSlackEvent({
-        eventType: "direct_message",
+      let session = await getSessionBySlackThread(message.channel);
+      if (!session) {
+        session = await createSession({
+          userId: nubabelUser.id,
+          organizationId: organization.id,
+          source: "slack",
+          metadata: {
+            slackChannelId: message.channel,
+            slackUserId: user,
+          },
+        });
+      }
+
+      const eventId = randomUUID();
+
+      await slackEventQueue.enqueueEvent({
+        type: "direct_message",
+        channel: message.channel,
+        user,
+        text,
+        ts: (message as any).ts,
         organizationId: organization.id,
         userId: nubabelUser.id,
-        slackUserId: user,
-        slackWorkspaceId: workspaceId,
-        channelId: message.channel,
-        text,
-        event: message as any,
+        sessionId: session.id,
+        eventId,
       });
 
-      await say(`Processing your message... (Job: ${job.id?.substring(0, 8)})`);
+      await say(`🤔 Processing your message...`);
     } catch (error: any) {
       logger.error("DM handler error", { error: error.message });
       await say(`Error: ${error.message}`);
@@ -190,24 +201,38 @@ app.command("/nubabel", async ({ command, ack, say }) => {
 
     const organization = await getOrganizationBySlackWorkspace(team_id);
     if (!organization) {
-      await say(
-        "Organization not found. Please connect your Slack workspace in Settings.",
-      );
+      await say("Organization not found. Please connect your Slack workspace in Settings.");
       return;
     }
 
-    const job = await enqueueSlackEvent({
-      eventType: "slash_command",
+    let session = await getSessionBySlackThread(channel_id);
+    if (!session) {
+      session = await createSession({
+        userId: nubabelUser.id,
+        organizationId: organization.id,
+        source: "slack",
+        metadata: {
+          slackChannelId: channel_id,
+          slackUserId: user_id,
+        },
+      });
+    }
+
+    const eventId = randomUUID();
+
+    await slackEventQueue.enqueueEvent({
+      type: "slash_command",
+      channel: channel_id,
+      user: user_id,
+      text,
+      ts: Date.now().toString(),
       organizationId: organization.id,
       userId: nubabelUser.id,
-      slackUserId: user_id,
-      slackWorkspaceId: team_id,
-      channelId: channel_id,
-      text,
-      event: command as any,
+      sessionId: session.id,
+      eventId,
     });
 
-    await say(`Processing your command... (Job: ${job.id?.substring(0, 8)})`);
+    await say(`🤔 Processing your command...`);
   } catch (error: any) {
     logger.error("Slash command error", { error: error.message });
     await say(`Error: ${error.message}`);

@@ -1,78 +1,43 @@
-export interface BlockKitMessage {
-  text: string;
-  blocks?: any[];
-}
-
-export function buildSuccessMessage(
-  category: string,
-  output: string,
-  metadata?: {
-    duration?: number;
-    skills?: string[];
-    model?: string;
-  },
-): BlockKitMessage {
-  const emoji = getCategoryEmoji(category);
-  const categoryLabel = formatCategoryLabel(category);
-
-  const blocks: any[] = [
-    {
-      type: "header",
-      text: {
-        type: "plain_text",
-        text: `${emoji} ${categoryLabel}`,
-      },
-    },
-    {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: output,
-      },
-    },
-  ];
-
-  if (metadata) {
-    const fields: Array<{ type: "mrkdwn"; text: string }> = [];
-
-    if (metadata.duration) {
-      fields.push({
-        type: "mrkdwn",
-        text: `*Duration:* ${(metadata.duration / 1000).toFixed(1)}s`,
-      });
-    }
-
-    if (metadata.skills && metadata.skills.length > 0) {
-      fields.push({
-        type: "mrkdwn",
-        text: `*Skills:* ${metadata.skills.join(", ")}`,
-      });
-    }
-
-    if (metadata.model) {
-      fields.push({
-        type: "mrkdwn",
-        text: `*Model:* ${metadata.model}`,
-      });
-    }
-
-    if (fields.length > 0) {
-      blocks.push({
-        type: "context",
-        elements: fields,
-      });
-    }
-  }
+export function buildSuccessMessage(data: {
+  output: string;
+  category: string;
+  skills: string[];
+  duration: number;
+  model: string;
+}): { text: string; blocks: any[] } {
+  const { output, category, skills, duration, model } = data;
 
   return {
-    text: `${emoji} [${categoryLabel}] ${output}`,
-    blocks,
+    text: output,
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `✅ *Task Completed*\n\n${output}`,
+        },
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `📊 *Category:* \`${category}\` | *Skills:* \`${skills.join(", ")}\` | *Model:* \`${model}\` | *Duration:* ${(duration / 1000).toFixed(2)}s`,
+          },
+        ],
+      },
+    ],
   };
 }
 
-export function buildErrorMessage(error: string): BlockKitMessage {
+export function buildErrorMessage(data: { error: string; eventId: string }): {
+  text: string;
+  blocks: any[];
+} {
+  const { error, eventId } = data;
+
   return {
-    text: `❌ Error: ${error}`,
+    text: `Error: ${error}`,
     blocks: [
       {
         type: "section",
@@ -81,46 +46,37 @@ export function buildErrorMessage(error: string): BlockKitMessage {
           text: `❌ *Error*\n\n${error}`,
         },
       },
-    ],
-  };
-}
-
-export function buildProgressMessage(
-  step: string,
-  progress?: number,
-): BlockKitMessage {
-  const progressText = progress !== undefined ? ` (${progress}%)` : "";
-
-  return {
-    text: `🤔 ${step}${progressText}`,
-    blocks: [
       {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `🤔 *${step}*${progressText}`,
-        },
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `🔍 *Event ID:* \`${eventId}\``,
+          },
+        ],
       },
     ],
   };
 }
 
-function getCategoryEmoji(category: string): string {
-  const emojiMap: Record<string, string> = {
-    "visual-engineering": "🎨",
-    ultrabrain: "🧠",
-    artistry: "✨",
-    quick: "⚡",
-    writing: "📝",
-    "unspecified-low": "🤖",
-    "unspecified-high": "🚀",
-  };
-  return emojiMap[category] || "🤖";
-}
+export function buildProgressMessage(data: { status: string; progress: number }): {
+  text: string;
+  blocks: any[];
+} {
+  const { status, progress } = data;
+  const progressBar =
+    "▓".repeat(Math.floor(progress / 10)) + "░".repeat(10 - Math.floor(progress / 10));
 
-function formatCategoryLabel(category: string): string {
-  return category
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  return {
+    text: status,
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `⏳ *Processing...*\n\n${status}\n\n${progressBar} ${progress}%`,
+        },
+      },
+    ],
+  };
 }

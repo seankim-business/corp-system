@@ -1,146 +1,161 @@
-import { Queue, QueueOptions, DefaultJobOptions } from "bullmq";
-import Redis from "ioredis";
+import { Queue, QueueOptions, Worker, WorkerOptions, Job } from "bullmq";
+import IORedis from "ioredis";
 import { logger } from "../utils/logger";
 
-/**
- * Base Queue Configuration
- *
- * Shared configuration for all BullMQ queues in the system.
- * Implements:
- * - Exponential backoff with jitter
- * - Dead letter queue support
- * - Per-organization rate limiting
- * - Redis connection pooling
- */
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 
-// Redis connection configuration
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-const redisOptions = {
-  maxRetriesPerRequest: null, // Required for BullMQ
-  enableReadyCheck: false,
-};
+let redisConnection: IORedis | null = null;
 
-// Create Redis connection for BullMQ
-export const createRedisConnection = (): Redis => {
-  const connection = new Redis(redisUrl, redisOptions);
+export function getRedisConnection(): IORedis {
+  if (!redisConnection) {
+    redisConnection = new IORedis(REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      retryStrategy: (times: number) => {
+        if (times > 10) {
+          logger.error("Redis connection failed after 10 retries");
+          return null;
+        }
+        return Math.min(times * 100, 3000);
+      },
+    });
 
-  connection.on("error", (err) => {
-    logger.error("Redis connection error", { error: err.message });
-  });
+    redisConnection.on("error", (err: Error) => {
+      logger.error("Redis connection error:", err);
+    });
 
-  connection.on("connect", () => {
-    logger.info("Redis connected for BullMQ");
-  });
+    redisConnection.on("connect", () => {
+      logger.info("Redis connected for BullMQ");
+    });
+  }
 
-  return connection;
-};
-
-/**
- * Exponential backoff with jitter
- * Formula: min(maxDelay, baseDelay * 2^attemptsMade) + random(0, jitter)
- */
-export function exponentialBackoffWithJitter(
-  attemptsMade: number,
-  baseDelay = 1000,
-  maxDelay = 60000,
-  jitter = 1000,
-): number {
-  const exponentialDelay = Math.min(
-    maxDelay,
-    baseDelay * Math.pow(2, attemptsMade),
-  );
-  const randomJitter = Math.random() * jitter;
-  return Math.floor(exponentialDelay + randomJitter);
+  return redisConnection;
 }
 
-/**
- * Default job options for all queues
- */
-export const defaultJobOptions: DefaultJobOptions = {
-  attempts: 3,
-  backoff: {
-    type: "custom",
-  },
-  removeOnComplete: {
-    age: 24 * 3600,
-    count: 1000,
-  },
-  removeOnFail: {
-    age: 7 * 24 * 3600,
-  },
-};
-
-/**
- * Base queue options
- */
-export const baseQueueOptions: QueueOptions = {
-  connection: createRedisConnection(),
-  defaultJobOptions,
-};
-
-/**
- * Create a standardized queue with logging and error handling
- */
-export function createQueue<T = any>(
-  name: string,
-  options?: Partial<QueueOptions>,
-): Queue<T> {
-  const queue = new Queue<T>(name, {
-    ...baseQueueOptions,
-    ...options,
-  });
-
-  queue.on("error", (error) => {
-    logger.error(`Queue error: ${name}`, { error: error.message });
-  });
-
-  logger.info(`Queue created: ${name}`);
-
-  return queue;
-}
-
-/**
- * Get queue metrics
- */
-export async function getQueueMetrics(queue: Queue) {
-  const [waiting, active, completed, failed, delayed] = await Promise.all([
-    queue.getWaitingCount(),
-    queue.getActiveCount(),
-    queue.getCompletedCount(),
-    queue.getFailedCount(),
-    queue.getDelayedCount(),
-  ]);
-
-  return {
-    waiting,
-    active,
-    completed,
-    failed,
-    delayed,
-    total: waiting + active + completed + failed + delayed,
+export interface BaseQueueOptions {
+  name: string;
+  defaultJobOptions?: {
+    removeOnComplete?: number | boolean;
+    removeOnFail?: number | boolean;
+    attempts?: number;
+    backoff?: {
+      type: "exponential" | "fixed";
+      delay: number;
+    };
+  };
+  rateLimiter?: {
+    max: number;
+    duration: number;
   };
 }
 
-/**
- * Rate limiting configuration per organization
- * Uses BullMQ's built-in rate limiting
- */
-export interface RateLimitConfig {
-  max: number; // Max jobs per duration
-  duration: number; // Duration in milliseconds
+export class BaseQueue<T = any> {
+  protected queue: Queue<T>;
+  protected queueName: string;
+
+  constructor(options: BaseQueueOptions) {
+    this.queueName = options.name;
+
+    const queueOptions: QueueOptions = {
+      connection: getRedisConnection(),
+      defaultJobOptions: {
+        removeOnComplete: 100,
+        removeOnFail: 100,
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 1000,
+        },
+        ...options.defaultJobOptions,
+      },
+    };
+
+    this.queue = new Queue<T>(this.queueName, queueOptions);
+
+    this.queue.on("error", (err: Error) => {
+      logger.error(`Queue ${this.queueName} error:`, err);
+    });
+
+    logger.info(`Queue ${this.queueName} initialized`);
+  }
+
+  async add(jobName: string, data: T, opts?: any): Promise<Job<any, any, string>> {
+    try {
+      const job = await this.queue.add(jobName as any, data as any, opts);
+      logger.debug(`Job ${job.id} added to ${this.queueName}`, {
+        jobName,
+        jobId: job.id,
+      });
+      return job as any;
+    } catch (error: any) {
+      logger.error(`Failed to add job to ${this.queueName}:`, error);
+      throw error;
+    }
+  }
+
+  async close(): Promise<void> {
+    await this.queue.close();
+    logger.info(`Queue ${this.queueName} closed`);
+  }
+
+  getQueue(): Queue<T> {
+    return this.queue;
+  }
 }
 
-export const defaultRateLimits: Record<string, RateLimitConfig> = {
-  "slack-events": {
-    max: 100, // 100 events
-    duration: 60000, // per minute
-  },
-  orchestration: {
-    max: 20, // 20 orchestrations
-    duration: 60000, // per minute (accounts for long LLM calls)
-  },
-  notifications: {
-    max: 200, // 200 notifications
-    duration: 60000, // per minute
-  },
-};
+export interface BaseWorkerOptions {
+  concurrency?: number;
+}
+
+export abstract class BaseWorker<T = any> {
+  protected worker: Worker<T>;
+  protected workerName: string;
+
+  constructor(queueName: string, options: BaseWorkerOptions = {}) {
+    this.workerName = queueName;
+
+    const workerOptions: WorkerOptions = {
+      connection: getRedisConnection(),
+      concurrency: options.concurrency || 1,
+    };
+
+    this.worker = new Worker<T>(
+      queueName,
+      async (job: Job<T>) => {
+        logger.debug(`Processing job ${job.id} in ${this.workerName}`, {
+          jobId: job.id,
+          jobName: job.name,
+        });
+
+        try {
+          const result = await this.process(job);
+          logger.info(`Job ${job.id} completed in ${this.workerName}`, {
+            jobId: job.id,
+          });
+          return result;
+        } catch (error: any) {
+          logger.error(`Job ${job.id} failed in ${this.workerName}:`, error);
+          throw error;
+        }
+      },
+      workerOptions,
+    );
+
+    this.worker.on("completed", (job: Job<T>) => {
+      logger.debug(`Worker ${this.workerName} completed job ${job.id}`);
+    });
+
+    this.worker.on("failed", (job: Job<T> | undefined, err: Error) => {
+      logger.error(`Worker ${this.workerName} failed job ${job?.id}:`, err);
+    });
+
+    logger.info(`Worker ${this.workerName} initialized`);
+  }
+
+  abstract process(job: Job<T>): Promise<any>;
+
+  async close(): Promise<void> {
+    await this.worker.close();
+    logger.info(`Worker ${this.workerName} closed`);
+  }
+}

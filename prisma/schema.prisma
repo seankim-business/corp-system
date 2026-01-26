@@ -26,18 +26,19 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  workspaceDomains WorkspaceDomain[]
-  memberships      Membership[]
-  agents           Agent[]
-  teams            Team[]
-  projects         Project[]
-  tasks            Task[]
-  goals            Goal[]
-  valueStreams     ValueStream[]
+  workspaceDomains  WorkspaceDomain[]
+  memberships       Membership[]
+  agents            Agent[]
+  teams             Team[]
+  projects          Project[]
+  tasks             Task[]
+  goals             Goal[]
+  valueStreams      ValueStream[]
   kpis              KPI[]
   workflows         Workflow[]
   notionConnections NotionConnection[]
   mcpConnections    MCPConnection[]
+  slackIntegrations SlackIntegration[]
 
   @@map("organizations")
 }
@@ -196,18 +197,18 @@ model Team {
 
 /// Projects
 model Project {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  name           String   @db.VarChar(255)
-  status         String   @db.VarChar(50)
-  ownerId        String?  @map("owner_id") @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String    @db.VarChar(255)
+  status         String    @db.VarChar(50)
+  ownerId        String?   @map("owner_id") @db.Uuid
   startDate      DateTime? @map("start_date") @db.Date
   dueDate        DateTime? @map("due_date") @db.Date
-  progress       Int      @default(0)
-  budget         Decimal? @db.Decimal(15, 2)
-  description    String?  @db.Text
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  progress       Int       @default(0)
+  budget         Decimal?  @db.Decimal(15, 2)
+  description    String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -220,27 +221,27 @@ model Project {
 
 /// Tasks (RABSIC-enabled)
 model Task {
-  id               String   @id @default(uuid()) @db.Uuid
-  organizationId   String   @map("organization_id") @db.Uuid
-  projectId        String?  @map("project_id") @db.Uuid
-  name             String   @db.VarChar(500)
-  status           String   @db.VarChar(50) // 1_ToDo, 2_InProgress, 5_Done
-  dueDate          DateTime? @map("due_date") @db.Date
-  urgencyScore     Int?     @map("urgency_score") @default(0)
-  importanceScore  Int?     @map("importance_score") @default(0)
-  eisenhowerQuad   String?  @map("eisenhower_quadrant") @db.VarChar(50)
-  
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  projectId       String?   @map("project_id") @db.Uuid
+  name            String    @db.VarChar(500)
+  status          String    @db.VarChar(50) // 1_ToDo, 2_InProgress, 5_Done
+  dueDate         DateTime? @map("due_date") @db.Date
+  urgencyScore    Int?      @default(0) @map("urgency_score")
+  importanceScore Int?      @default(0) @map("importance_score")
+  eisenhowerQuad  String?   @map("eisenhower_quadrant") @db.VarChar(50)
+
   // RABSIC fields
-  responsible      String[] @db.Uuid
-  accountable      String[] @db.Uuid // Must be exactly 1
-  backup           String[] @db.Uuid
-  support          String[] @db.Uuid
-  informed         String[] @db.Uuid
-  consulted        String[] @db.Uuid
-  
-  description      String?  @db.Text
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  responsible String[] @db.Uuid
+  accountable String[] @db.Uuid // Must be exactly 1
+  backup      String[] @db.Uuid
+  support     String[] @db.Uuid
+  informed    String[] @db.Uuid
+  consulted   String[] @db.Uuid
+
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -254,17 +255,17 @@ model Task {
 
 /// Goals (Hierarchical)
 model Goal {
-  id               String   @id @default(uuid()) @db.Uuid
-  organizationId   String   @map("organization_id") @db.Uuid
-  title            String   @db.VarChar(500)
-  status           String   @db.VarChar(50)
-  ownerPositionId  String?  @map("owner_position_id") @db.Uuid
-  dueDate          DateTime? @map("due_date") @db.Date
-  progress         Int      @default(0)
-  parentGoalId     String?  @map("parent_goal_id") @db.Uuid
-  description      String?  @db.Text
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  title           String    @db.VarChar(500)
+  status          String    @db.VarChar(50)
+  ownerPositionId String?   @map("owner_position_id") @db.Uuid
+  dueDate         DateTime? @map("due_date") @db.Date
+  progress        Int       @default(0)
+  parentGoalId    String?   @map("parent_goal_id") @db.Uuid
+  description     String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -301,20 +302,20 @@ model ValueStream {
 
 /// KPIs (Key Performance Indicators)
 model KPI {
-  id               String   @id @default(uuid()) @db.Uuid
-  organizationId   String   @map("organization_id") @db.Uuid
-  name             String   @db.VarChar(255)
-  status           String   @db.VarChar(50)
-  ownerRoleId      String?  @map("owner_role_id") @db.Uuid
-  target           String?  @db.VarChar(255)
-  currentValue     Decimal? @map("current_value") @db.Decimal(15, 2)
-  unit             String?  @db.VarChar(50)
-  updateFrequency  String?  @map("update_frequency") @db.VarChar(50)
-  dataSource       String?  @map("data_source") @db.Text
-  upToDate         Boolean  @default(true) @map("up_to_date")
-  lastUpdated      DateTime? @map("last_updated") @db.Timestamptz(6)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  status          String    @db.VarChar(50)
+  ownerRoleId     String?   @map("owner_role_id") @db.Uuid
+  target          String?   @db.VarChar(255)
+  currentValue    Decimal?  @map("current_value") @db.Decimal(15, 2)
+  unit            String?   @db.VarChar(50)
+  updateFrequency String?   @map("update_frequency") @db.VarChar(50)
+  dataSource      String?   @map("data_source") @db.Text
+  upToDate        Boolean   @default(true) @map("up_to_date")
+  lastUpdated     DateTime? @map("last_updated") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -403,4 +404,49 @@ model NotionConnection {
   @@unique([organizationId])
   @@index([organizationId])
   @@map("notion_connections")
+}
+
+// ============================================================================
+// SLACK INTEGRATION TABLES (Phase 2 Week 9-12 - Multi-Tenant)
+// ============================================================================
+
+/// Slack Integrations (Per-organization Slack workspaces)
+/// Replaces hardcoded SLACK_BOT_TOKEN environment variable
+model SlackIntegration {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  workspaceId    String @unique @map("workspace_id") @db.VarChar(50) // Slack Team ID (T01234ABCD)
+  workspaceName  String @map("workspace_name") @db.VarChar(255) // Friendly name
+
+  // OAuth tokens (encrypted in application layer before storage)
+  botToken String  @map("bot_token") @db.Text // xoxb-... (encrypted)
+  appToken String? @map("app_token") @db.Text // xapp-... (encrypted, for Socket Mode)
+
+  // Security
+  signingSecret String @map("signing_secret") @db.Text // Webhook verification (encrypted)
+
+  // OAuth metadata
+  botUserId String?  @map("bot_user_id") @db.VarChar(50) // U01234ABCD
+  scopes    String[] @default([]) @db.VarChar(100) // [app_mentions:read, chat:write, ...]
+
+  // Installation metadata
+  installedBy String?  @map("installed_by") @db.Uuid // Which user authorized
+  installedAt DateTime @default(now()) @map("installed_at") @db.Timestamptz(6)
+
+  // Status
+  enabled         Boolean   @default(true)
+  lastHealthCheck DateTime? @map("last_health_check") @db.Timestamptz(6)
+  healthStatus    String    @default("unknown") @map("health_status") @db.VarChar(50) // healthy, degraded, offline, unknown
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, workspaceId])
+  @@index([organizationId])
+  @@index([workspaceId])
+  @@index([enabled])
+  @@map("slack_integrations")
 }

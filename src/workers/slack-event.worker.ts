@@ -1,116 +1,56 @@
-import { Worker, Job } from "bullmq";
-import { createRedisConnection } from "../queue/base.queue";
-import { SlackEventJobData } from "../queue/slack-event.queue";
-import { enqueueOrchestration } from "../queue/orchestration.queue";
-import { sendSlackThreadReply } from "../queue/notification.queue";
-import { moveToDLQ } from "../queue/dead-letter.queue";
+import { Job } from "bullmq";
+import { BaseWorker } from "../queue/base.queue";
+import { SlackEventData } from "../queue/slack-event.queue";
+import { orchestrationQueue } from "../queue/orchestration.queue";
+import { deadLetterQueue } from "../queue/dead-letter.queue";
 import { logger } from "../utils/logger";
-import { metrics } from "../utils/metrics";
 
-const concurrency = parseInt(process.env.QUEUE_SLACK_CONCURRENCY || "5", 10);
+export class SlackEventWorker extends BaseWorker<SlackEventData> {
+  constructor() {
+    super("slack-events", {
+      concurrency: 5,
+    });
+  }
 
-export const slackEventWorker = new Worker<SlackEventJobData>(
-  "slack-events",
-  async (job: Job<SlackEventJobData>) => {
-    const startTime = Date.now();
-    const { eventType, organizationId, userId, text, channelId, threadTs } =
-      job.data;
+  async process(job: Job<SlackEventData>): Promise<void> {
+    const { eventId, text, channel, user, ts, organizationId, userId, sessionId } = job.data;
 
-    logger.info("Processing Slack event", {
-      jobId: job.id,
-      eventType,
-      organizationId,
-      userId,
+    logger.info(`Processing Slack event ${eventId}`, {
+      channel,
+      user,
+      textPreview: text.substring(0, 50),
     });
 
     try {
-      const sessionId = `slack-${threadTs || job.id}`;
-
-      const orchestrationJobId = await enqueueOrchestration({
+      await orchestrationQueue.enqueueOrchestration({
+        userRequest: text,
+        sessionId,
         organizationId,
         userId,
-        sessionId,
-        userRequest: text,
-        metadata: {
-          source: "slack",
-          channelId,
-          threadTs,
-        },
+        eventId,
+        slackChannel: channel,
+        slackThreadTs: ts,
       });
 
-      logger.info("Orchestration enqueued", {
-        jobId: job.id,
-        orchestrationJobId,
-        sessionId,
-      });
-
-      metrics.increment("slack_event.processed", {
-        eventType,
-        organizationId,
-      });
-
-      metrics.timing("slack_event.duration", Date.now() - startTime, {
-        eventType,
-      });
-
-      return {
-        orchestrationJobId,
-        sessionId,
-      };
+      logger.info(`Enqueued orchestration for event ${eventId}`);
     } catch (error: any) {
-      logger.error("Slack event processing failed", {
-        jobId: job.id,
-        error: error.message,
-        organizationId,
-      });
+      logger.error(`Failed to process Slack event ${eventId}:`, error);
 
-      metrics.increment("slack_event.failed", {
-        eventType,
-        organizationId,
-      });
+      if (job.attemptsMade >= (job.opts.attempts || 3)) {
+        await deadLetterQueue.enqueueFailedJob({
+          originalQueue: "slack-events",
+          originalJobId: job.id || "",
+          jobName: job.name || "",
+          jobData: job.data,
+          failedReason: error.message,
+          attempts: job.attemptsMade,
+          timestamp: Date.now(),
+        });
+      }
 
       throw error;
     }
-  },
-  {
-    connection: createRedisConnection(),
-    concurrency,
-  },
-);
-
-slackEventWorker.on("completed", (job) => {
-  logger.debug("Slack event worker completed", {
-    jobId: job.id,
-    result: job.returnvalue,
-  });
-});
-
-slackEventWorker.on("failed", async (job, err) => {
-  if (!job) return;
-
-  logger.error("Slack event worker failed", {
-    jobId: job.id,
-    error: err.message,
-    attemptsMade: job.attemptsMade,
-  });
-
-  if (job.attemptsMade >= 3) {
-    await moveToDLQ(job, "slack-events", err.message);
-
-    if (job.data.channelId && job.data.threadTs) {
-      await sendSlackThreadReply(
-        job.data.organizationId,
-        job.data.userId,
-        job.data.channelId,
-        job.data.threadTs,
-        "I encountered an error processing your request. Please try again later or contact support.",
-      );
-    }
   }
-});
+}
 
-slackEventWorker.on("error", (err) => {
-  logger.error("Slack event worker error", { error: err.message });
-});
-
-logger.info("Slack event worker started", { concurrency });
+export const slackEventWorker = new SlackEventWorker();

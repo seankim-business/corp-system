@@ -6,17 +6,17 @@ import { orchestrationQueue } from "./orchestration.queue";
 import { notificationQueue } from "./notification.queue";
 import { deadLetterQueue } from "./dead-letter.queue";
 
-export const serverAdapter = new ExpressAdapter();
+const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/admin/queues");
 
 createBullBoard({
   queues: [
-    new BullMQAdapter(slackEventQueue),
-    new BullMQAdapter(orchestrationQueue),
-    new BullMQAdapter(notificationQueue),
-    new BullMQAdapter(deadLetterQueue),
+    new BullMQAdapter(slackEventQueue.getQueue()),
+    new BullMQAdapter(orchestrationQueue.getQueue()),
+    new BullMQAdapter(notificationQueue.getQueue()),
+    new BullMQAdapter(deadLetterQueue.getQueue()),
   ],
   serverAdapter,
 });
 
-export { serverAdapter as bullBoardAdapter };
+export { serverAdapter };
