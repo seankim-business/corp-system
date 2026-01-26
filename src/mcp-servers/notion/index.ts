@@ -13,23 +13,43 @@ import { getTasksTool } from "./tools/getTasks";
 import { createTaskTool } from "./tools/createTask";
 import { updateTaskTool } from "./tools/updateTask";
 import { deleteTaskTool } from "./tools/deleteTask";
+import { validateToolAccess } from "../../services/mcp-registry";
+import { MCPConnection } from "../../orchestrator/types";
+
+const legacyToolMap: Record<string, string> = {
+  get_tasks: "getTasks",
+  create_task: "createTask",
+  update_task: "updateTask",
+  delete_task: "deleteTask",
+};
+
+export function registerTools(): string[] {
+  return ["notion__getTasks", "notion__createTask", "notion__updateTask", "notion__deleteTask"];
+}
 
 export async function executeNotionTool(
   apiKey: string,
   toolName: string,
   input: any,
+  organizationId: string,
+  connection: MCPConnection,
 ): Promise<any> {
-  switch (toolName) {
-    case "notion_get_tasks":
+  const parsed = validateToolAccess(toolName, "notion", organizationId, connection);
+  const resolvedToolName = parsed.isLegacy
+    ? (legacyToolMap[parsed.toolName] ?? parsed.toolName)
+    : parsed.toolName;
+
+  switch (resolvedToolName) {
+    case "getTasks":
       return await getTasksTool(apiKey, input);
 
-    case "notion_create_task":
+    case "createTask":
       return await createTaskTool(apiKey, input);
 
-    case "notion_update_task":
+    case "updateTask":
       return await updateTaskTool(apiKey, input);
 
-    case "notion_delete_task":
+    case "deleteTask":
       return await deleteTaskTool(apiKey, input);
 
     default:

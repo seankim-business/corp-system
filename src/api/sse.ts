@@ -17,24 +17,26 @@ interface SSEClient {
 class SSEManager extends EventEmitter {
   private clients: Map<string, SSEClient> = new Map();
   private redis = getRedisConnection();
-  // Subscriber is initialized in constructor if supported.
+  private subscriber: any = null;
 
   constructor() {
     super();
 
     const dup = (this.redis as unknown as { duplicate?: () => unknown }).duplicate;
     if (typeof dup === "function") {
-      const subscriber = dup.call(this.redis) as {
+      this.subscriber = dup.call(this.redis) as {
         subscribe?: (channel: string, cb?: (err: unknown) => void) => unknown;
         on?: (event: string, cb: (...args: any[]) => void) => unknown;
+        unsubscribe?: (channel: string) => unknown;
+        quit?: () => Promise<unknown>;
       };
-      subscriber.subscribe?.("sse:org", (err: unknown) => {
+      this.subscriber.subscribe?.("sse:org", (err: unknown) => {
         if (err) {
           logger.error("Failed to subscribe SSE channel", { err: String(err) });
         }
       });
 
-      subscriber.on?.("message", (_channel: string, message: string) => {
+      this.subscriber.on?.("message", (_channel: string, message: string) => {
         try {
           const parsed = JSON.parse(message) as {
             organizationId: string;
@@ -131,11 +133,40 @@ class SSEManager extends EventEmitter {
       client.res.write(":heartbeat\n\n");
     });
   }
+
+  async shutdown() {
+    logger.info("Shutting down SSE manager", { activeClients: this.clients.size });
+
+    this.clients.forEach((client) => {
+      try {
+        client.res.write("event: shutdown\n");
+        client.res.write('data: {"reason": "server_shutting_down"}\n\n');
+        client.res.end();
+      } catch (err) {
+        logger.error("Error closing SSE client", { clientId: client.id, err: String(err) });
+      }
+    });
+    this.clients.clear();
+
+    if (this.subscriber) {
+      try {
+        await this.subscriber.unsubscribe?.("sse:org");
+        await this.subscriber.quit?.();
+        logger.info("SSE Redis subscriber closed");
+      } catch (err) {
+        logger.error("Error closing SSE subscriber", { err: String(err) });
+      }
+    }
+  }
 }
 
 export const sseManager = new SSEManager();
 
 setInterval(() => sseManager.sendHeartbeat(), 30000);
+
+export async function shutdownSSE(): Promise<void> {
+  await sseManager.shutdown();
+}
 
 sseRouter.get("/events", authenticate, (req: Request, res: Response) => {
   const clientId = `${req.user!.id}-${Date.now()}`;

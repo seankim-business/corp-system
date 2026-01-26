@@ -1,11 +1,11 @@
 /**
  * Notion Settings API Routes
- * 
+ *
  * 기획:
  * - Organization별 Notion API Key 관리
  * - Notion 데이터베이스 목록 조회
  * - 연결 테스트
- * 
+ *
  * 엔드포인트:
  * - POST   /api/notion/connection
  * - GET    /api/notion/connection
@@ -15,20 +15,20 @@
  * - POST   /api/notion/test
  */
 
-import { Router, Request, Response } from 'express';
-import { db as prisma } from '../db/client';
-import { requireAuth } from '../middleware/auth.middleware';
-import { NotionClient } from '../mcp-servers/notion/client';
+import { Router, Request, Response } from "express";
+import { db as prisma } from "../db/client";
+import { requireAuth } from "../middleware/auth.middleware";
+import { NotionClient } from "../mcp-servers/notion/client";
 
 const router = Router();
 
-router.post('/notion/connection', requireAuth, async (req: Request, res: Response) => {
+router.post("/notion/connection", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
     const { apiKey, defaultDatabaseId } = req.body;
 
     if (!apiKey) {
-      return res.status(400).json({ error: 'API key is required' });
+      return res.status(400).json({ error: "API key is required" });
     }
 
     const existingConnection = await prisma.notionConnection.findUnique({
@@ -36,7 +36,9 @@ router.post('/notion/connection', requireAuth, async (req: Request, res: Respons
     });
 
     if (existingConnection) {
-      return res.status(409).json({ error: 'Notion connection already exists. Use PUT to update.' });
+      return res
+        .status(409)
+        .json({ error: "Notion connection already exists. Use PUT to update." });
     }
 
     const connection = await prisma.notionConnection.create({
@@ -57,12 +59,12 @@ router.post('/notion/connection', requireAuth, async (req: Request, res: Respons
       },
     });
   } catch (error) {
-    console.error('Create Notion connection error:', error);
-    return res.status(500).json({ error: 'Failed to create Notion connection' });
+    console.error("Create Notion connection error:", error);
+    return res.status(500).json({ error: "Failed to create Notion connection" });
   }
 });
 
-router.get('/notion/connection', requireAuth, async (req: Request, res: Response) => {
+router.get("/notion/connection", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
 
@@ -71,7 +73,7 @@ router.get('/notion/connection', requireAuth, async (req: Request, res: Response
     });
 
     if (!connection) {
-      return res.status(404).json({ error: 'Notion connection not found' });
+      return res.status(404).json({ error: "Notion connection not found" });
     }
 
     return res.json({
@@ -84,12 +86,12 @@ router.get('/notion/connection', requireAuth, async (req: Request, res: Response
       },
     });
   } catch (error) {
-    console.error('Get Notion connection error:', error);
-    return res.status(500).json({ error: 'Failed to fetch Notion connection' });
+    console.error("Get Notion connection error:", error);
+    return res.status(500).json({ error: "Failed to fetch Notion connection" });
   }
 });
 
-router.put('/notion/connection', requireAuth, async (req: Request, res: Response) => {
+router.put("/notion/connection", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
     const { apiKey, defaultDatabaseId } = req.body;
@@ -99,7 +101,7 @@ router.put('/notion/connection', requireAuth, async (req: Request, res: Response
     });
 
     if (!existing) {
-      return res.status(404).json({ error: 'Notion connection not found' });
+      return res.status(404).json({ error: "Notion connection not found" });
     }
 
     const connection = await prisma.notionConnection.update({
@@ -120,12 +122,12 @@ router.put('/notion/connection', requireAuth, async (req: Request, res: Response
       },
     });
   } catch (error) {
-    console.error('Update Notion connection error:', error);
-    return res.status(500).json({ error: 'Failed to update Notion connection' });
+    console.error("Update Notion connection error:", error);
+    return res.status(500).json({ error: "Failed to update Notion connection" });
   }
 });
 
-router.delete('/notion/connection', requireAuth, async (req: Request, res: Response) => {
+router.delete("/notion/connection", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
 
@@ -134,7 +136,7 @@ router.delete('/notion/connection', requireAuth, async (req: Request, res: Respo
     });
 
     if (!existing) {
-      return res.status(404).json({ error: 'Notion connection not found' });
+      return res.status(404).json({ error: "Notion connection not found" });
     }
 
     await prisma.notionConnection.delete({
@@ -143,12 +145,12 @@ router.delete('/notion/connection', requireAuth, async (req: Request, res: Respo
 
     return res.json({ success: true });
   } catch (error) {
-    console.error('Delete Notion connection error:', error);
-    return res.status(500).json({ error: 'Failed to delete Notion connection' });
+    console.error("Delete Notion connection error:", error);
+    return res.status(500).json({ error: "Failed to delete Notion connection" });
   }
 });
 
-router.get('/notion/databases', requireAuth, async (req: Request, res: Response) => {
+router.get("/notion/databases", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
 
@@ -157,7 +159,7 @@ router.get('/notion/databases', requireAuth, async (req: Request, res: Response)
     });
 
     if (!connection) {
-      return res.status(404).json({ error: 'Notion connection not found' });
+      return res.status(404).json({ error: "Notion connection not found" });
     }
 
     const client = new NotionClient(connection.apiKey);
@@ -165,17 +167,17 @@ router.get('/notion/databases', requireAuth, async (req: Request, res: Response)
 
     return res.json({ databases });
   } catch (error) {
-    console.error('Get Notion databases error:', error);
-    return res.status(500).json({ error: 'Failed to fetch Notion databases' });
+    console.error("Get Notion databases error:", error);
+    return res.status(500).json({ error: "Failed to fetch Notion databases" });
   }
 });
 
-router.post('/notion/test', requireAuth, async (req: Request, res: Response) => {
+router.post("/notion/test", requireAuth, async (req: Request, res: Response) => {
   try {
     const { apiKey } = req.body;
 
     if (!apiKey) {
-      return res.status(400).json({ error: 'API key is required for testing' });
+      return res.status(400).json({ error: "API key is required for testing" });
     }
 
     const client = new NotionClient(apiKey);
@@ -184,13 +186,13 @@ router.post('/notion/test', requireAuth, async (req: Request, res: Response) => 
     return res.json({
       success: true,
       databaseCount: databases.length,
-      message: 'Notion API key is valid',
+      message: "Notion API key is valid",
     });
   } catch (error: any) {
-    console.error('Test Notion connection error:', error);
+    console.error("Test Notion connection error:", error);
     return res.status(400).json({
       success: false,
-      error: error.message || 'Invalid Notion API key',
+      error: error.message || "Invalid Notion API key",
     });
   }
 });

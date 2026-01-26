@@ -71,6 +71,7 @@ export interface MCPConnection {
   id: string;
   organizationId: string;
   provider: string;
+  namespace: string;
   name: string;
   config: Record<string, any>;
   enabled: boolean;

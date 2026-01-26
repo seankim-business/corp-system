@@ -43,10 +43,6 @@ featureFlagsRouter.get("/flags", async (req: Request, res: Response) => {
 
 // Admin CRUD
 featureFlagsAdminRouter.post("/admin/feature-flags", async (req: Request, res: Response) => {
-  const role = req.membership?.role;
-  if (role !== "owner" && role !== "admin") {
-    return res.status(403).json({ error: "Admin role required" });
-  }
   const { key, name, description, enabled } = req.body as {
     key?: string;
     name?: string;
@@ -69,10 +65,6 @@ featureFlagsAdminRouter.post("/admin/feature-flags", async (req: Request, res: R
 });
 
 featureFlagsAdminRouter.patch("/admin/feature-flags/:key", async (req: Request, res: Response) => {
-  const role = req.membership?.role;
-  if (role !== "owner" && role !== "admin") {
-    return res.status(403).json({ error: "Admin role required" });
-  }
   const key = String(req.params.key);
   const { name, description, enabled } = req.body as {
     name?: string;
@@ -96,10 +88,6 @@ featureFlagsAdminRouter.patch("/admin/feature-flags/:key", async (req: Request, 
 featureFlagsAdminRouter.post(
   "/admin/feature-flags/:key/rules",
   async (req: Request, res: Response) => {
-    const role = req.membership?.role;
-    if (role !== "owner" && role !== "admin") {
-      return res.status(403).json({ error: "Admin role required" });
-    }
     const key = String(req.params.key);
     const { type, organizationIds, percentage, priority, enabled } = req.body as {
       type?: string;
@@ -133,10 +121,6 @@ featureFlagsAdminRouter.post(
 featureFlagsAdminRouter.post(
   "/admin/feature-flags/:key/overrides",
   async (req: Request, res: Response) => {
-    const role = req.membership?.role;
-    if (role !== "owner" && role !== "admin") {
-      return res.status(403).json({ error: "Admin role required" });
-    }
     const key = String(req.params.key);
     const { organizationId, enabled, reason, expiresAt } = req.body as {
       organizationId?: string;

@@ -2,23 +2,43 @@ import { getIssuesTool } from "./tools/getIssues";
 import { createIssueTool } from "./tools/createIssue";
 import { updateIssueTool } from "./tools/updateIssue";
 import { getTeamsTool } from "./tools/getTeams";
+import { validateToolAccess } from "../../services/mcp-registry";
+import { MCPConnection } from "../../orchestrator/types";
+
+const legacyToolMap: Record<string, string> = {
+  get_issues: "getIssues",
+  create_issue: "createIssue",
+  update_issue: "updateIssue",
+  get_teams: "getTeams",
+};
+
+export function registerTools(): string[] {
+  return ["linear__getIssues", "linear__createIssue", "linear__updateIssue", "linear__getTeams"];
+}
 
 export async function executeLinearTool(
   apiKey: string,
   toolName: string,
   input: any,
+  organizationId: string,
+  connection: MCPConnection,
 ): Promise<any> {
-  switch (toolName) {
-    case "linear_get_issues":
+  const parsed = validateToolAccess(toolName, "linear", organizationId, connection);
+  const resolvedToolName = parsed.isLegacy
+    ? (legacyToolMap[parsed.toolName] ?? parsed.toolName)
+    : parsed.toolName;
+
+  switch (resolvedToolName) {
+    case "getIssues":
       return await getIssuesTool(apiKey, input);
 
-    case "linear_create_issue":
+    case "createIssue":
       return await createIssueTool(apiKey, input);
 
-    case "linear_update_issue":
+    case "updateIssue":
       return await updateIssueTool(apiKey, input);
 
-    case "linear_get_teams":
+    case "getTeams":
       return await getTeamsTool(apiKey, input);
 
     default:

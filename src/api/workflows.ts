@@ -24,6 +24,7 @@ import { requireAuth } from "../middleware/auth.middleware";
 import { executeNotionTool } from "../mcp-servers/notion";
 import { executeLinearTool } from "../mcp-servers/linear";
 import { executeGitHubTool } from "../mcp-servers/github";
+import { MCPConnection } from "../orchestrator/types";
 import {
   validate,
   uuidParamSchema,
@@ -244,10 +245,26 @@ router.post(
                   if (!notionConnection) {
                     throw new Error("Notion connection not configured");
                   }
+                  const notionAccessConnection: MCPConnection = {
+                    id: notionConnection.id,
+                    organizationId: notionConnection.organizationId,
+                    provider: "notion",
+                    namespace: "notion",
+                    name: "Notion",
+                    config: {
+                      apiKey: notionConnection.apiKey,
+                      defaultDatabaseId: notionConnection.defaultDatabaseId,
+                    },
+                    enabled: true,
+                    createdAt: notionConnection.createdAt,
+                    updatedAt: notionConnection.updatedAt,
+                  };
                   const toolResult = await executeNotionTool(
                     notionConnection.apiKey,
                     step.tool,
                     toolInput,
+                    organizationId,
+                    notionAccessConnection,
                   );
                   finalOutputData = { ...finalOutputData, ...toolResult };
                 } else if (step.mcp === "linear") {
@@ -258,7 +275,24 @@ router.post(
                   if (!config.apiKey) {
                     throw new Error("Linear API key not configured");
                   }
-                  const toolResult = await executeLinearTool(config.apiKey, step.tool, toolInput);
+                  const linearAccessConnection: MCPConnection = {
+                    id: linearConnection.id,
+                    organizationId: linearConnection.organizationId,
+                    provider: linearConnection.provider,
+                    namespace: linearConnection.provider.toLowerCase(),
+                    name: linearConnection.name,
+                    config: linearConnection.config as Record<string, unknown>,
+                    enabled: linearConnection.enabled,
+                    createdAt: linearConnection.createdAt,
+                    updatedAt: linearConnection.updatedAt,
+                  };
+                  const toolResult = await executeLinearTool(
+                    config.apiKey,
+                    step.tool,
+                    toolInput,
+                    organizationId,
+                    linearAccessConnection,
+                  );
                   finalOutputData = { ...finalOutputData, ...toolResult };
                 } else if (step.mcp === "github") {
                   const githubConnection = await prisma.mCPConnection.findFirst({
@@ -271,10 +305,23 @@ router.post(
                   if (!config.accessToken) {
                     throw new Error("GitHub access token not configured");
                   }
+                  const githubAccessConnection: MCPConnection = {
+                    id: githubConnection.id,
+                    organizationId: githubConnection.organizationId,
+                    provider: githubConnection.provider,
+                    namespace: githubConnection.provider.toLowerCase(),
+                    name: githubConnection.name,
+                    config: githubConnection.config as Record<string, unknown>,
+                    enabled: githubConnection.enabled,
+                    createdAt: githubConnection.createdAt,
+                    updatedAt: githubConnection.updatedAt,
+                  };
                   const toolResult = await executeGitHubTool(
                     config.accessToken,
                     step.tool,
                     toolInput,
+                    organizationId,
+                    githubAccessConnection,
                   );
                   finalOutputData = { ...finalOutputData, ...toolResult };
                 }
