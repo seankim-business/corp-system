@@ -1,9 +1,28 @@
 # Multi-stage build for Kyndof Corp System
 
 # ============================================================================
-# Stage 1: Builder
+# Stage 1: Frontend Builder
 # ============================================================================
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY frontend/package*.json ./
+
+# Install frontend dependencies
+RUN npm ci
+
+# Copy frontend source code
+COPY frontend/ ./
+
+# Build frontend (generates dist/ folder)
+RUN npm run build
+
+# ============================================================================
+# Stage 2: Backend Builder
+# ============================================================================
+FROM node:20-alpine AS backend-builder
 
 WORKDIR /app
 
@@ -28,7 +47,7 @@ COPY src ./src
 RUN npm run build
 
 # ============================================================================
-# Stage 2: Production Runtime
+# Stage 3: Production Runtime
 # ============================================================================
 FROM node:20-alpine AS runtime
 
@@ -54,10 +73,14 @@ RUN npm ci --only=production && \
 # Generate Prisma Client in runtime stage
 RUN npx prisma generate
 
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
+# Copy built application from backend-builder
+COPY --from=backend-builder /app/dist ./dist
 
-COPY frontend/dist ./frontend/dist
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Copy landing page
+COPY landing ./landing
 
 # Copy startup script and make executable
 COPY scripts/start.sh ./scripts/start.sh

@@ -382,15 +382,39 @@ app.get("/api/user", authenticate, sentryUserContext, (req, res) => {
 app.use(sentryErrorHandler());
 app.use(errorHandler);
 
-// Serve frontend static files (production)
+// Serve static files (production)
 if (process.env.NODE_ENV === "production") {
   const path = require("path");
   const frontendPath = path.join(__dirname, "../frontend/dist");
+  const landingPath = path.join(__dirname, "../landing");
 
+  // Serve landing page for root domain (nubabel.com)
+  app.use((req, res, next) => {
+    const host = req.get("host") || "";
+
+    // Root domain → landing page
+    if (host === "nubabel.com" || host === "www.nubabel.com") {
+      if (req.path === "/" || req.path === "/index.html") {
+        return res.sendFile(path.join(landingPath, "index.html"));
+      }
+      // Serve landing static assets (images, etc.)
+      return express.static(landingPath)(req, res, next);
+    }
+
+    // Subdomains (app.nubabel.com, auth.nubabel.com) → frontend app
+    next();
+  });
+
+  // Serve frontend app static files
   app.use(express.static(frontendPath));
 
+  // SPA fallback for frontend app (excluding API routes)
   app.use((req, res, next) => {
-    if (!req.path.startsWith("/api") && !req.path.startsWith("/health")) {
+    if (
+      !req.path.startsWith("/api") &&
+      !req.path.startsWith("/health") &&
+      !req.path.startsWith("/auth")
+    ) {
       res.sendFile(path.join(frontendPath, "index.html"));
     } else {
       next();

@@ -1,0 +1,3 @@
+[submodule "vendor/ohmyopencode"]
+	path = vendor/ohmyopencode
+	url = https://github.com/code-yeongyu/oh-my-opencode.git
