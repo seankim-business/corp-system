@@ -60,6 +60,110 @@
         z-index: -1;
       }
 
+      /* ========== ENHANCED ANIMATIONS ========== */
+      @keyframes typewriter {
+        from {
+          width: 0;
+        }
+        to {
+          width: 100%;
+        }
+      }
+
+      @keyframes blink {
+        50% {
+          border-color: transparent;
+        }
+      }
+
+      @keyframes slideInLeft {
+        from {
+          opacity: 0;
+          transform: translateX(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      @keyframes slideInRight {
+        from {
+          opacity: 0;
+          transform: translateX(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+
+      @keyframes scaleIn {
+        from {
+          opacity: 0;
+          transform: scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes drawLine {
+        from {
+          stroke-dashoffset: 100;
+        }
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+
+      .animate-float {
+        animation: float 3s ease-in-out infinite;
+      }
+      .animate-pulse {
+        animation: pulse 2s ease-in-out infinite;
+      }
+      .animate-scale-in {
+        animation: scaleIn 0.5s ease-out forwards;
+      }
+
+      .delay-1 {
+        animation-delay: 0.5s;
+      }
+      .delay-2 {
+        animation-delay: 1s;
+      }
+      .delay-3 {
+        animation-delay: 1.5s;
+      }
+      .delay-4 {
+        animation-delay: 2s;
+      }
+      .delay-5 {
+        animation-delay: 2.5s;
+      }
+
       .container {
         max-width: 1100px;
         margin: 0 auto;
@@ -187,15 +291,198 @@
 
       .hero-inner {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1.2fr;
         gap: 64px;
         align-items: center;
       }
 
-      .hero-image img {
-        width: 100%;
+      .hero-demo {
+        position: relative;
+      }
+
+      .hero-slack {
         border-radius: 12px;
-        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+        box-shadow:
+          0 24px 48px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(255, 255, 255, 0.1);
+        max-height: 450px;
+      }
+
+      .hero-slack .slack-messages {
+        min-height: 300px;
+      }
+
+      /* ========== AGENT FLOW VISUALIZATION ========== */
+      .agent-flow {
+        padding: 120px 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        overflow: hidden;
+      }
+
+      .flow-header {
+        text-align: center;
+        margin-bottom: 80px;
+      }
+
+      .flow-header h2 {
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+
+      .flow-header p {
+        font-size: 18px;
+        color: var(--text-secondary);
+      }
+
+      .flow-visualization {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+
+      .flow-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .flow-node {
+        text-align: center;
+        padding: 24px 32px;
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        min-width: 160px;
+      }
+
+      .flow-node.orchestrator-node {
+        border-color: var(--accent);
+        background: var(--accent-dim);
+      }
+
+      .flow-icon {
+        font-size: 40px;
+        margin-bottom: 8px;
+      }
+
+      .flow-label {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .flow-sublabel {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      .flow-connector {
+        margin: 8px 0;
+      }
+
+      .flow-branches {
+        margin: 8px 0;
+      }
+
+      .flow-agents {
+        display: flex;
+        gap: 24px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .flow-agent {
+        opacity: 0;
+      }
+
+      .agent-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px 24px;
+        text-align: center;
+        min-width: 180px;
+        transition: all 0.2s;
+      }
+
+      .agent-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-4px);
+      }
+
+      .agent-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin: 0 auto 12px;
+      }
+
+      .agent-name {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .agent-task {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .flow-result {
+        margin-top: 24px;
+        opacity: 0;
+      }
+
+      .result-card {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 32px;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(139, 92, 246, 0.15));
+        border: 1px solid var(--green);
+        border-radius: 12px;
+      }
+
+      .result-icon {
+        font-size: 32px;
+      }
+
+      .result-text {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .result-text strong {
+        font-size: 16px;
+        color: var(--green);
+      }
+
+      .result-text span {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      .search-result-card {
+        background: #161616;
+        border: 1px solid #262626;
+        border-radius: 8px;
+        padding: 16px;
+        transition: all 0.15s;
+      }
+
+      .search-result-card:hover {
+        border-color: var(--accent);
+        background: #1a1a1a;
       }
 
       .babel-image {
@@ -1554,96 +1841,167 @@
               <a href="https://app.nubabel.com/auth/google" class="btn btn-primary"
                 >Add your first AI teammate</a
               >
-              <a href="#scenarios" class="btn btn-ghost">See 26 real scenarios →</a>
+              <a href="#demos" class="btn btn-ghost">See it in action →</a>
             </div>
           </div>
-          <div class="hero-image">
-            <img src="images/hero-slack.png" alt="AI agent in Slack conversation" />
+          <div class="hero-demo">
+            <div class="slack-window hero-slack">
+              <div class="slack-header">
+                <span class="slack-channel-icon">#</span>
+                <span class="slack-channel-name">general</span>
+                <span style="margin-left: auto; font-size: 12px; color: #616061">23 members</span>
+              </div>
+              <div class="slack-messages">
+                <div class="slack-message animate-scale-in">
+                  <div class="slack-avatar human">👤</div>
+                  <div class="slack-msg-content">
+                    <div class="slack-msg-header">
+                      <span class="slack-username">You</span>
+                      <span class="slack-timestamp">Just now</span>
+                    </div>
+                    <div class="slack-msg-text">
+                      <span class="slack-mention">@nubabel</span> what's on my plate today?
+                    </div>
+                  </div>
+                </div>
+                <div class="slack-message animate-scale-in delay-1">
+                  <div class="slack-avatar bot">🤖</div>
+                  <div class="slack-msg-content">
+                    <div class="slack-msg-header">
+                      <span class="slack-username">Nubabel</span>
+                      <span class="slack-app-badge">APP</span>
+                      <span class="slack-timestamp">Just now</span>
+                    </div>
+                    <div class="slack-msg-text">Checking Linear, Notion, and your calendar...</div>
+                  </div>
+                </div>
+                <div class="slack-message animate-scale-in delay-2">
+                  <div class="slack-avatar bot">🤖</div>
+                  <div class="slack-msg-content">
+                    <div class="slack-msg-header">
+                      <span class="slack-username">Nubabel</span>
+                      <span class="slack-app-badge">APP</span>
+                      <span class="slack-timestamp">Just now</span>
+                    </div>
+                    <div class="slack-msg-text">Here's your day:</div>
+                    <div class="slack-msg-attachment">
+                      <div style="margin-bottom: 8px">
+                        <span style="color: #f76363">●</span>
+                        <strong style="color: #fff">ENG-142</strong> Fix auth bug
+                        <span style="color: #616061">— due today</span>
+                      </div>
+                      <div style="margin-bottom: 8px">
+                        <span style="color: #f59e0b">●</span>
+                        <strong style="color: #fff">Review PR #847</strong>
+                        <span style="color: #616061">— Emily waiting</span>
+                      </div>
+                      <div style="margin-bottom: 8px">
+                        <span style="color: #22d3ee">●</span>
+                        <strong style="color: #fff">11:00 AM</strong> Sprint planning
+                      </div>
+                      <div style="margin-top: 12px; font-size: 12px; color: #1d9bd1">
+                        Want me to block focus time for the auth bug?
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="slack-input">
+                <div class="slack-input-box">Message #general</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="philosophy">
+    <section class="agent-flow">
       <div class="container">
-        <div class="philosophy-header">
-          <h2>The Philosophy</h2>
-          <p>
-            The Tower of Babel failed because humans couldn't collaborate. AI agents don't have that
-            problem.
-          </p>
+        <div class="flow-header">
+          <h2>One request. Multiple agents. Seamless execution.</h2>
+          <p>Watch how a single @mention triggers an intelligent workflow</p>
         </div>
 
-        <div class="babel-image">
-          <img src="images/babel-comparison.png" alt="Tower of Babel vs Nubabel comparison" />
-        </div>
-
-        <div class="babel-story">
-          <div class="babel-card">
-            <h3>The Ancient Failure</h3>
-            <h4>Tower of Babel</h4>
-            <p>
-              Humans attempted to build a tower reaching the heavens. But when their languages
-              split, collaboration collapsed. Individual brilliance couldn't overcome organizational
-              chaos.
-            </p>
-            <div class="babel-result">
-              <span class="fail"
-                >✗ Different languages → Coordination failure → Tower collapsed</span
-              >
+        <div class="flow-visualization">
+          <div class="flow-step">
+            <div class="flow-node user-node animate-float">
+              <div class="flow-icon">👤</div>
+              <div class="flow-label">You</div>
+            </div>
+            <div class="flow-connector">
+              <svg width="80" height="40" viewBox="0 0 80 40">
+                <path
+                  d="M0,20 L70,20"
+                  stroke="var(--accent)"
+                  stroke-width="2"
+                  stroke-dasharray="5,5"
+                  fill="none"
+                  style="animation: drawLine 1s ease forwards"
+                />
+                <polygon points="70,15 80,20 70,25" fill="var(--accent)" />
+              </svg>
             </div>
           </div>
 
-          <div class="babel-card">
-            <h3>The Modern Solution</h3>
-            <h4>Nu-babel</h4>
-            <p>
-              AI agents speak the same protocol. Perfect sync. Zero miscommunication. They delegate,
-              collaborate, and execute with precision humans can't match.
-            </p>
-            <div class="babel-result">
-              <span class="success"
-                >✓ Same protocol → Perfect collaboration → Superhuman execution</span
-              >
+          <div class="flow-step">
+            <div class="flow-node orchestrator-node animate-pulse">
+              <div class="flow-icon">🧠</div>
+              <div class="flow-label">Orchestrator</div>
+              <div class="flow-sublabel">Analyzes & delegates</div>
+            </div>
+            <div class="flow-branches">
+              <svg width="200" height="100" viewBox="0 0 200 100">
+                <path
+                  d="M100,0 L40,50 L40,100"
+                  stroke="var(--accent)"
+                  stroke-width="2"
+                  fill="none"
+                  opacity="0.5"
+                />
+                <path d="M100,0 L100,100" stroke="var(--accent)" stroke-width="2" fill="none" />
+                <path
+                  d="M100,0 L160,50 L160,100"
+                  stroke="var(--green)"
+                  stroke-width="2"
+                  fill="none"
+                  opacity="0.5"
+                />
+              </svg>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
 
-    <section class="vision">
-      <div class="container">
-        <h2>The gradual shift to an AI organization</h2>
-        <p class="vision-subtitle">
-          Your agents start as assistants. They learn. They take on more. Eventually, your org chart
-          has both humans and AI—working together.
-        </p>
-
-        <div class="vision-image">
-          <img src="images/org-evolution.png" alt="Organization evolution from human to AI" />
-        </div>
-
-        <div class="org-evolution">
-          <div class="org-stage">
-            <div class="org-stage-icon">👤</div>
-            <h4>Today</h4>
-            <p>Humans do everything. AI helps occasionally.</p>
+          <div class="flow-agents">
+            <div class="flow-agent animate-scale-in delay-1">
+              <div class="agent-card">
+                <div class="agent-icon" style="background: #1d9bd1">📊</div>
+                <div class="agent-name">Data Agent</div>
+                <div class="agent-task">Pulls from Salesforce, Sheets</div>
+              </div>
+            </div>
+            <div class="flow-agent animate-scale-in delay-2">
+              <div class="agent-card">
+                <div class="agent-icon" style="background: var(--accent)">📝</div>
+                <div class="agent-name">Report Agent</div>
+                <div class="agent-task">Creates Notion document</div>
+              </div>
+            </div>
+            <div class="flow-agent animate-scale-in delay-3">
+              <div class="agent-card">
+                <div class="agent-icon" style="background: var(--green)">📤</div>
+                <div class="agent-name">Comms Agent</div>
+                <div class="agent-task">Posts to Slack channel</div>
+              </div>
+            </div>
           </div>
 
-          <span class="org-arrow">→</span>
-
-          <div class="org-stage current">
-            <div class="org-stage-icon">👤🤖</div>
-            <h4>With Nubabel</h4>
-            <p>Agents learn and handle routine work.</p>
-          </div>
-
-          <span class="org-arrow">→</span>
-
-          <div class="org-stage">
-            <div class="org-stage-icon">🤖🤖🤖</div>
-            <h4>The Future</h4>
-            <p>AI org with human oversight.</p>
+          <div class="flow-result animate-scale-in delay-4">
+            <div class="result-card">
+              <div class="result-icon">✅</div>
+              <div class="result-text">
+                <strong>Done in 30 seconds</strong>
+                <span>Report created, team notified, you approved</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2201,449 +2559,997 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
 
-    <section class="scenarios" id="scenarios">
-      <div class="container">
-        <div class="scenarios-header">
-          <h2>26 ways agents work for you</h2>
-          <p class="scenarios-subtitle">
-            Real scenarios powered by Slack, Notion, Linear, Jira, Google Drive, and more. Every
-            scenario connects to actually implemented features.
-          </p>
-        </div>
-
-        <div class="scenario-categories">
-          <!-- Category 1: Daily Work -->
-          <div class="scenario-category">
-            <h3 class="category-title">
-              <span class="category-icon">☀️</span> Daily Work Automation
-            </h3>
-            <div class="scenario-list">
-              <div class="scenario-item">
-                <div class="scenario-number">01</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel organize my tasks for today"</h4>
-                  <p>
-                    <span class="tool-badge">Notion</span> <span class="tool-badge">Linear</span>
-                    <span class="tool-badge">Google Calendar</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Agent scans your Notion tasks, Linear issues assigned to you, and today's
-                    calendar. Returns a prioritized daily plan in Slack thread.
-                  </p>
+          <div class="demo-scenario">
+            <div class="demo-title">
+              <span class="demo-badge">Cross-Platform</span>
+              <h3>Scenario: Find all project documents</h3>
+            </div>
+            <div class="demo-content">
+              <div class="demo-panel">
+                <div class="demo-panel-divider"></div>
+                <div class="slack-window">
+                  <div class="slack-header">
+                    <span class="slack-channel-icon">#</span>
+                    <span class="slack-channel-name">product</span>
+                  </div>
+                  <div class="slack-messages">
+                    <div class="slack-message">
+                      <div class="slack-avatar human">👤</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">David Park</span>
+                          <span class="slack-timestamp">2:15 PM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          <span class="slack-mention">@nubabel</span> find everything related to
+                          Project Aurora
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">2:15 PM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          Searching Notion, Drive, Confluence, and Slack history...
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">2:16 PM</span>
+                        </div>
+                        <div class="slack-msg-text">Found 12 documents across 4 platforms:</div>
+                        <div class="slack-msg-attachment">
+                          <div style="margin-bottom: 12px">
+                            <div
+                              style="
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              <span
+                                style="
+                                  background: #000;
+                                  padding: 2px 6px;
+                                  border-radius: 3px;
+                                  font-size: 10px;
+                                "
+                                >📝 Notion</span
+                              >
+                            </div>
+                            <div style="font-size: 13px; margin-left: 8px">
+                              <div>
+                                • <a href="#" style="color: #1d9bd1">Aurora PRD v2.3</a>
+                                <span style="color: #616061">— Updated 2 days ago</span>
+                              </div>
+                              <div>
+                                • <a href="#" style="color: #1d9bd1">Technical Architecture</a>
+                              </div>
+                              <div>
+                                • <a href="#" style="color: #1d9bd1">Sprint Planning Notes</a>
+                              </div>
+                            </div>
+                          </div>
+                          <div style="margin-bottom: 12px">
+                            <div
+                              style="
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              <span
+                                style="
+                                  background: #0f9d58;
+                                  padding: 2px 6px;
+                                  border-radius: 3px;
+                                  font-size: 10px;
+                                "
+                                >📁 Drive</span
+                              >
+                            </div>
+                            <div style="font-size: 13px; margin-left: 8px">
+                              <div>
+                                • <a href="#" style="color: #1d9bd1">Aurora_Contract_Final.pdf</a>
+                              </div>
+                              <div>
+                                • <a href="#" style="color: #1d9bd1">Budget_Projections.xlsx</a>
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <div
+                              style="
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              <span
+                                style="
+                                  background: #4a154b;
+                                  padding: 2px 6px;
+                                  border-radius: 3px;
+                                  font-size: 10px;
+                                "
+                                >💬 Slack</span
+                              >
+                            </div>
+                            <div style="font-size: 13px; margin-left: 8px">
+                              <div>
+                                • <a href="#" style="color: #1d9bd1">5 relevant threads</a> in
+                                #aurora-dev
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="slack-input">
+                    <div class="slack-input-box">Message #product</div>
+                  </div>
                 </div>
               </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">02</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel write up this week's team meeting notes"</h4>
-                  <p>
-                    <span class="tool-badge">Slack</span> <span class="tool-badge">Notion</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Listens to meeting discussion, extracts action items, creates a structured
-                    meeting note in Notion, and assigns follow-up tasks.
-                  </p>
+              <div
+                class="demo-panel"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                  padding: 20px;
+                  background: #0d0d0d;
+                "
+              >
+                <div
+                  style="
+                    font-size: 12px;
+                    color: #666;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                  "
+                >
+                  Search Results
                 </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">03</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel summarize what I accomplished last week"</h4>
-                  <p>
-                    <span class="tool-badge">Linear</span> <span class="tool-badge">GitHub</span>
-                    <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Aggregates closed Linear issues, merged PRs, and Slack threads. Generates a
-                    weekly accomplishment report for standups or 1:1s.
-                  </p>
+                <div class="search-result-card">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                    <span style="font-size: 20px">📝</span>
+                    <span style="color: #fff; font-weight: 500">Aurora PRD v2.3</span>
+                    <span style="margin-left: auto; font-size: 11px; color: #666">Notion</span>
+                  </div>
+                  <div style="font-size: 13px; color: #9b9a97">
+                    Product requirements document including user stories, acceptance criteria, and
+                    technical constraints...
+                  </div>
+                </div>
+                <div class="search-result-card">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                    <span style="font-size: 20px">📊</span>
+                    <span style="color: #fff; font-weight: 500">Technical Architecture</span>
+                    <span style="margin-left: auto; font-size: 11px; color: #666">Notion</span>
+                  </div>
+                  <div style="font-size: 13px; color: #9b9a97">
+                    System design diagrams, API specifications, database schema...
+                  </div>
+                </div>
+                <div class="search-result-card">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                    <span style="font-size: 20px">📄</span>
+                    <span style="color: #fff; font-weight: 500">Aurora_Contract_Final.pdf</span>
+                    <span style="margin-left: auto; font-size: 11px; color: #666">Drive</span>
+                  </div>
+                  <div style="font-size: 13px; color: #9b9a97">
+                    Signed contract with vendor terms and SLA agreements...
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Category 2: Cross-Platform Info Gathering -->
-          <div class="scenario-category">
-            <h3 class="category-title">
-              <span class="category-icon">🔍</span> Cross-Platform Information Gathering
-            </h3>
-            <div class="scenario-list">
-              <div class="scenario-item">
-                <div class="scenario-number">04</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel find all documents related to ProjectX"</h4>
-                  <p>
-                    <span class="tool-badge">Notion</span>
-                    <span class="tool-badge">Google Drive</span>
-                    <span class="tool-badge">Confluence</span>
-                    <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Searches across all connected knowledge stores. Returns a curated list with
-                    links: specs in Notion, contracts in Drive, discussions in Slack.
-                  </p>
+          <div class="demo-scenario">
+            <div class="demo-title">
+              <span class="demo-badge">Human-in-the-Loop</span>
+              <h3>Scenario: Approval workflow</h3>
+            </div>
+            <div class="demo-content">
+              <div class="demo-panel">
+                <div class="demo-panel-divider"></div>
+                <div class="slack-window">
+                  <div class="slack-header">
+                    <span class="slack-channel-icon">🔒</span>
+                    <span class="slack-channel-name">finance-approvals</span>
+                  </div>
+                  <div class="slack-messages">
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">3:45 PM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          <span class="slack-mention">@jennifer</span> Approval needed for vendor
+                          payment:
+                        </div>
+                        <div class="slack-msg-attachment" style="border-left-color: #f59e0b">
+                          <div style="margin-bottom: 12px">
+                            <strong style="color: #fff">💳 Payment Request</strong>
+                          </div>
+                          <div style="font-size: 13px; margin-bottom: 8px">
+                            <div
+                              style="
+                                display: flex;
+                                justify-content: space-between;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              <span style="color: #9b9a97">Vendor:</span>
+                              <span style="color: #fff">AWS Services</span>
+                            </div>
+                            <div
+                              style="
+                                display: flex;
+                                justify-content: space-between;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              <span style="color: #9b9a97">Amount:</span>
+                              <span style="color: #fff; font-weight: 600">$4,250.00</span>
+                            </div>
+                            <div
+                              style="
+                                display: flex;
+                                justify-content: space-between;
+                                margin-bottom: 4px;
+                              "
+                            >
+                              <span style="color: #9b9a97">Invoice #:</span>
+                              <span style="color: #fff">INV-2024-0847</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between">
+                              <span style="color: #9b9a97">Due Date:</span>
+                              <span style="color: #f59e0b">Jan 30, 2026</span>
+                            </div>
+                          </div>
+                          <div style="display: flex; gap: 8px; margin-top: 12px">
+                            <button
+                              style="
+                                background: #2eb67d;
+                                color: white;
+                                border: none;
+                                padding: 8px 16px;
+                                border-radius: 4px;
+                                font-weight: 500;
+                                cursor: pointer;
+                              "
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              style="
+                                background: #36373d;
+                                color: white;
+                                border: none;
+                                padding: 8px 16px;
+                                border-radius: 4px;
+                                font-weight: 500;
+                                cursor: pointer;
+                              "
+                            >
+                              ✗ Reject
+                            </button>
+                            <button
+                              style="
+                                background: #36373d;
+                                color: white;
+                                border: none;
+                                padding: 8px 16px;
+                                border-radius: 4px;
+                                font-weight: 500;
+                                cursor: pointer;
+                              "
+                            >
+                              💬 Ask Questions
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar human">👤</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Jennifer Wu</span>
+                          <span class="slack-timestamp">3:47 PM</span>
+                        </div>
+                        <div class="slack-msg-text" style="color: #2eb67d">
+                          ✓ <em>Approved this payment</em>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">3:47 PM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          Payment approved! Processing with accounting system... ✅ Done.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="slack-input">
+                    <div class="slack-input-box">Message #finance-approvals</div>
+                  </div>
                 </div>
               </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">05</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel give me the history with client Acme Inc"</h4>
-                  <p>
-                    <span class="tool-badge">Salesforce</span> <span class="tool-badge">Gmail</span>
-                    <span class="tool-badge">Slack</span>
-                    <span class="tool-badge">Google Drive</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Pulls CRM records, email threads, Slack mentions, and shared documents. Creates
-                    a comprehensive customer timeline.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">06</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel how is our auth system implemented?"</h4>
-                  <p>
-                    <span class="tool-badge">GitHub</span> <span class="tool-badge">Notion</span>
-                    <span class="tool-badge">Confluence</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Reads codebase, architecture docs, and technical specs. Explains the auth flow
-                    with references to actual files and documentation.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">07</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel gather last quarter's marketing performance data"</h4>
-                  <p>
-                    <span class="tool-badge">Google Sheets</span>
-                    <span class="tool-badge">HubSpot</span>
-                    <span class="tool-badge">Google Analytics</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Aggregates data from multiple sources. Creates a unified report with charts in
-                    Google Sheets or Notion.
-                  </p>
+              <div
+                class="demo-panel"
+                style="
+                  background: #0d0d0d;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: center;
+                  align-items: center;
+                  padding: 40px;
+                "
+              >
+                <div style="text-align: center">
+                  <div style="font-size: 64px; margin-bottom: 16px">🔐</div>
+                  <div style="font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 8px">
+                    Human-in-the-Loop
+                  </div>
+                  <div style="font-size: 14px; color: #9b9a97; max-width: 280px; margin: 0 auto">
+                    Sensitive actions like payments, contracts, and personnel changes always require
+                    human approval.
+                  </div>
+                  <div
+                    style="
+                      margin-top: 24px;
+                      display: flex;
+                      gap: 12px;
+                      justify-content: center;
+                      flex-wrap: wrap;
+                    "
+                  >
+                    <span
+                      style="
+                        background: rgba(46, 182, 125, 0.2);
+                        color: #2eb67d;
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                      "
+                      >Payments</span
+                    >
+                    <span
+                      style="
+                        background: rgba(245, 158, 11, 0.2);
+                        color: #f59e0b;
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                      "
+                      >Contracts</span
+                    >
+                    <span
+                      style="
+                        background: rgba(139, 92, 246, 0.2);
+                        color: var(--accent);
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                      "
+                      >Hiring</span
+                    >
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Category 3: Task & Project Management -->
-          <div class="scenario-category">
-            <h3 class="category-title">
-              <span class="category-icon">📋</span> Task & Project Management
-            </h3>
-            <div class="scenario-list">
-              <div class="scenario-item">
-                <div class="scenario-number">08</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel create a Linear issue for this bug"</h4>
-                  <p>
-                    <span class="tool-badge">Linear</span> <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Creates a Linear issue from Slack context. Auto-fills title, description,
-                    labels, and assigns to the right team based on content analysis.
-                  </p>
+          <div class="demo-scenario">
+            <div class="demo-title">
+              <span class="demo-badge">Proactive</span>
+              <h3>Scenario: Agent-initiated alerts</h3>
+            </div>
+            <div class="demo-content">
+              <div class="demo-panel">
+                <div class="demo-panel-divider"></div>
+                <div class="slack-window">
+                  <div class="slack-header">
+                    <span class="slack-channel-icon">#</span>
+                    <span class="slack-channel-name">eng-alerts</span>
+                  </div>
+                  <div class="slack-messages">
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">10:00 AM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          ⚠️ <span class="slack-mention">@channel</span> Risk detected for
+                          <strong>Project Phoenix</strong>:
+                        </div>
+                        <div class="slack-msg-attachment" style="border-left-color: #f76363">
+                          <div style="margin-bottom: 12px">
+                            <strong style="color: #f76363">🚨 Deadline Risk Alert</strong>
+                          </div>
+                          <div style="font-size: 13px">
+                            <div style="margin-bottom: 8px">
+                              <strong style="color: #fff">Deadline:</strong> Jan 31 (5 days)
+                            </div>
+                            <div style="margin-bottom: 8px">
+                              <strong style="color: #fff">Progress:</strong> 42% complete
+                            </div>
+                            <div style="margin-bottom: 12px">
+                              <strong style="color: #fff">Blockers:</strong>
+                              <div style="margin-left: 12px; margin-top: 4px; color: #9b9a97">
+                                • ENG-201: API integration blocked (3 days)
+                                <br />• ENG-198: Waiting on design review
+                              </div>
+                            </div>
+                            <div
+                              style="
+                                margin-top: 12px;
+                                padding-top: 12px;
+                                border-top: 1px solid #35373b;
+                              "
+                            >
+                              <strong style="color: #fff">Suggested actions:</strong>
+                              <div
+                                style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px"
+                              >
+                                <button
+                                  style="
+                                    background: #1d9bd1;
+                                    color: white;
+                                    border: none;
+                                    padding: 6px 12px;
+                                    border-radius: 4px;
+                                    font-size: 12px;
+                                    cursor: pointer;
+                                  "
+                                >
+                                  Reassign blockers
+                                </button>
+                                <button
+                                  style="
+                                    background: #36373d;
+                                    color: white;
+                                    border: none;
+                                    padding: 6px 12px;
+                                    border-radius: 4px;
+                                    font-size: 12px;
+                                    cursor: pointer;
+                                  "
+                                >
+                                  Schedule sync
+                                </button>
+                                <button
+                                  style="
+                                    background: #36373d;
+                                    color: white;
+                                    border: none;
+                                    padding: 6px 12px;
+                                    border-radius: 4px;
+                                    font-size: 12px;
+                                    cursor: pointer;
+                                  "
+                                >
+                                  Notify stakeholders
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar human">👤</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Tech Lead</span>
+                          <span class="slack-timestamp">10:05 AM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          <span class="slack-mention">@nubabel</span> reassign ENG-201 to Mike and
+                          schedule a sync for tomorrow
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">10:05 AM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          Done! ✅ Reassigned ENG-201 to Mike. 📅 Sync scheduled for tomorrow 2pm.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="slack-input">
+                    <div class="slack-input-box">Message #eng-alerts</div>
+                  </div>
                 </div>
               </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">09</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel what's the sprint progress?"</h4>
-                  <p><span class="tool-badge">Linear</span> <span class="tool-badge">Jira</span></p>
-                  <p class="scenario-desc">
-                    Calculates sprint velocity, remaining story points, blockers, and at-risk items.
-                    Posts a visual progress update.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">10</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel set up alerts for tasks nearing deadline"</h4>
-                  <p>
-                    <span class="tool-badge">Notion</span> <span class="tool-badge">Linear</span>
-                    <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Monitors deadlines across platforms. Sends proactive reminders to task owners
-                    24h and 2h before due.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">11</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel create a Jira epic from this Notion page"</h4>
-                  <p><span class="tool-badge">Notion</span> <span class="tool-badge">Jira</span></p>
-                  <p class="scenario-desc">
-                    Reads PRD in Notion, extracts requirements, creates Jira epic with child stories
-                    and acceptance criteria.
-                  </p>
+              <div class="demo-panel">
+                <div class="linear-window">
+                  <div class="linear-header">
+                    <div class="linear-logo"></div>
+                    <span class="linear-title">Phoenix - Sprint Board</span>
+                  </div>
+                  <div
+                    style="
+                      padding: 16px;
+                      display: flex;
+                      gap: 16px;
+                      height: calc(100% - 56px);
+                      overflow-x: auto;
+                    "
+                  >
+                    <div style="min-width: 200px">
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: #666;
+                          margin-bottom: 12px;
+                          text-transform: uppercase;
+                        "
+                      >
+                        Blocked
+                        <span
+                          style="
+                            background: #5c2b29;
+                            padding: 2px 6px;
+                            border-radius: 10px;
+                            color: #e06c6c;
+                            margin-left: 4px;
+                          "
+                          >2</span
+                        >
+                      </div>
+                      <div class="linear-issue" style="border-color: #f76363">
+                        <div class="linear-issue-header">
+                          <div class="linear-priority urgent"></div>
+                          <span class="linear-issue-id">ENG-201</span>
+                        </div>
+                        <div class="linear-issue-title">API integration</div>
+                        <div class="linear-issue-meta">
+                          <span>→ Mike R.</span>
+                        </div>
+                      </div>
+                      <div class="linear-issue">
+                        <div class="linear-issue-header">
+                          <div class="linear-priority high"></div>
+                          <span class="linear-issue-id">ENG-198</span>
+                        </div>
+                        <div class="linear-issue-title">Design review</div>
+                      </div>
+                    </div>
+                    <div style="min-width: 200px">
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: #666;
+                          margin-bottom: 12px;
+                          text-transform: uppercase;
+                        "
+                      >
+                        In Progress
+                        <span
+                          style="
+                            background: #1e3a5f;
+                            padding: 2px 6px;
+                            border-radius: 10px;
+                            color: #60a5fa;
+                            margin-left: 4px;
+                          "
+                          >3</span
+                        >
+                      </div>
+                      <div class="linear-issue">
+                        <div class="linear-issue-header">
+                          <div class="linear-priority medium"></div>
+                          <span class="linear-issue-id">ENG-199</span>
+                        </div>
+                        <div class="linear-issue-title">Dashboard UI</div>
+                      </div>
+                    </div>
+                    <div style="min-width: 200px">
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: #666;
+                          margin-bottom: 12px;
+                          text-transform: uppercase;
+                        "
+                      >
+                        Done
+                        <span
+                          style="
+                            background: #14532d;
+                            padding: 2px 6px;
+                            border-radius: 10px;
+                            color: #4ade80;
+                            margin-left: 4px;
+                          "
+                          >5</span
+                        >
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Category 4: Learning & SOP Creation -->
-          <div class="scenario-category">
-            <h3 class="category-title">
-              <span class="category-icon">📚</span> Self-Learning & SOP Creation
-            </h3>
-            <div class="scenario-list">
-              <div class="scenario-item">
-                <div class="scenario-number">12</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel document our onboarding process as an SOP"</h4>
-                  <p>
-                    <span class="tool-badge">Slack History</span>
-                    <span class="tool-badge">Notion</span>
-                    <span class="tool-badge">Google Drive</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Analyzes past onboarding conversations, existing docs, and checklists. Creates a
-                    standardized SOP document with steps, owners, and timelines.
-                  </p>
+          <div class="demo-scenario">
+            <div class="demo-title">
+              <span class="demo-badge">Learning</span>
+              <h3>Scenario: SOP creation from observation</h3>
+            </div>
+            <div class="demo-content">
+              <div class="demo-panel">
+                <div class="demo-panel-divider"></div>
+                <div class="slack-window">
+                  <div class="slack-header">
+                    <span class="slack-channel-icon">#</span>
+                    <span class="slack-channel-name">ops</span>
+                  </div>
+                  <div class="slack-messages">
+                    <div class="slack-message">
+                      <div class="slack-avatar human">👤</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">HR Manager</span>
+                          <span class="slack-timestamp">11:00 AM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          <span class="slack-mention">@nubabel</span> can you learn how we do
+                          employee onboarding and create an SOP?
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">11:00 AM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          I'll analyze your onboarding history. Looking at:
+                        </div>
+                        <div class="slack-msg-attachment">
+                          <div style="font-size: 13px">
+                            <div style="margin-bottom: 4px">
+                              📝 Previous onboarding Notion pages
+                            </div>
+                            <div style="margin-bottom: 4px">💬 #new-hires Slack history</div>
+                            <div style="margin-bottom: 4px">📁 Onboarding checklists in Drive</div>
+                            <div style="margin-bottom: 4px">
+                              📅 Calendar patterns for orientation
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slack-message">
+                      <div class="slack-avatar bot">🤖</div>
+                      <div class="slack-msg-content">
+                        <div class="slack-msg-header">
+                          <span class="slack-username">Nubabel</span>
+                          <span class="slack-app-badge">APP</span>
+                          <span class="slack-timestamp">11:03 AM</span>
+                        </div>
+                        <div class="slack-msg-text">
+                          ✅ SOP created! I identified 8 steps across 4 weeks.
+                          <a href="#" style="color: #1d9bd1">View in Notion →</a>
+                        </div>
+                        <div class="slack-msg-attachment" style="border-left-color: var(--green)">
+                          <div style="margin-bottom: 8px">
+                            <strong style="color: #fff">📋 Employee Onboarding SOP</strong>
+                          </div>
+                          <div style="font-size: 13px; color: #9b9a97">
+                            <div>Week 1: Account setup, team intros</div>
+                            <div>Week 2: Tool training, shadow sessions</div>
+                            <div>Week 3: First assignments</div>
+                            <div>Week 4: 30-day check-in</div>
+                          </div>
+                          <div style="margin-top: 12px; font-size: 12px; color: #1d9bd1">
+                            Want me to run this SOP for new hires automatically?
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="slack-input">
+                    <div class="slack-input-box">Message #ops</div>
+                  </div>
                 </div>
               </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">13</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel learn my weekly reporting workflow and do it for me"</h4>
-                  <p>
-                    <span class="tool-badge">Google Sheets</span>
-                    <span class="tool-badge">Notion</span>
-                    <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Observes your reporting workflow for 2-3 cycles. Creates an SOP and proposes
-                    automation: "I can do this every Friday at 9am. Approve?"
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">14</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel learn our team's code review conventions"</h4>
-                  <p>
-                    <span class="tool-badge">GitHub</span> <span class="tool-badge">Notion</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Analyzes PR comments, review patterns, and style guides. Learns your team's
-                    conventions and can later assist with code reviews.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">15</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel analyze support patterns and create an FAQ"</h4>
-                  <p>
-                    <span class="tool-badge">Zendesk</span> <span class="tool-badge">Slack</span>
-                    <span class="tool-badge">Notion</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Reviews support tickets, identifies common questions, generates FAQ document,
-                    and suggests response templates.
-                  </p>
+              <div class="demo-panel">
+                <div class="notion-window">
+                  <div class="notion-header">
+                    <span class="notion-breadcrumb"
+                      >HR / SOPs / <span>Employee Onboarding</span></span
+                    >
+                  </div>
+                  <div class="notion-page" style="padding: 24px">
+                    <div class="notion-page-icon">📋</div>
+                    <div class="notion-page-title" style="font-size: 24px">
+                      Employee Onboarding SOP
+                    </div>
+                    <div style="margin-top: 20px">
+                      <div
+                        style="
+                          display: flex;
+                          align-items: center;
+                          gap: 8px;
+                          padding: 12px;
+                          background: rgba(46, 182, 125, 0.1);
+                          border-radius: 6px;
+                          margin-bottom: 16px;
+                        "
+                      >
+                        <span style="font-size: 16px">🤖</span>
+                        <span style="font-size: 13px; color: #9b9a97"
+                          >Auto-generated by Nubabel from historical data</span
+                        >
+                      </div>
+                      <div style="font-size: 14px">
+                        <div style="margin-bottom: 16px">
+                          <div style="font-weight: 600; color: #fff; margin-bottom: 8px">
+                            📅 Week 1: Setup & Introduction
+                          </div>
+                          <div style="margin-left: 20px; color: #9b9a97">
+                            <div style="margin-bottom: 4px">☑️ Create email & Slack accounts</div>
+                            <div style="margin-bottom: 4px">☑️ Add to relevant channels</div>
+                            <div style="margin-bottom: 4px">☑️ Schedule 1:1 with manager</div>
+                            <div>☑️ Team lunch introduction</div>
+                          </div>
+                        </div>
+                        <div style="margin-bottom: 16px">
+                          <div style="font-weight: 600; color: #fff; margin-bottom: 8px">
+                            📅 Week 2: Training
+                          </div>
+                          <div style="margin-left: 20px; color: #9b9a97">
+                            <div style="margin-bottom: 4px">☑️ Tool walkthroughs</div>
+                            <div style="margin-bottom: 4px">☑️ Shadow senior team member</div>
+                            <div>☑️ Complete compliance training</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Category 5: Gradual Work Takeover -->
-          <div class="scenario-category">
-            <h3 class="category-title">
-              <span class="category-icon">🔄</span> Gradual Work Distribution & Takeover
-            </h3>
-            <div class="scenario-list">
-              <div class="scenario-item">
-                <div class="scenario-number">16</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel show our work distribution status"</h4>
-                  <p>
-                    <span class="tool-badge">All Connected Tools</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Shows which tasks are handled by humans vs agents. Suggests candidates for next
-                    automation: "Invoice processing is 80% manual—want me to learn it?"
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">17</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel run the onboarding for our new hire"</h4>
-                  <p>
-                    <span class="tool-badge">Notion</span> <span class="tool-badge">Slack</span>
-                    <span class="tool-badge">Google Workspace</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Executes the learned onboarding SOP. Creates accounts, shares docs, schedules
-                    meetings, assigns mentors—with human checkpoints for sensitive steps.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">18</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel automate our weekly report every Friday"</h4>
-                  <p>
-                    <span class="tool-badge">Linear</span> <span class="tool-badge">GitHub</span>
-                    <span class="tool-badge">Notion</span>
-                    <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Every Friday at 5pm: aggregates week's progress, generates report in Notion,
-                    asks for approval, then posts to #team-updates.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">19</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel auto-close Linear issues when PRs are merged"</h4>
-                  <p>
-                    <span class="tool-badge">GitHub</span> <span class="tool-badge">Linear</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Watches for merged PRs, updates linked Linear issues to "Done", posts completion
-                    summary to relevant Slack channel.
-                  </p>
-                </div>
-              </div>
+          <div class="demo-scenario">
+            <div class="demo-title">
+              <span class="demo-badge">Multi-Agent</span>
+              <h3>Scenario: Complex coordinated workflow</h3>
             </div>
-          </div>
-
-          <!-- Category 6: Communication & Collaboration -->
-          <div class="scenario-category">
-            <h3 class="category-title">
-              <span class="category-icon">🤝</span> Communication & Team Collaboration
-            </h3>
-            <div class="scenario-list">
-              <div class="scenario-item">
-                <div class="scenario-number">20</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel forward this request to the design team"</h4>
-                  <p>
-                    <span class="tool-badge">Slack</span> <span class="tool-badge">Notion</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Formats the request properly, creates a Notion brief, posts to #design-requests
-                    with context, and tracks the request status.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">21</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel gather stakeholder feedback on this decision"</h4>
-                  <p><span class="tool-badge">Slack</span></p>
-                  <p class="scenario-desc">
-                    Identifies stakeholders, DMs each with context, collects responses, and
-                    summarizes consensus with dissenting views.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">22</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel coordinate next week's team schedule"</h4>
-                  <p>
-                    <span class="tool-badge">Google Calendar</span>
-                    <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Checks everyone's availability, proposes meeting times, sends calendar invites
-                    once confirmed.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">23</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel summarize this Slack thread and save to Notion"</h4>
-                  <p>
-                    <span class="tool-badge">Slack</span> <span class="tool-badge">Notion</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Extracts key decisions, action items, and participants from a long thread.
-                    Creates a clean summary page in Notion.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Category 7: Goal Alignment & Monitoring -->
-          <div class="scenario-category">
-            <h3 class="category-title">
-              <span class="category-icon">🎯</span> Goal Alignment & Proactive Monitoring
-            </h3>
-            <div class="scenario-list">
-              <div class="scenario-item">
-                <div class="scenario-number">24</div>
-                <div class="scenario-content">
-                  <h4>"@nubabel check our OKR progress"</h4>
-                  <p>
-                    <span class="tool-badge">Notion</span> <span class="tool-badge">Linear</span>
-                    <span class="tool-badge">Google Sheets</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Maps completed work to OKR key results. Shows progress percentages, at-risk
-                    objectives, and suggests focus areas.
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">25</div>
-                <div class="scenario-content">
-                  <h4>Proactive: "This task seems misaligned with Q1 goals"</h4>
-                  <p><span class="tool-badge">All Tools</span></p>
-                  <p class="scenario-desc">
-                    Agent notices a task doesn't align with stated objectives. Politely flags it:
-                    "This seems outside our Q1 focus. Want me to check with the lead?"
-                  </p>
-                </div>
-              </div>
-
-              <div class="scenario-item">
-                <div class="scenario-number">26</div>
-                <div class="scenario-content">
-                  <h4>Proactive: "3 days until deadline but only 40% complete"</h4>
-                  <p>
-                    <span class="tool-badge">Linear</span> <span class="tool-badge">Slack</span>
-                  </p>
-                  <p class="scenario-desc">
-                    Monitors project health. Alerts when timeline is at risk, suggests resource
-                    reallocation or scope adjustment.
-                  </p>
+            <div class="demo-content" style="grid-template-columns: 1fr">
+              <div class="demo-panel" style="padding: 32px; background: #0d0d0d">
+                <div style="max-width: 900px; margin: 0 auto">
+                  <div style="text-align: center; margin-bottom: 32px">
+                    <div style="font-size: 14px; color: var(--accent); margin-bottom: 8px">
+                      User Request
+                    </div>
+                    <div
+                      style="
+                        background: #1a1d21;
+                        padding: 16px 24px;
+                        border-radius: 8px;
+                        display: inline-block;
+                      "
+                    >
+                      <span style="font-size: 16px; color: #fff"
+                        >"<span class="slack-mention">@nubabel</span> prepare Q1 board presentation
+                        with financials, metrics, and team highlights"</span
+                      >
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: center; margin-bottom: 24px">
+                    <svg width="2" height="40" style="overflow: visible">
+                      <line
+                        x1="1"
+                        y1="0"
+                        x2="1"
+                        y2="40"
+                        stroke="var(--accent)"
+                        stroke-width="2"
+                        stroke-dasharray="4,4"
+                      />
+                    </svg>
+                  </div>
+                  <div style="display: flex; justify-content: center; margin-bottom: 24px">
+                    <div
+                      style="
+                        background: var(--accent-dim);
+                        border: 2px solid var(--accent);
+                        border-radius: 12px;
+                        padding: 16px 32px;
+                        text-align: center;
+                      "
+                    >
+                      <div style="font-size: 24px; margin-bottom: 4px">🧠</div>
+                      <div style="font-weight: 600">Orchestrator</div>
+                      <div style="font-size: 12px; color: var(--text-muted)">
+                        Breaks down into 4 subtasks
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: center; gap: 60px; flex-wrap: wrap">
+                    <div style="text-align: center">
+                      <div
+                        style="
+                          width: 2px;
+                          height: 30px;
+                          background: var(--border);
+                          margin: 0 auto 12px;
+                        "
+                      ></div>
+                      <div
+                        style="
+                          background: #161616;
+                          border: 1px solid #262626;
+                          border-radius: 8px;
+                          padding: 16px 20px;
+                          min-width: 140px;
+                        "
+                      >
+                        <div style="font-size: 20px; margin-bottom: 8px">💰</div>
+                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
+                          Finance Agent
+                        </div>
+                        <div style="font-size: 11px; color: #666">QuickBooks, Sheets</div>
+                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
+                          ✓ Revenue data
+                        </div>
+                      </div>
+                    </div>
+                    <div style="text-align: center">
+                      <div
+                        style="
+                          width: 2px;
+                          height: 30px;
+                          background: var(--border);
+                          margin: 0 auto 12px;
+                        "
+                      ></div>
+                      <div
+                        style="
+                          background: #161616;
+                          border: 1px solid #262626;
+                          border-radius: 8px;
+                          padding: 16px 20px;
+                          min-width: 140px;
+                        "
+                      >
+                        <div style="font-size: 20px; margin-bottom: 8px">📊</div>
+                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
+                          Analytics Agent
+                        </div>
+                        <div style="font-size: 11px; color: #666">Amplitude, Mixpanel</div>
+                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
+                          ✓ KPI metrics
+                        </div>
+                      </div>
+                    </div>
+                    <div style="text-align: center">
+                      <div
+                        style="
+                          width: 2px;
+                          height: 30px;
+                          background: var(--border);
+                          margin: 0 auto 12px;
+                        "
+                      ></div>
+                      <div
+                        style="
+                          background: #161616;
+                          border: 1px solid #262626;
+                          border-radius: 8px;
+                          padding: 16px 20px;
+                          min-width: 140px;
+                        "
+                      >
+                        <div style="font-size: 20px; margin-bottom: 8px">👥</div>
+                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
+                          HR Agent
+                        </div>
+                        <div style="font-size: 11px; color: #666">Linear, Slack</div>
+                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
+                          ✓ Team highlights
+                        </div>
+                      </div>
+                    </div>
+                    <div style="text-align: center">
+                      <div
+                        style="
+                          width: 2px;
+                          height: 30px;
+                          background: var(--border);
+                          margin: 0 auto 12px;
+                        "
+                      ></div>
+                      <div
+                        style="
+                          background: #161616;
+                          border: 1px solid #262626;
+                          border-radius: 8px;
+                          padding: 16px 20px;
+                          min-width: 140px;
+                        "
+                      >
+                        <div style="font-size: 20px; margin-bottom: 8px">🎨</div>
+                        <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px">
+                          Design Agent
+                        </div>
+                        <div style="font-size: 11px; color: #666">Figma, Slides</div>
+                        <div style="margin-top: 8px; font-size: 11px; color: #4ade80">
+                          ✓ Deck layout
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: center; margin-top: 24px">
+                    <svg width="2" height="30" style="overflow: visible">
+                      <line x1="1" y1="0" x2="1" y2="30" stroke="var(--green)" stroke-width="2" />
+                    </svg>
+                  </div>
+                  <div style="display: flex; justify-content: center; margin-top: 12px">
+                    <div
+                      style="
+                        background: linear-gradient(
+                          135deg,
+                          rgba(16, 185, 129, 0.15),
+                          rgba(139, 92, 246, 0.15)
+                        );
+                        border: 1px solid var(--green);
+                        border-radius: 12px;
+                        padding: 20px 40px;
+                        text-align: center;
+                      "
+                    >
+                      <div style="font-size: 24px; margin-bottom: 8px">✅</div>
+                      <div style="font-weight: 600; color: var(--green)">Board Deck Ready</div>
+                      <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px">
+                        24 slides • Generated in 3 minutes
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
