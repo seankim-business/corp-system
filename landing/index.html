@@ -4012,12 +4012,46 @@
         font-weight: 600;
       }
 
-      .hero-tools-compact {
+      .hero-subtitle-clean {
+        font-size: 18px;
+        color: var(--text-secondary);
+        margin: 20px 0;
+        line-height: 1.6;
+      }
+
+      .hero-checks {
         display: flex;
-        align-items: center;
-        gap: 16px;
-        margin: 24px 0;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 32px;
+      }
+
+      .hero-check {
+        font-size: 14px;
+        color: var(--text-secondary);
+        opacity: 0;
+        animation: checkIn 0.3s ease-out forwards;
+      }
+
+      .hero-check:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .hero-check:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .hero-check:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+
+      @keyframes checkIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
       }
 
       .tool-check {
@@ -4318,11 +4352,9 @@
       }
 
       @media (max-width: 900px) {
-        .hero-tools-compact {
-          justify-content: center;
-        }
-        .hero-value-props {
-          justify-content: center;
+        .hero-checks {
+          align-items: center;
+          text-align: center;
         }
         .command-flow-vertical {
           padding: 0 16px;
@@ -4363,44 +4395,15 @@
             </div>
             <h1>Add <span class="gradient-text">AI teammates</span> to your existing workflow.</h1>
 
-            <div class="hero-tools-compact">
-              <span class="tool-check"><span class="check-icon">✓</span> Slack</span>
-              <span class="tool-check"><span class="check-icon">✓</span> Notion</span>
-              <span class="tool-check"><span class="check-icon">✓</span> Drive</span>
-              <span class="tool-check"><span class="check-icon">✓</span> Linear</span>
-              <span class="tool-check"><span class="check-icon">✓</span> Jira</span>
-              <span class="tool-more">+12 more</span>
-            </div>
-
-            <p class="hero-subtitle-enhanced">
-              No new tools to learn. No migration needed.
-              <span class="typed-text"
-                >Agents join your team and gradually take over repetitive work</span
-              >—just like onboarding a brilliant new hire.
+            <p class="hero-subtitle-clean">
+              Agents join your team and gradually take over repetitive work—just like onboarding a
+              brilliant new hire.
             </p>
 
-            <div class="hero-value-props">
-              <div class="value-prop" style="animation-delay: 0.2s">
-                <div class="value-icon">🚀</div>
-                <div class="value-text">
-                  <strong>No setup required</strong>
-                  <span>Connect in 2 minutes</span>
-                </div>
-              </div>
-              <div class="value-prop" style="animation-delay: 0.4s">
-                <div class="value-icon">🔗</div>
-                <div class="value-text">
-                  <strong>Works with your tools</strong>
-                  <span>Not another app to manage</span>
-                </div>
-              </div>
-              <div class="value-prop" style="animation-delay: 0.6s">
-                <div class="value-icon">🧠</div>
-                <div class="value-text">
-                  <strong>Learns as it goes</strong>
-                  <span>Gets smarter over time</span>
-                </div>
-              </div>
+            <div class="hero-checks">
+              <span class="hero-check">✓ No setup required</span>
+              <span class="hero-check">✓ Works with Slack, Notion, Linear & more</span>
+              <span class="hero-check">✓ Learns as it goes</span>
             </div>
 
             <div class="hero-cta">
