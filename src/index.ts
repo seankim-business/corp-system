@@ -39,6 +39,7 @@ import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
 import { webhooksRouter } from "./api/webhooks";
+import { sidecarCallbacksRouter } from "./api/sidecar-callbacks";
 import gdprRoutes from "./api/gdpr.routes";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
@@ -326,25 +327,10 @@ app.get("/health/circuits", (_req, res) => {
   });
 });
 
-// Root handler - helps identify which service is responding
-app.get("/", (_req, res) => {
-  res.json({
-    service: "Nubabel Backend API",
-    version: "1.0.0",
-    environment: process.env.NODE_ENV || "development",
-    endpoints: {
-      health: "/health",
-      api: "/api",
-      auth: "/auth",
-      docs: "https://github.com/seankim-business/corp-system",
-    },
-    message: "This is the backend API server. For the web interface, visit app.nubabel.com",
-  });
-});
-
 app.use("/auth", authRateLimiter, authRoutes);
 
 app.use("/api", apiRateLimiter, webhooksRouter);
+app.use("/api", apiRateLimiter, sidecarCallbacksRouter);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 
