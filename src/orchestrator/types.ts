@@ -74,6 +74,8 @@ export interface MCPConnection {
   namespace: string;
   name: string;
   config: Record<string, any>;
+  refreshToken?: string | null;
+  expiresAt?: Date | null;
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;

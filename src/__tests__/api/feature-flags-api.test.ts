@@ -1,0 +1,370 @@
+import request from "supertest";
+import express from "express";
+import { featureFlagsRouter, featureFlagsAdminRouter } from "../../api/feature-flags";
+
+// Mock dependencies
+jest.mock("../../db/client", () => ({
+  db: {
+    featureFlag: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    featureFlagRule: {
+      create: jest.fn(),
+    },
+    featureFlagOverride: {
+      upsert: jest.fn(),
+    },
+  },
+}));
+
+jest.mock("../../features/feature-flags", () => ({
+  evaluateFeatureFlag: jest.fn(),
+  invalidateFeatureFlagCache: jest.fn(),
+}));
+
+jest.mock("../../middleware/auth.middleware", () => ({
+  requireAdmin: (req: any, res: any, next: any) => {
+    // Simulate admin check - allow if membership has admin/owner role
+    if (req.membership?.role === "admin" || req.membership?.role === "owner") {
+      next();
+    } else {
+      res.status(403).json({ error: "Admin role required" });
+    }
+  },
+}));
+
+const { db } = require("../../db/client");
+const { evaluateFeatureFlag, invalidateFeatureFlagCache } = require("../../features/feature-flags");
+
+function createTestApp(isAdmin = false) {
+  const app = express();
+  app.use(express.json());
+
+  app.use((req, _res, next) => {
+    req.user = { id: isAdmin ? "admin1" : "user1", organizationId: "org1" } as any;
+    req.organization = { id: "org1", slug: "test-org" } as any;
+    if (isAdmin) {
+      req.membership = { id: "m1", userId: "admin1", organizationId: "org1", role: "admin" } as any;
+    } else {
+      req.membership = { id: "m2", userId: "user1", organizationId: "org1", role: "member" } as any;
+    }
+    next();
+  });
+
+  app.use("/api", featureFlagsRouter);
+  app.use("/api", featureFlagsAdminRouter);
+
+  return app;
+}
+
+describe("Feature Flags API", () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    app = createTestApp();
+  });
+
+  describe("GET /api/flags - Evaluation Endpoint", () => {
+    it("should return 400 when keys param is missing", async () => {
+      const response = await request(app).get("/api/flags");
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: "keys query param required" });
+    });
+
+    it("should return 400 when keys param is empty", async () => {
+      const response = await request(app).get("/api/flags?keys=");
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: "keys query param required" });
+    });
+
+    it("should evaluate single flag", async () => {
+      (evaluateFeatureFlag as jest.Mock).mockResolvedValue(true);
+
+      const response = await request(app).get("/api/flags?keys=new_ui");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        organizationId: "org1",
+        flags: { new_ui: true },
+      });
+      expect(evaluateFeatureFlag).toHaveBeenCalledWith({
+        key: "new_ui",
+        organizationId: "org1",
+        userId: "user1",
+      });
+    });
+
+    it("should evaluate multiple flags", async () => {
+      (evaluateFeatureFlag as jest.Mock)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+
+      const response = await request(app).get("/api/flags?keys=new_ui,beta_feature,experimental");
+
+      expect(response.status).toBe(200);
+      expect(response.body.flags).toEqual({
+        new_ui: true,
+        beta_feature: false,
+        experimental: true,
+      });
+      expect(evaluateFeatureFlag).toHaveBeenCalledTimes(3);
+    });
+
+    it("should handle whitespace in keys", async () => {
+      (evaluateFeatureFlag as jest.Mock).mockResolvedValue(false);
+
+      const response = await request(app).get("/api/flags?keys= flag1 , flag2 , flag3 ");
+
+      expect(response.status).toBe(200);
+      expect(Object.keys(response.body.flags)).toEqual(["flag1", "flag2", "flag3"]);
+    });
+
+    it("should include userId in evaluation context when available", async () => {
+      (evaluateFeatureFlag as jest.Mock).mockResolvedValue(true);
+
+      await request(app).get("/api/flags?keys=user_feature");
+
+      expect(evaluateFeatureFlag).toHaveBeenCalledWith({
+        key: "user_feature",
+        organizationId: "org1",
+        userId: "user1",
+      });
+    });
+  });
+
+  describe("POST /api/admin/feature-flags - Create Flag", () => {
+    it("should return 403 when user is not admin", async () => {
+      const response = await request(app)
+        .post("/api/admin/feature-flags")
+        .send({ key: "test_flag", name: "Test Flag" });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ error: "Admin role required" });
+    });
+
+    it("should return 400 when key is missing", async () => {
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags")
+        .send({ name: "Test Flag" });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: "key and name are required" });
+    });
+
+    it("should return 400 when name is missing", async () => {
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags")
+        .send({ key: "test_flag" });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: "key and name are required" });
+    });
+
+    it("should create flag when admin user provides valid data", async () => {
+      const mockFlag = {
+        id: "flag1",
+        key: "new_ui",
+        name: "New UI",
+        description: "Enable new user interface",
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (db.featureFlag.create as jest.Mock).mockResolvedValue(mockFlag);
+
+      // Create admin app
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp).post("/api/admin/feature-flags").send({
+        key: "new_ui",
+        name: "New UI",
+        description: "Enable new user interface",
+        enabled: true,
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.flag).toMatchObject({
+        key: "new_ui",
+        name: "New UI",
+        enabled: true,
+      });
+      expect(db.featureFlag.create).toHaveBeenCalledWith({
+        data: {
+          key: "new_ui",
+          name: "New UI",
+          description: "Enable new user interface",
+          enabled: true,
+        },
+      });
+    });
+  });
+
+  describe("PATCH /api/admin/feature-flags/:key - Update Flag", () => {
+    it("should update flag and invalidate cache", async () => {
+      const mockFlag = {
+        id: "flag1",
+        key: "new_ui",
+        name: "Updated UI",
+        enabled: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (db.featureFlag.update as jest.Mock).mockResolvedValue(mockFlag);
+
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp).patch("/api/admin/feature-flags/new_ui").send({
+        name: "Updated UI",
+        enabled: false,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.flag.enabled).toBe(false);
+      expect(invalidateFeatureFlagCache).toHaveBeenCalledWith("new_ui");
+    });
+  });
+
+  describe("POST /api/admin/feature-flags/:key/rules - Create Rule", () => {
+    it("should return 400 when type is missing", async () => {
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags/test_flag/rules")
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: "type is required" });
+    });
+
+    it("should return 404 when flag not found", async () => {
+      (db.featureFlag.findUnique as jest.Mock).mockResolvedValue(null);
+
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags/nonexistent/rules")
+        .send({ type: "allowlist" });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: "Flag not found" });
+    });
+
+    it("should create rule and invalidate cache", async () => {
+      const mockFlag = { id: "flag1", key: "new_ui" };
+      const mockRule = {
+        id: "rule1",
+        featureFlagId: "flag1",
+        type: "allowlist",
+        organizationIds: ["org1", "org2"],
+        percentage: 0,
+        priority: 100,
+        enabled: true,
+      };
+
+      (db.featureFlag.findUnique as jest.Mock).mockResolvedValue(mockFlag);
+      (db.featureFlagRule.create as jest.Mock).mockResolvedValue(mockRule);
+
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags/new_ui/rules")
+        .send({
+          type: "allowlist",
+          organizationIds: ["org1", "org2"],
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.rule.type).toBe("allowlist");
+      expect(invalidateFeatureFlagCache).toHaveBeenCalledWith("new_ui");
+    });
+  });
+
+  describe("POST /api/admin/feature-flags/:key/overrides - Create Override", () => {
+    it("should return 400 when organizationId or enabled is missing", async () => {
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags/test_flag/overrides")
+        .send({ organizationId: "org1" });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: "organizationId and enabled are required" });
+    });
+
+    it("should create override and invalidate cache", async () => {
+      const mockFlag = { id: "flag1", key: "new_ui" };
+      const mockOverride = {
+        id: "override1",
+        featureFlagId: "flag1",
+        organizationId: "org1",
+        enabled: true,
+        reason: "VIP customer",
+        expiresAt: null,
+      };
+
+      (db.featureFlag.findUnique as jest.Mock).mockResolvedValue(mockFlag);
+      (db.featureFlagOverride.upsert as jest.Mock).mockResolvedValue(mockOverride);
+
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags/new_ui/overrides")
+        .send({
+          organizationId: "org1",
+          enabled: true,
+          reason: "VIP customer",
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.override.enabled).toBe(true);
+      expect(invalidateFeatureFlagCache).toHaveBeenCalledWith("new_ui");
+    });
+
+    it("should handle expiration date", async () => {
+      const mockFlag = { id: "flag1", key: "new_ui" };
+      const expiresAt = new Date("2026-12-31");
+
+      (db.featureFlag.findUnique as jest.Mock).mockResolvedValue(mockFlag);
+      (db.featureFlagOverride.upsert as jest.Mock).mockResolvedValue({
+        id: "override1",
+        featureFlagId: "flag1",
+        organizationId: "org1",
+        enabled: true,
+        expiresAt,
+      });
+
+      const adminApp = createTestApp(true);
+
+      const response = await request(adminApp)
+        .post("/api/admin/feature-flags/new_ui/overrides")
+        .send({
+          organizationId: "org1",
+          enabled: true,
+          expiresAt: expiresAt.toISOString(),
+        });
+
+      expect(response.status).toBe(201);
+      expect(db.featureFlagOverride.upsert).toHaveBeenCalledWith({
+        where: { featureFlagId_organizationId: { featureFlagId: "flag1", organizationId: "org1" } },
+        create: expect.objectContaining({
+          expiresAt,
+        }),
+        update: expect.objectContaining({
+          expiresAt,
+        }),
+      });
+    });
+  });
+});

@@ -1,0 +1,591 @@
+groups:
+  - name: sli_slo_alerts
+    interval: 30s
+    rules:
+      # Error Rate Alert (SLI) - Critical
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) by (job)
+            /
+            sum(rate(http_requests_total[5m])) by (job)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+          sli: error_rate
+        annotations:
+          summary: "High error rate detected ({{ $value | humanizePercentage }})"
+          description: |
+            Error rate is above 5% for the last 5 minutes.
+            Current rate: {{ $value | humanizePercentage }}
+            Job: {{ $labels.job }}
+          runbook: "https://docs.nubabel.com/runbooks/high-error-rate"
+          dashboard: "https://grafana.nubabel.com/d/api-health"
+
+      # P95 Latency Alert (SLI) - Warning
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+          sli: latency_p95
+        annotations:
+          summary: "P95 latency is high ({{ $value | humanizePercentage }}s)"
+          description: |
+            95th percentile latency exceeds 2 seconds for the last 5 minutes.
+            Current P95: {{ $value }}s
+            Job: {{ $labels.job }}
+          runbook: "https://docs.nubabel.com/runbooks/high-latency"
+          dashboard: "https://grafana.nubabel.com/d/api-health"
+
+      # P99 Latency Alert (SLI) - Critical
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job)) > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+          sli: latency_p99
+        annotations:
+          summary: "P99 latency is critical ({{ $value }}s)"
+          description: |
+            99th percentile latency exceeds 5 seconds for the last 5 minutes.
+            Current P99: {{ $value }}s
+            Job: {{ $labels.job }}
+          runbook: "https://docs.nubabel.com/runbooks/high-latency"
+          dashboard: "https://grafana.nubabel.com/d/api-health"
+
+      # Availability SLO Alert
+      - alert: SLOAvailabilityBreach
+        expr: |
+          (
+            sum(rate(http_requests_total{status!~"5.."}[30m])) by (job)
+            /
+            sum(rate(http_requests_total[30m])) by (job)
+          ) < 0.995
+        for: 10m
+        labels:
+          severity: critical
+          component: api
+          slo: availability
+        annotations:
+          summary: "SLO availability breach ({{ $value | humanizePercentage }})"
+          description: |
+            Availability has dropped below 99.5% SLO threshold.
+            Current availability: {{ $value | humanizePercentage }}
+            Job: {{ $labels.job }}
+          runbook: "https://docs.nubabel.com/runbooks/slo-breach"
+          dashboard: "https://grafana.nubabel.com/d/slo-dashboard"
+
+  - name: circuit_breaker_alerts
+    interval: 30s
+    rules:
+      # Circuit Breaker Open - Critical
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          component: resilience
+        annotations:
+          summary: "Circuit breaker {{ $labels.name }} is open"
+          description: |
+            Circuit breaker for {{ $labels.name }} has been open for 1 minute.
+            This indicates repeated failures in the downstream service.
+            Immediate investigation required.
+          runbook: "https://docs.nubabel.com/runbooks/circuit-breaker"
+          dashboard: "https://grafana.nubabel.com/d/resilience"
+
+      # Circuit Breaker High Failure Rate - Warning
+      - alert: CircuitBreakerHighFailureRate
+        expr: |
+          rate(circuit_breaker_failures_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: resilience
+        annotations:
+          summary: "High failure rate for {{ $labels.name }}"
+          description: |
+            Circuit breaker {{ $labels.name }} is experiencing {{ $value | humanize }} failures per second.
+            This may indicate upstream service degradation.
+          runbook: "https://docs.nubabel.com/runbooks/circuit-breaker"
+          dashboard: "https://grafana.nubabel.com/d/resilience"
+
+      # Circuit Breaker Half-Open - Info
+      - alert: CircuitBreakerHalfOpen
+        expr: circuit_breaker_state{state="half_open"} == 1
+        for: 2m
+        labels:
+          severity: info
+          component: resilience
+        annotations:
+          summary: "Circuit breaker {{ $labels.name }} is half-open"
+          description: |
+            Circuit breaker {{ $labels.name }} is in half-open state.
+            Testing recovery of downstream service.
+          runbook: "https://docs.nubabel.com/runbooks/circuit-breaker"
+
+  - name: queue_alerts
+    interval: 30s
+    rules:
+      # BullMQ Queue Depth - Warning
+      - alert: HighQueueDepth
+        expr: |
+          bullmq_queue_jobs{queue="orchestration", state="waiting"} > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "High queue depth for {{ $labels.queue }}"
+          description: |
+            Queue {{ $labels.queue }} has {{ $value | humanize }} pending jobs.
+            Processing may be falling behind. Check worker health.
+          runbook: "https://docs.nubabel.com/runbooks/queue-depth"
+          dashboard: "https://grafana.nubabel.com/d/queue-health"
+
+      # Queue Processing Lag - Warning
+      - alert: QueueProcessingLag
+        expr: |
+          (
+            rate(bullmq_queue_jobs{state="waiting"}[5m])
+            >
+            rate(bullmq_queue_jobs{state="completed"}[5m]) * 0.8
+          )
+        for: 10m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "Queue processing is lagging"
+          description: |
+            Jobs are being added faster than they're being processed.
+            Queue: {{ $labels.queue }}
+            Current backlog: {{ $value | humanize }} jobs/sec
+          runbook: "https://docs.nubabel.com/runbooks/queue-lag"
+          dashboard: "https://grafana.nubabel.com/d/queue-health"
+
+      # Stalled Jobs - Critical
+      - alert: HighStalledJobRate
+        expr: |
+          rate(bullmq_queue_jobs{state="failed"}[5m]) > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: queue
+        annotations:
+          summary: "High rate of stalled/failed jobs"
+          description: |
+            {{ $value | humanize }} jobs per second are failing.
+            Queue: {{ $labels.queue }}
+            This indicates worker process issues or job processing errors.
+          runbook: "https://docs.nubabel.com/runbooks/stalled-jobs"
+          dashboard: "https://grafana.nubabel.com/d/queue-health"
+
+      # Queue Stuck - Critical
+      - alert: QueueStuck
+        expr: |
+          (
+            bullmq_queue_jobs{state="active"} > 0
+            and
+            increase(bullmq_queue_jobs{state="completed"}[10m]) == 0
+          )
+        for: 10m
+        labels:
+          severity: critical
+          component: queue
+        annotations:
+          summary: "Queue {{ $labels.queue }} appears stuck"
+          description: |
+            Queue has active jobs but no completions in the last 10 minutes.
+            Workers may be hung or deadlocked.
+          runbook: "https://docs.nubabel.com/runbooks/queue-stuck"
+          dashboard: "https://grafana.nubabel.com/d/queue-health"
+
+  - name: ai_alerts
+    interval: 30s
+    rules:
+      # AI Request Failure Rate - Warning
+      - alert: HighAIFailureRate
+        expr: |
+          (
+            sum(rate(ai_requests_total{success="false"}[5m])) by (model)
+            /
+            sum(rate(ai_requests_total[5m])) by (model)
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: "High AI request failure rate for {{ $labels.model }}"
+          description: |
+            {{ $value | humanizePercentage }} of AI requests are failing.
+            Model: {{ $labels.model }}
+            Check API quota, rate limits, or service health.
+          runbook: "https://docs.nubabel.com/runbooks/ai-failures"
+          dashboard: "https://grafana.nubabel.com/d/ai-health"
+
+      # AI Request Latency High - Warning
+      - alert: HighAILatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(ai_request_duration_seconds_bucket[5m])) by (le, model)) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: "High AI request latency for {{ $labels.model }}"
+          description: |
+            P95 latency for AI requests is {{ $value }}s (threshold: 30s).
+            Model: {{ $labels.model }}
+            This may impact user experience.
+          runbook: "https://docs.nubabel.com/runbooks/ai-latency"
+          dashboard: "https://grafana.nubabel.com/d/ai-health"
+
+      # AI Token Cost Spike - Warning
+      - alert: AITokenCostSpike
+        expr: |
+          rate(ai_tokens_total{type="total"}[1h]) > 100000
+        for: 10m
+        labels:
+          severity: warning
+          component: ai
+          team: finance
+        annotations:
+          summary: "AI token cost is unusually high"
+          description: |
+            AI token consumption is {{ $value | humanize }} tokens/hour.
+            This is significantly above baseline.
+            Model: {{ $labels.model }}
+          runbook: "https://docs.nubabel.com/runbooks/ai-cost-spike"
+          dashboard: "https://grafana.nubabel.com/d/cost-tracking"
+
+      # AI Service Unavailable - Critical
+      - alert: AIServiceUnavailable
+        expr: |
+          (
+            sum(rate(ai_requests_total{success="false"}[5m])) by (model)
+            /
+            sum(rate(ai_requests_total[5m])) by (model)
+          ) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          component: ai
+        annotations:
+          summary: "AI service {{ $labels.model }} is unavailable"
+          description: |
+            More than 50% of AI requests are failing.
+            Model: {{ $labels.model }}
+            Immediate action required.
+          runbook: "https://docs.nubabel.com/runbooks/ai-unavailable"
+          dashboard: "https://grafana.nubabel.com/d/ai-health"
+
+  - name: mcp_alerts
+    interval: 30s
+    rules:
+      # MCP Tool Failure Rate - Warning
+      - alert: HighMCPFailureRate
+        expr: |
+          (
+            sum(rate(mcp_tool_calls_total{success="false"}[5m])) by (provider)
+            /
+            sum(rate(mcp_tool_calls_total[5m])) by (provider)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: mcp
+        annotations:
+          summary: "High MCP tool failure rate for {{ $labels.provider }}"
+          description: |
+            {{ $value | humanizePercentage }} of {{ $labels.provider }} tool calls are failing.
+            Check provider API status and authentication.
+          runbook: "https://docs.nubabel.com/runbooks/mcp-failures"
+          dashboard: "https://grafana.nubabel.com/d/mcp-health"
+
+      # MCP Tool Latency High - Warning
+      - alert: HighMCPLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(mcp_tool_duration_seconds_bucket[5m])) by (le, provider)) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: mcp
+        annotations:
+          summary: "High MCP tool latency for {{ $labels.provider }}"
+          description: |
+            P95 latency for {{ $labels.provider }} tools is {{ $value }}s.
+            This may indicate provider API slowness.
+          runbook: "https://docs.nubabel.com/runbooks/mcp-latency"
+          dashboard: "https://grafana.nubabel.com/d/mcp-health"
+
+      # MCP Service Unavailable - Critical
+      - alert: MCPServiceUnavailable
+        expr: |
+          (
+            sum(rate(mcp_tool_calls_total{success="false"}[5m])) by (provider)
+            /
+            sum(rate(mcp_tool_calls_total[5m])) by (provider)
+          ) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          component: mcp
+        annotations:
+          summary: "MCP service {{ $labels.provider }} is unavailable"
+          description: |
+            More than 50% of {{ $labels.provider }} tool calls are failing.
+            Provider may be down or credentials expired.
+          runbook: "https://docs.nubabel.com/runbooks/mcp-unavailable"
+          dashboard: "https://grafana.nubabel.com/d/mcp-health"
+
+  - name: redis_alerts
+    interval: 30s
+    rules:
+      # Redis Connection Issues - Critical
+      - alert: RedisConnectionFailures
+        expr: redis_connected == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis connection lost"
+          description: |
+            Application has lost connection to Redis.
+            This will impact session management and caching.
+          runbook: "https://docs.nubabel.com/runbooks/redis-down"
+          dashboard: "https://grafana.nubabel.com/d/redis-health"
+
+      # Redis Memory High - Warning
+      - alert: RedisMemoryHigh
+        expr: |
+          (redis_memory_used_bytes / redis_maxmemory_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis memory usage is high"
+          description: |
+            Redis is using {{ $value | humanizePercentage }} of available memory.
+            Eviction may occur soon.
+          runbook: "https://docs.nubabel.com/runbooks/redis-memory"
+          dashboard: "https://grafana.nubabel.com/d/redis-health"
+
+      # Redis Evictions - Warning
+      - alert: RedisEvictions
+        expr: |
+          rate(redis_evicted_keys_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis is evicting keys"
+          description: |
+            Redis is evicting {{ $value | humanize }} keys per second.
+            Memory is insufficient. Consider increasing maxmemory.
+          runbook: "https://docs.nubabel.com/runbooks/redis-evictions"
+          dashboard: "https://grafana.nubabel.com/d/redis-health"
+
+      # Redis Replication Lag - Warning
+      - alert: RedisReplicationLag
+        expr: |
+          redis_replication_offset_lag > 1000000
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis replication lag is high"
+          description: |
+            Replication lag is {{ $value | humanize }} bytes.
+            Replica may be out of sync.
+          runbook: "https://docs.nubabel.com/runbooks/redis-replication"
+          dashboard: "https://grafana.nubabel.com/d/redis-health"
+
+  - name: database_alerts
+    interval: 30s
+    rules:
+      # Database Connection Pool Exhausted - Critical
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          (prisma_pool_active_connections / prisma_pool_max_connections) > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: |
+            {{ $value | humanizePercentage }} of database connections in use.
+            New connections will be rejected.
+          runbook: "https://docs.nubabel.com/runbooks/db-pool"
+          dashboard: "https://grafana.nubabel.com/d/database-health"
+
+      # Slow Queries - Warning
+      - alert: SlowQueries
+        expr: |
+          histogram_quantile(0.95, sum(rate(prisma_query_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: |
+            P95 query latency is {{ $value }}s (threshold: 1s).
+            Check for missing indexes or inefficient queries.
+          runbook: "https://docs.nubabel.com/runbooks/slow-queries"
+          dashboard: "https://grafana.nubabel.com/d/database-health"
+
+      # Database Replication Lag - Warning
+      - alert: DatabaseReplicationLag
+        expr: |
+          pg_replication_lag_seconds > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database replication lag is high"
+          description: |
+            Replication lag is {{ $value }}s.
+            Replica may be out of sync.
+          runbook: "https://docs.nubabel.com/runbooks/db-replication"
+          dashboard: "https://grafana.nubabel.com/d/database-health"
+
+      # Database Disk Space - Warning
+      - alert: DatabaseDiskSpaceHigh
+        expr: |
+          (pg_database_size_bytes / pg_disk_total_bytes) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database disk space is running low"
+          description: |
+            Database is using {{ $value | humanizePercentage }} of available disk space.
+            Plan for expansion soon.
+          runbook: "https://docs.nubabel.com/runbooks/db-disk-space"
+          dashboard: "https://grafana.nubabel.com/d/database-health"
+
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      # High Memory Usage - Warning
+      - alert: HighMemoryUsage
+        expr: |
+          (nodejs_heap_used_bytes / nodejs_heap_size_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High memory usage detected"
+          description: |
+            Process is using {{ $value | humanizePercentage }} of heap memory.
+            Memory leak possible.
+          runbook: "https://docs.nubabel.com/runbooks/high-memory"
+          dashboard: "https://grafana.nubabel.com/d/process-health"
+
+      # Process Restart - Critical
+      - alert: ProcessRestart
+        expr: |
+          increase(process_uptime_seconds[5m]) < 0
+        for: 1m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Process has restarted"
+          description: |
+            Application process has restarted unexpectedly.
+            Check logs for crash reasons.
+          runbook: "https://docs.nubabel.com/runbooks/process-restart"
+          dashboard: "https://grafana.nubabel.com/d/process-health"
+
+      # High CPU Usage - Warning
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: |
+            Process CPU usage is {{ $value | humanizePercentage }}.
+            Check for inefficient code or resource contention.
+          runbook: "https://docs.nubabel.com/runbooks/high-cpu"
+          dashboard: "https://grafana.nubabel.com/d/process-health"
+
+  - name: business_alerts
+    interval: 30s
+    rules:
+      # Workflow Execution Failure Rate - Warning
+      - alert: HighWorkflowFailureRate
+        expr: |
+          (
+            sum(rate(workflow_executions_total{status="failed"}[5m])) by (workflow_id)
+            /
+            sum(rate(workflow_executions_total[5m])) by (workflow_id)
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: workflows
+        annotations:
+          summary: "High workflow failure rate"
+          description: |
+            Workflow {{ $labels.workflow_id }} has {{ $value | humanizePercentage }} failure rate.
+            Check workflow configuration and dependencies.
+          runbook: "https://docs.nubabel.com/runbooks/workflow-failures"
+          dashboard: "https://grafana.nubabel.com/d/workflow-health"
+
+      # Webhook Delivery Failure - Warning
+      - alert: HighWebhookFailureRate
+        expr: |
+          (
+            sum(rate(webhook_deliveries_total{status="failed"}[5m])) by (event_type)
+            /
+            sum(rate(webhook_deliveries_total[5m])) by (event_type)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: webhooks
+        annotations:
+          summary: "High webhook delivery failure rate"
+          description: |
+            Webhook delivery for {{ $labels.event_type }} has {{ $value | humanizePercentage }} failure rate.
+            Check webhook endpoint health.
+          runbook: "https://docs.nubabel.com/runbooks/webhook-failures"
+          dashboard: "https://grafana.nubabel.com/d/webhook-health"
+
+      # Organization Quota Exceeded - Warning
+      - alert: OrganizationQuotaExceeded
+        expr: |
+          (organization_usage_bytes / organization_quota_bytes) > 0.95
+        for: 10m
+        labels:
+          severity: warning
+          component: billing
+        annotations:
+          summary: "Organization {{ $labels.org_id }} quota nearly exceeded"
+          description: |
+            Organization is using {{ $value | humanizePercentage }} of quota.
+            Upgrade required soon.
+          runbook: "https://docs.nubabel.com/runbooks/quota-exceeded"
+          dashboard: "https://grafana.nubabel.com/d/billing"

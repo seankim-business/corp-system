@@ -1,17 +1,29 @@
-import { LinearClient } from "../client";
+import { getLinearClient } from "../client";
 import { GetIssuesInput, GetIssuesOutput } from "../types";
+import { MCPConnection } from "../../../orchestrator/types";
 
 export async function getIssuesTool(
   apiKey: string,
   input: GetIssuesInput,
+  connection?: MCPConnection,
+  userId?: string,
 ): Promise<GetIssuesOutput> {
-  const client = new LinearClient(apiKey);
+  const { client, release } = await getLinearClient({
+    apiKey,
+    connection,
+    organizationId: connection?.organizationId,
+    userId,
+  });
 
-  const result = await client.getIssues(input);
+  try {
+    const result = await client.getIssues(input);
 
-  return {
-    issues: result.issues,
-    hasMore: result.hasMore,
-    endCursor: result.endCursor,
-  };
+    return {
+      issues: result.issues,
+      hasMore: result.hasMore,
+      endCursor: result.endCursor,
+    };
+  } finally {
+    release();
+  }
 }

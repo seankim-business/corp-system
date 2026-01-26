@@ -1,5 +1,12 @@
 import { getCircuitBreaker } from "../../utils/circuit-breaker";
 import {
+  acquireMcpClient,
+  getAccessTokenFromConfig,
+  isTokenExpired,
+  refreshOAuthToken,
+} from "../../services/mcp-registry";
+import { recordMcpToolCall } from "../../services/metrics";
+import {
   GitHubIssue,
   GitHubPullRequest,
   GitHubRepository,
@@ -9,11 +16,23 @@ import {
   GetPullRequestsInput,
   CreatePullRequestInput,
 } from "./types";
+import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
+import { MCPConnection } from "../../orchestrator/types";
+import { decrypt } from "../../utils/encryption";
 
 const GITHUB_API_URL = "https://api.github.com";
 
+const tracer = trace.getTracer("mcp-github");
+
+const formatToolSpanName = (toolName: string): string =>
+  toolName.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
+
 export class GitHubClient {
   private accessToken: string;
+  private connectionId?: string;
+  private expiresAt?: Date | null;
+  private organizationId?: string;
+  private userId?: string;
   private circuitBreaker = getCircuitBreaker("github-api", {
     failureThreshold: 5,
     successThreshold: 2,
@@ -21,8 +40,116 @@ export class GitHubClient {
     resetTimeout: 60000,
   });
 
-  constructor(accessToken: string) {
+  constructor(
+    accessToken: string,
+    options?: {
+      connectionId?: string;
+      expiresAt?: Date | null;
+      organizationId?: string;
+      userId?: string;
+    },
+  ) {
     this.accessToken = accessToken;
+    this.connectionId = options?.connectionId;
+    this.expiresAt = options?.expiresAt ?? null;
+    this.organizationId = options?.organizationId;
+    this.userId = options?.userId;
+  }
+
+  setContext(options: {
+    connectionId?: string;
+    expiresAt?: Date | null;
+    organizationId?: string;
+    userId?: string;
+  }): void {
+    this.connectionId = options.connectionId;
+    this.expiresAt = options.expiresAt ?? null;
+    this.organizationId = options.organizationId;
+    this.userId = options.userId;
+  }
+
+  private async ensureFreshToken(): Promise<void> {
+    if (!this.connectionId || !isTokenExpired(this.expiresAt ?? null)) {
+      return;
+    }
+
+    const refreshed = await refreshOAuthToken(this.connectionId);
+    const nextToken = getAccessTokenFromConfig(refreshed.config);
+
+    if (!nextToken) {
+      throw new Error("Refreshed GitHub token missing access token");
+    }
+
+    this.accessToken = nextToken;
+    this.expiresAt = refreshed.expiresAt ?? null;
+  }
+
+  private async executeWithAuth<T>(operation: () => Promise<T>): Promise<T> {
+    return this.circuitBreaker.execute(async () => {
+      await this.ensureFreshToken();
+      return operation();
+    });
+  }
+
+  private async executeWithMetrics<T>(
+    toolName: string,
+    spanAttributes: Record<string, string | number | boolean> = {},
+    operation: () => Promise<T>,
+    onSuccess?: (result: T, span: Span) => void,
+  ): Promise<T> {
+    const start = Date.now();
+    const spanName = `mcp.github.${formatToolSpanName(toolName)}`;
+    const environment = process.env.NODE_ENV || "development";
+
+    return tracer.startActiveSpan(spanName, async (span) => {
+      try {
+        span.setAttribute("mcp.provider", "github");
+        span.setAttribute("mcp.tool", toolName);
+        span.setAttribute("environment", environment);
+
+        if (this.connectionId) {
+          span.setAttribute("mcp.connection_id", this.connectionId);
+        }
+
+        if (this.organizationId) {
+          span.setAttribute("organization.id", this.organizationId);
+        }
+
+        if (this.userId) {
+          span.setAttribute("user.id", this.userId);
+        }
+
+        Object.entries(spanAttributes).forEach(([key, value]) => {
+          span.setAttribute(key, value);
+        });
+
+        const result = await this.executeWithAuth(operation);
+        recordMcpToolCall({
+          provider: "github",
+          toolName,
+          success: true,
+          duration: Date.now() - start,
+        });
+        if (onSuccess) {
+          onSuccess(result, span);
+        }
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        recordMcpToolCall({
+          provider: "github",
+          toolName,
+          success: false,
+          duration: Date.now() - start,
+        });
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    });
   }
 
   private async request<T>(
@@ -54,108 +181,182 @@ export class GitHubClient {
   }
 
   async getIssues(input: GetIssuesInput): Promise<GitHubIssue[]> {
-    return this.circuitBreaker.execute(async () => {
-      const { owner, repo, state = "open", labels, assignee, limit = 30 } = input;
+    return this.executeWithMetrics(
+      "getIssues",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        ...(input.state ? { "github.state": input.state } : {}),
+        ...(input.labels ? { "github.labels": input.labels } : {}),
+        ...(input.assignee ? { "github.assignee": input.assignee } : {}),
+        "github.limit": input.limit ?? 30,
+      },
+      async () => {
+        const { owner, repo, state = "open", labels, assignee, limit = 30 } = input;
 
-      const params = new URLSearchParams();
-      params.set("state", state);
-      params.set("per_page", String(limit));
-      if (labels) params.set("labels", labels);
-      if (assignee) params.set("assignee", assignee);
+        const params = new URLSearchParams();
+        params.set("state", state);
+        params.set("per_page", String(limit));
+        if (labels) params.set("labels", labels);
+        if (assignee) params.set("assignee", assignee);
 
-      const issues = await this.request<any[]>(
-        "GET",
-        `/repos/${owner}/${repo}/issues?${params.toString()}`,
-      );
+        const issues = await this.request<any[]>(
+          "GET",
+          `/repos/${owner}/${repo}/issues?${params.toString()}`,
+        );
 
-      return issues.filter((item) => !item.pull_request).map((issue) => this.mapIssue(issue));
-    });
+        const results = issues
+          .filter((item) => !item.pull_request)
+          .map((issue) => this.mapIssue(issue));
+        return results;
+      },
+      (result, span) => {
+        span.setAttribute("result.count", result.length);
+      },
+    );
   }
 
   async createIssue(input: CreateIssueInput): Promise<GitHubIssue> {
-    return this.circuitBreaker.execute(async () => {
-      const { owner, repo, ...body } = input;
+    return this.executeWithMetrics(
+      "createIssue",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+      },
+      async () => {
+        const { owner, repo, ...body } = input;
 
-      const issue = await this.request<any>("POST", `/repos/${owner}/${repo}/issues`, body);
+        const issue = await this.request<any>("POST", `/repos/${owner}/${repo}/issues`, body);
 
-      return this.mapIssue(issue);
-    });
+        return this.mapIssue(issue);
+      },
+      (issue, span) => {
+        span.setAttribute("github.issue_number", issue.number);
+      },
+    );
   }
 
   async updateIssue(input: UpdateIssueInput): Promise<GitHubIssue> {
-    return this.circuitBreaker.execute(async () => {
-      const { owner, repo, issueNumber, ...updates } = input;
+    return this.executeWithMetrics(
+      "updateIssue",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        "github.issue_number": input.issueNumber,
+      },
+      async () => {
+        const { owner, repo, issueNumber, ...updates } = input;
 
-      const body: Record<string, any> = {};
-      if (updates.title !== undefined) body.title = updates.title;
-      if (updates.body !== undefined) body.body = updates.body;
-      if (updates.state !== undefined) body.state = updates.state;
-      if (updates.labels !== undefined) body.labels = updates.labels;
-      if (updates.assignees !== undefined) body.assignees = updates.assignees;
-      if (updates.milestone !== undefined) body.milestone = updates.milestone;
+        const body: Record<string, any> = {};
+        if (updates.title !== undefined) body.title = updates.title;
+        if (updates.body !== undefined) body.body = updates.body;
+        if (updates.state !== undefined) body.state = updates.state;
+        if (updates.labels !== undefined) body.labels = updates.labels;
+        if (updates.assignees !== undefined) body.assignees = updates.assignees;
+        if (updates.milestone !== undefined) body.milestone = updates.milestone;
 
-      const issue = await this.request<any>(
-        "PATCH",
-        `/repos/${owner}/${repo}/issues/${issueNumber}`,
-        body,
-      );
+        const issue = await this.request<any>(
+          "PATCH",
+          `/repos/${owner}/${repo}/issues/${issueNumber}`,
+          body,
+        );
 
-      return this.mapIssue(issue);
-    });
+        return this.mapIssue(issue);
+      },
+      (issue, span) => {
+        span.setAttribute("github.updated_issue_number", issue.number);
+      },
+    );
   }
 
   async getPullRequests(input: GetPullRequestsInput): Promise<GitHubPullRequest[]> {
-    return this.circuitBreaker.execute(async () => {
-      const { owner, repo, state = "open", head, base, limit = 30 } = input;
+    return this.executeWithMetrics(
+      "getPullRequests",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        ...(input.state ? { "github.state": input.state } : {}),
+        ...(input.head ? { "github.head": input.head } : {}),
+        ...(input.base ? { "github.base": input.base } : {}),
+        "github.limit": input.limit ?? 30,
+      },
+      async () => {
+        const { owner, repo, state = "open", head, base, limit = 30 } = input;
 
-      const params = new URLSearchParams();
-      params.set("state", state);
-      params.set("per_page", String(limit));
-      if (head) params.set("head", head);
-      if (base) params.set("base", base);
+        const params = new URLSearchParams();
+        params.set("state", state);
+        params.set("per_page", String(limit));
+        if (head) params.set("head", head);
+        if (base) params.set("base", base);
 
-      const prs = await this.request<any[]>(
-        "GET",
-        `/repos/${owner}/${repo}/pulls?${params.toString()}`,
-      );
+        const prs = await this.request<any[]>(
+          "GET",
+          `/repos/${owner}/${repo}/pulls?${params.toString()}`,
+        );
 
-      return prs.map((pr) => this.mapPullRequest(pr));
-    });
+        const results = prs.map((pr) => this.mapPullRequest(pr));
+        return results;
+      },
+      (result, span) => {
+        span.setAttribute("result.count", result.length);
+      },
+    );
   }
 
   async createPullRequest(input: CreatePullRequestInput): Promise<GitHubPullRequest> {
-    return this.circuitBreaker.execute(async () => {
-      const { owner, repo, ...body } = input;
+    return this.executeWithMetrics(
+      "createPullRequest",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+      },
+      async () => {
+        const { owner, repo, ...body } = input;
 
-      const pr = await this.request<any>("POST", `/repos/${owner}/${repo}/pulls`, body);
+        const pr = await this.request<any>("POST", `/repos/${owner}/${repo}/pulls`, body);
 
-      return this.mapPullRequest(pr);
-    });
+        return this.mapPullRequest(pr);
+      },
+      (pr, span) => {
+        span.setAttribute("github.pull_request_number", pr.number);
+      },
+    );
   }
 
   async getRepositories(
     type: "all" | "owner" | "public" | "private" | "member" = "all",
     limit = 30,
   ): Promise<GitHubRepository[]> {
-    return this.circuitBreaker.execute(async () => {
-      const params = new URLSearchParams();
-      params.set("type", type);
-      params.set("per_page", String(limit));
-      params.set("sort", "updated");
-      params.set("direction", "desc");
+    return this.executeWithMetrics(
+      "getRepositories",
+      {
+        "github.type": type,
+        "github.limit": limit,
+      },
+      async () => {
+        const params = new URLSearchParams();
+        params.set("type", type);
+        params.set("per_page", String(limit));
+        params.set("sort", "updated");
+        params.set("direction", "desc");
 
-      const repos = await this.request<any[]>("GET", `/user/repos?${params.toString()}`);
+        const repos = await this.request<any[]>("GET", `/user/repos?${params.toString()}`);
 
-      return repos.map((repo) => ({
-        id: repo.id,
-        name: repo.name,
-        fullName: repo.full_name,
-        description: repo.description,
-        private: repo.private,
-        defaultBranch: repo.default_branch,
-        htmlUrl: repo.html_url,
-      }));
-    });
+        const results = repos.map((repo) => ({
+          id: repo.id,
+          name: repo.name,
+          fullName: repo.full_name,
+          description: repo.description,
+          private: repo.private,
+          defaultBranch: repo.default_branch,
+          htmlUrl: repo.html_url,
+        }));
+        return results;
+      },
+      (result, span) => {
+        span.setAttribute("result.count", result.length);
+      },
+    );
   }
 
   private mapIssue(issue: any): GitHubIssue {
@@ -238,4 +439,61 @@ export class GitHubClient {
       htmlUrl: pr.html_url,
     };
   }
+}
+
+type GitHubClientFactoryOptions = {
+  accessToken: string;
+  connection?: MCPConnection;
+  organizationId?: string;
+  userId?: string;
+};
+
+const resolveGitHubToken = (accessToken: string, connection?: MCPConnection): string => {
+  const fromConfig = connection ? getAccessTokenFromConfig(connection.config) : null;
+  return fromConfig || decrypt(accessToken);
+};
+
+export async function getGitHubClient(
+  options: GitHubClientFactoryOptions,
+): Promise<{ client: GitHubClient; release: () => void }> {
+  const organizationId = options.connection?.organizationId ?? options.organizationId;
+  const token = resolveGitHubToken(options.accessToken, options.connection);
+  if (!organizationId) {
+    return {
+      client: new GitHubClient(token, {
+        connectionId: options.connection?.id,
+        expiresAt: options.connection?.expiresAt ?? null,
+        organizationId: options.organizationId,
+        userId: options.userId,
+      }),
+      release: () => undefined,
+    };
+  }
+
+  const credentials = {
+    accessToken: token,
+    refreshToken: options.connection?.refreshToken ?? null,
+  };
+
+  const { client, release } = await acquireMcpClient({
+    provider: "github",
+    organizationId,
+    credentials,
+    createClient: () =>
+      new GitHubClient(token, {
+        connectionId: options.connection?.id,
+        expiresAt: options.connection?.expiresAt ?? null,
+        organizationId,
+        userId: options.userId,
+      }),
+  });
+
+  client.setContext({
+    connectionId: options.connection?.id,
+    expiresAt: options.connection?.expiresAt ?? null,
+    organizationId,
+    userId: options.userId,
+  });
+
+  return { client, release };
 }

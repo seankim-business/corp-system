@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../auth/auth.service";
 import { db } from "../db/client";
+import { logger } from "../utils/logger";
+import { setSentryUser } from "../services/sentry";
 
 const authService = new AuthService();
 
@@ -43,9 +45,17 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     req.membership = membership;
     req.currentOrganizationId = payload.organizationId;
 
+    if (user && payload.organizationId) {
+      setSentryUser(user.id, payload.organizationId, user.email ?? undefined);
+    }
+
     return next();
   } catch (error) {
-    console.error("Authentication error:", error);
+    logger.error(
+      "Authentication error",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return res.status(401).json({ error: "Invalid token" });
   }
 }

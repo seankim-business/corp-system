@@ -470,8 +470,8 @@ authentication:
 servers:
   - Notion: @notionhq/client
   - Slack: @slack/web-api
-  - Linear: @linear/sdk (to be added)
-  - Jira: jira-client (to be added)
+- Linear: planned integration (SDK selection pending)
+- Jira: planned integration (client selection pending)
 ```
 
 ### Real-Time Updates

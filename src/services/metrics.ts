@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { redis } from "../db/redis";
+import { getPoolStats, redis, withQueueConnection } from "../db/redis";
 import { getAllCircuitBreakers } from "../utils/circuit-breaker";
 import { logger } from "../utils/logger";
 
@@ -13,10 +13,16 @@ interface MetricValue {
   }>;
 }
 
+interface MetricDefinition {
+  help: string;
+  type: "counter" | "gauge" | "histogram" | "summary";
+}
+
 class MetricsCollector {
   private counters: Map<string, Map<string, number>> = new Map();
   private gauges: Map<string, Map<string, number>> = new Map();
   private histograms: Map<string, Map<string, number[]>> = new Map();
+  private definitions: Map<string, MetricDefinition> = new Map();
 
   incrementCounter(name: string, labels: Record<string, string> = {}, value = 1): void {
     const key = this.labelKey(labels);
@@ -47,6 +53,10 @@ class MetricsCollector {
     histogram.get(key)!.push(value);
   }
 
+  describeMetric(name: string, definition: MetricDefinition): void {
+    this.definitions.set(name, definition);
+  }
+
   private labelKey(labels: Record<string, string>): string {
     return Object.entries(labels)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -58,10 +68,11 @@ class MetricsCollector {
     const metrics: MetricValue[] = [];
 
     for (const [name, values] of this.counters) {
+      const definition = this.definitions.get(name);
       metrics.push({
         name,
-        help: `Counter for ${name}`,
-        type: "counter",
+        help: definition?.help || `Counter for ${name}`,
+        type: definition?.type || "counter",
         values: Array.from(values.entries()).map(([key, value]) => ({
           labels: this.parseLabels(key),
           value,
@@ -70,10 +81,11 @@ class MetricsCollector {
     }
 
     for (const [name, values] of this.gauges) {
+      const definition = this.definitions.get(name);
       metrics.push({
         name,
-        help: `Gauge for ${name}`,
-        type: "gauge",
+        help: definition?.help || `Gauge for ${name}`,
+        type: definition?.type || "gauge",
         values: Array.from(values.entries()).map(([key, value]) => ({
           labels: this.parseLabels(key),
           value,
@@ -86,6 +98,32 @@ class MetricsCollector {
     await this.collectCircuitBreakerMetrics(metrics);
 
     return metrics;
+  }
+
+  getCounterValues(name: string): Array<{ labels: Record<string, string>; value: number }> {
+    const values = this.counters.get(name);
+    if (!values) {
+      return [];
+    }
+
+    return Array.from(values.entries()).map(([key, value]) => ({
+      labels: this.parseLabels(key),
+      value,
+    }));
+  }
+
+  getHistogramValues(name: string): number[] {
+    const histogram = this.histograms.get(name);
+    if (!histogram) {
+      return [];
+    }
+
+    const observations: number[] = [];
+    for (const values of histogram.values()) {
+      observations.push(...values);
+    }
+
+    return observations;
   }
 
   private parseLabels(key: string): Record<string, string> {
@@ -181,8 +219,7 @@ class MetricsCollector {
 
   private async getSetSize(key: string): Promise<number> {
     try {
-      const client = await import("../db/redis").then((m) => m.getRedisClient());
-      return await client.zCard(key);
+      return await withQueueConnection((client) => client.zcard(key));
     } catch {
       return 0;
     }
@@ -237,6 +274,100 @@ class MetricsCollector {
 
 export const metricsCollector = new MetricsCollector();
 
+metricsCollector.describeMetric("mcp_pool_acquisitions_total", {
+  help: "Total MCP connection pool acquisitions",
+  type: "counter",
+});
+metricsCollector.describeMetric("mcp_pool_timeouts_total", {
+  help: "Total MCP connection pool acquire timeouts",
+  type: "counter",
+});
+metricsCollector.describeMetric("mcp_pool_evictions_total", {
+  help: "Total MCP connection pool evictions",
+  type: "counter",
+});
+
+export class Gauge {
+  private name: string;
+
+  constructor(config: { name: string; help: string; labelNames: string[] }) {
+    this.name = config.name;
+    metricsCollector.describeMetric(config.name, { help: config.help, type: "gauge" });
+  }
+
+  set(value: number, labels: Record<string, string> = {}): void {
+    metricsCollector.setGauge(this.name, labels, value);
+  }
+}
+
+export const httpErrorRate = new Gauge({
+  name: "http_error_rate",
+  help: "Percentage of HTTP requests that failed (5xx)",
+  labelNames: [],
+});
+
+export const httpLatencyP95 = new Gauge({
+  name: "http_latency_p95_seconds",
+  help: "P95 latency for HTTP requests",
+  labelNames: [],
+});
+
+export const httpLatencyP99 = new Gauge({
+  name: "http_latency_p99_seconds",
+  help: "P99 latency for HTTP requests",
+  labelNames: [],
+});
+
+export const redisPoolSize = new Gauge({
+  name: "redis_pool_size",
+  help: "Current Redis pool size",
+  labelNames: ["pool", "state"],
+});
+
+export const mcpPoolSize = new Gauge({
+  name: "mcp_pool_size",
+  help: "Current MCP connection pool size",
+  labelNames: ["provider", "state"],
+});
+
+setInterval(() => {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const stats = getPoolStats();
+  redisPoolSize.set(stats.queue.available, { pool: "queue", state: "available" });
+  redisPoolSize.set(stats.queue.inUse, { pool: "queue", state: "inUse" });
+  redisPoolSize.set(stats.worker.available, { pool: "worker", state: "available" });
+  redisPoolSize.set(stats.worker.inUse, { pool: "worker", state: "inUse" });
+}, 5000).unref?.();
+
+export function calculateSLI(): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const counterValues = metricsCollector.getCounterValues("http_requests_total");
+  let total = 0;
+  let errors = 0;
+
+  for (const { labels, value } of counterValues) {
+    total += value;
+    if (labels.status && labels.status.startsWith("5")) {
+      errors += value;
+    }
+  }
+
+  const errorRate = total === 0 ? 0 : (errors / total) * 100;
+  httpErrorRate.set(errorRate);
+
+  const durations = metricsCollector.getHistogramValues("http_request_duration_seconds");
+  const p95 = percentile(durations, 0.95);
+  const p99 = percentile(durations, 0.99);
+  httpLatencyP95.set(p95);
+  httpLatencyP99.set(p99);
+}
+
 export function createMetricsRouter(): Router {
   const router = Router();
 
@@ -256,12 +387,17 @@ export function createMetricsRouter(): Router {
   return router;
 }
 
-export function recordHttpRequest(
-  method: string,
-  path: string,
-  statusCode: number,
-  duration: number,
-): void {
+export function recordHttpRequest(params: {
+  method: string;
+  path: string;
+  statusCode: number;
+  duration: number;
+}): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const { method, path, statusCode, duration } = params;
   metricsCollector.incrementCounter("http_requests_total", {
     method,
     path: normalizePath(path),
@@ -278,13 +414,19 @@ export function recordHttpRequest(
   );
 }
 
-export function recordAiRequest(
-  model: string,
-  category: string,
-  success: boolean,
-  duration: number,
-  tokens: number,
-): void {
+export function recordAiRequest(params: {
+  model: string;
+  category: string;
+  success: boolean;
+  duration: number;
+  inputTokens: number;
+  outputTokens: number;
+}): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const { model, category, success, duration, inputTokens, outputTokens } = params;
   metricsCollector.incrementCounter("ai_requests_total", {
     model,
     category,
@@ -304,21 +446,44 @@ export function recordAiRequest(
     "ai_tokens_total",
     {
       model,
+      type: "input",
+    },
+    inputTokens,
+  );
+
+  metricsCollector.incrementCounter(
+    "ai_tokens_total",
+    {
+      model,
+      type: "output",
+    },
+    outputTokens,
+  );
+
+  metricsCollector.incrementCounter(
+    "ai_tokens_total",
+    {
+      model,
       type: "total",
     },
-    tokens,
+    inputTokens + outputTokens,
   );
 }
 
-export function recordMcpToolCall(
-  provider: string,
-  tool: string,
-  success: boolean,
-  duration: number,
-): void {
+export function recordMcpToolCall(params: {
+  provider: string;
+  toolName: string;
+  success: boolean;
+  duration: number;
+}): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const { provider, toolName, success, duration } = params;
   metricsCollector.incrementCounter("mcp_tool_calls_total", {
     provider,
-    tool,
+    tool: toolName,
     success: String(success),
   });
 
@@ -326,14 +491,72 @@ export function recordMcpToolCall(
     "mcp_tool_duration_seconds",
     {
       provider,
-      tool,
+      tool: toolName,
     },
     duration / 1000,
   );
+}
+
+export function recordMcpPoolAcquisition(provider: string): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  metricsCollector.incrementCounter("mcp_pool_acquisitions_total", {
+    provider,
+  });
+}
+
+export function recordMcpPoolTimeout(provider: string): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  metricsCollector.incrementCounter("mcp_pool_timeouts_total", {
+    provider,
+  });
+}
+
+export function recordMcpPoolEviction(provider: string, count = 1): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  metricsCollector.incrementCounter(
+    "mcp_pool_evictions_total",
+    {
+      provider,
+    },
+    count,
+  );
+}
+
+export function recordMcpPoolSize(provider: string, active: number, idle: number): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  mcpPoolSize.set(active, { provider, state: "active" });
+  mcpPoolSize.set(idle, { provider, state: "idle" });
 }
 
 function normalizePath(path: string): string {
   return path
     .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "/:id")
     .replace(/\/\d+/g, "/:id");
+}
+
+function percentile(values: number[], percentileValue: number): number {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.ceil(percentileValue * sorted.length) - 1;
+  return sorted[Math.max(0, index)];
+}
+
+function shouldRecordMetrics(): boolean {
+  const env = process.env.NODE_ENV;
+  return env !== "development" && env !== "test";
 }

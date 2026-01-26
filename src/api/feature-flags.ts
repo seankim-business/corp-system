@@ -2,7 +2,6 @@ import { Router, Request, Response } from "express";
 import { db as prisma } from "../db/client";
 import { evaluateFeatureFlag, invalidateFeatureFlagCache } from "../features/feature-flags";
 import { requireAdmin } from "../middleware/auth.middleware";
-import "../types/express";
 
 export const featureFlagsRouter = Router();
 export const featureFlagsAdminRouter = Router();

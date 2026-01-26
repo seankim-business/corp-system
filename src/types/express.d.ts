@@ -8,6 +8,7 @@ declare global {
       membership?: Membership;
       currentOrganizationId?: string;
       rawBody?: Buffer;
+      correlationId?: string;
     }
   }
 }

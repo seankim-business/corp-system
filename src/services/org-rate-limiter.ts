@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { redis } from "../db/redis";
+import { redis, withQueueConnection } from "../db/redis";
 import { logger } from "../utils/logger";
 
 interface RateLimitConfig {
@@ -100,8 +100,7 @@ async function checkRateLimit(
 
 async function getTTL(key: string): Promise<number> {
   try {
-    const client = await import("../db/redis").then((m) => m.getRedisClient());
-    return await client.ttl(key);
+    return await withQueueConnection((client) => client.ttl(key));
   } catch {
     return -1;
   }

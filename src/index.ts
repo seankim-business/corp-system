@@ -1,9 +1,23 @@
 import "dotenv/config";
+import * as Sentry from "@sentry/node";
+import { initSentry } from "./services/sentry";
+
+// Initialize Sentry FIRST
+initSentry();
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { authenticate } from "./middleware/auth.middleware";
+import { correlationIdMiddleware } from "./middleware/correlation-id.middleware";
+import { metricsMiddleware } from "./middleware/metrics.middleware";
+import {
+  sentryErrorHandler,
+  sentryRequestHandler,
+  sentryTracingHandler,
+  sentryUserContext,
+} from "./middleware/sentry.middleware";
 import {
   authRateLimiter,
   apiRateLimiter,
@@ -11,22 +25,31 @@ import {
 } from "./middleware/rate-limiter.middleware";
 import { getAllCircuitBreakers } from "./utils/circuit-breaker";
 import { getEnv } from "./utils/env";
-import { getRedisClient } from "./db/redis";
-import { getRedisConnection } from "./queue/base.queue";
+import {
+  getPoolStats,
+  getQueueConnection,
+  getWorkerConnection,
+  releaseQueueConnection,
+  releaseWorkerConnection,
+  withQueueConnection,
+} from "./db/redis";
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
 import { webhooksRouter } from "./api/webhooks";
+import gdprRoutes from "./api/gdpr.routes";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
-import { startWorkers, stopWorkers } from "./workers";
+import { startWorkers, gracefulShutdown as gracefulWorkerShutdown } from "./workers";
 import { startSlackBot, stopSlackBot } from "./api/slack";
 import { disconnectRedis } from "./db/redis";
 import { db } from "./db/client";
 import { shutdownOpenTelemetry } from "./instrumentation";
 import { logger } from "./utils/logger";
+import { calculateSLI, createMetricsRouter } from "./services/metrics";
+import { errorHandler } from "./middleware/error-handler";
 
 logger.info("Initializing Nubabel Platform", {
   nodeVersion: process.version,
@@ -51,6 +74,9 @@ const port = parseInt(process.env.PORT || "3000", 10);
 let activeRequests = 0;
 let isShuttingDown = false;
 
+app.use(sentryRequestHandler());
+app.use(sentryTracingHandler());
+
 app.use(helmet());
 app.use(
   cors({
@@ -58,6 +84,9 @@ app.use(
     credentials: true,
   }),
 );
+
+// Correlation ID middleware - must be early to capture all requests
+app.use(correlationIdMiddleware);
 
 app.use((_req, res, next) => {
   if (isShuttingDown) {
@@ -81,6 +110,12 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(metricsMiddleware);
+app.use(createMetricsRouter());
+
+setInterval(() => {
+  calculateSLI();
+}, 60000);
 
 // Health check endpoints (no auth required)
 app.get("/health/live", (_req, res) => {
@@ -88,17 +123,18 @@ app.get("/health/live", (_req, res) => {
 });
 
 app.get("/health/ready", async (_req, res) => {
+  const queueRedis = await getQueueConnection();
+  const workerRedis = await getWorkerConnection();
+
   try {
     await db.$queryRaw`SELECT 1`;
-    const redisClient = await getRedisClient();
-    await redisClient.ping();
-    const bullRedis = getRedisConnection();
-    await bullRedis.ping();
+    await withQueueConnection((client) => client.ping() as Promise<any>);
+    await Promise.all([queueRedis.ping(), workerRedis.ping()]);
 
     res.json({
       status: "ok",
       service: "ready",
-      checks: { database: true, redis: true, bullmqRedis: true },
+      checks: { database: true, redis: true, queueRedis: true, workerRedis: true },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -108,12 +144,21 @@ app.get("/health/ready", async (_req, res) => {
       error: String(error),
       timestamp: new Date().toISOString(),
     });
+  } finally {
+    releaseQueueConnection(queueRedis);
+    releaseWorkerConnection(workerRedis);
   }
 });
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+if (process.env.NODE_ENV === "development") {
+  app.get("/debug/sentry-test", (_req, _res) => {
+    throw new Error("Sentry test error");
+  });
+}
 
 app.get("/health/db", async (_req, res) => {
   try {
@@ -126,10 +171,9 @@ app.get("/health/db", async (_req, res) => {
 });
 
 app.get("/health/redis", async (_req, res) => {
-  try {
-    const { getRedisConnection } = await import("./queue/base.queue");
-    const redis = getRedisConnection();
+  const redis = await getQueueConnection();
 
+  try {
     const pingResult = await redis.ping();
     const info = await redis.info("server");
     const memoryInfo = await redis.info("memory");
@@ -150,7 +194,19 @@ app.get("/health/redis", async (_req, res) => {
       service: "redis",
       error: String(error),
     });
+  } finally {
+    releaseQueueConnection(redis);
   }
+});
+
+app.get("/health/redis-pool", (_req, res) => {
+  const stats = getPoolStats();
+  const healthy = stats.queue.available > 0 && stats.worker.available > 0;
+
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? "healthy" : "unhealthy",
+    pools: stats,
+  });
 });
 
 app.get("/health/circuits", (_req, res) => {
@@ -192,16 +248,30 @@ app.use("/api", apiRateLimiter, webhooksRouter);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 
-app.use("/api", apiRateLimiter, authenticate, workflowRoutes);
-app.use("/api", apiRateLimiter, authenticate, notionRoutes);
-app.use("/api", apiRateLimiter, authenticate, slackIntegrationRouter);
-app.use("/api", apiRateLimiter, authenticate, featureFlagsRouter);
-app.use("/api", apiRateLimiter, authenticate, strictRateLimiter, featureFlagsAdminRouter);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, workflowRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, notionRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, slackIntegrationRouter);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, featureFlagsRouter);
+app.use(
+  "/api",
+  apiRateLimiter,
+  authenticate,
+  sentryUserContext,
+  strictRateLimiter,
+  featureFlagsAdminRouter,
+);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, gdprRoutes);
 app.use("/api", sseRouter);
 
-app.use("/admin/queues", authenticate, strictRateLimiter, bullBoardAdapter.getRouter());
+app.use(
+  "/admin/queues",
+  authenticate,
+  sentryUserContext,
+  strictRateLimiter,
+  bullBoardAdapter.getRouter(),
+);
 
-app.get("/api/user", authenticate, (req, res) => {
+app.get("/api/user", authenticate, sentryUserContext, (req, res) => {
   res.json({
     user: req.user,
     organization: req.organization,
@@ -209,21 +279,16 @@ app.get("/api/user", authenticate, (req, res) => {
   });
 });
 
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  logger.error("Internal server error", { message: err.message }, err);
-  res.status(500).json({
-    error: "Internal server error",
-    message: err.message,
-  });
-});
+app.use(sentryErrorHandler());
+app.use(errorHandler);
 
 // Serve frontend static files (production)
 if (process.env.NODE_ENV === "production") {
   const path = require("path");
   const frontendPath = path.join(__dirname, "../frontend/dist");
-  
+
   app.use(express.static(frontendPath));
-  
+
   // SPA fallback - send index.html for all non-API routes
   app.get("*", (_req, res) => {
     res.sendFile(path.join(frontendPath, "index.html"));
@@ -314,12 +379,16 @@ async function gracefulShutdown(signal: string) {
     logger.info("Slack Bot stopped");
 
     logger.info("Stopping BullMQ workers");
-    await stopWorkers();
+    await gracefulWorkerShutdown(signal);
     logger.info("Workers stopped");
 
     logger.info("Closing Redis connections");
     await disconnectRedis();
     logger.info("Redis closed");
+
+    logger.info("Flushing Sentry events");
+    await Sentry.close(2000);
+    logger.info("Sentry flushed");
 
     logger.info("Disconnecting Prisma");
     await db.$disconnect();

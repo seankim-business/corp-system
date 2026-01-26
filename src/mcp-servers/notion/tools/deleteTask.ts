@@ -9,14 +9,22 @@
  * - Output: success, taskId
  */
 
-import { NotionClient } from "../client";
+import { getNotionClient } from "../client";
 import { DeleteTaskInput, DeleteTaskOutput } from "../types";
+import { MCPConnection } from "../../../orchestrator/types";
 
 export async function deleteTaskTool(
   apiKey: string,
   input: DeleteTaskInput,
+  connection?: MCPConnection,
+  userId?: string,
 ): Promise<DeleteTaskOutput> {
-  const client = new NotionClient(apiKey);
+  const { client, release } = await getNotionClient({
+    apiKey,
+    connection,
+    organizationId: connection?.organizationId,
+    userId,
+  });
 
   const { taskId } = input;
 
@@ -24,7 +32,11 @@ export async function deleteTaskTool(
     throw new Error("taskId is required");
   }
 
-  const success = await client.deleteTask(taskId);
+  try {
+    const success = await client.deleteTask(taskId);
 
-  return { success, taskId };
+    return { success, taskId };
+  } finally {
+    release();
+  }
 }

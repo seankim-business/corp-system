@@ -10,11 +10,22 @@
  * - Output: tasks[], hasMore, nextCursor
  */
 
-import { NotionClient } from "../client";
+import { getNotionClient } from "../client";
 import { GetTasksInput, GetTasksOutput } from "../types";
+import { MCPConnection } from "../../../orchestrator/types";
 
-export async function getTasksTool(apiKey: string, input: GetTasksInput): Promise<GetTasksOutput> {
-  const client = new NotionClient(apiKey);
+export async function getTasksTool(
+  apiKey: string,
+  input: GetTasksInput,
+  connection?: MCPConnection,
+  userId?: string,
+): Promise<GetTasksOutput> {
+  const { client, release } = await getNotionClient({
+    apiKey,
+    connection,
+    organizationId: connection?.organizationId,
+    userId,
+  });
 
   const { databaseId, filter, limit = 50 } = input;
 
@@ -22,11 +33,15 @@ export async function getTasksTool(apiKey: string, input: GetTasksInput): Promis
     throw new Error("databaseId is required");
   }
 
-  const result = await client.getTasks(databaseId, filter, limit);
+  try {
+    const result = await client.getTasks(databaseId, filter, limit);
 
-  return {
-    tasks: result.tasks,
-    hasMore: result.hasMore,
-    nextCursor: result.nextCursor,
-  };
+    return {
+      tasks: result.tasks,
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
+    };
+  } finally {
+    release();
+  }
 }

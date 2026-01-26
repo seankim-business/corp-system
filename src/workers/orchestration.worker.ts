@@ -12,6 +12,9 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
   constructor() {
     super("orchestration", {
       concurrency: 3,
+      lockDuration: 300000,
+      stalledInterval: 180000,
+      maxStalledCount: 2,
     });
   }
 

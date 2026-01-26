@@ -1,11 +1,41 @@
+import { AsyncLocalStorage } from "async_hooks";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
+  correlationId?: string;
   context?: Record<string, any>;
   error?: Error;
+}
+
+interface CorrelationContext {
+  correlationId: string;
+}
+
+/**
+ * AsyncLocalStorage for correlation ID
+ * Enables correlation ID to be available in all async contexts
+ * without passing it through function parameters
+ */
+const asyncLocalStorage = new AsyncLocalStorage<CorrelationContext>();
+
+/**
+ * Set correlation ID in async context
+ * Called by correlation-id middleware for each request
+ */
+export function setCorrelationId(correlationId: string): void {
+  asyncLocalStorage.enterWith({ correlationId });
+}
+
+/**
+ * Get correlation ID from async context
+ * Available in all async operations within the request
+ */
+export function getCorrelationId(): string | undefined {
+  return asyncLocalStorage.getStore()?.correlationId;
 }
 
 class Logger {
@@ -24,8 +54,14 @@ class Logger {
   }
 
   private formatLog(entry: LogEntry): string {
-    const { timestamp, level, message, context, error } = entry;
-    let log = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+    const { timestamp, level, message, correlationId, context, error } = entry;
+    let log = `[${timestamp}] [${level.toUpperCase()}]`;
+
+    if (correlationId) {
+      log += ` [${correlationId}]`;
+    }
+
+    log += ` ${message}`;
 
     if (context) {
       log += ` ${JSON.stringify(context)}`;
@@ -41,10 +77,13 @@ class Logger {
   private log(level: LogLevel, message: string, context?: Record<string, any>, error?: Error) {
     if (!this.shouldLog(level)) return;
 
+    const correlationId = getCorrelationId();
+
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
       message,
+      correlationId,
       context,
       error,
     };

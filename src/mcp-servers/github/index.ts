@@ -33,6 +33,7 @@ export async function executeGitHubTool(
   input: any,
   organizationId: string,
   connection: MCPConnection,
+  userId?: string,
 ): Promise<any> {
   const parsed = validateToolAccess(toolName, "github", organizationId, connection);
   const resolvedToolName = parsed.isLegacy
@@ -41,22 +42,22 @@ export async function executeGitHubTool(
 
   switch (resolvedToolName) {
     case "getIssues":
-      return await getIssuesTool(accessToken, input);
+      return await getIssuesTool(accessToken, input, connection, userId);
 
     case "createIssue":
-      return await createIssueTool(accessToken, input);
+      return await createIssueTool(accessToken, input, connection, userId);
 
     case "updateIssue":
-      return await updateIssueTool(accessToken, input);
+      return await updateIssueTool(accessToken, input, connection, userId);
 
     case "getPullRequests":
-      return await getPullRequestsTool(accessToken, input);
+      return await getPullRequestsTool(accessToken, input, connection, userId);
 
     case "createPullRequest":
-      return await createPullRequestTool(accessToken, input);
+      return await createPullRequestTool(accessToken, input, connection, userId);
 
     case "getRepositories":
-      return await getRepositoriesTool(accessToken, input);
+      return await getRepositoriesTool(accessToken, input, connection, userId);
 
     default:
       throw new Error(`Unknown GitHub tool: ${toolName}`);
@@ -64,4 +65,4 @@ export async function executeGitHubTool(
 }
 
 export * from "./types";
-export { GitHubClient } from "./client";
+export { GitHubClient, getGitHubClient } from "./client";

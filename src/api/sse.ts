@@ -2,7 +2,7 @@ import { Request, Response, Router } from "express";
 import { EventEmitter } from "events";
 import { authenticate } from "../middleware/auth.middleware";
 import { logger } from "../utils/logger";
-import { getRedisConnection } from "../queue/base.queue";
+import { getQueueConnectionSync, releaseQueueConnection, withQueueConnection } from "../db/redis";
 
 export const sseRouter = Router();
 
@@ -16,47 +16,38 @@ interface SSEClient {
 
 class SSEManager extends EventEmitter {
   private clients: Map<string, SSEClient> = new Map();
-  private redis = getRedisConnection();
-  private subscriber: any = null;
+  private redis = getQueueConnectionSync();
+  private subscriber = getQueueConnectionSync();
 
   constructor() {
     super();
 
-    const dup = (this.redis as unknown as { duplicate?: () => unknown }).duplicate;
-    if (typeof dup === "function") {
-      this.subscriber = dup.call(this.redis) as {
-        subscribe?: (channel: string, cb?: (err: unknown) => void) => unknown;
-        on?: (event: string, cb: (...args: any[]) => void) => unknown;
-        unsubscribe?: (channel: string) => unknown;
-        quit?: () => Promise<unknown>;
-      };
-      this.subscriber.subscribe?.("sse:org", (err: unknown) => {
-        if (err) {
-          logger.error("Failed to subscribe SSE channel", { err: String(err) });
-        }
-      });
+    this.subscriber.subscribe("sse:org", (err: unknown) => {
+      if (err) {
+        logger.error("Failed to subscribe SSE channel", { err: String(err) });
+      }
+    });
 
-      this.subscriber.on?.("message", (_channel: string, message: string) => {
-        try {
-          const parsed = JSON.parse(message) as {
-            organizationId: string;
-            event: string;
-            data: unknown;
-            id?: string;
-          };
+    this.subscriber.on("message", (_channel: string, message: string) => {
+      try {
+        const parsed = JSON.parse(message) as {
+          organizationId: string;
+          event: string;
+          data: unknown;
+          id?: string;
+        };
 
-          const orgClients = Array.from(this.clients.values()).filter(
-            (c) => c.organizationId === parsed.organizationId,
-          );
+        const orgClients = Array.from(this.clients.values()).filter(
+          (c) => c.organizationId === parsed.organizationId,
+        );
 
-          orgClients.forEach((client) => {
-            this.sendEvent(client, parsed.event, parsed.data, parsed.id);
-          });
-        } catch (err) {
-          logger.error("Failed to parse SSE pubsub message", { err: String(err) });
-        }
-      });
-    }
+        orgClients.forEach((client) => {
+          this.sendEvent(client, parsed.event, parsed.data, parsed.id);
+        });
+      } catch (err) {
+        logger.error("Failed to parse SSE pubsub message", { err: String(err) });
+      }
+    });
   }
 
   addClient(client: SSEClient) {
@@ -150,13 +141,15 @@ class SSEManager extends EventEmitter {
 
     if (this.subscriber) {
       try {
-        await this.subscriber.unsubscribe?.("sse:org");
-        await this.subscriber.quit?.();
+        await this.subscriber.unsubscribe("sse:org");
         logger.info("SSE Redis subscriber closed");
       } catch (err) {
         logger.error("Error closing SSE subscriber", { err: String(err) });
       }
     }
+
+    releaseQueueConnection(this.redis);
+    releaseQueueConnection(this.subscriber);
   }
 }
 
@@ -194,8 +187,9 @@ sseRouter.get("/events", authenticate, (req: Request, res: Response) => {
   // Best-effort replay from Redis stream for organization events.
   if (lastEventId) {
     const streamKey = `sse:org:${client.organizationId}`;
-    void getRedisConnection()
-      .xread("COUNT", 100, "STREAMS", streamKey, lastEventId)
+    void withQueueConnection(
+      (client) => client.xread("COUNT", 100, "STREAMS", streamKey, lastEventId) as Promise<any>,
+    )
       .then((result: any) => {
         if (!result) return;
         const entries = result[0]?.[1] as Array<[string, string[]]> | undefined;

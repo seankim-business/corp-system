@@ -1,11 +1,19 @@
-import { LinearClient } from "../client";
+import { getLinearClient } from "../client";
 import { CreateIssueInput, CreateIssueOutput } from "../types";
+import { MCPConnection } from "../../../orchestrator/types";
 
 export async function createIssueTool(
   apiKey: string,
   input: CreateIssueInput,
+  connection?: MCPConnection,
+  userId?: string,
 ): Promise<CreateIssueOutput> {
-  const client = new LinearClient(apiKey);
+  const { client, release } = await getLinearClient({
+    apiKey,
+    connection,
+    organizationId: connection?.organizationId,
+    userId,
+  });
 
   if (!input.teamId) {
     throw new Error("teamId is required");
@@ -15,7 +23,11 @@ export async function createIssueTool(
     throw new Error("title is required");
   }
 
-  const issue = await client.createIssue(input);
+  try {
+    const issue = await client.createIssue(input);
 
-  return { issue };
+    return { issue };
+  } finally {
+    release();
+  }
 }

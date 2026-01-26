@@ -625,7 +625,7 @@ import Image from 'next/image';
   height={600}
   quality={80}
   loading="lazy"
-  placeholder="blur"
+  // NOTE: avoid Next.js image placeholders in non-Next.js contexts
 />
 ```
 

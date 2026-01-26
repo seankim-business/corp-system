@@ -33,6 +33,7 @@ export async function executeNotionTool(
   input: any,
   organizationId: string,
   connection: MCPConnection,
+  userId?: string,
 ): Promise<any> {
   const parsed = validateToolAccess(toolName, "notion", organizationId, connection);
   const resolvedToolName = parsed.isLegacy
@@ -41,18 +42,20 @@ export async function executeNotionTool(
 
   switch (resolvedToolName) {
     case "getTasks":
-      return await getTasksTool(apiKey, input);
+      return await getTasksTool(apiKey, input, connection, userId);
 
     case "createTask":
-      return await createTaskTool(apiKey, input);
+      return await createTaskTool(apiKey, input, connection, userId);
 
     case "updateTask":
-      return await updateTaskTool(apiKey, input);
+      return await updateTaskTool(apiKey, input, connection, userId);
 
     case "deleteTask":
-      return await deleteTaskTool(apiKey, input);
+      return await deleteTaskTool(apiKey, input, connection, userId);
 
     default:
       throw new Error(`Unknown Notion tool: ${toolName}`);
   }
 }
+
+export { NotionClient, getNotionClient } from "./client";

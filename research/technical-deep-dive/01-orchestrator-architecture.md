@@ -74,10 +74,8 @@ User Request (Slack/Web/API)
 **Current Implementation** (stubbed):
 
 ```typescript
-// TODO: 실제 구현은 리서치 완료 후 진행
-export async function analyzeRequest(
-  userRequest: string,
-): Promise<RequestAnalysis> {
+// NOTE: 예시(stub) — 실제 구현은 src/orchestrator/request-analyzer.ts 참고
+export async function analyzeRequest(userRequest: string): Promise<RequestAnalysis> {
   return {
     intent: extractIntent(userRequest),
     complexity: assessComplexity(userRequest),
@@ -94,9 +92,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export async function analyzeRequest(
-  userRequest: string,
-): Promise<RequestAnalysis> {
+export async function analyzeRequest(userRequest: string): Promise<RequestAnalysis> {
   // Fast path: Simple keyword heuristics
   const simpleAnalysis = quickAnalyze(userRequest);
   if (simpleAnalysis.confidence > 0.9) {
@@ -125,16 +121,12 @@ Return JSON with:
   };
 }
 
-function quickAnalyze(
-  userRequest: string,
-): RequestAnalysis & { confidence: number } {
+function quickAnalyze(userRequest: string): RequestAnalysis & { confidence: number } {
   const text = userRequest.toLowerCase();
 
   // Simple task creation
   if (
-    (text.includes("create") ||
-      text.includes("만들") ||
-      text.includes("작성")) &&
+    (text.includes("create") || text.includes("만들") || text.includes("작성")) &&
     (text.includes("task") || text.includes("태스크"))
   ) {
     return {
@@ -200,10 +192,7 @@ function quickAnalyze(
 **Current Implementation**:
 
 ```typescript
-export function selectCategory(
-  userRequest: string,
-  analysis: RequestAnalysis,
-): Category {
+export function selectCategory(userRequest: string, analysis: RequestAnalysis): Category {
   const text = userRequest.toLowerCase();
 
   // Keyword-based scoring
@@ -232,9 +221,7 @@ if (estimatedCost > COST_THRESHOLD && category !== "ultrabrain") {
   const cheaperCategory = downgradeCategoryIfPossible(category);
 
   // Log for analysis
-  console.log(
-    `[Cost Optimization] Downgraded ${category} → ${cheaperCategory}`,
-  );
+  console.log(`[Cost Optimization] Downgraded ${category} → ${cheaperCategory}`);
 
   return cheaperCategory;
 }
@@ -574,10 +561,7 @@ function decryptCredential(encrypted: string): string {
   const iv = Buffer.from(ivHex, "hex");
   const encryptedData = Buffer.from(encryptedHex, "hex");
   const decipher = crypto.createDecipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
-  return Buffer.concat([
-    decipher.update(encryptedData),
-    decipher.final(),
-  ]).toString();
+  return Buffer.concat([decipher.update(encryptedData), decipher.final()]).toString();
 }
 ```
 

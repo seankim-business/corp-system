@@ -38,7 +38,7 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
       await slackClient.chat.postMessage({
         channel,
         text,
-        thread_ts: threadTs,
+        ...(threadTs ? { thread_ts: threadTs } : {}),
         blocks,
       });
 

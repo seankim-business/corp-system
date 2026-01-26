@@ -255,6 +255,8 @@ router.post(
                       apiKey: notionConnection.apiKey,
                       defaultDatabaseId: notionConnection.defaultDatabaseId,
                     },
+                    refreshToken: null,
+                    expiresAt: null,
                     enabled: true,
                     createdAt: notionConnection.createdAt,
                     updatedAt: notionConnection.updatedAt,
@@ -265,6 +267,7 @@ router.post(
                     toolInput,
                     organizationId,
                     notionAccessConnection,
+                    req.user?.id,
                   );
                   finalOutputData = { ...finalOutputData, ...toolResult };
                 } else if (step.mcp === "linear") {
@@ -275,6 +278,10 @@ router.post(
                   if (!config.apiKey) {
                     throw new Error("Linear API key not configured");
                   }
+                  const linearRefreshToken = (linearConnection as Record<string, unknown>)
+                    .refreshToken as string | null | undefined;
+                  const linearExpiresAt = (linearConnection as Record<string, unknown>)
+                    .expiresAt as Date | string | null | undefined;
                   const linearAccessConnection: MCPConnection = {
                     id: linearConnection.id,
                     organizationId: linearConnection.organizationId,
@@ -282,6 +289,13 @@ router.post(
                     namespace: linearConnection.provider.toLowerCase(),
                     name: linearConnection.name,
                     config: linearConnection.config as Record<string, unknown>,
+                    refreshToken: linearRefreshToken ?? null,
+                    expiresAt:
+                      linearExpiresAt instanceof Date
+                        ? linearExpiresAt
+                        : linearExpiresAt
+                          ? new Date(linearExpiresAt)
+                          : null,
                     enabled: linearConnection.enabled,
                     createdAt: linearConnection.createdAt,
                     updatedAt: linearConnection.updatedAt,
@@ -292,6 +306,7 @@ router.post(
                     toolInput,
                     organizationId,
                     linearAccessConnection,
+                    req.user?.id,
                   );
                   finalOutputData = { ...finalOutputData, ...toolResult };
                 } else if (step.mcp === "github") {
@@ -305,6 +320,10 @@ router.post(
                   if (!config.accessToken) {
                     throw new Error("GitHub access token not configured");
                   }
+                  const githubRefreshToken = (githubConnection as Record<string, unknown>)
+                    .refreshToken as string | null | undefined;
+                  const githubExpiresAt = (githubConnection as Record<string, unknown>)
+                    .expiresAt as Date | string | null | undefined;
                   const githubAccessConnection: MCPConnection = {
                     id: githubConnection.id,
                     organizationId: githubConnection.organizationId,
@@ -312,6 +331,13 @@ router.post(
                     namespace: githubConnection.provider.toLowerCase(),
                     name: githubConnection.name,
                     config: githubConnection.config as Record<string, unknown>,
+                    refreshToken: githubRefreshToken ?? null,
+                    expiresAt:
+                      githubExpiresAt instanceof Date
+                        ? githubExpiresAt
+                        : githubExpiresAt
+                          ? new Date(githubExpiresAt)
+                          : null,
                     enabled: githubConnection.enabled,
                     createdAt: githubConnection.createdAt,
                     updatedAt: githubConnection.updatedAt,
@@ -322,6 +348,7 @@ router.post(
                     toolInput,
                     organizationId,
                     githubAccessConnection,
+                    req.user?.id,
                   );
                   finalOutputData = { ...finalOutputData, ...toolResult };
                 }

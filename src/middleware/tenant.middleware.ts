@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { db } from "../db/client";
+import { logger } from "../utils/logger";
 
 export async function resolveTenant(req: Request, res: Response, next: NextFunction) {
   try {
@@ -24,7 +25,11 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
     req.organization = organization;
     next();
   } catch (error) {
-    console.error("Tenant resolution error:", error);
+    logger.error(
+      "Tenant resolution error",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
     res.status(500).json({ error: "Internal server error" });
   }
 }

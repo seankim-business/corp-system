@@ -1,52 +1,12 @@
 import { Queue, QueueOptions, Worker, WorkerOptions, Job } from "bullmq";
-import IORedis from "ioredis";
+import type Redis from "ioredis";
 import { logger } from "../utils/logger";
-
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
-
-let redisConnection: IORedis | null = null;
-
-export function getRedisConnection(): IORedis {
-  if (!redisConnection) {
-    redisConnection = new IORedis(REDIS_URL, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-      retryStrategy: (times: number) => {
-        if (times > 10) {
-          logger.error("Redis connection failed after 10 retries");
-          return null;
-        }
-        return Math.min(times * 100, 3000);
-      },
-    });
-
-    redisConnection.on("error", (err: Error) => {
-      logger.error("Redis connection error:", err);
-    });
-
-    redisConnection.on("connect", () => {
-      logger.info("Redis connected for BullMQ");
-    });
-  }
-
-  return redisConnection;
-}
-
-export async function closeRedisConnection(): Promise<void> {
-  if (!redisConnection) return;
-  const conn = redisConnection;
-  redisConnection = null;
-
-  try {
-    await conn.quit();
-  } catch (error) {
-    try {
-      conn.disconnect();
-    } catch (disconnectError) {
-      void disconnectError;
-    }
-  }
-}
+import {
+  getQueueConnectionSync,
+  getWorkerConnectionSync,
+  releaseQueueConnection,
+  releaseWorkerConnection,
+} from "../db/redis";
 
 export interface BaseQueueOptions {
   name: string;
@@ -68,12 +28,15 @@ export interface BaseQueueOptions {
 export class BaseQueue<T = any> {
   protected queue: Queue<T>;
   protected queueName: string;
+  protected connection: Redis;
 
   constructor(options: BaseQueueOptions) {
     this.queueName = options.name;
 
+    this.connection = getQueueConnectionSync();
+
     const queueOptions: QueueOptions = {
-      connection: getRedisConnection(),
+      connection: this.connection,
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 100,
@@ -111,6 +74,7 @@ export class BaseQueue<T = any> {
 
   async close(): Promise<void> {
     await this.queue.close();
+    releaseQueueConnection(this.connection);
     logger.info(`Queue ${this.queueName} closed`);
   }
 
@@ -121,18 +85,27 @@ export class BaseQueue<T = any> {
 
 export interface BaseWorkerOptions {
   concurrency?: number;
+  lockDuration?: number;
+  stalledInterval?: number;
+  maxStalledCount?: number;
 }
 
 export abstract class BaseWorker<T = any> {
   protected worker: Worker<T>;
   protected workerName: string;
+  protected connection: Redis;
 
   constructor(queueName: string, options: BaseWorkerOptions = {}) {
     this.workerName = queueName;
 
+    this.connection = getWorkerConnectionSync();
+
     const workerOptions: WorkerOptions = {
-      connection: getRedisConnection(),
+      connection: this.connection,
       concurrency: options.concurrency || 1,
+      lockDuration: options.lockDuration || 60000,
+      stalledInterval: options.stalledInterval || 120000,
+      maxStalledCount: options.maxStalledCount || 3,
     };
 
     this.worker = new Worker<T>(
@@ -165,6 +138,13 @@ export abstract class BaseWorker<T = any> {
       logger.error(`Worker ${this.workerName} failed job ${job?.id}:`, err);
     });
 
+    this.worker.on("stalled", (jobId: string) => {
+      logger.warn(`[${this.workerName}] Job stalled (may be stuck)`, {
+        jobId,
+        message: "Job exceeded lock duration without completing",
+      });
+    });
+
     logger.info(`Worker ${this.workerName} initialized`);
   }
 
@@ -172,6 +152,11 @@ export abstract class BaseWorker<T = any> {
 
   async close(): Promise<void> {
     await this.worker.close();
+    releaseWorkerConnection(this.connection);
     logger.info(`Worker ${this.workerName} closed`);
+  }
+
+  public getWorker(): Worker<T> {
+    return this.worker;
   }
 }

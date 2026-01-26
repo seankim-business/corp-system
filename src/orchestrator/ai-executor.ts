@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../utils/logger";
 import { Category } from "./types";
 import { trackUsage } from "../services/cost-tracker";
+import { recordAiRequest } from "../services/metrics";
+import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
 
 export interface AIExecutionParams {
   category: Category;
@@ -83,6 +85,8 @@ You specialize in:
 Provide production-ready code with modern best practices.`,
 };
 
+const tracer = trace.getTracer("ai-executor");
+
 function buildSystemPrompt(skills: string[]): string {
   const basePrompt = `You are a helpful AI assistant. Respond concisely and accurately.`;
 
@@ -107,6 +111,12 @@ function calculateCost(model: string, inputTokens: number, outputTokens: number)
   return (inputTokens / 1000) * costs.input + (outputTokens / 1000) * costs.output;
 }
 
+function estimateInputTokens(prompt: string, systemPrompt: string): number {
+  const combined = `${systemPrompt} ${prompt}`.trim();
+  if (!combined) return 0;
+  return combined.split(/\s+/).filter(Boolean).length;
+}
+
 let anthropicClient: Anthropic | null = null;
 
 function getAnthropicClient(): Anthropic {
@@ -121,95 +131,189 @@ function getAnthropicClient(): Anthropic {
 }
 
 export async function executeWithAI(params: AIExecutionParams): Promise<AIExecutionResult> {
-  const startTime = Date.now();
-  const model = CATEGORY_MODEL_MAP[params.category] || "claude-3-5-sonnet-20241022";
-  const systemPrompt = buildSystemPrompt(params.skills);
+  const result = await tracer.startActiveSpan(
+    "ai_executor.execute",
+    async (span: Span): Promise<AIExecutionResult> => {
+      const startTime = Date.now();
+      const model = CATEGORY_MODEL_MAP[params.category] || "claude-3-5-sonnet-20241022";
+      const systemPrompt = buildSystemPrompt(params.skills);
+      const environment = process.env.NODE_ENV || "development";
 
-  try {
-    const client = getAnthropicClient();
+      span.setAttribute("ai.model", model);
+      span.setAttribute("ai.category", params.category);
+      span.setAttribute("organization.id", params.organizationId);
+      span.setAttribute("user.id", params.userId);
+      span.setAttribute("environment", environment);
 
-    logger.info("Executing AI request", {
-      model,
-      category: params.category,
-      skills: params.skills,
-      sessionId: params.sessionId,
-    });
+      try {
+        const client = getAnthropicClient();
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: params.prompt,
-        },
-      ],
-    });
+        logger.info("Executing AI request", {
+          model,
+          category: params.category,
+          skills: params.skills,
+          sessionId: params.sessionId,
+        });
 
-    const duration = Date.now() - startTime;
-    const inputTokens = response.usage.input_tokens;
-    const outputTokens = response.usage.output_tokens;
-    const cost = calculateCost(model, inputTokens, outputTokens);
+        const inputTokenEstimate = await tracer.startActiveSpan(
+          "ai_executor.count_tokens",
+          async (tokenSpan) => {
+            try {
+              const count = estimateInputTokens(params.prompt, systemPrompt);
+              tokenSpan.setAttribute("tokens.input_estimate", count);
+              return count;
+            } finally {
+              tokenSpan.end();
+            }
+          },
+        );
 
-    let output = "";
-    for (const block of response.content) {
-      if (block.type === "text") {
-        output += block.text;
+        span.setAttribute("ai.tokens.input_estimate", inputTokenEstimate);
+
+        const response = await tracer.startActiveSpan("ai_executor.api_call", async (apiSpan) => {
+          const callStart = Date.now();
+          try {
+            apiSpan.setAttribute("ai.provider", "anthropic");
+            apiSpan.setAttribute("ai.endpoint", "/v1/messages");
+            apiSpan.setAttribute("ai.model", model);
+
+            const result = await client.messages.create({
+              model,
+              max_tokens: 4096,
+              system: systemPrompt,
+              messages: [
+                {
+                  role: "user",
+                  content: params.prompt,
+                },
+              ],
+            });
+            const durationMs = Date.now() - callStart;
+
+            apiSpan.setAttribute("ai.tokens.input", result.usage.input_tokens);
+            apiSpan.setAttribute("ai.tokens.output", result.usage.output_tokens);
+            apiSpan.setAttribute("ai.duration_ms", durationMs);
+            apiSpan.setAttribute("ai.finish_reason", result.stop_reason ?? "unknown");
+
+            return result;
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            apiSpan.recordException(error as Error);
+            apiSpan.setStatus({ code: SpanStatusCode.ERROR, message });
+            throw error;
+          } finally {
+            apiSpan.end();
+          }
+        });
+
+        const duration = Date.now() - startTime;
+        const inputTokens = response.usage.input_tokens;
+        const outputTokens = response.usage.output_tokens;
+
+        const cost = await tracer.startActiveSpan(
+          "ai_executor.calculate_cost",
+          async (costSpan) => {
+            try {
+              const computed = calculateCost(model, inputTokens, outputTokens);
+              costSpan.setAttribute("ai.cost_usd", computed);
+              return computed;
+            } finally {
+              costSpan.end();
+            }
+          },
+        );
+
+        span.setAttribute("ai.tokens.input", inputTokens);
+        span.setAttribute("ai.tokens.output", outputTokens);
+        span.setAttribute("ai.cost_usd", cost);
+        span.setAttribute("ai.duration_ms", duration);
+
+        let output = "";
+        for (const block of response.content) {
+          if (block.type === "text") {
+            output += block.text;
+          }
+        }
+
+        await trackUsage({
+          organizationId: params.organizationId,
+          userId: params.userId,
+          sessionId: params.sessionId,
+          model,
+          inputTokens,
+          outputTokens,
+          cost,
+          category: params.category,
+        }).catch((err: Error) => logger.warn("Failed to track usage", { error: err.message }));
+
+        recordAiRequest({
+          model,
+          category: params.category,
+          success: true,
+          duration,
+          inputTokens,
+          outputTokens,
+        });
+
+        logger.info("AI execution completed", {
+          model,
+          inputTokens,
+          outputTokens,
+          cost: cost.toFixed(6),
+          duration,
+        });
+
+        span.setStatus({ code: SpanStatusCode.OK });
+        return {
+          output,
+          status: "success",
+          metadata: {
+            model,
+            inputTokens,
+            outputTokens,
+            duration,
+            cost,
+          },
+        };
+      } catch (error: unknown) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
+
+        recordAiRequest({
+          model,
+          category: params.category,
+          success: false,
+          duration,
+          inputTokens: 0,
+          outputTokens: 0,
+        });
+
+        logger.error("AI execution failed", {
+          model,
+          error: errorMessage,
+          duration,
+        });
+
+        return {
+          output: `AI execution failed: ${errorMessage}`,
+          status: "failed",
+          metadata: {
+            model,
+            inputTokens: 0,
+            outputTokens: 0,
+            duration,
+            cost: 0,
+            error: errorMessage,
+          },
+        };
+      } finally {
+        span.end();
       }
-    }
+    },
+  );
 
-    await trackUsage({
-      organizationId: params.organizationId,
-      userId: params.userId,
-      sessionId: params.sessionId,
-      model,
-      inputTokens,
-      outputTokens,
-      cost,
-      category: params.category,
-    }).catch((err: Error) => logger.warn("Failed to track usage", { error: err.message }));
-
-    logger.info("AI execution completed", {
-      model,
-      inputTokens,
-      outputTokens,
-      cost: cost.toFixed(6),
-      duration,
-    });
-
-    return {
-      output,
-      status: "success",
-      metadata: {
-        model,
-        inputTokens,
-        outputTokens,
-        duration,
-        cost,
-      },
-    };
-  } catch (error: unknown) {
-    const duration = Date.now() - startTime;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    logger.error("AI execution failed", {
-      model,
-      error: errorMessage,
-      duration,
-    });
-
-    return {
-      output: `AI execution failed: ${errorMessage}`,
-      status: "failed",
-      metadata: {
-        model,
-        inputTokens: 0,
-        outputTokens: 0,
-        duration,
-        cost: 0,
-        error: errorMessage,
-      },
-    };
-  }
+  return result;
 }

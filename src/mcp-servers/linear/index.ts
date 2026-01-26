@@ -22,6 +22,7 @@ export async function executeLinearTool(
   input: any,
   organizationId: string,
   connection: MCPConnection,
+  userId?: string,
 ): Promise<any> {
   const parsed = validateToolAccess(toolName, "linear", organizationId, connection);
   const resolvedToolName = parsed.isLegacy
@@ -30,16 +31,16 @@ export async function executeLinearTool(
 
   switch (resolvedToolName) {
     case "getIssues":
-      return await getIssuesTool(apiKey, input);
+      return await getIssuesTool(apiKey, input, connection, userId);
 
     case "createIssue":
-      return await createIssueTool(apiKey, input);
+      return await createIssueTool(apiKey, input, connection, userId);
 
     case "updateIssue":
-      return await updateIssueTool(apiKey, input);
+      return await updateIssueTool(apiKey, input, connection, userId);
 
     case "getTeams":
-      return await getTeamsTool(apiKey, input);
+      return await getTeamsTool(apiKey, input, connection, userId);
 
     default:
       throw new Error(`Unknown Linear tool: ${toolName}`);
@@ -47,4 +48,4 @@ export async function executeLinearTool(
 }
 
 export * from "./types";
-export { LinearClient } from "./client";
+export { LinearClient, getLinearClient } from "./client";

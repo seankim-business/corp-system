@@ -80,4 +80,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start application (runs migrations first, non-fatal)
-CMD ["sh", "-c", "echo '=== Starting Nubabel Container ===' && echo 'Environment: '${NODE_ENV} && echo 'Database URL: '${DATABASE_URL:0:30}'...' && echo '' && echo '=== Running Prisma Migrations ===' && npx prisma migrate deploy --schema=prisma/schema.prisma || echo '⚠️  Migration failed, starting server anyway for debugging' && echo '' && echo '=== Starting Node.js Server ===' && node dist/index.js"]
+CMD ["sh", "-c", "echo '=== Starting Nubabel Container ===' && echo 'Environment: '${NODE_ENV} && echo 'Database URL: '${DATABASE_URL:0:30}'...' && echo '' && echo '=== Running Prisma Migrations ===' && (npx prisma migrate deploy --schema=prisma/schema.prisma || echo '⚠️  Migration failed, starting server anyway for debugging') && echo '' && echo '=== Starting Node.js Server ===' && node dist/index.js"]

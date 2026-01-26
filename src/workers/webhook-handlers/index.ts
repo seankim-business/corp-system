@@ -1,6 +1,23 @@
 import { WebhookEventData } from "../../queue/webhook.queue";
 import { logger } from "../../utils/logger";
 
+/**
+ * Webhook Handler Interface
+ *
+ * These handlers are INTENTIONAL EXTENSION POINTS for company-specific business logic.
+ *
+ * The Nubabel Core provides webhook infrastructure (receiving, validating, queuing),
+ * but business logic is left to extensions/customizations.
+ *
+ * Examples of what to implement:
+ * - Trigger orchestration workflows based on external events
+ * - Sync data between external systems and internal database
+ * - Send notifications to users
+ * - Update workflow execution status
+ *
+ * See: docs/planning/CORE_VS_EXTENSION.md for extension patterns
+ * See: docs/IMPLEMENTATION_STATUS.md for extensibility points
+ */
 export interface WebhookHandler {
   canHandle(provider: string): boolean;
   handle(data: WebhookEventData): Promise<void>;

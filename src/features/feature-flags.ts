@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { db as prisma } from "../db/client";
-import { getRedisClient } from "../db/redis";
+import { withQueueConnection } from "../db/redis";
 
 type FlagReason =
   | "KILL_SWITCH"
@@ -49,10 +49,9 @@ export async function evaluateFeatureFlag(params: {
   organizationId: string;
   userId?: string;
 }): Promise<{ enabled: boolean; reason: FlagReason }> {
-  const redis = await getRedisClient();
   const cacheKey = `ff:eval:${params.organizationId}:${params.key}`;
 
-  const cached = await redis.get(cacheKey);
+  const cached = await withQueueConnection((redis) => redis.get(cacheKey));
   if (cached) {
     return JSON.parse(cached) as { enabled: boolean; reason: FlagReason };
   }
@@ -76,7 +75,7 @@ export async function evaluateFeatureFlag(params: {
       });
     }
     const value = { enabled: false as const, reason: "KILL_SWITCH" as const };
-    await redis.setEx(cacheKey, 30, JSON.stringify(value));
+    await withQueueConnection((redis) => redis.set(cacheKey, JSON.stringify(value), "EX", 30));
     return value;
   }
 
@@ -88,7 +87,7 @@ export async function evaluateFeatureFlag(params: {
       userId: params.userId,
       metadata: { key: params.key, result: value.enabled, reason: value.reason },
     });
-    await redis.setEx(cacheKey, 30, JSON.stringify(value));
+    await withQueueConnection((redis) => redis.set(cacheKey, JSON.stringify(value), "EX", 30));
     return value;
   }
 
@@ -105,7 +104,7 @@ export async function evaluateFeatureFlag(params: {
           userId: params.userId,
           metadata: { key: params.key, result: true, reason: value.reason },
         });
-        await redis.setEx(cacheKey, 30, JSON.stringify(value));
+        await withQueueConnection((redis) => redis.set(cacheKey, JSON.stringify(value), "EX", 30));
         return value;
       }
       continue;
@@ -119,7 +118,7 @@ export async function evaluateFeatureFlag(params: {
           userId: params.userId,
           metadata: { key: params.key, result: false, reason: value.reason },
         });
-        await redis.setEx(cacheKey, 30, JSON.stringify(value));
+        await withQueueConnection((redis) => redis.set(cacheKey, JSON.stringify(value), "EX", 30));
         return value;
       }
       continue;
@@ -133,7 +132,7 @@ export async function evaluateFeatureFlag(params: {
         userId: params.userId,
         metadata: { key: params.key, result: enabled, reason: value.reason, pct: rule.percentage },
       });
-      await redis.setEx(cacheKey, 30, JSON.stringify(value));
+      await withQueueConnection((redis) => redis.set(cacheKey, JSON.stringify(value), "EX", 30));
       return value;
     }
   }
@@ -144,16 +143,15 @@ export async function evaluateFeatureFlag(params: {
     userId: params.userId,
     metadata: { key: params.key, result: false, reason: value.reason },
   });
-  await redis.setEx(cacheKey, 30, JSON.stringify(value));
+  await withQueueConnection((redis) => redis.set(cacheKey, JSON.stringify(value), "EX", 30));
   return value;
 }
 
 export async function invalidateFeatureFlagCache(key: string) {
-  const redis = await getRedisClient();
-  const keys = await redis.keys(`ff:eval:*:${key}`);
-  if (keys.length > 0) {
-    for (const k of keys) {
-      await redis.del(k);
+  await withQueueConnection(async (redis) => {
+    const keys = await redis.keys(`ff:eval:*:${key}`);
+    if (keys.length > 0) {
+      await redis.del(...keys);
     }
-  }
+  });
 }

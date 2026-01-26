@@ -4,12 +4,16 @@ import {
   createMCPConnection,
   updateMCPConnection,
   deleteMCPConnection,
+  refreshOAuthToken,
 } from "../../services/mcp-registry";
 import { db as prisma } from "../../db/client";
+import { refreshNotionToken } from "../../services/oauth-refresh";
 
 jest.mock("../../utils/cache", () => ({
   cache: {
     remember: async (_key: string, fn: () => Promise<any>) => fn(),
+    get: async () => null,
+    set: async () => undefined,
   },
 }));
 
@@ -17,10 +21,39 @@ jest.mock("../../db/client", () => ({
   db: {
     mCPConnection: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
+  },
+}));
+
+jest.mock("../../services/audit-logger", () => ({
+  auditLogger: {
+    log: jest.fn(),
+  },
+}));
+
+jest.mock("../../queue/notification.queue", () => ({
+  notificationQueue: {
+    enqueueNotification: jest.fn(),
+  },
+}));
+
+jest.mock("../../services/oauth-refresh", () => ({
+  refreshNotionToken: jest.fn(),
+  refreshLinearToken: jest.fn(),
+  refreshGitHubToken: jest.fn(),
+  OAuthRefreshError: class OAuthRefreshError extends Error {
+    code: string;
+    status: number;
+
+    constructor(message: string, code: string, status: number) {
+      super(message);
+      this.code = code;
+      this.status = status;
+    }
   },
 }));
 
@@ -168,6 +201,51 @@ describe("MCP Registry Service", () => {
       expect(prisma.mCPConnection.delete).toHaveBeenCalledWith({
         where: { id: connectionId },
       });
+    });
+  });
+
+  describe("refreshOAuthToken", () => {
+    it("should refresh token and update connection", async () => {
+      const connectionId = "conn-1";
+      const initialConnection = {
+        id: connectionId,
+        organizationId: mockOrgId,
+        provider: "notion",
+        name: "Notion",
+        config: {
+          accessToken: "old-token",
+          clientId: "client-id",
+          clientSecret: "client-secret",
+          tokenUrl: "https://api.notion.com/v1/oauth/token",
+        },
+        refreshToken: "refresh-token",
+        expiresAt: new Date(Date.now() - 1000),
+        enabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      (prisma.mCPConnection.findUnique as jest.Mock).mockResolvedValue(initialConnection);
+      (refreshNotionToken as jest.Mock).mockResolvedValue({
+        accessToken: "new-access-token",
+        refreshToken: "new-refresh-token",
+        expiresIn: 3600,
+      });
+      (prisma.mCPConnection.update as jest.Mock).mockResolvedValue({
+        ...initialConnection,
+        config: {
+          ...initialConnection.config,
+          accessToken: "new-access-token",
+        },
+        refreshToken: "new-refresh-token",
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+      });
+
+      const result = await refreshOAuthToken(connectionId);
+
+      expect(prisma.mCPConnection.update).toHaveBeenCalled();
+      expect(result.id).toBe(connectionId);
+      expect(result.config).toEqual(expect.objectContaining({ accessToken: "new-access-token" }));
     });
   });
 });

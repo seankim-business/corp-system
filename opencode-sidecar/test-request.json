@@ -1,0 +1,11 @@
+{
+  "category": "ultrabrain",
+  "load_skills": ["git-master"],
+  "prompt": "Explain the difference between git rebase and git merge in detail",
+  "session_id": "ses_1738000000_test123",
+  "organizationId": "org_test",
+  "userId": "user_test",
+  "context": {
+    "availableMCPs": []
+  }
+}

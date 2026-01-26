@@ -13,161 +13,255 @@ import { logger } from "../utils/logger";
 import { metrics, measureTime } from "../utils/metrics";
 import { getActiveMCPConnections } from "../services/mcp-registry";
 import { delegateTask } from "./delegate-task";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("orchestrator");
 
 export async function orchestrate(request: OrchestrationRequest): Promise<OrchestrationResult> {
-  const { userRequest, sessionId, organizationId, userId } = request;
+  return await tracer.startActiveSpan("orchestrator.orchestrate", async (span) => {
+    const { userRequest, sessionId, organizationId, userId } = request;
+    const environment = process.env.NODE_ENV || "development";
 
-  logger.info("Orchestration started", {
-    sessionId,
-    organizationId,
-    userId,
-    requestLength: userRequest.length,
-  });
+    try {
+      span.setAttribute("organization.id", organizationId);
+      span.setAttribute("user.id", userId);
+      span.setAttribute("environment", environment);
+      span.setAttribute("request.type", "orchestrate");
+      span.setAttribute("request.length", userRequest.length);
 
-  metrics.increment("orchestration.started", {
-    organizationId,
-  });
+      logger.info("Orchestration started", {
+        sessionId,
+        organizationId,
+        userId,
+        requestLength: userRequest.length,
+      });
 
-  try {
-    const sessionState = await getSessionState(sessionId);
-    const isFollowUp = isFollowUpQuery(userRequest);
+      metrics.increment("orchestration.started", {
+        organizationId,
+      });
 
-    const analysis = await measureTime("orchestration.analysis", () => analyzeRequest(userRequest));
+      const sessionState = await getSessionState(sessionId);
+      const isFollowUp = isFollowUpQuery(userRequest);
 
-    let categorySelection = await selectCategoryHybrid(userRequest, analysis, {
-      minConfidence: 0.7,
-      enableLLM: true,
-      enableCache: true,
-    });
-
-    if (isFollowUp) {
-      const boostedConfidence = applyContextBoost(
-        categorySelection.confidence,
-        sessionState,
-        isFollowUp,
+      const analysis = await tracer.startActiveSpan(
+        "orchestrator.analyze_request",
+        async (analysisSpan) => {
+          try {
+            const result = await measureTime("orchestration.analysis", () =>
+              analyzeRequest(userRequest),
+            );
+            analysisSpan.setAttribute("intent", result.intent);
+            analysisSpan.setAttribute("complexity", result.complexity);
+            return result;
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            analysisSpan.recordException(error as Error);
+            analysisSpan.setStatus({ code: SpanStatusCode.ERROR, message });
+            throw error;
+          } finally {
+            analysisSpan.end();
+          }
+        },
       );
-      if (boostedConfidence !== categorySelection.confidence) {
-        logger.debug("Applied context boost", {
-          originalConfidence: categorySelection.confidence,
-          boostedConfidence,
-          lastCategory: sessionState?.lastCategory,
-        });
-        categorySelection = {
-          ...categorySelection,
-          confidence: boostedConfidence,
-        };
-      }
-    }
 
-    const skillSelection = selectSkillsEnhanced(userRequest, {
-      minScore: 1,
-      includeDependencies: true,
-    });
+      let categorySelection = await tracer.startActiveSpan(
+        "orchestrator.select_category",
+        async (categorySpan) => {
+          try {
+            let selection = await selectCategoryHybrid(userRequest, analysis, {
+              minConfidence: 0.7,
+              enableLLM: true,
+              enableCache: true,
+            });
 
-    const skills = skillSelection.skills;
+            if (isFollowUp) {
+              const boostedConfidence = applyContextBoost(
+                selection.confidence,
+                sessionState,
+                isFollowUp,
+              );
+              if (boostedConfidence !== selection.confidence) {
+                logger.debug("Applied context boost", {
+                  originalConfidence: selection.confidence,
+                  boostedConfidence,
+                  lastCategory: sessionState?.lastCategory,
+                });
+                selection = {
+                  ...selection,
+                  confidence: boostedConfidence,
+                };
+              }
+            }
 
-    logger.debug("Request analyzed", {
-      sessionDepth: sessionState?.conversationDepth || 0,
-      isFollowUp,
-      lastCategory: sessionState?.lastCategory,
-      category: categorySelection.category,
-      categoryConfidence: categorySelection.confidence,
-      categoryMethod: categorySelection.method,
-      categoryKeywords: categorySelection.matchedKeywords,
-      skills: skillSelection.skills,
-      skillScores: skillSelection.scores,
-      skillDependencies: skillSelection.dependencies,
-      skillConflicts: skillSelection.conflicts,
-      intent: analysis.intent,
-      complexity: analysis.complexity,
-    });
+            categorySpan.setAttribute("category", selection.category);
+            categorySpan.setAttribute("confidence", selection.confidence);
+            categorySpan.setAttribute("method", selection.method);
+            return selection;
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            categorySpan.recordException(error as Error);
+            categorySpan.setStatus({ code: SpanStatusCode.ERROR, message });
+            throw error;
+          } finally {
+            categorySpan.end();
+          }
+        },
+      );
 
-    metrics.increment("orchestration.category_selected", {
-      category: categorySelection.category,
-      method: categorySelection.method,
-    });
+      const skillSelection = await tracer.startActiveSpan(
+        "orchestrator.select_skills",
+        async (skillSpan) => {
+          try {
+            const selection = selectSkillsEnhanced(userRequest, {
+              minScore: 1,
+              includeDependencies: true,
+            });
+            const skillsList = selection.skills;
+            skillSpan.setAttribute("skills.count", skillsList.length);
+            skillSpan.setAttribute("skills.names", skillsList.join(","));
+            return selection;
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            skillSpan.recordException(error as Error);
+            skillSpan.setStatus({ code: SpanStatusCode.ERROR, message });
+            throw error;
+          } finally {
+            skillSpan.end();
+          }
+        },
+      );
 
-    metrics.histogram("orchestration.category_confidence", categorySelection.confidence, {
-      category: categorySelection.category,
-    });
+      const skills = skillSelection.skills;
 
-    const mcpConnections = await getActiveMCPConnections(organizationId);
+      span.setAttribute("intent", analysis.intent);
+      span.setAttribute("complexity", analysis.complexity);
+      span.setAttribute("category", categorySelection.category);
+      span.setAttribute("skills.names", skills.join(","));
 
-    const context = {
-      availableMCPs: mcpConnections.map((conn) => ({
-        provider: conn.provider,
-        name: conn.name,
-        enabled: conn.enabled,
-      })),
-      organizationId,
-      userId,
-    };
-
-    const startTime = Date.now();
-    const result = await delegateTask({
-      category: categorySelection.category,
-      load_skills: skills,
-      prompt: userRequest,
-      session_id: sessionId,
-      context,
-    });
-    const duration = Date.now() - startTime;
-
-    await updateSessionState(sessionId, {
-      lastCategory: categorySelection.category,
-      lastIntent: analysis.intent,
-      metadata: {
-        lastSkills: skills,
-        lastComplexity: analysis.complexity,
-      },
-    });
-
-    await saveExecution({
-      organizationId,
-      userId,
-      sessionId,
-      category: categorySelection.category,
-      skills,
-      prompt: userRequest,
-      result: result.output,
-      status: result.status,
-      duration,
-      metadata: {
-        ...result.metadata,
-        categoryConfidence: categorySelection.confidence,
-        categoryMethod: categorySelection.method,
+      logger.debug("Request analyzed", {
         sessionDepth: sessionState?.conversationDepth || 0,
         isFollowUp,
-      },
-    });
+        lastCategory: sessionState?.lastCategory,
+        category: categorySelection.category,
+        categoryConfidence: categorySelection.confidence,
+        categoryMethod: categorySelection.method,
+        categoryKeywords: categorySelection.matchedKeywords,
+        skills: skillSelection.skills,
+        skillScores: skillSelection.scores,
+        skillDependencies: skillSelection.dependencies,
+        skillConflicts: skillSelection.conflicts,
+        intent: analysis.intent,
+        complexity: analysis.complexity,
+      });
 
-    return {
-      output: result.output,
-      status: result.status,
-      metadata: {
+      metrics.increment("orchestration.category_selected", {
+        category: categorySelection.category,
+        method: categorySelection.method,
+      });
+
+      metrics.histogram("orchestration.category_confidence", categorySelection.confidence, {
+        category: categorySelection.category,
+      });
+
+      const mcpConnections = await getActiveMCPConnections(organizationId);
+
+      const context = {
+        availableMCPs: mcpConnections.map((conn) => ({
+          provider: conn.provider,
+          name: conn.name,
+          enabled: conn.enabled,
+        })),
+        organizationId,
+        userId,
+      };
+
+      const result = await tracer.startActiveSpan("orchestrator.execute", async (execSpan) => {
+        const startTime = Date.now();
+        try {
+          const execution = await delegateTask({
+            category: categorySelection.category,
+            load_skills: skills,
+            prompt: userRequest,
+            session_id: sessionId,
+            context,
+          });
+          const duration = Date.now() - startTime;
+          execSpan.setAttribute("result.status", execution.status);
+          execSpan.setAttribute("result.duration", duration);
+          return { execution, duration };
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : "Unknown error";
+          execSpan.recordException(error as Error);
+          execSpan.setStatus({ code: SpanStatusCode.ERROR, message });
+          throw error;
+        } finally {
+          execSpan.end();
+        }
+      });
+
+      await updateSessionState(sessionId, {
+        lastCategory: categorySelection.category,
+        lastIntent: analysis.intent,
+        metadata: {
+          lastSkills: skills,
+          lastComplexity: analysis.complexity,
+        },
+      });
+
+      await saveExecution({
+        organizationId,
+        userId,
+        sessionId,
         category: categorySelection.category,
         skills,
-        duration,
-        model: result.metadata.model,
-        sessionId,
-      },
-    };
-  } catch (error: any) {
-    await saveExecution({
-      organizationId,
-      userId,
-      sessionId,
-      category: "error",
-      skills: [],
-      prompt: userRequest,
-      result: error.message,
-      status: "failed",
-      duration: 0,
-      metadata: { error: error.stack },
-    });
+        prompt: userRequest,
+        result: result.execution.output,
+        status: result.execution.status,
+        duration: result.duration,
+        metadata: {
+          ...result.execution.metadata,
+          categoryConfidence: categorySelection.confidence,
+          categoryMethod: categorySelection.method,
+          sessionDepth: sessionState?.conversationDepth || 0,
+          isFollowUp,
+        },
+      });
 
-    throw error;
-  }
+      span.setStatus({ code: SpanStatusCode.OK });
+      return {
+        output: result.execution.output,
+        status: result.execution.status,
+        metadata: {
+          category: categorySelection.category,
+          skills,
+          duration: result.duration,
+          model: result.execution.metadata.model,
+          sessionId,
+        },
+      };
+    } catch (error: any) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      span.recordException(error instanceof Error ? error : new Error(message));
+      span.setStatus({ code: SpanStatusCode.ERROR, message });
+
+      await saveExecution({
+        organizationId: request.organizationId,
+        userId: request.userId,
+        sessionId: request.sessionId,
+        category: "error",
+        skills: [],
+        prompt: request.userRequest,
+        result: message,
+        status: "failed",
+        duration: 0,
+        metadata: { error: error?.stack },
+      });
+
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
 }
 
 export async function orchestrateMulti(

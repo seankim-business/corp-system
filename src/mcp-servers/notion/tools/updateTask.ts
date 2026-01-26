@@ -9,14 +9,22 @@
  * - Output: updated task
  */
 
-import { NotionClient } from "../client";
+import { getNotionClient } from "../client";
 import { UpdateTaskInput, UpdateTaskOutput } from "../types";
+import { MCPConnection } from "../../../orchestrator/types";
 
 export async function updateTaskTool(
   apiKey: string,
   input: UpdateTaskInput,
+  connection?: MCPConnection,
+  userId?: string,
 ): Promise<UpdateTaskOutput> {
-  const client = new NotionClient(apiKey);
+  const { client, release } = await getNotionClient({
+    apiKey,
+    connection,
+    organizationId: connection?.organizationId,
+    userId,
+  });
 
   const { taskId, ...updates } = input;
 
@@ -24,7 +32,11 @@ export async function updateTaskTool(
     throw new Error("taskId is required");
   }
 
-  const task = await client.updateTask(taskId, updates);
+  try {
+    const task = await client.updateTask(taskId, updates);
 
-  return { task };
+    return { task };
+  } finally {
+    release();
+  }
 }

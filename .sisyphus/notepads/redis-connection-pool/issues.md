@@ -1,0 +1,1 @@
+- Load test failed locally due to Redis connection refused (REDIS_URL not reachable). Tests require a running Redis instance.

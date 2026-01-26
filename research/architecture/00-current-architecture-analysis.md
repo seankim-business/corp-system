@@ -71,7 +71,7 @@
   "orchestration": "OhMyOpenCode delegate_task",
   "protocol": "MCP (Model Context Protocol)",
   "llm": "Claude 3.5 Sonnet (Anthropic API)",
-  "frameworks": "TBD (LangGraph vs Custom)"
+  "frameworks": "Custom Router (see research/architecture/01-synthesis-and-decisions.md)"
 }
 ```
 

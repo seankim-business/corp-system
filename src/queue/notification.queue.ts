@@ -2,7 +2,7 @@ import { BaseQueue } from "./base.queue";
 
 export interface NotificationData {
   channel: string;
-  threadTs: string;
+  threadTs?: string;
   text: string;
   blocks?: any[];
   organizationId: string;

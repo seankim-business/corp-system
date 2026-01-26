@@ -18,7 +18,7 @@
 import { Router, Request, Response } from "express";
 import { db as prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
-import { NotionClient } from "../mcp-servers/notion/client";
+import { getNotionClient } from "../mcp-servers/notion/client";
 
 const router = Router();
 
@@ -162,10 +162,17 @@ router.get("/notion/databases", requireAuth, async (req: Request, res: Response)
       return res.status(404).json({ error: "Notion connection not found" });
     }
 
-    const client = new NotionClient(connection.apiKey);
-    const databases = await client.getDatabases();
-
-    return res.json({ databases });
+    const { client, release } = await getNotionClient({
+      apiKey: connection.apiKey,
+      organizationId,
+      userId: req.user?.id,
+    });
+    try {
+      const databases = await client.getDatabases();
+      return res.json({ databases });
+    } finally {
+      release();
+    }
   } catch (error) {
     console.error("Get Notion databases error:", error);
     return res.status(500).json({ error: "Failed to fetch Notion databases" });
@@ -180,14 +187,21 @@ router.post("/notion/test", requireAuth, async (req: Request, res: Response) => 
       return res.status(400).json({ error: "API key is required for testing" });
     }
 
-    const client = new NotionClient(apiKey);
-    const databases = await client.getDatabases();
-
-    return res.json({
-      success: true,
-      databaseCount: databases.length,
-      message: "Notion API key is valid",
+    const { client, release } = await getNotionClient({
+      apiKey,
+      organizationId: req.user?.organizationId,
+      userId: req.user?.id,
     });
+    try {
+      const databases = await client.getDatabases();
+      return res.json({
+        success: true,
+        databaseCount: databases.length,
+        message: "Notion API key is valid",
+      });
+    } finally {
+      release();
+    }
   } catch (error: any) {
     console.error("Test Notion connection error:", error);
     return res.status(400).json({

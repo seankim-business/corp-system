@@ -7,6 +7,14 @@
 
 ---
 
+## 🔗 Quick Links
+
+- **Executive Summary**: [`RESEARCH_COMPLETE.md`](./RESEARCH_COMPLETE.md)
+- **Architecture Decisions (Source of Truth)**: [`architecture/01-synthesis-and-decisions.md`](./architecture/01-synthesis-and-decisions.md)
+- **Research Index (Navigation)**: [`INDEX.md`](./INDEX.md)
+- **Backlog / Tracking**: [`ACTIVE_RESEARCH_TRACKING.md`](./ACTIVE_RESEARCH_TRACKING.md)
+- **Full Roadmap (200 tasks)**: [`COMPREHENSIVE_RESEARCH_PLAN.md`](./COMPREHENSIVE_RESEARCH_PLAN.md)
+
 ## 📋 리서치 스코프
 
 ### 핵심 질문
@@ -25,32 +33,82 @@
 ```
 research/
 ├── README.md                           # 이 파일
-├── architecture/                       # 아키텍처 패턴
-│   ├── slack-bot-patterns.md           # Slack Bot 아키텍처 패턴
-│   ├── mcp-protocol-deep-dive.md       # MCP 프로토콜 상세 분석
-│   ├── agent-orchestration.md          # Agent 조율 패턴
-│   └── event-driven-patterns.md        # Event-driven 아키텍처
+├── INDEX.md                            # Research navigation
+├── RESEARCH_COMPLETE.md                # ⭐ Executive summary (MUST READ)
+├── ACTIVE_RESEARCH_TRACKING.md         # Backlog / in-progress tracking (may include planned docs)
+├── COMPREHENSIVE_RESEARCH_PLAN.md      # 200-task research roadmap
 │
-├── integration-patterns/               # 통합 패턴
-│   ├── session-management.md           # Session 관리 및 continuity
-│   ├── multi-tenant-isolation.md       # Multi-tenant 격리 전략
-│   ├── error-handling.md               # Error handling & retry
-│   └── authentication-patterns.md      # 인증/인가 패턴
+├── architecture/                       # System analysis + decisions
+│   ├── 00-current-architecture-analysis.md
+│   ├── 01-synthesis-and-decisions.md
+│   ├── ohmyopencode-integration-blueprint.md
+│   └── ohmyopencode-integration-design.md
 │
-├── commercial-tools/                   # 상용 도구 분석
-│   ├── zapier-analysis.md              # Zapier 아키텍처
-│   ├── n8n-analysis.md                 # n8n 구조 분석
-│   ├── make-integromat-analysis.md     # Make.com 패턴
-│   └── temporal-workflow-engine.md     # Temporal.io 워크플로우 엔진
+├── technical-deep-dive/                # 01-09 deep dive guides (core)
+│   ├── 01-orchestrator-architecture.md
+│   ├── 02-category-system-deep-dive.md
+│   ├── 03-skill-system-architecture.md
+│   ├── 04-slack-integration-patterns.md
+│   ├── 05-mcp-sdk-production-patterns.md
+│   ├── 06-langgraph-vs-custom-router.md
+│   ├── 07-redis-production-config.md
+│   ├── 08-ai-error-handling-guide.md
+│   └── 09-multi-tenant-security-checklist.md
 │
-└── technical-deep-dive/                # 기술 심화
-    ├── langchain-langgraph.md          # LangChain/LangGraph 패턴
-    ├── bullmq-job-queues.md            # BullMQ 작업 큐
-    ├── redis-session-patterns.md       # Redis 세션 패턴
-    └── slack-api-best-practices.md     # Slack API 모범 사례
+├── integration/                        # External integrations (webhooks, real-time, etc.)
+│   ├── webhook-integration-patterns-guide.md
+│   └── real-time/
+│       └── 01-sse-patterns.md
+│
+├── performance/                        # Scaling + DB strategies
+│   ├── autoscaling-implementation-guide.md
+│   ├── database-sharding-partitioning-guide.md
+│   ├── load-testing/
+│   │   └── 01-tools-and-patterns.md
+│   └── optimization/
+│       └── 01-database-query-optimization.md
+│
+├── production/                         # Operations, cost, compliance
+│   ├── cloud-cost-optimization-guide.md
+│   ├── incident-response-postmortem-playbook.md
+│   ├── soc2-compliance-roadmap.md
+│   ├── monitoring/
+│   │   └── 01-apm-patterns.md
+│   ├── deployment/
+│   │   └── 01-zero-downtime-deployment.md
+│   └── compliance/
+│       └── 01-gdpr-compliance.md
+│
+├── security/                           # Security patterns
+│   ├── api-security-patterns-guide.md
+│   ├── session-security-comprehensive-guide.md
+│   └── authentication/
+│       └── 01-oauth-2.1-security.md
+│
+└── usability/                          # UX / analytics patterns
+    ├── ai-analytics-visualization-summary.md
+    ├── data-visualization-dashboard-guide.md
+    ├── feature-flags-advanced-patterns.md
+    ├── slack-bot-patterns/
+    │   └── 01-conversation-design.md
+    ├── onboarding/
+    │   └── 01-saas-onboarding-flows.md
+    └── error-ux/
+        └── 01-error-message-patterns.md
 ```
 
 ---
+
+## 📚 Recommended Reading Order
+
+1. **Start here**: [`RESEARCH_COMPLETE.md`](./RESEARCH_COMPLETE.md)
+2. **Architecture**:
+   - [`architecture/00-current-architecture-analysis.md`](./architecture/00-current-architecture-analysis.md)
+   - [`architecture/01-synthesis-and-decisions.md`](./architecture/01-synthesis-and-decisions.md)
+3. **Technical Deep Dive (01→09 in order)**: [`technical-deep-dive/`](./technical-deep-dive/)
+4. **Domain guides (as needed)**: `integration/`, `performance/`, `production/`, `security/`, `usability/`
+
+> Note: Additional backlog topics are tracked in `ACTIVE_RESEARCH_TRACKING.md`.
 
 ## 🎯 리서치 목표
 
@@ -88,28 +146,10 @@ research/
 
 ## 🔍 현재 진행 상황
 
-### 완료된 문서 읽기
+### Status
 
-- ✅ README.md (프로젝트 개요)
-- ✅ docs/core/06-ohmyopencode-integration.md
-- ✅ docs/core/07-slack-orchestrator-implementation.md
-- ✅ PROJECT_IDENTITY.md
-- ✅ ARCHITECTURE.md
-- ✅ plan/00-overview.md
-- ✅ plan/01-architecture/system-architecture.md
-- ✅ package.json (dependencies 파악)
-- ✅ prisma/schema.prisma (data model 파악)
-- ✅ src/\*_/_.ts 파일 목록
-
-### 실행 중인 백그라운드 에이전트
-
-1. **bg_18d3049e** - Slack Bot architecture patterns (librarian) - **running**
-2. **bg_954765ff** - MCP protocol implementations (librarian) - **running**
-3. **bg_2f1218f8** - AI agent orchestration frameworks (librarian) - **running**
-4. **bg_691574ae** - Explore existing codebase structure (explore) - **running**
-5. **bg_8d3c9249** - Event-driven architectures (librarian) - **running**
-6. **NEW** - Commercial automation platforms analysis (librarian)
-7. **NEW** - Session continuity patterns (librarian)
+- ✅ **Core Week 9-12 research** documents are present under `architecture/` and `technical-deep-dive/`.
+- 🚧 **Additional backlog research** is tracked in [`ACTIVE_RESEARCH_TRACKING.md`](./ACTIVE_RESEARCH_TRACKING.md) (this may reference documents that are planned but not yet created).
 
 ---
 
@@ -139,9 +179,10 @@ research/
 
 ### 즉시 (리서치 완료 대기 중)
 
-- [ ] 7개 백그라운드 에이전트 완료 대기
-- [ ] 각 에이전트 결과를 해당 카테고리 문서로 작성
-- [ ] 추가 필요한 리서치 식별 및 실행
+- [x] `INDEX.md` 추가 (navigation + mapping)
+- [ ] 각 서브폴더 README 추가 (scope + link)
+- [x] Stub/placeholder 제거 및 내용 보강
+- [ ] `ACTIVE_RESEARCH_TRACKING.md`의 planned deliverables를 실제 문서로 생성/동기화
 
 ### 단기 (리서치 결과 통합)
 

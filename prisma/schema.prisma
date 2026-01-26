@@ -26,22 +26,22 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  workspaceDomains  WorkspaceDomain[]
-  memberships       Membership[]
-  agents            Agent[]
-  teams             Team[]
-  projects          Project[]
-  tasks             Task[]
-  goals             Goal[]
-  valueStreams      ValueStream[]
-  kpis              KPI[]
-  workflows         Workflow[]
-  notionConnections NotionConnection[]
-  mcpConnections    MCPConnection[]
-  slackIntegrations SlackIntegration[]
+  workspaceDomains       WorkspaceDomain[]
+  memberships            Membership[]
+  agents                 Agent[]
+  teams                  Team[]
+  projects               Project[]
+  tasks                  Task[]
+  goals                  Goal[]
+  valueStreams           ValueStream[]
+  kpis                   KPI[]
+  workflows              Workflow[]
+  notionConnections      NotionConnection[]
+  mcpConnections         MCPConnection[]
+  slackIntegrations      SlackIntegration[]
   orchestratorExecutions OrchestratorExecution[]
-  featureFlagOverrides FeatureFlagOverride[]
-  featureFlagAuditLogs FeatureFlagAuditLog[]
+  featureFlagOverrides   FeatureFlagOverride[]
+  featureFlagAuditLogs   FeatureFlagAuditLog[]
 
   @@map("organizations")
 }
@@ -60,10 +60,10 @@ model User {
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  memberships Membership[]
-  sessions    Session[]
+  memberships            Membership[]
+  sessions               Session[]
   orchestratorExecutions OrchestratorExecution[]
-  featureFlagAuditLogs FeatureFlagAuditLog[]
+  featureFlagAuditLogs   FeatureFlagAuditLog[]
 
   @@index([email])
   @@index([googleId])
@@ -375,15 +375,15 @@ model WorkflowExecution {
 /// Orchestrator Executions (Conversation / delegation history)
 /// Separate from WorkflowExecution to avoid mixing automation runs with orchestration.
 model OrchestratorExecution {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  userId         String   @map("user_id") @db.Uuid
-  sessionId      String   @map("session_id") @db.VarChar(255)
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId         String @map("user_id") @db.Uuid
+  sessionId      String @map("session_id") @db.VarChar(255)
 
-  category String  @db.VarChar(100)
+  category String   @db.VarChar(100)
   skills   String[] @default([]) @db.VarChar(100)
-  status   String  @db.VarChar(50)
-  duration Int     @default(0)
+  status   String   @db.VarChar(50)
+  duration Int      @default(0)
 
   inputData    Json?   @map("input_data") @db.JsonB
   outputData   Json?   @map("output_data") @db.JsonB
@@ -409,19 +409,23 @@ model OrchestratorExecution {
 /// Generic MCP Connections (Organization-level integrations)
 /// Supports: Notion, Linear, Jira, Asana, Airtable, etc.
 model MCPConnection {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  provider       String   @db.VarChar(100) // notion, linear, jira, asana, airtable, etc.
-  name           String   @db.VarChar(255) // User-friendly name
-  config         Json     @db.JsonB // Provider-specific config (API keys, tokens, etc.)
-  enabled        Boolean  @default(true)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  provider       String    @db.VarChar(100) // notion, linear, jira, asana, airtable, etc.
+  namespace      String    @db.VarChar(100) // MCP namespace/scope identifier
+  name           String    @db.VarChar(255) // User-friendly name
+  config         Json      @db.JsonB // Provider-specific config (API keys, tokens, etc.)
+  refreshToken   String?   @map("refresh_token") @db.Text // OAuth refresh token (encrypted)
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6) // Token expiration timestamp
+  enabled        Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([provider])
+  @@index([namespace])
   @@map("mcp_connections")
 }
 
@@ -508,14 +512,14 @@ model FeatureFlag {
 }
 
 model FeatureFlagRule {
-  id            String   @id @default(uuid()) @db.Uuid
-  featureFlagId String   @map("feature_flag_id") @db.Uuid
+  id            String @id @default(uuid()) @db.Uuid
+  featureFlagId String @map("feature_flag_id") @db.Uuid
 
-  type           String   @db.VarChar(50) // ALLOWLIST | BLOCKLIST | PERCENTAGE
+  type            String   @db.VarChar(50) // ALLOWLIST | BLOCKLIST | PERCENTAGE
   organizationIds String[] @default([]) @map("organization_ids") @db.Uuid
-  percentage     Int      @default(0)
-  priority       Int      @default(100)
-  enabled        Boolean  @default(true)
+  percentage      Int      @default(0)
+  priority        Int      @default(100)
+  enabled         Boolean  @default(true)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -528,19 +532,19 @@ model FeatureFlagRule {
 }
 
 model FeatureFlagOverride {
-  id            String   @id @default(uuid()) @db.Uuid
-  featureFlagId String   @map("feature_flag_id") @db.Uuid
-  organizationId String  @map("organization_id") @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  featureFlagId  String @map("feature_flag_id") @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
 
   enabled   Boolean
-  reason    String?  @db.Text
+  reason    String?   @db.Text
   expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  featureFlag  FeatureFlag   @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  featureFlag  FeatureFlag  @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([featureFlagId, organizationId])
   @@index([organizationId])
@@ -549,8 +553,8 @@ model FeatureFlagOverride {
 }
 
 model FeatureFlagAuditLog {
-  id            String   @id @default(uuid()) @db.Uuid
-  featureFlagId String   @map("feature_flag_id") @db.Uuid
+  id            String @id @default(uuid()) @db.Uuid
+  featureFlagId String @map("feature_flag_id") @db.Uuid
 
   action String @db.VarChar(50) // CREATED | UPDATED | RULE_SET | OVERRIDE_SET | EVALUATED
 
@@ -576,8 +580,8 @@ model FeatureFlagAuditLog {
 
 /// AuditLog (Tracks all user/system actions)
 model AuditLog {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
 
   action       String  @db.VarChar(100) // user.login, workflow.execute, etc.
   userId       String? @map("user_id") @db.Uuid

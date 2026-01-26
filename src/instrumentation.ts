@@ -3,11 +3,7 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import {
-  SEMRESATTRS_SERVICE_NAME,
-  SEMRESATTRS_SERVICE_VERSION,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import { PrismaInstrumentation } from "@prisma/instrumentation";
 
 const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
@@ -33,9 +29,9 @@ if (otlpEndpoint) {
 
     sdk = new NodeSDK({
       resource: resourceFromAttributes({
-        [SEMRESATTRS_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || "nubabel-backend",
-        [SEMRESATTRS_SERVICE_VERSION]: process.env.npm_package_version || "1.0.0",
-        [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || "development",
+        [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || "nubabel-backend",
+        [ATTR_SERVICE_VERSION]: process.env.npm_package_version || "1.0.0",
+        "deployment.environment": process.env.NODE_ENV || "development",
       }),
       spanProcessor: new BatchSpanProcessor(exporter, {
         maxQueueSize: 2048,

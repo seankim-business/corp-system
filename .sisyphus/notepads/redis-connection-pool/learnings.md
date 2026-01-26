@@ -1,0 +1,4 @@
+- Implemented Redis connection pooling with ioredis, including health monitoring, recycling, and stats.
+- Queue pool configured at min 5/max 10; worker pool min 5/max 15 for isolated workloads.
+- Added async getQueue/WorkerConnection plus sync variants for BullMQ constructors.
+- Added MCP client pooling keyed by provider+organization+credentials hash (min 2/max 5, 5s acquire timeout, 15m idle eviction) with per-request context updates and Prometheus counters/gauges.

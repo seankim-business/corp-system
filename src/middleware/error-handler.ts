@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { logger } from "../utils/logger";
+import * as Sentry from "@sentry/node";
 
 export class AppError extends Error {
   constructor(
@@ -22,6 +23,26 @@ export function errorHandler(
   const statusCode = isAppError ? err.statusCode : 500;
   const message = isAppError ? err.message : "Internal server error";
   const isOperational = isAppError ? err.isOperational : false;
+
+  const shouldCapture = statusCode >= 500 && (!isAppError || (isAppError && !isOperational));
+  const isDevelopment = process.env.NODE_ENV === "development";
+
+  if (shouldCapture && !isDevelopment) {
+    const safeHeaders: Record<string, string | string[] | undefined> = {
+      "user-agent": req.headers["user-agent"],
+      "content-type": req.headers["content-type"],
+    };
+
+    Sentry.captureException(err, {
+      contexts: {
+        request: {
+          method: req.method,
+          url: req.url,
+          headers: safeHeaders,
+        },
+      },
+    });
+  }
 
   logger.error(
     "Request error",

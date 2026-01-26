@@ -1,0 +1,2 @@
+- Chose dual pool strategy (queue vs worker) to isolate BullMQ workloads and avoid contention.
+- Kept sync connection accessors for BullMQ constructors and async accessors for general usage.

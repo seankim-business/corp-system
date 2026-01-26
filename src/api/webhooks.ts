@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
-import { getRedisClient } from "../db/redis";
+import { withQueueConnection } from "../db/redis";
 import { webhookQueue } from "../queue/webhook.queue";
 
 export const webhooksRouter = Router();
@@ -58,9 +58,16 @@ webhooksRouter.post("/webhooks/:provider", async (req: Request, res: Response) =
   }
 
   // Idempotency (1 hour)
-  const redis = await getRedisClient();
   const dedupeKey = `webhook:${provider}:${eventId}`;
-  const setResult = await redis.set(dedupeKey, "1", { NX: true, EX: 3600 });
+  const setResult = await withQueueConnection((redis) =>
+    (redis as unknown as { set: (...args: Array<string | number>) => Promise<string | null> }).set(
+      dedupeKey,
+      "1",
+      "NX",
+      "EX",
+      3600,
+    ),
+  );
   if (setResult !== "OK") {
     return res.status(200).json({ ok: true, duplicate: true });
   }

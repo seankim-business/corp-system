@@ -9,14 +9,22 @@
  * - Output: created task
  */
 
-import { NotionClient } from "../client";
+import { getNotionClient } from "../client";
 import { CreateTaskInput, CreateTaskOutput } from "../types";
+import { MCPConnection } from "../../../orchestrator/types";
 
 export async function createTaskTool(
   apiKey: string,
   input: CreateTaskInput,
+  connection?: MCPConnection,
+  userId?: string,
 ): Promise<CreateTaskOutput> {
-  const client = new NotionClient(apiKey);
+  const { client, release } = await getNotionClient({
+    apiKey,
+    connection,
+    organizationId: connection?.organizationId,
+    userId,
+  });
 
   const { databaseId, title, status, assignee, dueDate, properties } = input;
 
@@ -28,12 +36,16 @@ export async function createTaskTool(
     throw new Error("title is required");
   }
 
-  const task = await client.createTask(databaseId, title, {
-    status,
-    assignee,
-    dueDate,
-    ...properties,
-  });
+  try {
+    const task = await client.createTask(databaseId, title, {
+      status,
+      assignee,
+      dueDate,
+      ...properties,
+    });
 
-  return { task };
+    return { task };
+  } finally {
+    release();
+  }
 }

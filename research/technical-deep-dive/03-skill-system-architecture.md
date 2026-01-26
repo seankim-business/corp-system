@@ -285,7 +285,7 @@ return "Please connect Notion first";
 const result = await callTool('notion\_\_createTask', {
 title: 'Implement auth',
 properties: {
-Status: 'Todo',
+Status: 'To-do',
 Priority: 'High',
 },
 });
@@ -301,7 +301,7 @@ return `Created task: ${result.title} (${result.url})`;
 
 // 1. Get Notion tasks
 const tasks = await callTool('notion\_\_getTasks', {
-filter: { Status: 'Todo' },
+filter: { Status: 'To-do' },
 });
 
 // 2. Create Linear issues
@@ -450,7 +450,7 @@ return "Notion connection required. Add it in Settings.";
 // Extract task details
 const title = "Fix bug in auth";
 const properties = {
-Status: "Todo",
+Status: "To-do",
 Priority: "High",
 Assignee: context.userId,
 };
@@ -601,11 +601,7 @@ interface SkillMetrics {
   }>;
 }
 
-async function trackSkillUsage(
-  skills: string[],
-  duration: number,
-  success: boolean,
-) {
+async function trackSkillUsage(skills: string[], duration: number, success: boolean) {
   for (const skill of skills) {
     await db.skillMetrics.upsert({
       where: { skill },

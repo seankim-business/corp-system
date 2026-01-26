@@ -2760,6 +2760,449 @@
         .spawn-explanation {
           order: 1;
         }
+        .command-center-grid {
+          grid-template-columns: 1fr;
+        }
+        .command-agents-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .command-flow {
+          flex-direction: column;
+        }
+        .command-flow-arrow {
+          transform: rotate(90deg);
+        }
+      }
+
+      /* ========== UNIFIED COMMAND CENTER ========== */
+      .command-center {
+        padding: 120px 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .command-center-header {
+        text-align: center;
+        margin-bottom: 48px;
+      }
+
+      .command-center-header h2 {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin-bottom: 12px;
+      }
+
+      .command-center-header p {
+        font-size: 18px;
+        color: var(--text-secondary);
+      }
+
+      .command-panel {
+        background: linear-gradient(180deg, rgba(10, 10, 15, 0.9), rgba(3, 3, 5, 0.95));
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 1px rgba(139, 92, 246, 0.1),
+          0 20px 50px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+
+      .command-mission {
+        background: linear-gradient(90deg, var(--accent-dim), rgba(16, 185, 129, 0.1));
+        padding: 20px 32px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .mission-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--accent);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+      }
+
+      .mission-content {
+        flex: 1;
+      }
+
+      .mission-label {
+        font-size: 11px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+      }
+
+      .mission-text {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .mission-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 20px;
+        font-size: 13px;
+        color: var(--green);
+        font-weight: 500;
+      }
+
+      .mission-status-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      .command-body {
+        padding: 40px;
+      }
+
+      .command-flow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        margin-bottom: 48px;
+      }
+
+      .command-node {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .command-node-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        transition: all 0.3s ease;
+      }
+
+      .command-node-icon.user {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        border: 2px solid rgba(102, 126, 234, 0.4);
+      }
+
+      .command-node-icon.orchestrator {
+        background: var(--accent-dim);
+        border: 2px solid var(--accent);
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+      }
+
+      .command-node-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .command-node-sublabel {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .command-flow-arrow {
+        color: var(--accent);
+        font-size: 24px;
+        opacity: 0.6;
+      }
+
+      .command-flow-branches {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .command-flow-branches svg {
+        width: 100%;
+        max-width: 500px;
+        height: 40px;
+      }
+
+      .command-branch-line {
+        stroke: var(--accent);
+        stroke-width: 2;
+        stroke-dasharray: 6 4;
+        fill: none;
+        animation: dashMove 1s linear infinite;
+      }
+
+      .command-agents-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 40px;
+      }
+
+      .command-agent {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .command-agent::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--agent-color, var(--accent));
+      }
+
+      .command-agent:hover {
+        border-color: var(--agent-color, var(--accent));
+        transform: translateY(-4px);
+      }
+
+      .command-agent-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .command-agent-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        background: var(--agent-color, var(--accent));
+        opacity: 0.9;
+      }
+
+      .command-agent-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .command-agent-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .command-tool-tag {
+        padding: 3px 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .command-agent-subtasks {
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+        margin-top: 8px;
+      }
+
+      .command-subtask {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+      }
+
+      .command-subtask:last-child {
+        margin-bottom: 0;
+      }
+
+      .command-subtask-icon {
+        font-size: 10px;
+      }
+
+      .command-agent-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+        font-size: 12px;
+      }
+
+      .command-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .command-status-dot.done {
+        background: var(--green);
+      }
+
+      .command-status-dot.working {
+        background: var(--accent);
+        animation: pulse 1s ease-in-out infinite;
+      }
+
+      .command-status-text {
+        color: var(--text-muted);
+      }
+
+      .command-status-text.done {
+        color: var(--green);
+      }
+
+      .command-divider {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin: 32px 0;
+      }
+
+      .command-divider-line {
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      .command-divider-text {
+        font-size: 12px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .command-skills {
+        display: flex;
+        align-items: center;
+        gap: 32px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+      }
+
+      .command-skills-visual {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        flex: 1;
+      }
+
+      .command-skill-badge {
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+      }
+
+      .command-skill-badge.mastered {
+        background: var(--accent-dim);
+        border: 1px solid var(--accent);
+        color: var(--accent);
+      }
+
+      .command-skill-badge.learning {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        color: var(--green);
+        animation: skillPulse 2s ease-in-out infinite;
+      }
+
+      .command-skill-badge.locked {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        opacity: 0.5;
+      }
+
+      .command-skills-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 160px;
+      }
+
+      .command-skills-bar {
+        height: 8px;
+        background: var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .command-skills-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), var(--green));
+        border-radius: 4px;
+        width: 0;
+        animation: skillBarGrow 2s ease-out 0.5s forwards;
+      }
+
+      @keyframes skillBarGrow {
+        to {
+          width: 65%;
+        }
+      }
+
+      .command-skills-numbers {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .command-footer {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      .command-stat {
+        padding: 20px 24px;
+        text-align: center;
+        border-right: 1px solid var(--border);
+      }
+
+      .command-stat:last-child {
+        border-right: none;
+      }
+
+      .command-stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 4px;
+      }
+
+      .command-stat-label {
+        font-size: 12px;
+        color: var(--text-muted);
       }
     </style>
   </head>
@@ -2962,224 +3405,211 @@
       </div>
     </section>
 
-    <section class="agent-flow">
+    <section class="command-center" id="how">
       <div class="container">
-        <div class="flow-header">
-          <h2>One request. Multiple agents. Seamless execution.</h2>
-          <p>Watch how a single @mention triggers an intelligent workflow</p>
+        <div class="command-center-header">
+          <h2>Your AI workforce in action</h2>
+          <p>One request triggers a coordinated team of specialized agents</p>
         </div>
 
-        <div class="flow-visualization">
-          <div class="flow-step">
-            <div class="flow-node user-node animate-float">
-              <div class="flow-icon">👤</div>
-              <div class="flow-label">You</div>
+        <div class="command-panel">
+          <div class="command-mission">
+            <div class="mission-icon">🎯</div>
+            <div class="mission-content">
+              <div class="mission-label">Active Mission</div>
+              <div class="mission-text">
+                "Prepare Q1 board presentation with financials, metrics, and team highlights"
+              </div>
             </div>
-            <div class="flow-connector">
-              <svg width="80" height="40" viewBox="0 0 80 40">
-                <path
-                  d="M0,20 L70,20"
-                  stroke="var(--accent)"
-                  stroke-width="2"
-                  stroke-dasharray="5,5"
-                  fill="none"
-                  style="animation: drawLine 1s ease forwards"
-                />
-                <polygon points="70,15 80,20 70,25" fill="var(--accent)" />
-              </svg>
+            <div class="mission-status">
+              <div class="mission-status-dot"></div>
+              <span>Executing</span>
             </div>
           </div>
 
-          <div class="flow-step">
-            <div class="flow-node orchestrator-node animate-pulse">
-              <div class="flow-icon">🧠</div>
-              <div class="flow-label">Orchestrator</div>
-              <div class="flow-sublabel">Analyzes & delegates</div>
+          <div class="command-body">
+            <div class="command-flow">
+              <div class="command-node">
+                <div class="command-node-icon user">👤</div>
+                <div class="command-node-label">You</div>
+                <div class="command-node-sublabel">@mention in Slack</div>
+              </div>
+
+              <div class="command-flow-arrow">→</div>
+
+              <div class="command-node">
+                <div class="command-node-icon orchestrator">🧠</div>
+                <div class="command-node-label">Orchestrator</div>
+                <div class="command-node-sublabel">Analyzes & delegates</div>
+              </div>
+
+              <div class="command-flow-branches">
+                <svg viewBox="0 0 300 40" preserveAspectRatio="none">
+                  <path
+                    d="M0,0 L0,20 L-100,20 L-100,40"
+                    class="command-branch-line"
+                    transform="translate(150,0)"
+                  />
+                  <path
+                    d="M0,0 L0,20 L-33,20 L-33,40"
+                    class="command-branch-line"
+                    transform="translate(150,0)"
+                  />
+                  <path
+                    d="M0,0 L0,20 L33,20 L33,40"
+                    class="command-branch-line"
+                    transform="translate(150,0)"
+                  />
+                  <path
+                    d="M0,0 L0,20 L100,20 L100,40"
+                    class="command-branch-line"
+                    transform="translate(150,0)"
+                  />
+                </svg>
+              </div>
             </div>
-            <div class="flow-branches">
-              <svg width="200" height="100" viewBox="0 0 200 100">
-                <path
-                  d="M100,0 L40,50 L40,100"
-                  stroke="var(--accent)"
-                  stroke-width="2"
-                  fill="none"
-                  opacity="0.5"
-                />
-                <path d="M100,0 L100,100" stroke="var(--accent)" stroke-width="2" fill="none" />
-                <path
-                  d="M100,0 L160,50 L160,100"
-                  stroke="var(--green)"
-                  stroke-width="2"
-                  fill="none"
-                  opacity="0.5"
-                />
-              </svg>
+
+            <div class="command-agents-grid">
+              <div class="command-agent" style="--agent-color: #f59e0b">
+                <div class="command-agent-header">
+                  <div class="command-agent-icon">💰</div>
+                  <div class="command-agent-name">Finance Agent</div>
+                </div>
+                <div class="command-agent-tools">
+                  <span class="command-tool-tag">QuickBooks</span>
+                  <span class="command-tool-tag">Sheets</span>
+                </div>
+                <div class="command-agent-subtasks">
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Pull revenue data
+                  </div>
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Calculate margins
+                  </div>
+                </div>
+                <div class="command-agent-status">
+                  <div class="command-status-dot done"></div>
+                  <span class="command-status-text done">✓ Complete</span>
+                </div>
+              </div>
+
+              <div class="command-agent" style="--agent-color: #3b82f6">
+                <div class="command-agent-header">
+                  <div class="command-agent-icon">📊</div>
+                  <div class="command-agent-name">Analytics Agent</div>
+                </div>
+                <div class="command-agent-tools">
+                  <span class="command-tool-tag">Amplitude</span>
+                  <span class="command-tool-tag">Mixpanel</span>
+                </div>
+                <div class="command-agent-subtasks">
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Extract KPI metrics
+                  </div>
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Generate charts
+                  </div>
+                </div>
+                <div class="command-agent-status">
+                  <div class="command-status-dot done"></div>
+                  <span class="command-status-text done">✓ Complete</span>
+                </div>
+              </div>
+
+              <div class="command-agent" style="--agent-color: #10b981">
+                <div class="command-agent-header">
+                  <div class="command-agent-icon">👥</div>
+                  <div class="command-agent-name">HR Agent</div>
+                </div>
+                <div class="command-agent-tools">
+                  <span class="command-tool-tag">Linear</span>
+                  <span class="command-tool-tag">Slack</span>
+                </div>
+                <div class="command-agent-subtasks">
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Team highlights
+                  </div>
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Key wins
+                  </div>
+                </div>
+                <div class="command-agent-status">
+                  <div class="command-status-dot working"></div>
+                  <span class="command-status-text">Working...</span>
+                </div>
+              </div>
+
+              <div class="command-agent" style="--agent-color: #8b5cf6">
+                <div class="command-agent-header">
+                  <div class="command-agent-icon">🎨</div>
+                  <div class="command-agent-name">Design Agent</div>
+                </div>
+                <div class="command-agent-tools">
+                  <span class="command-tool-tag">Figma</span>
+                  <span class="command-tool-tag">Slides</span>
+                </div>
+                <div class="command-agent-subtasks">
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Deck layout
+                  </div>
+                  <div class="command-subtask">
+                    <span class="command-subtask-icon">→</span> Visual styling
+                  </div>
+                </div>
+                <div class="command-agent-status">
+                  <div class="command-status-dot working"></div>
+                  <span class="command-status-text">Working...</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="command-divider">
+              <div class="command-divider-line"></div>
+              <span class="command-divider-text">Skills Growing</span>
+              <div class="command-divider-line"></div>
+            </div>
+
+            <div class="command-skills">
+              <div class="command-skills-visual">
+                <div class="command-skill-badge mastered">💬 Slack</div>
+                <div class="command-skill-badge mastered">📄 Notion</div>
+                <div class="command-skill-badge mastered">📊 Analytics</div>
+                <div class="command-skill-badge mastered">📅 Calendar</div>
+                <div class="command-skill-badge learning">📈 Reports</div>
+                <div class="command-skill-badge learning">🔄 Updates</div>
+                <div class="command-skill-badge locked">🎯 OKRs</div>
+                <div class="command-skill-badge locked">📋 Planning</div>
+              </div>
+              <div class="command-skills-stats">
+                <div class="command-skills-bar">
+                  <div class="command-skills-fill"></div>
+                </div>
+                <div class="command-skills-numbers">
+                  <span>6 mastered</span>
+                  <span>2 learning</span>
+                  <span>2 next</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="flow-agents">
-            <div class="flow-agent animate-scale-in delay-1">
-              <div class="agent-card">
-                <div class="agent-icon" style="background: #1d9bd1">📊</div>
-                <div class="agent-name">Data Agent</div>
-                <div class="agent-task">Pulls from Salesforce, Sheets</div>
-              </div>
+          <div class="command-footer">
+            <div class="command-stat">
+              <div class="command-stat-value">47s</div>
+              <div class="command-stat-label">Execution time</div>
             </div>
-            <div class="flow-agent animate-scale-in delay-2">
-              <div class="agent-card">
-                <div class="agent-icon" style="background: var(--accent)">📝</div>
-                <div class="agent-name">Report Agent</div>
-                <div class="agent-task">Creates Notion document</div>
-              </div>
+            <div class="command-stat">
+              <div class="command-stat-value">24</div>
+              <div class="command-stat-label">Slides generated</div>
             </div>
-            <div class="flow-agent animate-scale-in delay-3">
-              <div class="agent-card">
-                <div class="agent-icon" style="background: var(--green)">📤</div>
-                <div class="agent-name">Comms Agent</div>
-                <div class="agent-task">Posts to Slack channel</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="flow-result animate-scale-in delay-4">
-            <div class="result-card">
-              <div class="result-icon">✅</div>
-              <div class="result-text">
-                <strong>Done in 30 seconds</strong>
-                <span>Report created, team notified, you approved</span>
-              </div>
+            <div class="command-stat">
+              <div class="command-stat-value">4</div>
+              <div class="command-stat-label">Agents deployed</div>
             </div>
           </div>
         </div>
       </div>
     </section>
-
-    <section class="how-it-works" id="how">
-      <div class="container">
-        <div class="how-header">
-          <h2>How your AI workforce operates</h2>
-          <p>
-            A hierarchical system that delegates, executes in parallel, and learns—just like your
-            best team.
-          </p>
-        </div>
-
-        <div class="hierarchy-viz">
-          <!-- Level 1: User -->
-          <div class="hierarchy-level">
-            <div class="hierarchy-node">
-              <div class="hierarchy-card user-card">
-                <div class="hierarchy-icon">👤</div>
-                <div class="hierarchy-title">You</div>
-                <div class="hierarchy-desc">@mention in Slack</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Connector to Orchestrator -->
-          <div class="hierarchy-connector">
-            <svg viewBox="0 0 2 48">
-              <line x1="1" y1="0" x2="1" y2="48" class="hierarchy-connector-line" />
-            </svg>
-          </div>
-
-          <!-- Level 2: Orchestrator -->
-          <div class="hierarchy-level">
-            <div class="hierarchy-node">
-              <div class="hierarchy-card orchestrator-card">
-                <div class="hierarchy-icon">🧠</div>
-                <div class="hierarchy-title">Orchestrator</div>
-                <div class="hierarchy-desc">Analyzes, plans & delegates</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Branch lines to sub-agents -->
-          <div class="hierarchy-branches">
-            <svg viewBox="0 0 600 48" preserveAspectRatio="none">
-              <path d="M300,0 L300,24 L100,24 L100,48" class="hierarchy-branch-line active" />
-              <path d="M300,0 L300,48" class="hierarchy-branch-line active" />
-              <path d="M300,0 L300,24 L500,24 L500,48" class="hierarchy-branch-line active" />
-            </svg>
-          </div>
-
-          <!-- Level 3: Sub-agents -->
-          <div class="hierarchy-level">
-            <div class="hierarchy-node">
-              <div class="hierarchy-card agent-card-l2" style="border-color: #1d9bd1">
-                <div class="hierarchy-icon">📊</div>
-                <div class="hierarchy-title">Data Agent</div>
-                <div class="hierarchy-desc">Fetches & analyzes</div>
-              </div>
-              <div class="hierarchy-sublevel">
-                <div class="hierarchy-card agent-card-l3">
-                  <div class="hierarchy-icon">🔍</div>
-                  <div class="hierarchy-title">Search</div>
-                </div>
-                <div class="hierarchy-card agent-card-l3">
-                  <div class="hierarchy-icon">📈</div>
-                  <div class="hierarchy-title">Analyze</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hierarchy-node">
-              <div class="hierarchy-card agent-card-l2" style="border-color: var(--accent)">
-                <div class="hierarchy-icon">📝</div>
-                <div class="hierarchy-title">Report Agent</div>
-                <div class="hierarchy-desc">Creates documents</div>
-              </div>
-              <div class="hierarchy-sublevel">
-                <div class="hierarchy-card agent-card-l3">
-                  <div class="hierarchy-icon">✍️</div>
-                  <div class="hierarchy-title">Draft</div>
-                </div>
-                <div class="hierarchy-card agent-card-l3">
-                  <div class="hierarchy-icon">🎨</div>
-                  <div class="hierarchy-title">Format</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hierarchy-node">
-              <div class="hierarchy-card agent-card-l2" style="border-color: var(--green)">
-                <div class="hierarchy-icon">📤</div>
-                <div class="hierarchy-title">Comms Agent</div>
-                <div class="hierarchy-desc">Shares & notifies</div>
-              </div>
-              <div class="hierarchy-sublevel">
-                <div class="hierarchy-card agent-card-l3">
-                  <div class="hierarchy-icon">💬</div>
-                  <div class="hierarchy-title">Slack</div>
-                </div>
-                <div class="hierarchy-card agent-card-l3">
-                  <div class="hierarchy-icon">📧</div>
-                  <div class="hierarchy-title">Email</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Parallel execution indicator -->
-          <div class="parallel-indicator">
-            <div class="parallel-dot"></div>
-            <div class="parallel-dot"></div>
-            <div class="parallel-dot"></div>
-            <span class="parallel-text">All agents execute in parallel</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="non-invasive">
-      <div class="container">
-        <div class="non-invasive-header">
-          <h2>Agents spawn when you need them</h2>
-          <p class="non-invasive-subtitle">
-            No pre-configuration. No workflow builders. Just describe what you need—agents
-            materialize automatically.
-          </p>
-        </div>
 
         <div class="spawn-container">
           <div class="spawn-explanation">
