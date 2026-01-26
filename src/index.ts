@@ -4,7 +4,11 @@ import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { authenticate } from "./middleware/auth.middleware";
-import { authRateLimiter, apiRateLimiter } from "./middleware/rate-limiter.middleware";
+import {
+  authRateLimiter,
+  apiRateLimiter,
+  strictRateLimiter,
+} from "./middleware/rate-limiter.middleware";
 import { getAllCircuitBreakers } from "./utils/circuit-breaker";
 import { getEnv } from "./utils/env";
 import { getRedisClient } from "./db/redis";
@@ -16,11 +20,12 @@ import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integratio
 import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
 import { webhooksRouter } from "./api/webhooks";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
-import { sseRouter } from "./api/sse";
+import { sseRouter, shutdownSSE } from "./api/sse";
 import { startWorkers, stopWorkers } from "./workers";
 import { startSlackBot, stopSlackBot } from "./api/slack";
 import { disconnectRedis } from "./db/redis";
 import { db } from "./db/client";
+import { shutdownOpenTelemetry } from "./instrumentation";
 
 console.log("🚀 Initializing Nubabel Platform...");
 console.log(`📍 Node version: ${process.version}`);
@@ -37,6 +42,9 @@ try {
 const app = express();
 const port = parseInt(process.env.PORT || "3000", 10);
 
+let activeRequests = 0;
+let isShuttingDown = false;
+
 app.use(helmet());
 app.use(
   cors({
@@ -44,6 +52,19 @@ app.use(
     credentials: true,
   }),
 );
+
+app.use((_req, res, next) => {
+  if (isShuttingDown) {
+    res.set("Connection", "close");
+    return res.status(503).json({ error: "Server is shutting down" });
+  }
+  activeRequests++;
+  res.on("finish", () => {
+    activeRequests--;
+  });
+  return next();
+});
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -145,7 +166,6 @@ app.get("/health/circuits", (_req, res) => {
 
 app.use("/auth", authRateLimiter, authRoutes);
 
-// Webhooks must be reachable without auth; signatures are verified in-route.
 app.use("/api", apiRateLimiter, webhooksRouter);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
@@ -154,10 +174,10 @@ app.use("/api", apiRateLimiter, authenticate, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, notionRoutes);
 app.use("/api", apiRateLimiter, authenticate, slackIntegrationRouter);
 app.use("/api", apiRateLimiter, authenticate, featureFlagsRouter);
-app.use("/api", apiRateLimiter, authenticate, featureFlagsAdminRouter);
+app.use("/api", apiRateLimiter, authenticate, strictRateLimiter, featureFlagsAdminRouter);
 app.use("/api", sseRouter);
 
-app.use("/admin/queues", authenticate, bullBoardAdapter.getRouter());
+app.use("/admin/queues", authenticate, strictRateLimiter, bullBoardAdapter.getRouter());
 
 app.get("/api/user", authenticate, (req, res) => {
   res.json({
@@ -209,29 +229,72 @@ server.on("error", (error: any) => {
   process.exit(1);
 });
 
-process.on("SIGTERM", async () => {
-  console.log("SIGTERM signal received: closing HTTP server");
-  await stopSlackBot();
-  await stopWorkers();
-  await disconnectRedis();
-  await db.$disconnect();
-  server.close(() => {
-    console.log("HTTP server closed");
-    process.exit(0);
-  });
-});
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) {
+    console.log("Shutdown already in progress");
+    return;
+  }
 
-process.on("SIGINT", async () => {
-  console.log("SIGINT signal received: closing HTTP server");
-  await stopSlackBot();
-  await stopWorkers();
-  await disconnectRedis();
-  await db.$disconnect();
-  server.close(() => {
-    console.log("HTTP server closed");
+  console.log(`\n${signal} received, starting graceful shutdown...`);
+  isShuttingDown = true;
+
+  const shutdownTimeout = setTimeout(() => {
+    console.error("⚠️  Graceful shutdown timeout (30s), forcing exit");
+    process.exit(1);
+  }, 30000);
+
+  try {
+    console.log("1. Closing HTTP server (stop accepting new connections)...");
+    server.close();
+
+    console.log(`2. Waiting for ${activeRequests} active requests to complete...`);
+    const maxWait = 20000;
+    const startTime = Date.now();
+    while (activeRequests > 0 && Date.now() - startTime < maxWait) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (activeRequests > 0) {
+      console.warn(`⚠️  ${activeRequests} requests still active after timeout`);
+    } else {
+      console.log("   ✓ All requests completed");
+    }
+
+    console.log("3. Closing SSE connections...");
+    await shutdownSSE();
+    console.log("   ✓ SSE closed");
+
+    console.log("4. Stopping Slack Bot...");
+    await stopSlackBot();
+    console.log("   ✓ Slack Bot stopped");
+
+    console.log("5. Stopping BullMQ workers...");
+    await stopWorkers();
+    console.log("   ✓ Workers stopped");
+
+    console.log("6. Closing Redis connections...");
+    await disconnectRedis();
+    console.log("   ✓ Redis closed");
+
+    console.log("7. Disconnecting Prisma...");
+    await db.$disconnect();
+    console.log("   ✓ Prisma disconnected");
+
+    console.log("8. Shutting down OpenTelemetry...");
+    await shutdownOpenTelemetry();
+    console.log("   ✓ OpenTelemetry shut down");
+
+    clearTimeout(shutdownTimeout);
+    console.log("✅ Graceful shutdown complete");
     process.exit(0);
-  });
-});
+  } catch (error) {
+    console.error("❌ Error during graceful shutdown:", error);
+    clearTimeout(shutdownTimeout);
+    process.exit(1);
+  }
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);

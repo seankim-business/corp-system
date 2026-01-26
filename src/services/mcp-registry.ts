@@ -2,10 +2,53 @@ import { db as prisma } from "../db/client";
 import { MCPConnection } from "../orchestrator/types";
 import { cache } from "../utils/cache";
 
+type ToolExecutionRequest = {
+  params: {
+    name: string;
+    arguments?: Record<string, unknown>;
+  };
+  connection: MCPConnection;
+};
+
+type ParsedToolName = {
+  namespace: string | null;
+  toolName: string;
+  isLegacy: boolean;
+};
+
+const getProviderNamespace = (provider: string): string => provider.trim().toLowerCase();
+
+const parseToolName = (toolName: string, provider: string): ParsedToolName => {
+  const providerNamespace = getProviderNamespace(provider);
+  if (toolName.includes("__")) {
+    const [namespace, name] = toolName.split("__");
+    return {
+      namespace: namespace || null,
+      toolName: name || "",
+      isLegacy: false,
+    };
+  }
+
+  const legacyPrefix = `${providerNamespace}_`;
+  if (toolName.startsWith(legacyPrefix)) {
+    return {
+      namespace: providerNamespace,
+      toolName: toolName.slice(legacyPrefix.length),
+      isLegacy: true,
+    };
+  }
+
+  return {
+    namespace: null,
+    toolName,
+    isLegacy: false,
+  };
+};
+
 export async function getActiveMCPConnections(organizationId: string): Promise<MCPConnection[]> {
   return cache.remember(
     `mcp:${organizationId}`,
-    async () => {
+    async (): Promise<MCPConnection[]> => {
       const connections = await prisma.mCPConnection.findMany({
         where: {
           organizationId,
@@ -23,10 +66,11 @@ export async function getActiveMCPConnections(organizationId: string): Promise<M
           enabled: boolean;
           createdAt: Date;
           updatedAt: Date;
-        }) => ({
+        }): MCPConnection => ({
           id: conn.id,
           organizationId: conn.organizationId,
           provider: conn.provider,
+          namespace: getProviderNamespace(conn.provider),
           name: conn.name,
           config: conn.config as Record<string, unknown>,
           enabled: conn.enabled,
@@ -67,6 +111,7 @@ export async function createMCPConnection(params: {
     id: connection.id,
     organizationId: connection.organizationId,
     provider: connection.provider,
+    namespace: getProviderNamespace(connection.provider),
     name: connection.name,
     config: connection.config as Record<string, any>,
     enabled: connection.enabled,
@@ -89,4 +134,58 @@ export async function deleteMCPConnection(connectionId: string): Promise<void> {
   await prisma.mCPConnection.delete({
     where: { id: connectionId },
   });
+}
+
+export function validateToolAccess(
+  toolName: string,
+  provider: string,
+  organizationId: string,
+  connection: MCPConnection,
+): ParsedToolName {
+  const providerNamespace = getProviderNamespace(provider);
+  const parsed = parseToolName(toolName, providerNamespace);
+
+  if (!parsed.namespace) {
+    throw new Error(
+      `MCP tool access denied: missing namespace for tool ${toolName}. provider=${providerNamespace} connectionId=${connection.id}`,
+    );
+  }
+
+  if (parsed.namespace !== providerNamespace) {
+    throw new Error(
+      `MCP tool access denied: namespace mismatch for tool ${toolName}. expected=${providerNamespace} received=${parsed.namespace} connectionId=${connection.id}`,
+    );
+  }
+
+  if (organizationId !== connection.organizationId) {
+    throw new Error(
+      `MCP tool access denied: organization mismatch for tool ${toolName}. expectedOrganization=${connection.organizationId} receivedOrganization=${organizationId} provider=${providerNamespace} connectionId=${connection.id}`,
+    );
+  }
+
+  return parsed;
+}
+
+export function executeToolWithIsolation(
+  request: ToolExecutionRequest,
+  namespace: string,
+  organizationId: string,
+): { toolName: string; toolArguments?: Record<string, unknown> } {
+  const parsed = validateToolAccess(
+    request.params.name,
+    request.connection.provider,
+    organizationId,
+    request.connection,
+  );
+
+  if (parsed.namespace !== namespace) {
+    throw new Error(
+      `MCP tool access denied: namespace routing mismatch for tool ${request.params.name}. expectedNamespace=${namespace} connectionId=${request.connection.id}`,
+    );
+  }
+
+  return {
+    toolName: parsed.toolName,
+    toolArguments: request.params.arguments,
+  };
 }
