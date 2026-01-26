@@ -425,6 +425,7 @@ nubabel/
 ### Research Documentation (NEW - 2026-01-26)
 
 - **[Research Complete Summary](research/RESEARCH_COMPLETE.md)** ⭐⭐⭐ MUST READ - Executive summary of all findings
+- **[Research Index](research/INDEX.md)** ⭐ Complete document index with research→code mapping
 - **[Research Structure](research/README.md)** - Research methodology and organization
 - **Architecture Analysis**:
   - [Current Architecture Analysis](research/architecture/00-current-architecture-analysis.md) - Complete codebase analysis
@@ -439,6 +440,33 @@ nubabel/
   - [07 - Redis Production Config](research/technical-deep-dive/07-redis-production-config.md) - Production settings
   - [08 - AI Error Handling](research/technical-deep-dive/08-ai-error-handling-guide.md) - Retry, circuit breaker, cost
   - [09 - Multi-Tenant Security](research/technical-deep-dive/09-multi-tenant-security-checklist.md) - RLS, RBAC, compliance
+- **Integration Patterns**:
+  - [SSE Patterns](research/integration/real-time/01-sse-patterns.md) - Server-Sent Events for multi-tenant SaaS
+- **Security & Performance**:
+  - [OAuth 2.1 Security](research/security/authentication/01-oauth-2.1-security.md) - OAuth patterns
+  - [Database Query Optimization](research/performance/optimization/01-database-query-optimization.md) - Prisma + RLS
+  - [Load Testing](research/performance/load-testing/01-tools-and-patterns.md) - k6 & Artillery
+- **Production & Compliance**:
+  - [APM Patterns](research/production/monitoring/01-apm-patterns.md) - OpenTelemetry setup
+  - [Zero-Downtime Deployment](research/production/deployment/01-zero-downtime-deployment.md) - CI/CD
+  - [GDPR Compliance](research/production/compliance/01-gdpr-compliance.md) - GDPR roadmap
+- **UX & Design**:
+  - [Slack Bot UX](research/usability/slack-bot-patterns/01-conversation-design.md) - Conversation design
+  - [SaaS Onboarding](research/usability/onboarding/01-saas-onboarding-flows.md) - Onboarding flows
+  - [Error UX](research/usability/error-ux/01-error-message-patterns.md) - Error message patterns
+
+### Implementation Documentation (NEW - 2026-01-26)
+
+- **[Implementation Status](docs/IMPLEMENTATION_STATUS.md)** ⭐ Complete production implementation summary
+  - OpenTelemetry instrumentation
+  - Health check endpoints
+  - OrchestratorExecution model
+  - Feature flags system
+  - Generic webhooks
+  - SSE production enhancements
+  - Sidecar resilience patterns
+  - Environment variables reference
+  - Deployment checklist
 
 ### Development
 
