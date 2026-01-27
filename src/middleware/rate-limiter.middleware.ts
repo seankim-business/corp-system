@@ -11,7 +11,7 @@ const createRateLimitHandler = (type: string) => (_req: Request, res: Response) 
 
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   message: { error: "Too many authentication attempts" },
   standardHeaders: true,
   legacyHeaders: false,
