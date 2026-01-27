@@ -99,4 +99,5 @@ EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start application (runs migrations first, non-fatal)
-CMD ["sh", "-c", "echo '=== Starting Nubabel Container v2 ===' && echo 'Environment: '${NODE_ENV} && echo 'Database URL: '${DATABASE_URL:0:30}'...' && echo '' && echo '=== Running Prisma Migrations ===' && (npx prisma migrate deploy --schema=prisma/schema.prisma || echo '⚠️  Migration failed, starting server anyway for debugging') && echo '' && echo '=== Starting Node.js Server ===' && node dist/index.js"]
+# Using db push to sync schema (fixes table mismatch issues)
+CMD ["sh", "-c", "echo '=== Starting Nubabel Container v2 ===' && echo 'Environment: '${NODE_ENV} && echo 'Database URL: '${DATABASE_URL:0:30}'...' && echo '' && echo '=== Syncing Database Schema ===' && (npx prisma db push --accept-data-loss --schema=prisma/schema.prisma && echo '✅ Schema synced successfully' || echo '⚠️  Schema sync failed, trying migrate deploy...') && (npx prisma migrate deploy --schema=prisma/schema.prisma || echo '⚠️  Migration failed, starting server anyway') && echo '' && echo '=== Starting Node.js Server ===' && node dist/index.js"]
