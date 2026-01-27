@@ -21,7 +21,7 @@ UPDATE "sessions"
 SET 
   "state" = COALESCE("state", '{}'),
   "history" = COALESCE("history", '[]'),
-  "metadata" = COALESCE("metadata", '{}')
+  "metadata" = COALESCE("metadata", '{}');
 
 -- Add index on source field for fast Slack session lookup
 CREATE INDEX IF NOT EXISTS "sessions_source_idx" ON "sessions"("source");
