@@ -19,9 +19,9 @@ ALTER TABLE "sessions"
 -- Update existing sessions to have default values
 UPDATE "sessions" 
 SET 
-  "state" = '{}' WHERE "state" IS NULL,
-  "history" = '[]' WHERE "history" IS NULL,
-  "metadata" = '{}' WHERE "metadata" IS NULL;
+  "state" = COALESCE("state", '{}'),
+  "history" = COALESCE("history", '[]'),
+  "metadata" = COALESCE("metadata", '{}')
 
 -- Add index on source field for fast Slack session lookup
 CREATE INDEX IF NOT EXISTS "sessions_source_idx" ON "sessions"("source");
