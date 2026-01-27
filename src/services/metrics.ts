@@ -294,6 +294,22 @@ metricsCollector.describeMetric("mcp_cache_misses_total", {
   help: "Total MCP response cache misses",
   type: "counter",
 });
+metricsCollector.describeMetric("organization_budget_remaining_cents", {
+  help: "Organization budget remaining in cents",
+  type: "gauge",
+});
+metricsCollector.describeMetric("organization_budget_spend_cents", {
+  help: "Organization current month spend in cents",
+  type: "gauge",
+});
+metricsCollector.describeMetric("ai_requests_downgraded_total", {
+  help: "Total AI requests downgraded due to budget",
+  type: "counter",
+});
+metricsCollector.describeMetric("ai_requests_rejected_budget_total", {
+  help: "Total AI requests rejected for exhausted budget",
+  type: "counter",
+});
 
 export class Gauge {
   private name: string;
@@ -348,6 +364,18 @@ export const mcpCacheSizeBytes = new Gauge({
   name: "mcp_cache_size_bytes",
   help: "Estimated MCP response cache size in bytes",
   labelNames: ["provider"],
+});
+
+export const organizationBudgetRemainingCents = new Gauge({
+  name: "organization_budget_remaining_cents",
+  help: "Organization budget remaining (cents)",
+  labelNames: ["organizationId"],
+});
+
+export const organizationBudgetSpendCents = new Gauge({
+  name: "organization_budget_spend_cents",
+  help: "Organization current month spend (cents)",
+  labelNames: ["organizationId"],
 });
 
 type McpCacheStats = {
@@ -603,6 +631,43 @@ export function recordMcpCacheSize(provider: string, sizeBytes: number): void {
   if (shouldRecordMetrics()) {
     mcpCacheSizeBytes.set(sizeBytes, { provider });
   }
+}
+
+export function recordBudgetRemainingCents(organizationId: string, remainingCents: number): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  organizationBudgetRemainingCents.set(remainingCents, { organizationId });
+}
+
+export function recordBudgetSpendCents(organizationId: string, spendCents: number): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  organizationBudgetSpendCents.set(spendCents, { organizationId });
+}
+
+export function recordBudgetDowngrade(organizationId: string, reason: string): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  metricsCollector.incrementCounter("ai_requests_downgraded_total", {
+    organizationId,
+    reason,
+  });
+}
+
+export function recordBudgetRejection(organizationId: string): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  metricsCollector.incrementCounter("ai_requests_rejected_budget_total", {
+    organizationId,
+  });
 }
 
 export function getMcpCacheStats(): Array<{

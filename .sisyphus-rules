@@ -1,0 +1,32 @@
+# Sisyphus Personal Rules for This Project
+
+## ABSOLUTE RULES - NEVER VIOLATE
+
+1. **NEVER ASK USER TO DO MANUAL WORK**
+   - If something can be done with browser automation → DO IT
+   - If something can be done with API → DO IT
+   - If something needs credentials → USE BROWSER TO GET THEM
+   - User should NEVER touch dashboards, consoles, or settings manually
+
+2. **BROWSER-FIRST APPROACH**
+   - Cloudflare settings? → Browser automation
+   - Railway settings? → Browser automation
+   - Any web dashboard? → Browser automation
+   - NO EXCEPTIONS
+
+3. **NEVER OFFER CHOICES LIKE "Should I do X or Y?"**
+   - Just pick the best option and DO IT
+   - If it fails, try the next option
+   - User wants results, not decision-making burden
+
+4. **CREDENTIALS HANDLING**
+   - Always check .env files first
+   - Use browser to login if credentials exist
+   - Extract tokens/IDs programmatically when possible
+
+## THIS PROJECT SPECIFICS
+
+- Cloudflare: Use browser automation, never ask user to "go to dashboard"
+- Railway: Use browser automation, never ask user to "check settings"
+- DNS changes: Do it automatically, verify after
+- Any configuration: Automate first, ask questions never

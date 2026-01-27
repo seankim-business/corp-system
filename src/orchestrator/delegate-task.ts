@@ -2,6 +2,7 @@ import { logger } from "../utils/logger";
 import { getCircuitBreaker } from "../utils/circuit-breaker";
 import { executeWithAI } from "./ai-executor";
 import { Category } from "./types";
+import { getOpencodeSessionId, createSessionMapping } from "./session-mapping";
 
 export interface DelegateTaskParams {
   category: string;
@@ -23,6 +24,7 @@ export interface DelegateTaskResult {
     outputTokens?: number;
     cost?: number;
     error?: string;
+    opencodeSessionId?: string;
   };
 }
 
@@ -84,31 +86,55 @@ export async function delegateTask(params: DelegateTaskParams): Promise<Delegate
   const timeoutId = setTimeout(() => controller.abort(), OPENCODE_SIDECAR_TIMEOUT);
 
   try {
-    logger.info("Delegating task to OpenCode sidecar", {
-      url: OPENCODE_SIDECAR_URL,
-      category: params.category,
-      skills: params.load_skills,
-      sessionId: params.session_id,
-    });
+    const existingOpencodeSession = await getOpencodeSessionId(params.session_id);
+    const NUBABEL_URL = process.env.NUBABEL_URL || "http://localhost:3000";
 
-     const response = await sidecarBreaker.execute(async () => {
-       let attempt = 0;
-       // Small retry loop for transient failures.
-       // NOTE: circuit breaker still counts failures.
-       for (;;) {
-         attempt++;
-         const r = await fetch(`${OPENCODE_SIDECAR_URL}/delegate`, {
+    let endpoint: string;
+    let body: any;
+
+    if (existingOpencodeSession) {
+      logger.info("Resuming existing OpenCode session", {
+        sessionId: params.session_id,
+        opencodeSessionId: existingOpencodeSession,
+      });
+
+      endpoint = `${OPENCODE_SIDECAR_URL}/sessions/${existingOpencodeSession}/prompt`;
+      body = { prompt: params.prompt };
+    } else {
+      logger.info("Creating new OpenCode session", {
+        url: OPENCODE_SIDECAR_URL,
+        category: params.category,
+        skills: params.load_skills,
+        sessionId: params.session_id,
+      });
+
+      endpoint = `${OPENCODE_SIDECAR_URL}/delegate`;
+      body = {
+        category: params.category,
+        load_skills: params.load_skills,
+        prompt: params.prompt,
+        session_id: params.session_id,
+        organizationId: params.organizationId,
+        userId: params.userId,
+        context: params.context,
+        callbacks: {
+          sessionUpdate: `${NUBABEL_URL}/api/sidecar/sessions/${params.session_id}/update`,
+          mcpInvoke: `${NUBABEL_URL}/api/sidecar/mcp/invoke`,
+          progress: `${NUBABEL_URL}/api/sidecar/sessions/${params.session_id}/progress`,
+        },
+      };
+    }
+
+    const response = await sidecarBreaker.execute(async () => {
+      let attempt = 0;
+      for (;;) {
+        attempt++;
+        const r = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            category: params.category,
-            load_skills: params.load_skills,
-            prompt: params.prompt,
-            session_id: params.session_id,
-            context: params.context,
-          }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
 
@@ -140,12 +166,22 @@ export async function delegateTask(params: DelegateTaskParams): Promise<Delegate
     const result = (await response.json()) as {
       output?: string;
       status?: "success" | "failed";
-      metadata?: { model?: string; duration?: number };
+      metadata?: {
+        model?: string;
+        duration?: number;
+        opencodeSessionId?: string;
+        nubabelSessionId?: string;
+      };
     };
+
+    if (!existingOpencodeSession && result.metadata?.opencodeSessionId) {
+      await createSessionMapping(params.session_id, result.metadata.opencodeSessionId);
+    }
 
     logger.info("Task delegation completed", {
       status: result.status,
       model: result.metadata?.model,
+      opencodeSessionId: result.metadata?.opencodeSessionId,
     });
 
     return {
@@ -154,6 +190,7 @@ export async function delegateTask(params: DelegateTaskParams): Promise<Delegate
       metadata: {
         model: result.metadata?.model || "unknown",
         duration: result.metadata?.duration,
+        opencodeSessionId: result.metadata?.opencodeSessionId,
       },
     };
   } catch (error: unknown) {

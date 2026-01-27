@@ -22,6 +22,11 @@ export interface DelegateTaskRequest {
   organizationId?: string;
   userId?: string;
   context?: Record<string, unknown>;
+  callbacks?: {
+    sessionUpdate: string;
+    mcpInvoke: string;
+    progress: string;
+  };
 }
 
 export interface DelegateTaskResponse {
@@ -34,6 +39,8 @@ export interface DelegateTaskResponse {
     outputTokens?: number;
     cost?: number;
     error?: string;
+    opencodeSessionId?: string;
+    nubabelSessionId?: string;
   };
 }
 

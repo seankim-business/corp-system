@@ -25,6 +25,7 @@ import {
 } from "./middleware/rate-limiter.middleware";
 import { getAllCircuitBreakers } from "./utils/circuit-breaker";
 import { getEnv } from "./utils/env";
+import { startScheduledTasks, stopScheduledTasks } from "./utils/scheduler";
 import {
   getPoolStats,
   getQueueConnection,
@@ -442,6 +443,15 @@ const server = app.listen(port, "0.0.0.0", async () => {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+
+  try {
+    startScheduledTasks();
+    logger.info("✅ Scheduled tasks started (audit log cleanup: daily)");
+  } catch (error) {
+    logger.warn("⚠️  Failed to start scheduled tasks", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 server.on("error", (error: any) => {
@@ -493,6 +503,10 @@ async function gracefulShutdown(signal: string) {
     logger.info("Stopping Slack Bot");
     await stopSlackBot();
     logger.info("Slack Bot stopped");
+
+    logger.info("Stopping scheduled tasks");
+    stopScheduledTasks();
+    logger.info("Scheduled tasks stopped");
 
     logger.info("Stopping BullMQ workers");
     await gracefulWorkerShutdown(signal);

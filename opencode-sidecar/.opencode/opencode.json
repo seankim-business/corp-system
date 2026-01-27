@@ -1,0 +1,4 @@
+{
+  "plugin": ["nubabel-bridge"],
+  "model": "anthropic/claude-sonnet-4-5"
+}

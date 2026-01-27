@@ -1,4 +1,5 @@
 import { Category, RequestAnalysis } from "./types";
+import { estimateCostForCategory, getBudgetRemaining } from "../services/budget-enforcer";
 
 export type CategorySelectionMethod = "keyword" | "complexity-fallback" | "llm-fallback";
 
@@ -7,6 +8,14 @@ export interface CategorySelection {
   confidence: number;
   method: CategorySelectionMethod;
   matchedKeywords?: string[];
+}
+
+export interface BudgetAwareCategorySelection extends CategorySelection {
+  baseCategory: Category;
+  downgraded: boolean;
+  downgradeReason?: string;
+  budgetRemainingCents: number;
+  estimatedCostCents: number;
 }
 
 /**
@@ -429,6 +438,62 @@ export async function selectCategoryHybrid(
   }
 
   return finalResult;
+}
+
+export async function selectCategoryWithBudget(
+  organizationId: string,
+  userRequest: string,
+  analysis: RequestAnalysis,
+  options: { minConfidence?: number; enableLLM?: boolean; enableCache?: boolean } = {},
+): Promise<BudgetAwareCategorySelection> {
+  const baseSelection = await selectCategoryHybrid(userRequest, analysis, options);
+  const estimatedCost = estimateCostForCategory(baseSelection.category);
+  const budgetRemaining = await getBudgetRemaining(organizationId);
+
+  const OPUS_THRESHOLD = 100; // cents ($1.00)
+  const SONNET_THRESHOLD = 20; // cents ($0.20)
+  const EXPENSIVE_CATEGORIES: Category[] = ["ultrabrain", "artistry", "visual-engineering"];
+
+  let category = baseSelection.category;
+  let downgraded = false;
+  let downgradeReason: string | undefined;
+
+  // COMPLEXITY OVERRIDE: Downgrade expensive categories for low-complexity tasks
+  // Example: "Create a task" → keyword matches "ultrabrain" BUT complexity is "low"
+  // Override: ultrabrain → quick (saves $0.87 per request)
+  if (analysis.complexity === "low" && EXPENSIVE_CATEGORIES.includes(baseSelection.category)) {
+    category = "quick";
+    downgraded = true;
+    downgradeReason = "low_complexity_override";
+  }
+
+  // BUDGET ENFORCEMENT: Downgrade based on remaining budget
+  if (Number.isFinite(budgetRemaining) && !downgraded) {
+    if (budgetRemaining < OPUS_THRESHOLD && baseSelection.category === "ultrabrain") {
+      category = "quick";
+      downgraded = true;
+      downgradeReason = "opus_threshold";
+    }
+
+    if (
+      budgetRemaining < SONNET_THRESHOLD &&
+      ["visual-engineering", "writing", "artistry"].includes(baseSelection.category)
+    ) {
+      category = "quick";
+      downgraded = true;
+      downgradeReason = "sonnet_threshold";
+    }
+  }
+
+  return {
+    ...baseSelection,
+    category,
+    baseCategory: baseSelection.category,
+    downgraded,
+    downgradeReason,
+    budgetRemainingCents: budgetRemaining,
+    estimatedCostCents: estimatedCost,
+  };
 }
 
 export function getCategoryOnly(userRequest: string, analysis: RequestAnalysis): Category {

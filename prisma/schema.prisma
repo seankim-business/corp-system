@@ -22,6 +22,9 @@ model Organization {
   name      String   @db.VarChar(255)
   logoUrl   String?  @map("logo_url") @db.Text
   settings  Json     @default("{}") @db.JsonB
+  monthlyBudgetCents     Int?     @map("monthly_budget_cents")
+  currentMonthSpendCents Int      @default(0) @map("current_month_spend_cents")
+  budgetResetAt          DateTime? @map("budget_reset_at") @db.Timestamptz(6)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

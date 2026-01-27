@@ -248,6 +248,40 @@ npm run dev
 # @your-bot-name help
 ```
 
+### OhMyOpenCode Integration (Automated Updates)
+
+**OhMyOpenCode** is a continuously evolving AI orchestration framework. Nubabel automatically tracks updates:
+
+```bash
+# Check current OhMyOpenCode version
+cd vendor/ohmyopencode
+cat package.json | grep version
+
+# Automated updates (GitHub Actions)
+# - Runs every Monday 9:00 AM KST
+# - Creates PR with changelog if update available
+# - Runs automated tests
+# - Waits for manual approval
+
+# Manual update (if needed)
+gh workflow run ohmyopencode-update.yml
+
+# Rollback (if issues occur)
+cd opencode-sidecar
+./rollback.sh <commit-hash>
+```
+
+**Documentation**:
+
+- [COMPATIBILITY.md](COMPATIBILITY.md) - Version compatibility matrix
+- [docs/OHMYOPENCODE_UPDATE_GUIDE.md](docs/OHMYOPENCODE_UPDATE_GUIDE.md) - Manual update guide
+- [opencode-sidecar/rollback.sh](opencode-sidecar/rollback.sh) - Automated rollback script
+
+**Workflows**:
+
+- [.github/workflows/ohmyopencode-update.yml](.github/workflows/ohmyopencode-update.yml) - Auto update check
+- [.github/workflows/test-ohmyopencode.yml](.github/workflows/test-ohmyopencode.yml) - Auto testing
+
 ### Deploy to Railway
 
 Follow our comprehensive deployment guide:

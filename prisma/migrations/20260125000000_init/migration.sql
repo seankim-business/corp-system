@@ -112,5 +112,44 @@ ALTER TABLE "workflows" ADD CONSTRAINT "workflows_created_by_fkey" FOREIGN KEY (
 -- AddForeignKey
 ALTER TABLE "workflow_executions" ADD CONSTRAINT "workflow_executions_workflow_id_fkey" FOREIGN KEY ("workflow_id") REFERENCES "workflows"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- CreateTable
+CREATE TABLE "sessions" (
+    "id" VARCHAR(255) NOT NULL,
+    "user_id" UUID NOT NULL,
+    "organization_id" UUID NOT NULL,
+    "token_hash" VARCHAR(255),
+    "source" VARCHAR(50),
+    "state" JSONB NOT NULL DEFAULT '{}',
+    "history" JSONB NOT NULL DEFAULT '[]',
+    "metadata" JSONB NOT NULL DEFAULT '{}',
+    "expires_at" TIMESTAMPTZ(6) NOT NULL,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "last_used_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "sessions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "sessions_token_hash_key" ON "sessions"("token_hash");
+
+-- CreateIndex
+CREATE INDEX "sessions_user_id_idx" ON "sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "sessions_organization_id_idx" ON "sessions"("organization_id");
+
+-- CreateIndex
+CREATE INDEX "sessions_token_hash_idx" ON "sessions"("token_hash");
+
+-- CreateIndex
+CREATE INDEX "sessions_expires_at_idx" ON "sessions"("expires_at");
+
+-- CreateIndex
+CREATE INDEX "sessions_source_idx" ON "sessions"("source");
+
+-- AddForeignKey
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 -- AddForeignKey
 ALTER TABLE "notion_connections" ADD CONSTRAINT "notion_connections_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;

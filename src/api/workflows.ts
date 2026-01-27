@@ -21,6 +21,8 @@
 import { Router, Request, Response } from "express";
 import { db as prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
+import { requirePermission } from "../middleware/require-permission";
+import { Permission } from "../auth/rbac";
 import { executeNotionTool } from "../mcp-servers/notion";
 import { executeLinearTool } from "../mcp-servers/linear";
 import { executeGitHubTool } from "../mcp-servers/github";
@@ -38,25 +40,31 @@ import {
 
 const router = Router();
 
-router.get("/workflows", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { organizationId } = req.user!;
+router.get(
+  "/workflows",
+  requireAuth,
+  requirePermission(Permission.WORKFLOWS_READ),
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId } = req.user!;
 
-    const workflows = await prisma.workflow.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: "desc" },
-    });
+      const workflows = await prisma.workflow.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: "desc" },
+      });
 
-    return res.json({ workflows });
-  } catch (error) {
-    console.error("List workflows error:", error);
-    return res.status(500).json({ error: "Failed to fetch workflows" });
-  }
-});
+      return res.json({ workflows });
+    } catch (error) {
+      console.error("List workflows error:", error);
+      return res.status(500).json({ error: "Failed to fetch workflows" });
+    }
+  },
+);
 
 router.post(
   "/workflows",
   requireAuth,
+  requirePermission(Permission.WORKFLOWS_WRITE),
   validate({ body: createWorkflowSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -84,6 +92,7 @@ router.post(
 router.get(
   "/workflows/:id",
   requireAuth,
+  requirePermission(Permission.WORKFLOWS_READ),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -115,6 +124,7 @@ router.get(
 router.put(
   "/workflows/:id",
   requireAuth,
+  requirePermission(Permission.WORKFLOWS_WRITE),
   validate({ params: uuidParamSchema, body: updateWorkflowSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -151,6 +161,7 @@ router.put(
 router.delete(
   "/workflows/:id",
   requireAuth,
+  requirePermission(Permission.WORKFLOWS_DELETE),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -180,6 +191,7 @@ router.delete(
 router.post(
   "/workflows/:id/execute",
   requireAuth,
+  requirePermission(Permission.WORKFLOWS_EXECUTE),
   validate({ params: uuidParamSchema, body: executeWorkflowSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -390,6 +402,7 @@ router.post(
 router.get(
   "/workflows/:id/executions",
   requireAuth,
+  requirePermission(Permission.WORKFLOWS_READ),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -418,37 +431,43 @@ router.get(
   },
 );
 
-router.get("/executions", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { organizationId } = req.user!;
+router.get(
+  "/executions",
+  requireAuth,
+  requirePermission(Permission.WORKFLOWS_READ),
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId } = req.user!;
 
-    const executions = await prisma.workflowExecution.findMany({
-      where: {
-        workflow: {
-          organizationId,
-        },
-      },
-      include: {
-        workflow: {
-          select: {
-            name: true,
+      const executions = await prisma.workflowExecution.findMany({
+        where: {
+          workflow: {
+            organizationId,
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+        include: {
+          workflow: {
+            select: {
+              name: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
 
-    return res.json({ executions });
-  } catch (error) {
-    console.error("List executions error:", error);
-    return res.status(500).json({ error: "Failed to fetch executions" });
-  }
-});
+      return res.json({ executions });
+    } catch (error) {
+      console.error("List executions error:", error);
+      return res.status(500).json({ error: "Failed to fetch executions" });
+    }
+  },
+);
 
 router.get(
   "/executions/:id",
   requireAuth,
+  requirePermission(Permission.WORKFLOWS_READ),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {

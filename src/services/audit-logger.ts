@@ -39,7 +39,7 @@ export interface AuditLogEntry {
   errorMessage?: string;
 }
 
-const AUDIT_RETENTION_DAYS = 90;
+const AUDIT_RETENTION_DAYS = 2555;
 const BATCH_SIZE = 100;
 const FLUSH_INTERVAL_MS = 5000;
 

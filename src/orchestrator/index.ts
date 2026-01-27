@@ -1,5 +1,5 @@
 import { analyzeRequest } from "./request-analyzer";
-import { selectCategoryHybrid } from "./category-selector";
+import { selectCategoryWithBudget } from "./category-selector";
 import { selectSkillsEnhanced } from "./skill-selector";
 import {
   getSessionState,
@@ -14,6 +14,14 @@ import { metrics, measureTime } from "../utils/metrics";
 import { getActiveMCPConnections } from "../services/mcp-registry";
 import { delegateTask } from "./delegate-task";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
+import {
+  calculateActualCostCents,
+  checkBudgetSufficient,
+  getBudgetRemaining,
+  isBudgetExhausted,
+  updateSpend,
+} from "../services/budget-enforcer";
+import { recordBudgetDowngrade, recordBudgetRejection, recordAiRequest } from "../services/metrics";
 
 const tracer = trace.getTracer("orchestrator");
 
@@ -64,11 +72,11 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         },
       );
 
-      let categorySelection = await tracer.startActiveSpan(
+      const categorySelection = await tracer.startActiveSpan(
         "orchestrator.select_category",
         async (categorySpan) => {
           try {
-            let selection = await selectCategoryHybrid(userRequest, analysis, {
+            let selection = await selectCategoryWithBudget(organizationId, userRequest, analysis, {
               minConfidence: 0.7,
               enableLLM: true,
               enableCache: true,
@@ -94,8 +102,10 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
             }
 
             categorySpan.setAttribute("category", selection.category);
+            categorySpan.setAttribute("category.base", selection.baseCategory);
             categorySpan.setAttribute("confidence", selection.confidence);
             categorySpan.setAttribute("method", selection.method);
+            categorySpan.setAttribute("budget.downgraded", selection.downgraded);
             return selection;
           } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Unknown error";
@@ -143,6 +153,10 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         isFollowUp,
         lastCategory: sessionState?.lastCategory,
         category: categorySelection.category,
+        baseCategory: categorySelection.baseCategory,
+        categoryDowngraded: categorySelection.downgraded,
+        estimatedCostCents: categorySelection.estimatedCostCents,
+        budgetRemainingCents: categorySelection.budgetRemainingCents,
         categoryConfidence: categorySelection.confidence,
         categoryMethod: categorySelection.method,
         categoryKeywords: categorySelection.matchedKeywords,
@@ -163,6 +177,19 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         category: categorySelection.category,
       });
 
+      if (categorySelection.downgraded) {
+        const reason = categorySelection.downgradeReason || "budget_threshold";
+        recordBudgetDowngrade(organizationId, reason);
+        logger.info("Category downgraded due to budget", {
+          organizationId,
+          baseCategory: categorySelection.baseCategory,
+          downgradedCategory: categorySelection.category,
+          reason,
+          budgetRemainingCents: categorySelection.budgetRemainingCents,
+          estimatedCostCents: categorySelection.estimatedCostCents,
+        });
+      }
+
       const mcpConnections = await getActiveMCPConnections(organizationId);
 
       const context = {
@@ -175,6 +202,94 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         userId,
       };
 
+      // Decision: hard-block requests when budget is exhausted or estimated cost exceeds remaining.
+      // Alerts are emitted via logs + metrics (no email notifications yet).
+      const budgetRemaining = categorySelection.budgetRemainingCents;
+      if (isBudgetExhausted(budgetRemaining)) {
+        recordBudgetRejection(organizationId);
+        logger.warn("Organization budget exhausted", {
+          organizationId,
+          budgetRemainingCents: budgetRemaining,
+        });
+
+        await saveExecution({
+          organizationId,
+          userId,
+          sessionId,
+          category: categorySelection.category,
+          skills,
+          prompt: userRequest,
+          result: "Budget exhausted",
+          status: "failed",
+          duration: 0,
+          metadata: {
+            reason: "budget_exhausted",
+            baseCategory: categorySelection.baseCategory,
+            budgetRemainingCents: budgetRemaining,
+            estimatedCostCents: categorySelection.estimatedCostCents,
+          },
+        });
+
+        const failureResult: OrchestrationResult = {
+          output: "Organization budget exhausted. Please increase your budget or try again later.",
+          status: "failed",
+          metadata: {
+            category: categorySelection.category,
+            skills,
+            duration: 0,
+            model: "none",
+            sessionId,
+          },
+        };
+        return failureResult;
+      }
+
+      const budgetSufficient = await checkBudgetSufficient(
+        organizationId,
+        categorySelection.estimatedCostCents,
+      );
+
+      if (!budgetSufficient) {
+        recordBudgetRejection(organizationId);
+        logger.warn("Insufficient budget for estimated cost", {
+          organizationId,
+          budgetRemainingCents: budgetRemaining,
+          estimatedCostCents: categorySelection.estimatedCostCents,
+        });
+
+        await saveExecution({
+          organizationId,
+          userId,
+          sessionId,
+          category: categorySelection.category,
+          skills,
+          prompt: userRequest,
+          result: "Insufficient budget",
+          status: "failed",
+          duration: 0,
+          metadata: {
+            reason: "budget_insufficient",
+            baseCategory: categorySelection.baseCategory,
+            budgetRemainingCents: budgetRemaining,
+            estimatedCostCents: categorySelection.estimatedCostCents,
+          },
+        });
+
+        const failureResult: OrchestrationResult = {
+          output:
+            "Insufficient organization budget for this request. Please adjust budget or retry with a smaller task.",
+          status: "failed",
+          metadata: {
+            category: categorySelection.category,
+            skills,
+            duration: 0,
+            model: "none",
+            sessionId,
+          },
+        };
+        return failureResult;
+      }
+
       const result = await tracer.startActiveSpan("orchestrator.execute", async (execSpan) => {
         const startTime = Date.now();
         try {
@@ -183,6 +298,8 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
             load_skills: skills,
             prompt: userRequest,
             session_id: sessionId,
+            organizationId,
+            userId,
             context,
           });
           const duration = Date.now() - startTime;
@@ -208,6 +325,31 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         },
       });
 
+      const inputTokens = result.execution.metadata.inputTokens ?? 0;
+      const outputTokens = result.execution.metadata.outputTokens ?? 0;
+      if (
+        Number.isFinite(inputTokens) &&
+        Number.isFinite(outputTokens) &&
+        result.execution.metadata.model
+      ) {
+        const actualCostCents = calculateActualCostCents(
+          result.execution.metadata.model,
+          inputTokens,
+          outputTokens,
+        );
+        await updateSpend(organizationId, actualCostCents);
+        await getBudgetRemaining(organizationId);
+
+        recordAiRequest({
+          model: result.execution.metadata.model,
+          category: categorySelection.category,
+          success: result.execution.status === "success",
+          duration: result.duration,
+          inputTokens,
+          outputTokens,
+        });
+      }
+
       await saveExecution({
         organizationId,
         userId,
@@ -224,6 +366,11 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
           categoryMethod: categorySelection.method,
           sessionDepth: sessionState?.conversationDepth || 0,
           isFollowUp,
+          baseCategory: categorySelection.baseCategory,
+          downgraded: categorySelection.downgraded,
+          downgradeReason: categorySelection.downgradeReason,
+          budgetRemainingCents: categorySelection.budgetRemainingCents,
+          estimatedCostCents: categorySelection.estimatedCostCents,
         },
       });
 

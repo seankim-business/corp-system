@@ -1,0 +1,190 @@
+name: Test OhMyOpenCode Update
+
+on:
+  pull_request:
+    paths:
+      - "vendor/ohmyopencode/**"
+      - "opencode-sidecar/**"
+      - ".github/workflows/test-ohmyopencode.yml"
+
+jobs:
+  test-sidecar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "opencode-sidecar/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: opencode-sidecar
+        run: npm ci
+
+      - name: Build sidecar
+        working-directory: opencode-sidecar
+        run: npm run build
+
+      - name: Start sidecar in background
+        working-directory: opencode-sidecar
+        run: |
+          npm start &
+          echo $! > sidecar.pid
+          sleep 10
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PORT: 3001
+          NODE_ENV: test
+
+      - name: Wait for sidecar to be ready
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3001/health; do sleep 2; done'
+
+      - name: Test health endpoint
+        run: |
+          RESPONSE=$(curl -f http://localhost:3001/health)
+          echo "Health check response: $RESPONSE"
+
+          echo "$RESPONSE" | jq -e '.status == "healthy"' || {
+            echo "❌ Health check failed"
+            exit 1
+          }
+
+          echo "✅ Health check passed"
+
+      - name: Test basic delegation
+        run: |
+          RESPONSE=$(curl -X POST http://localhost:3001/delegate \
+            -H "Content-Type: application/json" \
+            -d '{
+              "category": "quick",
+              "load_skills": [],
+              "prompt": "Hello, this is a test from GitHub Actions",
+              "session_id": "test_github_actions"
+            }')
+
+          echo "Delegation response: $RESPONSE"
+
+          echo "$RESPONSE" | jq -e '.status == "success"' || {
+            echo "❌ Basic delegation test failed"
+            exit 1
+          }
+
+          echo "✅ Basic delegation test passed"
+
+      - name: Test all categories
+        run: |
+          declare -a categories=("quick" "writing" "unspecified-low" "artistry" "visual-engineering" "unspecified-high" "ultrabrain")
+
+          for category in "${categories[@]}"; do
+            echo "Testing category: $category"
+            
+            RESPONSE=$(curl -X POST http://localhost:3001/delegate \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"category\": \"$category\",
+                \"load_skills\": [],
+                \"prompt\": \"Test category $category\",
+                \"session_id\": \"test_category_$category\"
+              }")
+            
+            echo "$RESPONSE" | jq -e '.status == "success"' || {
+              echo "❌ Category test failed: $category"
+              exit 1
+            }
+            
+            echo "✅ Category test passed: $category"
+          done
+
+      - name: Test all skills
+        run: |
+          declare -a skills=("mcp-integration" "playwright" "git-master" "frontend-ui-ux")
+
+          for skill in "${skills[@]}"; do
+            echo "Testing skill: $skill"
+            
+            RESPONSE=$(curl -X POST http://localhost:3001/delegate \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"category\": \"quick\",
+                \"load_skills\": [\"$skill\"],
+                \"prompt\": \"Test skill $skill\",
+                \"session_id\": \"test_skill_$skill\"
+              }")
+            
+            echo "$RESPONSE" | jq -e '.status == "success"' || {
+              echo "❌ Skill test failed: $skill"
+              exit 1
+            }
+            
+            echo "✅ Skill test passed: $skill"
+          done
+
+      - name: Test validation errors
+        run: |
+          RESPONSE=$(curl -X POST http://localhost:3001/delegate \
+            -H "Content-Type: application/json" \
+            -d '{
+              "category": "invalid_category",
+              "load_skills": [],
+              "prompt": "Test",
+              "session_id": "test_validation"
+            }')
+
+          echo "$RESPONSE" | jq -e '.status == "failed"' || {
+            echo "❌ Validation error test failed"
+            exit 1
+          }
+
+          echo "✅ Validation error test passed"
+
+      - name: Stop sidecar
+        if: always()
+        working-directory: opencode-sidecar
+        run: |
+          if [ -f sidecar.pid ]; then
+            kill $(cat sidecar.pid) || true
+            rm sidecar.pid
+          fi
+
+      - name: Comment test results on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const testResults = {
+              health: '${{ steps.test-health-endpoint.outcome }}',
+              basic: '${{ steps.test-basic-delegation.outcome }}',
+              categories: '${{ steps.test-all-categories.outcome }}',
+              skills: '${{ steps.test-all-skills.outcome }}',
+              validation: '${{ steps.test-validation-errors.outcome }}'
+            };
+
+            const allPassed = Object.values(testResults).every(r => r === 'success');
+            const emoji = allPassed ? '✅' : '❌';
+
+            const body = `${emoji} **OhMyOpenCode Sidecar Tests**
+
+            | Test | Result |
+            |------|--------|
+            | Health Check | ${testResults.health === 'success' ? '✅' : '❌'} |
+            | Basic Delegation | ${testResults.basic === 'success' ? '✅' : '❌'} |
+            | All Categories | ${testResults.categories === 'success' ? '✅' : '❌'} |
+            | All Skills | ${testResults.skills === 'success' ? '✅' : '❌'} |
+            | Validation Errors | ${testResults.validation === 'success' ? '✅' : '❌'} |
+
+            ${allPassed ? '✅ All tests passed! Safe to merge.' : '❌ Some tests failed. Please review.'}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });

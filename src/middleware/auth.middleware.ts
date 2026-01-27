@@ -3,6 +3,7 @@ import { AuthService } from "../auth/auth.service";
 import { db } from "../db/client";
 import { logger } from "../utils/logger";
 import { setSentryUser } from "../services/sentry";
+import { asyncLocalStorage } from "../utils/async-context";
 
 const authService = new AuthService();
 
@@ -15,6 +16,27 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     }
 
     const payload = authService.verifySessionToken(token);
+
+    const currentIp = req.ip || req.socket.remoteAddress;
+    const currentUserAgent = req.get("user-agent");
+
+    if (payload.ipAddress && payload.ipAddress !== currentIp) {
+      logger.warn("Session hijacking attempt detected: IP mismatch", {
+        userId: payload.userId,
+        sessionIp: payload.ipAddress,
+        currentIp,
+      });
+      return res.status(401).json({ error: "Session invalid: IP mismatch" });
+    }
+
+    if (payload.userAgent && currentUserAgent && payload.userAgent !== currentUserAgent) {
+      logger.warn("Session hijacking attempt detected: User-Agent mismatch", {
+        userId: payload.userId,
+        sessionUserAgent: payload.userAgent,
+        currentUserAgent,
+      });
+      return res.status(401).json({ error: "Session invalid: User-Agent mismatch" });
+    }
 
     const user = await db.user.findUnique({
       where: { id: payload.userId },
@@ -49,7 +71,15 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       setSentryUser(user.id, payload.organizationId, user.email ?? undefined);
     }
 
-    return next();
+    // Store organization context in AsyncLocalStorage for RLS middleware
+    return asyncLocalStorage.run(
+      {
+        organizationId: payload.organizationId,
+        userId: payload.userId,
+        role: membership.role,
+      },
+      () => next(),
+    );
   } catch (error) {
     logger.error(
       "Authentication error",

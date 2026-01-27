@@ -47,6 +47,12 @@ export class BaseQueue<T = any> {
         },
         ...options.defaultJobOptions,
       },
+      ...(options.rateLimiter && {
+        limiter: {
+          max: options.rateLimiter.max,
+          duration: options.rateLimiter.duration,
+        },
+      }),
     };
 
     this.queue = new Queue<T>(this.queueName, queueOptions);

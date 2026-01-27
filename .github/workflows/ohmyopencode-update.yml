@@ -1,0 +1,144 @@
+name: OhMyOpenCode Update Check
+
+on:
+  schedule:
+    # 매주 월요일 오전 9시 (KST) = 매주 일요일 자정 (UTC)
+    - cron: "0 0 * * 0"
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch OhMyOpenCode updates
+        id: check
+        run: |
+          cd vendor/ohmyopencode
+          git fetch origin main
+
+          LOCAL=$(git rev-parse HEAD)
+          REMOTE=$(git rev-parse origin/main)
+
+          echo "local_commit=$LOCAL" >> $GITHUB_OUTPUT
+          echo "remote_commit=$REMOTE" >> $GITHUB_OUTPUT
+
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            echo "update_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Update available: $LOCAL -> $REMOTE"
+          else
+            echo "update_available=false" >> $GITHUB_OUTPUT
+            echo "✅ Already up to date: $LOCAL"
+          fi
+
+      - name: Get changelog
+        if: steps.check.outputs.update_available == 'true'
+        id: changelog
+        run: |
+          cd vendor/ohmyopencode
+
+          # Get commits between current and remote
+          CHANGELOG=$(git log --oneline --no-merges ${{ steps.check.outputs.local_commit }}..${{ steps.check.outputs.remote_commit }})
+
+          # Get version from package.json
+          CURRENT_VERSION=$(git show ${{ steps.check.outputs.local_commit }}:package.json | grep '"version"' | head -1 | awk -F'"' '{print $4}')
+          NEW_VERSION=$(git show ${{ steps.check.outputs.remote_commit }}:package.json | grep '"version"' | head -1 | awk -F'"' '{print $4}')
+
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Save changelog to multiline output
+          {
+            echo 'changelog<<EOF'
+            echo "$CHANGELOG"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - name: Update submodule
+        if: steps.check.outputs.update_available == 'true'
+        run: |
+          cd vendor/ohmyopencode
+          git checkout origin/main
+          cd ../..
+          git add vendor/ohmyopencode
+
+      - name: Create Pull Request
+        if: steps.check.outputs.update_available == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            chore(deps): update OhMyOpenCode to v${{ steps.changelog.outputs.new_version }}
+
+            Update OhMyOpenCode from v${{ steps.changelog.outputs.current_version }} to v${{ steps.changelog.outputs.new_version }}
+
+            Upstream commits:
+            ${{ steps.changelog.outputs.changelog }}
+          branch: deps/ohmyopencode-v${{ steps.changelog.outputs.new_version }}
+          delete-branch: true
+          title: "⬆️ OhMyOpenCode Update: v${{ steps.changelog.outputs.current_version }} → v${{ steps.changelog.outputs.new_version }}"
+          body: |
+            ## 🔄 OhMyOpenCode Update
+
+            **Current Version**: `v${{ steps.changelog.outputs.current_version }}` ([commit](${{ github.server_url }}/code-yeongyu/oh-my-opencode/commit/${{ steps.check.outputs.local_commit }}))
+            **New Version**: `v${{ steps.changelog.outputs.new_version }}` ([commit](${{ github.server_url }}/code-yeongyu/oh-my-opencode/commit/${{ steps.check.outputs.remote_commit }}))
+
+            ### 📝 Changelog
+            ```
+            ${{ steps.changelog.outputs.changelog }}
+            ```
+
+            ### ✅ Testing Checklist
+
+            - [ ] Build opencode-sidecar: `cd opencode-sidecar && npm run build`
+            - [ ] Test health endpoint: `curl http://localhost:3001/health`
+            - [ ] Test basic delegation: `curl -X POST http://localhost:3001/delegate -d @test-request.json`
+            - [ ] Verify no breaking changes in API contract
+            - [ ] Deploy to staging and test Slack bot integration
+            - [ ] Monitor logs for 1 hour
+
+            ### 🔄 Rollback Plan
+
+            If issues occur after deployment:
+
+            ```bash
+            cd vendor/ohmyopencode
+            git checkout ${{ steps.check.outputs.local_commit }}
+            cd ../../opencode-sidecar
+            npm run build
+            docker-compose restart opencode-sidecar
+            ```
+
+            ### 🚀 Deployment Steps
+
+            1. **Merge this PR** (after testing)
+            2. **Rebuild sidecar**: `cd opencode-sidecar && npm run build`
+            3. **Deploy to staging**: Railway will auto-deploy on merge
+            4. **Monitor for 1 hour**: Check logs and error rates
+            5. **Promote to production**: If no issues detected
+
+            ---
+
+            **Auto-generated by**: [OhMyOpenCode Update Check workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/ohmyopencode-update.yml)
+          labels: |
+            dependencies
+            ohmyopencode
+            automated
+          assignees: seankim-business
+
+      - name: Comment on existing PR
+        if: steps.check.outputs.update_available == 'false'
+        run: |
+          echo "✅ OhMyOpenCode is up to date (v${{ steps.changelog.outputs.current_version }})"
+          echo "No action needed."

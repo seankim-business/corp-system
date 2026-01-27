@@ -12,10 +12,13 @@ export class WebhookWorker extends BaseWorker<WebhookEventData> {
 
   async process(job: Job<WebhookEventData>): Promise<void> {
     const { provider, eventId, eventType } = job.data;
+    await job.updateProgress(20);
     logger.info("Processing webhook", { provider, eventId, eventType, jobId: job.id });
 
     try {
+      await job.updateProgress(50);
       await routeWebhook(job.data);
+      await job.updateProgress(100);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error("Webhook processing failed", { provider, eventId, message });

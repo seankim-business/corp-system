@@ -8,6 +8,7 @@ import {
   validateToolAccess,
 } from "../../services/mcp-registry";
 import { MCPConnection } from "../../orchestrator/types";
+import { recordMcpToolCall } from "../../services/metrics";
 
 const legacyToolMap: Record<string, string> = {
   get_issues: "getIssues",
@@ -34,34 +35,50 @@ export async function executeLinearTool(
     ? (legacyToolMap[parsed.toolName] ?? parsed.toolName)
     : parsed.toolName;
 
-  return executeTool({
-    provider: "linear",
-    toolName: resolvedToolName,
-    args: input,
-    organizationId,
-    skipCache: options?.skipCache,
-    ttlSeconds: options?.ttlSeconds,
-    dataType: options?.dataType,
-    sensitive: options?.sensitive,
-    execute: async () => {
-      switch (resolvedToolName) {
-        case "getIssues":
-          return await getIssuesTool(apiKey, input, connection, userId);
+  const startTime = Date.now();
+  let success = false;
 
-        case "createIssue":
-          return await createIssueTool(apiKey, input, connection, userId);
+  try {
+    const result = await executeTool({
+      provider: "linear",
+      toolName: resolvedToolName,
+      args: input,
+      organizationId,
+      skipCache: options?.skipCache,
+      ttlSeconds: options?.ttlSeconds,
+      dataType: options?.dataType,
+      sensitive: options?.sensitive,
+      execute: async () => {
+        switch (resolvedToolName) {
+          case "getIssues":
+            return await getIssuesTool(apiKey, input, connection, userId);
 
-        case "updateIssue":
-          return await updateIssueTool(apiKey, input, connection, userId);
+          case "createIssue":
+            return await createIssueTool(apiKey, input, connection, userId);
 
-        case "getTeams":
-          return await getTeamsTool(apiKey, input, connection, userId);
+          case "updateIssue":
+            return await updateIssueTool(apiKey, input, connection, userId);
 
-        default:
-          throw new Error(`Unknown Linear tool: ${toolName}`);
-      }
-    },
-  });
+          case "getTeams":
+            return await getTeamsTool(apiKey, input, connection, userId);
+
+          default:
+            throw new Error(`Unknown Linear tool: ${toolName}`);
+        }
+      },
+    });
+
+    success = true;
+    return result;
+  } finally {
+    const duration = Date.now() - startTime;
+    recordMcpToolCall({
+      provider: "linear",
+      toolName: resolvedToolName,
+      success,
+      duration,
+    });
+  }
 }
 
 export * from "./types";

@@ -19,6 +19,7 @@ import {
   validateToolAccess,
 } from "../../services/mcp-registry";
 import { MCPConnection } from "../../orchestrator/types";
+import { recordMcpToolCall } from "../../services/metrics";
 
 const legacyToolMap: Record<string, string> = {
   get_tasks: "getTasks",
@@ -45,34 +46,50 @@ export async function executeNotionTool(
     ? (legacyToolMap[parsed.toolName] ?? parsed.toolName)
     : parsed.toolName;
 
-  return executeTool({
-    provider: "notion",
-    toolName: resolvedToolName,
-    args: input,
-    organizationId,
-    skipCache: options?.skipCache,
-    ttlSeconds: options?.ttlSeconds,
-    dataType: options?.dataType,
-    sensitive: options?.sensitive,
-    execute: async () => {
-      switch (resolvedToolName) {
-        case "getTasks":
-          return await getTasksTool(apiKey, input, connection, userId);
+  const startTime = Date.now();
+  let success = false;
 
-        case "createTask":
-          return await createTaskTool(apiKey, input, connection, userId);
+  try {
+    const result = await executeTool({
+      provider: "notion",
+      toolName: resolvedToolName,
+      args: input,
+      organizationId,
+      skipCache: options?.skipCache,
+      ttlSeconds: options?.ttlSeconds,
+      dataType: options?.dataType,
+      sensitive: options?.sensitive,
+      execute: async () => {
+        switch (resolvedToolName) {
+          case "getTasks":
+            return await getTasksTool(apiKey, input, connection, userId);
 
-        case "updateTask":
-          return await updateTaskTool(apiKey, input, connection, userId);
+          case "createTask":
+            return await createTaskTool(apiKey, input, connection, userId);
 
-        case "deleteTask":
-          return await deleteTaskTool(apiKey, input, connection, userId);
+          case "updateTask":
+            return await updateTaskTool(apiKey, input, connection, userId);
 
-        default:
-          throw new Error(`Unknown Notion tool: ${toolName}`);
-      }
-    },
-  });
+          case "deleteTask":
+            return await deleteTaskTool(apiKey, input, connection, userId);
+
+          default:
+            throw new Error(`Unknown Notion tool: ${toolName}`);
+        }
+      },
+    });
+
+    success = true;
+    return result;
+  } finally {
+    const duration = Date.now() - startTime;
+    recordMcpToolCall({
+      provider: "notion",
+      toolName: resolvedToolName,
+      success,
+      duration,
+    });
+  }
 }
 
 export { NotionClient, getNotionClient } from "./client";

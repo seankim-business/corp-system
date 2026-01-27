@@ -15,6 +15,7 @@ export class SlackEventWorker extends BaseWorker<SlackEventData> {
   async process(job: Job<SlackEventData>): Promise<void> {
     const { eventId, text, channel, user, ts, organizationId, userId, sessionId } = job.data;
 
+    await job.updateProgress(20);
     logger.info(`Processing Slack event ${eventId}`, {
       channel,
       user,
@@ -22,6 +23,7 @@ export class SlackEventWorker extends BaseWorker<SlackEventData> {
     });
 
     try {
+      await job.updateProgress(50);
       await orchestrationQueue.enqueueOrchestration({
         userRequest: text,
         sessionId,
@@ -32,6 +34,7 @@ export class SlackEventWorker extends BaseWorker<SlackEventData> {
         slackThreadTs: ts,
       });
 
+      await job.updateProgress(100);
       logger.info(`Enqueued orchestration for event ${eventId}`);
     } catch (error: any) {
       logger.error(`Failed to process Slack event ${eventId}:`, error);

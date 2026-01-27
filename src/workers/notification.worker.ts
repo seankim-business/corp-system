@@ -16,12 +16,14 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
   async process(job: Job<NotificationData>): Promise<void> {
     const { channel, threadTs, text, blocks, eventId, organizationId } = job.data;
 
+    await job.updateProgress(10);
     logger.info(`Sending notification for event ${eventId}`, {
       channel,
       organizationId,
       textPreview: text.substring(0, 50),
     });
 
+    await job.updateProgress(30);
     const integration = await getSlackIntegrationByOrg(organizationId);
 
     if (!integration) {
@@ -32,9 +34,11 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
       throw new Error(`Slack integration is disabled for organization ${organizationId}`);
     }
 
+    await job.updateProgress(60);
     const slackClient = new WebClient(integration.botToken);
 
     try {
+      await job.updateProgress(80);
       await slackClient.chat.postMessage({
         channel,
         text,
@@ -42,6 +46,7 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
         blocks,
       });
 
+      await job.updateProgress(100);
       logger.info(`Notification sent for event ${eventId}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);

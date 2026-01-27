@@ -10,7 +10,12 @@ const googleClient = new OAuth2Client({
 });
 
 export class AuthService {
-  async loginWithGoogle(code: string, organizationSlug?: string) {
+  async loginWithGoogle(
+    code: string,
+    organizationSlug?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const { tokens } = await googleClient.getToken(code);
     googleClient.setCredentials(tokens);
 
@@ -108,6 +113,8 @@ export class AuthService {
       userId: user.id,
       organizationId: organization.id,
       role: membership.role,
+      ipAddress,
+      userAgent,
     });
 
     const refreshToken = this.createRefreshToken({
@@ -219,7 +226,7 @@ export class AuthService {
 
     const sessionToken = this.createSessionToken({
       userId: user.id,
-      organizationId: membership.organizationId,
+      organizationId: membership.organization.id,
       role: membership.role,
     });
 
@@ -234,7 +241,13 @@ export class AuthService {
     };
   }
 
-  createSessionToken(payload: { userId: string; organizationId: string; role: string }) {
+  createSessionToken(payload: {
+    userId: string;
+    organizationId: string;
+    role: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
     const options: any = {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d",
     };
@@ -252,6 +265,8 @@ export class AuthService {
     userId: string;
     organizationId: string;
     role: string;
+    ipAddress?: string;
+    userAgent?: string;
   } {
     return jwt.verify(token, process.env.JWT_SECRET!) as any;
   }

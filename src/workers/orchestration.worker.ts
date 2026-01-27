@@ -22,6 +22,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
     const { userRequest, sessionId, organizationId, userId, eventId, slackChannel, slackThreadTs } =
       job.data;
 
+    await job.updateProgress(10);
     logger.info(`Executing orchestration for event ${eventId}`, {
       sessionId,
       organizationId,
@@ -31,6 +32,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
     try {
       const startTime = Date.now();
 
+      await job.updateProgress(30);
       const result = await orchestrate({
         userRequest,
         sessionId,
@@ -38,6 +40,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         userId,
       });
 
+      await job.updateProgress(70);
       const duration = Date.now() - startTime;
 
       logger.info(`Orchestration completed for event ${eventId}`, {
@@ -53,6 +56,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         model: result.metadata.model,
       });
 
+      await job.updateProgress(90);
       await notificationQueue.enqueueNotification({
         channel: slackChannel,
         threadTs: slackThreadTs,
@@ -63,6 +67,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         eventId,
       });
 
+      await job.updateProgress(100);
       emitOrgEvent(organizationId, "orchestration.completed", {
         eventId,
         sessionId,

@@ -5,6 +5,11 @@ import rateLimit from "express-rate-limit";
 import { validateRequest } from "./validator";
 import { delegateTask } from "./delegate";
 import { TIMEOUTS } from "./constants";
+import {
+  createOpencodeSession,
+  sendPromptToSession,
+  waitForSessionCompletion,
+} from "./opencode-client";
 
 const app = express();
 
@@ -32,6 +37,9 @@ app.get("/health", (req, res) => {
     anthropic: {
       configured: !!process.env.ANTHROPIC_API_KEY,
     },
+    opencode: {
+      enabled: process.env.USE_OPENCODE === "true",
+    },
   });
 });
 
@@ -58,8 +66,38 @@ app.post("/delegate", async (req, res) => {
   });
 
   try {
-    const result = await Promise.race([delegateTask(validationResult.data), timeoutPromise]);
-    res.json(result);
+    const request = validationResult.data;
+
+    if (process.env.USE_OPENCODE === "true") {
+      if (!request.callbacks && process.env.NUBABEL_CALLBACK_URL) {
+        request.callbacks = {
+          sessionUpdate: `${process.env.NUBABEL_CALLBACK_URL}/api/sidecar/sessions/${request.session_id}/update`,
+          mcpInvoke: `${process.env.NUBABEL_CALLBACK_URL}/api/sidecar/mcp/invoke`,
+          progress: `${process.env.NUBABEL_CALLBACK_URL}/api/sidecar/sessions/${request.session_id}/progress`,
+        };
+      }
+
+      const opencodeSessionId = await createOpencodeSession(request);
+      await sendPromptToSession(opencodeSessionId, request.prompt);
+
+      const output = await Promise.race([
+        waitForSessionCompletion(opencodeSessionId),
+        timeoutPromise,
+      ]);
+
+      res.json({
+        output,
+        status: "success",
+        metadata: {
+          model: "claude-sonnet-4-5",
+          opencodeSessionId,
+          nubabelSessionId: request.session_id,
+        },
+      });
+    } else {
+      const result = await Promise.race([delegateTask(request), timeoutPromise]);
+      res.json(result);
+    }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -82,6 +120,49 @@ app.post("/delegate", async (req, res) => {
       metadata: {
         model: "unknown",
         duration: 0,
+        error: "EXECUTION_ERROR",
+      },
+    });
+  }
+});
+
+app.post("/sessions/:opencodeSessionId/prompt", async (req, res) => {
+  const { opencodeSessionId } = req.params;
+  const { prompt } = req.body;
+
+  if (!prompt || typeof prompt !== "string") {
+    return res.status(400).json({
+      output: "Validation error: prompt is required and must be a string",
+      status: "failed",
+      metadata: {
+        model: "unknown",
+        error: "VALIDATION_ERROR",
+      },
+    });
+  }
+
+  try {
+    await sendPromptToSession(opencodeSessionId, prompt);
+    const output = await waitForSessionCompletion(opencodeSessionId);
+
+    res.json({
+      output,
+      status: "success",
+      metadata: {
+        model: "claude-sonnet-4-5",
+        opencodeSessionId,
+      },
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    console.error("Session prompt error:", error);
+    return res.status(500).json({
+      output: `Failed to send prompt to session: ${errorMessage}`,
+      status: "failed",
+      metadata: {
+        model: "unknown",
+        opencodeSessionId,
         error: "EXECUTION_ERROR",
       },
     });
