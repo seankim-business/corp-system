@@ -71,18 +71,38 @@ export class AuthService {
 
     if (!organization && hostedDomain) {
       const slug = hostedDomain.split(".")[0];
-      organization = await db.organization.create({
-        data: {
-          slug,
-          name: hostedDomain,
-          workspaceDomains: {
-            create: {
-              domain: hostedDomain,
-              verified: false,
+
+      organization = await db.organization.findUnique({
+        where: { slug },
+      });
+
+      if (!organization) {
+        organization = await db.organization.create({
+          data: {
+            slug,
+            name: hostedDomain,
+            workspaceDomains: {
+              create: {
+                domain: hostedDomain,
+                verified: false,
+              },
             },
           },
-        },
-      });
+        });
+      } else {
+        const existingDomain = await db.workspaceDomain.findUnique({
+          where: { domain: hostedDomain },
+        });
+        if (!existingDomain) {
+          await db.workspaceDomain.create({
+            data: {
+              domain: hostedDomain,
+              organizationId: organization.id,
+              verified: false,
+            },
+          });
+        }
+      }
     }
 
     if (!organization) {
