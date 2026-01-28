@@ -130,9 +130,40 @@ app.use(sentryRequestHandler());
 app.use(sentryTracingHandler());
 
 app.use(helmet());
+
+// CORS: Allow requests from all nubabel.com subdomains
+const allowedOrigins = [
+  process.env.BASE_URL || "http://localhost:3000",
+  process.env.FRONTEND_URL || "https://app.nubabel.com",
+  "https://nubabel.com",
+  "https://www.nubabel.com",
+  "https://app.nubabel.com",
+  "https://auth.nubabel.com",
+];
+
 app.use(
   cors({
-    origin: process.env.BASE_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      // Allow all *.nubabel.com subdomains
+      if (origin.endsWith(".nubabel.com") || origin === "https://nubabel.com") {
+        return callback(null, true);
+      }
+
+      // Allow explicitly listed origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Development: allow localhost
+      if (origin.includes("localhost")) {
+        return callback(null, true);
+      }
+
+      callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
