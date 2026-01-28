@@ -23,6 +23,8 @@ import {
   authRateLimiter,
   apiRateLimiter,
   strictRateLimiter,
+  webhookRateLimiter,
+  sidecarRateLimiter,
 } from "./middleware/rate-limiter.middleware";
 import { getAllCircuitBreakers } from "./utils/circuit-breaker";
 import { getEnv } from "./utils/env";
@@ -54,14 +56,31 @@ import searchRoutes from "./api/search";
 import driveRoutes from "./api/drive";
 import googleCalendarRoutes from "./api/google-calendar";
 import githubRoutes from "./api/github";
+import githubSsotRoutes from "./api/github-ssot";
 import sopRoutes from "./api/sop";
+import sopEditorRoutes from "./api/sop-editor";
 import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
+import taskPrioritizationRoutes from "./api/task-prioritization";
 import syncRoutes from "./api/sync";
 import delegationRoutes from "./api/delegations";
 import agentMetricsRoutes from "./api/agent-metrics";
+import agentSessionsRoutes from "./api/agent-sessions";
+import costsRoutes from "./api/costs";
+import errorManagementRoutes from "./api/error-management";
+import agentAdminRoutes from "./api/agent-admin";
+import optimizationRoutes from "./api/optimization";
+import patternsRoutes from "./api/patterns";
+import feedbackRoutes from "./api/feedback";
+import memoryRoutes from "./api/memory";
+import knowledgeGraphRoutes from "./api/knowledge-graph";
+import ragRoutes from "./api/rag";
+import alertsRoutes from "./api/alerts";
+import analyticsRoutes from "./api/analytics";
+import metaAgentRoutes from "./api/meta-agent";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
+import { conversationsRouter } from "./api/conversations";
 import { startWorkers, gracefulShutdown as gracefulWorkerShutdown } from "./workers";
 import { startSlackBot, stopSlackBot } from "./api/slack";
 import { disconnectRedis } from "./db/redis";
@@ -70,6 +89,7 @@ import { shutdownOpenTelemetry } from "./instrumentation";
 import { logger } from "./utils/logger";
 import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
 import { errorHandler } from "./middleware/error-handler";
+import { csrfProtection } from "./middleware/csrf.middleware";
 
 logger.info("Initializing Nubabel Platform", {
   nodeVersion: process.version,
@@ -131,6 +151,7 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(csrfProtection);
 app.use(metricsMiddleware);
 app.use(createMetricsRouter());
 
@@ -346,11 +367,36 @@ app.get("/health/circuits", (_req, res) => {
   });
 });
 
+app.post("/health/circuits/reset", (req, res) => {
+  const { name } = req.body || {};
+  const breakers = getAllCircuitBreakers();
+
+  if (name) {
+    const breaker = breakers.get(name);
+    if (!breaker) {
+      return res.status(404).json({ error: `Circuit breaker '${name}' not found` });
+    }
+    breaker.reset();
+    logger.info(`Circuit breaker '${name}' reset manually`);
+    return res.json({ success: true, message: `Circuit breaker '${name}' has been reset` });
+  }
+
+  breakers.forEach((breaker, breakerName) => {
+    breaker.reset();
+    logger.info(`Circuit breaker '${breakerName}' reset manually`);
+  });
+
+  return res.json({
+    success: true,
+    message: `All ${breakers.size} circuit breakers have been reset`,
+  });
+});
+
 app.use("/auth", authRateLimiter, authRoutes);
 
-app.use("/api", apiRateLimiter, webhooksRouter);
-app.use("/api", apiRateLimiter, sidecarCallbacksRouter);
-app.use("/api", apiRateLimiter, syncRoutes); // Sync webhooks (Notion/GitHub) - no auth required
+app.use("/api", webhookRateLimiter, webhooksRouter);
+app.use("/api", sidecarRateLimiter, sidecarCallbacksRouter);
+app.use("/api", webhookRateLimiter, syncRoutes);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 app.use("/api", apiRateLimiter, googleAiOAuthRouter);
@@ -377,12 +423,28 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, searchRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, driveRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, googleCalendarRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubSsotRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
+app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopEditorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, taskPrioritizationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSettingsRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
+app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
+app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
+app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, feedbackRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, patternsRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memoryRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, knowledgeGraphRoutes);
+app.use("/api/rag", apiRateLimiter, authenticate, sentryUserContext, ragRoutes);
+app.use("/api/alerts", apiRateLimiter, authenticate, sentryUserContext, alertsRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
+app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
 app.use("/api", sseRouter);
 
 app.use(
@@ -391,6 +453,15 @@ app.use(
   sentryUserContext,
   strictRateLimiter,
   bullBoardAdapter.getRouter(),
+);
+
+app.use(
+  "/admin/errors",
+  apiRateLimiter,
+  authenticate,
+  sentryUserContext,
+  strictRateLimiter,
+  errorManagementRoutes,
 );
 
 app.get("/api/user", authenticate, sentryUserContext, (req, res) => {

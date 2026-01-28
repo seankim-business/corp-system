@@ -38,7 +38,26 @@ export default function NotionSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isResettingCircuit, setIsResettingCircuit] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const isCircuitBreakerError = message?.text?.toLowerCase().includes("circuit breaker");
+
+  const resetCircuitBreaker = async () => {
+    setIsResettingCircuit(true);
+    try {
+      await request({
+        url: "/health/circuits/reset",
+        method: "POST",
+        data: { name: "notion-api" },
+      });
+      setMessage({ type: "success", text: "Circuit breaker reset. Please try again." });
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to reset circuit breaker" });
+    } finally {
+      setIsResettingCircuit(false);
+    }
+  };
 
   useEffect(() => {
     fetchConnection();
@@ -196,7 +215,18 @@ export default function NotionSettingsPage() {
               : "bg-red-50 text-red-800 border border-red-200"
           }`}
         >
-          {message.text}
+          <div className="flex items-center justify-between">
+            <span>{message.text}</span>
+            {isCircuitBreakerError && (
+              <button
+                onClick={resetCircuitBreaker}
+                disabled={isResettingCircuit}
+                className="ml-4 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
+              >
+                {isResettingCircuit ? "Resetting..." : "Reset Circuit Breaker"}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
