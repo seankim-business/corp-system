@@ -38,7 +38,15 @@ router.get("/google", async (_req: Request, res: Response) => {
   const challenge = generateCodeChallenge(verifier);
 
   const sessionId = `pkce:${Date.now()}:${Math.random().toString(36).substring(7)}`;
-  await redis.set(sessionId, verifier, 600);
+  // 15 minutes TTL for PKCE session (users may take time on Google auth page)
+  const stored = await redis.set(sessionId, verifier, 900);
+
+  if (!stored) {
+    logger.error("Failed to store PKCE session in Redis", { sessionId });
+    return res.status(500).send("Failed to initialize authentication session. Please try again.");
+  }
+
+  logger.info("PKCE session created", { sessionId });
 
   let authUrl = googleClient.generateAuthUrl({
     access_type: "offline",
@@ -55,7 +63,14 @@ router.get("/google", async (_req: Request, res: Response) => {
 });
 
 router.get("/google/callback", async (req: Request, res: Response) => {
-  const { code, state } = req.query;
+  const { code, state, error: oauthError } = req.query;
+
+  // Handle OAuth error (user denied access, etc.)
+  if (oauthError) {
+    logger.warn("OAuth error from Google", { error: oauthError, state });
+    const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "https://nubabel.com";
+    return res.redirect(`${frontendUrl}/login?error=${oauthError}`);
+  }
 
   if (!code) {
     return res.status(400).send("Missing authorization code");
@@ -66,11 +81,20 @@ router.get("/google/callback", async (req: Request, res: Response) => {
   }
 
   try {
+    logger.info("Processing OAuth callback", { state, hasCode: !!code });
+
     const verifier = await redis.get(state as string);
     if (!verifier) {
-      return res.status(400).send("Invalid or expired PKCE session");
+      logger.warn("PKCE session not found or expired", {
+        state,
+        stateType: typeof state,
+        stateLength: (state as string).length,
+      });
+      const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "https://nubabel.com";
+      return res.redirect(`${frontendUrl}/login?error=session_expired`);
     }
 
+    logger.info("PKCE session validated", { state });
     await redis.del(state as string);
 
     const ipAddress = extractIpAddress(req);

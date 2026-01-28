@@ -291,6 +291,11 @@ export async function disconnectRedis(): Promise<void> {
 }
 
 function getPrefixedKey(key: string): string {
+  // PKCE keys should not be prefixed with NODE_ENV to ensure
+  // consistency across auth servers/environments
+  if (key.startsWith("pkce:")) {
+    return key;
+  }
   const env = getEnv();
   const nodeEnv = env.NODE_ENV || "development";
   return `${nodeEnv}:${key}`;
@@ -408,6 +413,17 @@ export const redis = {
       return await withQueueConnection((client) => client.incr(getPrefixedKey(key)));
     } catch (error: unknown) {
       logger.error(`Redis INCR error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  },
+
+  async incrby(key: string, increment: number): Promise<number> {
+    try {
+      return await withQueueConnection((client) => client.incrby(getPrefixedKey(key), increment));
+    } catch (error: unknown) {
+      logger.error(`Redis INCRBY error for key ${key}`, {
         error: error instanceof Error ? error.message : String(error),
       });
       return 0;
