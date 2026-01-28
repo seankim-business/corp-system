@@ -1,84 +1,338 @@
+/**
+ * RBAC (Role-Based Access Control) System
+ *
+ * Defines roles, permissions, and the permission matrix for the Nubabel platform.
+ *
+ * ROLE HIERARCHY:
+ * - owner: Full access to all permissions including org deletion and billing
+ * - admin: All permissions except org deletion and billing management
+ * - member: CRUD on own resources, execute workflows
+ * - viewer: Read-only access
+ */
+
+// =============================================================================
+// ROLES
+// =============================================================================
+
 export enum Role {
   OWNER = "owner",
   ADMIN = "admin",
   MEMBER = "member",
+  VIEWER = "viewer",
 }
+
+/** Array of all valid roles for validation */
+export const ROLES = Object.values(Role) as string[];
+
+/** Role hierarchy (higher index = higher privilege) */
+export const ROLE_HIERARCHY: Record<Role, number> = {
+  [Role.VIEWER]: 0,
+  [Role.MEMBER]: 1,
+  [Role.ADMIN]: 2,
+  [Role.OWNER]: 3,
+};
+
+// =============================================================================
+// PERMISSIONS
+// =============================================================================
 
 export enum Permission {
-  WORKFLOWS_READ = "workflows:read",
-  WORKFLOWS_WRITE = "workflows:write",
-  WORKFLOWS_DELETE = "workflows:delete",
-  WORKFLOWS_EXECUTE = "workflows:execute",
+  // Workflow permissions
+  WORKFLOW_CREATE = "workflow:create",
+  WORKFLOW_READ = "workflow:read",
+  WORKFLOW_UPDATE = "workflow:update",
+  WORKFLOW_DELETE = "workflow:delete",
+  WORKFLOW_EXECUTE = "workflow:execute",
 
-  INTEGRATIONS_READ = "integrations:read",
-  INTEGRATIONS_WRITE = "integrations:write",
-  INTEGRATIONS_DELETE = "integrations:delete",
+  // Execution permissions
+  EXECUTION_READ = "execution:read",
 
-  MEMBERS_READ = "members:read",
-  MEMBERS_WRITE = "members:write",
-  MEMBERS_DELETE = "members:delete",
+  // Member management permissions
+  MEMBER_INVITE = "member:invite",
+  MEMBER_REMOVE = "member:remove",
+  MEMBER_UPDATE_ROLE = "member:update-role",
+  MEMBER_READ = "member:read",
 
+  // Settings permissions
   SETTINGS_READ = "settings:read",
-  SETTINGS_WRITE = "settings:write",
+  SETTINGS_UPDATE = "settings:update",
 
+  // Integration permissions
+  INTEGRATION_MANAGE = "integration:manage",
+  INTEGRATION_READ = "integration:read",
+
+  // Audit permissions
   AUDIT_READ = "audit:read",
 
+  // Billing permissions (owner only)
   BILLING_READ = "billing:read",
-  BILLING_WRITE = "billing:write",
+  BILLING_MANAGE = "billing:manage",
+
+  // Organization permissions (owner only)
+  ORG_DELETE = "org:delete",
+
+  // Approval permissions
+  APPROVAL_CREATE = "approval:create",
+  APPROVAL_READ = "approval:read",
+  APPROVAL_RESPOND = "approval:respond",
+
+  // Legacy permission mappings (for backwards compatibility)
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  WORKFLOWS_READ = "workflow:read",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  WORKFLOWS_WRITE = "workflow:create",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  WORKFLOWS_DELETE = "workflow:delete",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  WORKFLOWS_EXECUTE = "workflow:execute",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  INTEGRATIONS_READ = "integration:read",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  INTEGRATIONS_WRITE = "integration:manage",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  INTEGRATIONS_DELETE = "integration:manage",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  MEMBERS_READ = "member:read",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  MEMBERS_WRITE = "member:invite",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  MEMBERS_DELETE = "member:remove",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  SETTINGS_WRITE = "settings:update",
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  BILLING_WRITE = "billing:manage",
 }
+
+/** Array of all valid permissions for validation */
+export const PERMISSIONS = Object.values(Permission).filter(
+  (v, i, arr) => arr.indexOf(v) === i,
+) as string[];
+
+// =============================================================================
+// ROLE-PERMISSION MATRIX
+// =============================================================================
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.OWNER]: [
-    Permission.WORKFLOWS_READ,
-    Permission.WORKFLOWS_WRITE,
-    Permission.WORKFLOWS_DELETE,
-    Permission.WORKFLOWS_EXECUTE,
-    Permission.INTEGRATIONS_READ,
-    Permission.INTEGRATIONS_WRITE,
-    Permission.INTEGRATIONS_DELETE,
-    Permission.MEMBERS_READ,
-    Permission.MEMBERS_WRITE,
-    Permission.MEMBERS_DELETE,
+    // Full workflow access
+    Permission.WORKFLOW_CREATE,
+    Permission.WORKFLOW_READ,
+    Permission.WORKFLOW_UPDATE,
+    Permission.WORKFLOW_DELETE,
+    Permission.WORKFLOW_EXECUTE,
+    // Execution access
+    Permission.EXECUTION_READ,
+    // Full member management
+    Permission.MEMBER_INVITE,
+    Permission.MEMBER_REMOVE,
+    Permission.MEMBER_UPDATE_ROLE,
+    Permission.MEMBER_READ,
+    // Full settings access
     Permission.SETTINGS_READ,
-    Permission.SETTINGS_WRITE,
+    Permission.SETTINGS_UPDATE,
+    // Full integration management
+    Permission.INTEGRATION_MANAGE,
+    Permission.INTEGRATION_READ,
+    // Audit access
     Permission.AUDIT_READ,
+    // Billing (owner only)
     Permission.BILLING_READ,
-    Permission.BILLING_WRITE,
+    Permission.BILLING_MANAGE,
+    // Org deletion (owner only)
+    Permission.ORG_DELETE,
+    // Approval permissions
+    Permission.APPROVAL_CREATE,
+    Permission.APPROVAL_READ,
+    Permission.APPROVAL_RESPOND,
   ],
+
   [Role.ADMIN]: [
-    Permission.WORKFLOWS_READ,
-    Permission.WORKFLOWS_WRITE,
-    Permission.WORKFLOWS_DELETE,
-    Permission.WORKFLOWS_EXECUTE,
-    Permission.INTEGRATIONS_READ,
-    Permission.INTEGRATIONS_WRITE,
-    Permission.INTEGRATIONS_DELETE,
-    Permission.MEMBERS_READ,
+    // Full workflow access
+    Permission.WORKFLOW_CREATE,
+    Permission.WORKFLOW_READ,
+    Permission.WORKFLOW_UPDATE,
+    Permission.WORKFLOW_DELETE,
+    Permission.WORKFLOW_EXECUTE,
+    // Execution access
+    Permission.EXECUTION_READ,
+    // Member management (cannot update roles to owner)
+    Permission.MEMBER_INVITE,
+    Permission.MEMBER_REMOVE,
+    Permission.MEMBER_UPDATE_ROLE,
+    Permission.MEMBER_READ,
+    // Settings access
     Permission.SETTINGS_READ,
+    Permission.SETTINGS_UPDATE,
+    // Full integration management
+    Permission.INTEGRATION_MANAGE,
+    Permission.INTEGRATION_READ,
+    // Audit access
     Permission.AUDIT_READ,
+    // Approval permissions
+    Permission.APPROVAL_CREATE,
+    Permission.APPROVAL_READ,
+    Permission.APPROVAL_RESPOND,
+    // NO billing access
+    // NO org deletion
   ],
+
   [Role.MEMBER]: [
-    Permission.WORKFLOWS_READ,
-    Permission.WORKFLOWS_EXECUTE,
-    Permission.INTEGRATIONS_READ,
+    // Can create and manage own workflows
+    Permission.WORKFLOW_CREATE,
+    Permission.WORKFLOW_READ,
+    Permission.WORKFLOW_UPDATE,
+    Permission.WORKFLOW_EXECUTE,
+    // Execution access
+    Permission.EXECUTION_READ,
+    // Can read members
+    Permission.MEMBER_READ,
+    // Can read settings
+    Permission.SETTINGS_READ,
+    // Can read integrations
+    Permission.INTEGRATION_READ,
+    // Approval permissions (can create and read, but only respond as designated approver)
+    Permission.APPROVAL_CREATE,
+    Permission.APPROVAL_READ,
+    Permission.APPROVAL_RESPOND,
+    // NO workflow delete
+    // NO member management
+    // NO settings update
+    // NO integration management
+    // NO audit
+    // NO billing
+  ],
+
+  [Role.VIEWER]: [
+    // Read-only access
+    Permission.WORKFLOW_READ,
+    Permission.EXECUTION_READ,
+    Permission.MEMBER_READ,
+    Permission.SETTINGS_READ,
+    Permission.INTEGRATION_READ,
+    Permission.APPROVAL_READ,
+    // NO create/update/delete
+    // NO execute
+    // NO audit
+    // NO billing
   ],
 };
 
+// =============================================================================
+// PERMISSION CHECK FUNCTIONS
+// =============================================================================
+
+/**
+ * Get all permissions for a role
+ */
 export function getRolePermissions(role: string): Permission[] {
   return ROLE_PERMISSIONS[role as Role] || [];
 }
 
-export function hasPermission(role: string, permission: Permission): boolean {
+/**
+ * Check if a role has a specific permission
+ */
+export function hasPermission(role: string, permission: Permission | string): boolean {
   const permissions = getRolePermissions(role);
-  return permissions.includes(permission);
+  return permissions.includes(permission as Permission);
 }
 
-export function hasAnyPermission(role: string, permissions: Permission[]): boolean {
+/**
+ * Check if a role has any of the specified permissions
+ */
+export function hasAnyPermission(role: string, permissions: (Permission | string)[]): boolean {
   const rolePermissions = getRolePermissions(role);
-  return permissions.some((p) => rolePermissions.includes(p));
+  return permissions.some((p) => rolePermissions.includes(p as Permission));
 }
 
-export function hasAllPermissions(role: string, permissions: Permission[]): boolean {
+/**
+ * Check if a role has all of the specified permissions
+ */
+export function hasAllPermissions(role: string, permissions: (Permission | string)[]): boolean {
   const rolePermissions = getRolePermissions(role);
-  return permissions.every((p) => rolePermissions.includes(p));
+  return permissions.every((p) => rolePermissions.includes(p as Permission));
+}
+
+// =============================================================================
+// ROLE VALIDATION
+// =============================================================================
+
+/**
+ * Validate if a string is a valid role
+ */
+export function isValidRole(role: string): role is Role {
+  return ROLES.includes(role);
+}
+
+/**
+ * Validate role assignment - ensures role hierarchy is respected
+ * @param assignerRole The role of the user assigning the role
+ * @param targetRole The role being assigned
+ * @returns true if assignment is allowed, false otherwise
+ */
+export function canAssignRole(assignerRole: string, targetRole: string): boolean {
+  if (!isValidRole(assignerRole) || !isValidRole(targetRole)) {
+    return false;
+  }
+
+  const assignerLevel = ROLE_HIERARCHY[assignerRole as Role];
+  const targetLevel = ROLE_HIERARCHY[targetRole as Role];
+
+  // Can only assign roles lower than or equal to own level
+  // Special case: only owner can assign owner role
+  if (targetRole === Role.OWNER) {
+    return assignerRole === Role.OWNER;
+  }
+
+  return assignerLevel >= targetLevel;
+}
+
+/**
+ * Check if a role change is allowed
+ * @param actorRole The role of the user performing the change
+ * @param currentRole The current role of the target user
+ * @param newRole The new role to assign
+ * @returns true if the role change is allowed
+ */
+export function canChangeRole(actorRole: string, currentRole: string, newRole: string): boolean {
+  if (!isValidRole(actorRole) || !isValidRole(currentRole) || !isValidRole(newRole)) {
+    return false;
+  }
+
+  const actorLevel = ROLE_HIERARCHY[actorRole as Role];
+  const currentLevel = ROLE_HIERARCHY[currentRole as Role];
+  const newLevel = ROLE_HIERARCHY[newRole as Role];
+
+  // Cannot modify users with equal or higher role (except self-demotion)
+  if (currentLevel >= actorLevel) {
+    return false;
+  }
+
+  // Cannot promote to equal or higher role
+  if (newLevel >= actorLevel) {
+    return false;
+  }
+
+  // Special case: only owner can demote from admin
+  if (currentRole === Role.ADMIN && actorRole !== Role.OWNER) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Get default role for new members
+ */
+export function getDefaultRole(): Role {
+  return Role.MEMBER;
+}
+
+/**
+ * Check if role is at least the minimum required level
+ */
+export function isRoleAtLeast(role: string, minimumRole: Role): boolean {
+  if (!isValidRole(role)) {
+    return false;
+  }
+  return ROLE_HIERARCHY[role as Role] >= ROLE_HIERARCHY[minimumRole];
 }

@@ -22,7 +22,11 @@ export type AuditAction =
   | "api.rate_limited"
   | "security.suspicious"
   | "data.export"
-  | "data.import";
+  | "data.import"
+  | "approval.created"
+  | "approval.approved"
+  | "approval.rejected"
+  | "approval.expired";
 
 export interface AuditLogEntry {
   id?: string;
@@ -233,6 +237,11 @@ class AuditLogger {
     logger.info("Audit log cleanup completed", { deleted: result.count, retentionDays });
     return result.count;
   }
+
+  async shutdown(): Promise<void> {
+    logger.info("Shutting down audit logger", { pendingEntries: this.buffer.length });
+    await this.flush();
+  }
 }
 
 export const auditLogger = new AuditLogger();
@@ -296,5 +305,32 @@ function getResourceType(path: string): string {
   if (path.includes("/users")) return "user";
   if (path.includes("/mcp")) return "mcp_connection";
   if (path.includes("/executions")) return "execution";
+  if (path.includes("/approvals")) return "approval";
   return "unknown";
+}
+
+export async function createAuditLog(params: {
+  organizationId: string;
+  action: string;
+  userId?: string;
+  resourceType?: string;
+  resourceId?: string;
+  details?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+  success?: boolean;
+  errorMessage?: string;
+}): Promise<void> {
+  await auditLogger.log({
+    action: params.action as AuditAction,
+    organizationId: params.organizationId,
+    userId: params.userId,
+    resourceType: params.resourceType,
+    resourceId: params.resourceId,
+    details: params.details,
+    ipAddress: params.ipAddress,
+    userAgent: params.userAgent,
+    success: params.success ?? true,
+    errorMessage: params.errorMessage,
+  });
 }

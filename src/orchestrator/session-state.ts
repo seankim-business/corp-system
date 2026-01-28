@@ -13,6 +13,34 @@ export interface SessionState {
 const SESSION_STATE_TTL = 1800;
 const SESSION_STATE_PREFIX = "session:state:";
 
+const UPDATE_SESSION_SCRIPT = `
+local key = KEYS[1]
+local updates = cjson.decode(ARGV[1])
+local ttl = tonumber(ARGV[2])
+local sessionId = ARGV[3]
+local now = tonumber(ARGV[4])
+
+local current = redis.call('GET', key)
+local state
+if current then
+  state = cjson.decode(current)
+else
+  state = { sessionId = sessionId, conversationDepth = 0 }
+end
+
+for k, v in pairs(updates) do
+  state[k] = v
+end
+
+state.sessionId = sessionId
+state.lastQueryTime = now
+state.conversationDepth = (state.conversationDepth or 0) + 1
+
+local result = cjson.encode(state)
+redis.call('SETEX', key, ttl, result)
+return result
+`;
+
 function getSessionKey(sessionId: string): string {
   return SESSION_STATE_PREFIX + sessionId;
 }
@@ -41,19 +69,18 @@ export async function getSessionState(sessionId: string): Promise<SessionState |
 export async function updateSessionState(
   sessionId: string,
   updates: Partial<Omit<SessionState, "sessionId">>,
-): Promise<void> {
+): Promise<SessionState> {
   const key = getSessionKey(sessionId);
-  const current = await getSessionState(sessionId);
-
-  const updated: SessionState = {
-    ...current,
-    ...updates,
+  const result = await redis.eval(
+    UPDATE_SESSION_SCRIPT,
+    1,
+    key,
+    JSON.stringify(updates),
+    String(SESSION_STATE_TTL),
     sessionId,
-    lastQueryTime: Date.now(),
-    conversationDepth: (current?.conversationDepth || 0) + 1,
-  };
-
-  await redis.set(key, JSON.stringify(updated), SESSION_STATE_TTL);
+    String(Date.now()),
+  );
+  return JSON.parse(result as string);
 }
 
 export async function clearSessionState(sessionId: string): Promise<void> {

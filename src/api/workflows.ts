@@ -43,7 +43,7 @@ const router = Router();
 router.get(
   "/workflows",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_READ),
+  requirePermission(Permission.WORKFLOW_READ),
   async (req: Request, res: Response) => {
     try {
       const { organizationId } = req.user!;
@@ -64,7 +64,7 @@ router.get(
 router.post(
   "/workflows",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_WRITE),
+  requirePermission(Permission.WORKFLOW_CREATE),
   validate({ body: createWorkflowSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -92,7 +92,7 @@ router.post(
 router.get(
   "/workflows/:id",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_READ),
+  requirePermission(Permission.WORKFLOW_READ),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -124,7 +124,7 @@ router.get(
 router.put(
   "/workflows/:id",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_WRITE),
+  requirePermission(Permission.WORKFLOW_UPDATE),
   validate({ params: uuidParamSchema, body: updateWorkflowSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -161,7 +161,7 @@ router.put(
 router.delete(
   "/workflows/:id",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_DELETE),
+  requirePermission(Permission.WORKFLOW_DELETE),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -191,7 +191,7 @@ router.delete(
 router.post(
   "/workflows/:id/execute",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_EXECUTE),
+  requirePermission(Permission.WORKFLOW_EXECUTE),
   validate({ params: uuidParamSchema, body: executeWorkflowSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -230,13 +230,17 @@ router.post(
           let finalOutputData: any = { message: "Workflow executed successfully" };
 
           if (steps.length > 0) {
-            const notionConnection = await prisma.notionConnection.findUnique({
-              where: { organizationId },
-            });
-
-            const linearConnection = await prisma.mCPConnection.findFirst({
-              where: { organizationId, provider: "linear", enabled: true },
-            });
+            const [notionConnection, linearConnection, githubConnection] = await Promise.all([
+              prisma.notionConnection.findUnique({
+                where: { organizationId },
+              }),
+              prisma.mCPConnection.findFirst({
+                where: { organizationId, provider: "linear", enabled: true },
+              }),
+              prisma.mCPConnection.findFirst({
+                where: { organizationId, provider: "github", enabled: true },
+              }),
+            ]);
 
             for (const step of steps) {
               if (step.type === "mcp_call") {
@@ -322,9 +326,6 @@ router.post(
                   );
                   finalOutputData = { ...finalOutputData, ...toolResult };
                 } else if (step.mcp === "github") {
-                  const githubConnection = await prisma.mCPConnection.findFirst({
-                    where: { organizationId, provider: "github", enabled: true },
-                  });
                   if (!githubConnection) {
                     throw new Error("GitHub connection not configured");
                   }
@@ -402,7 +403,7 @@ router.post(
 router.get(
   "/workflows/:id/executions",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_READ),
+  requirePermission(Permission.EXECUTION_READ),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {
@@ -434,7 +435,7 @@ router.get(
 router.get(
   "/executions",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_READ),
+  requirePermission(Permission.EXECUTION_READ),
   async (req: Request, res: Response) => {
     try {
       const { organizationId } = req.user!;
@@ -467,7 +468,7 @@ router.get(
 router.get(
   "/executions/:id",
   requireAuth,
-  requirePermission(Permission.WORKFLOWS_READ),
+  requirePermission(Permission.EXECUTION_READ),
   validate({ params: uuidParamSchema }),
   async (req: Request, res: Response) => {
     try {

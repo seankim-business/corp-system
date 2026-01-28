@@ -10,11 +10,13 @@ import {
   GitHubIssue,
   GitHubPullRequest,
   GitHubRepository,
+  GitHubFileContent,
   GetIssuesInput,
   CreateIssueInput,
   UpdateIssueInput,
   GetPullRequestsInput,
   CreatePullRequestInput,
+  GetFileInput,
 } from "./types";
 import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
 import { MCPConnection } from "../../orchestrator/types";
@@ -355,6 +357,55 @@ export class GitHubClient {
       },
       (result, span) => {
         span.setAttribute("result.count", result.length);
+      },
+    );
+  }
+
+  async getFile(input: GetFileInput): Promise<GitHubFileContent> {
+    return this.executeWithMetrics(
+      "getFile",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        "github.path": input.path,
+        ...(input.ref ? { "github.ref": input.ref } : {}),
+      },
+      async () => {
+        const { owner, repo, path, ref } = input;
+        const params = new URLSearchParams();
+        if (ref) params.set("ref", ref);
+
+        const queryString = params.toString();
+        const endpoint = `/repos/${owner}/${repo}/contents/${path}${queryString ? `?${queryString}` : ""}`;
+
+        const response = await this.request<any>("GET", endpoint);
+
+        if (Array.isArray(response)) {
+          throw new Error(`Path "${path}" is a directory, not a file`);
+        }
+
+        if (response.type !== "file") {
+          throw new Error(`Path "${path}" is not a file (type: ${response.type})`);
+        }
+
+        const content =
+          response.encoding === "base64"
+            ? Buffer.from(response.content, "base64").toString("utf-8")
+            : response.content;
+
+        return {
+          name: response.name,
+          path: response.path,
+          sha: response.sha,
+          size: response.size,
+          content,
+          encoding: "utf-8",
+          htmlUrl: response.html_url,
+          downloadUrl: response.download_url,
+        };
+      },
+      (file, span) => {
+        span.setAttribute("github.file_size", file.size);
       },
     );
   }

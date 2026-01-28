@@ -18,7 +18,23 @@ export interface EnhancedRequestAnalysis extends RequestAnalysis {
     assignee?: ExtractedEntity;
     dueDate?: ExtractedEntity;
     priority?: ExtractedEntity;
+    project?: ExtractedEntity;
   };
+  ambiguity?: {
+    isAmbiguous: boolean;
+    clarifyingQuestions?: string[];
+    ambiguousTerms?: string[];
+  };
+  followUp?: {
+    isFollowUp: boolean;
+    relatedTo?: string;
+  };
+}
+
+export interface IntentClassification {
+  intent: string;
+  confidence: number;
+  category: "task_creation" | "search" | "report" | "approval" | "general_query" | "unknown";
 }
 
 export async function analyzeRequest(
@@ -60,6 +76,8 @@ export async function analyzeRequestEnhanced(
   const extractedEntities = extractEntitiesEnhanced(userRequest);
   const requiresMultiAgent = detectMultiAgentNeed(lowercased);
   const complexity = assessComplexity(lowercased, requiresMultiAgent, context);
+  const ambiguity = detectAmbiguity(userRequest, extractedEntities);
+  const followUp = detectFollowUp(userRequest, context);
 
   return {
     intent,
@@ -69,6 +87,8 @@ export async function analyzeRequestEnhanced(
     complexity,
     intentConfidence,
     extractedEntities,
+    ambiguity,
+    followUp,
   };
 }
 
@@ -96,63 +116,110 @@ function detectIntentWithConfidence(
     sessionMetadata?: Record<string, any>;
   },
 ): { intent: string; confidence: number } {
-  const intentPatterns: Record<string, string[]> = {
-    create_task: ["생성", "만들", "추가", "작성", "create", "add"],
-    update_task: [
-      "수정",
-      "변경",
-      "업데이트",
-      "완료",
-      "update",
-      "modify",
-      "change",
-      "complete",
-      "done",
-      "finish",
-    ],
-    delete_task: ["삭제", "제거", "delete", "remove"],
-    query_data: ["조회", "확인", "보여", "알려", "show", "list", "get"],
-    generate_content: ["콘셉트", "아이디어", "디자인", "generate", "design"],
-  };
+  const classification = classifyIntent(text, context);
+  return { intent: classification.intent, confidence: classification.confidence };
+}
 
+function classifyIntent(
+  text: string,
+  context?: {
+    previousMessages?: Array<{ role: string; content: string }>;
+    sessionMetadata?: Record<string, any>;
+  },
+): IntentClassification {
+  // Check for follow-up context first
   if (context?.previousMessages && context.previousMessages.length > 0) {
     const lastMessage = context.previousMessages[context.previousMessages.length - 1];
 
-    if (
-      lastMessage.role === "assistant" &&
-      (lastMessage.content.includes("생성했습니다") || lastMessage.content.includes("created"))
-    ) {
-      if (text.includes("확인") || text.includes("보여")) {
-        return { intent: "query_data", confidence: 0.9 };
-      }
-      if (text.includes("수정") || text.includes("변경")) {
-        return { intent: "update_task", confidence: 0.85 };
+    if (lastMessage.role === "assistant") {
+      if (lastMessage.content.includes("생성했습니다") || lastMessage.content.includes("created")) {
+        if (text.includes("확인") || text.includes("보여")) {
+          return { intent: "query_data", confidence: 0.9, category: "search" };
+        }
+        if (text.includes("수정") || text.includes("변경")) {
+          return { intent: "update_task", confidence: 0.85, category: "task_creation" };
+        }
       }
     }
   }
 
-  let bestMatch: { intent: string; confidence: number; matchCount: number } = {
-    intent: "general",
-    confidence: 0.3,
-    matchCount: 0,
+  // Task creation patterns
+  const taskCreationPatterns = [
+    /\b(create|add|make|new|assign|allocate|schedule)\s+(task|job|work|assignment)/i,
+    /\b(create|add|make)\s+\w+\s+(for|to)\s+@?\w+/i,
+    /\b(create task for|assign to|allocate to)\s+/i,
+    /(생성|만들|추가|작성|할당)\s+(태스크|작업|이슈)/,
+  ];
+
+  // Search/query patterns
+  const searchPatterns = [
+    /\b(search|find|look for|show|list|get|retrieve|query|what|where|which)\b/i,
+    /\b(show|list|display)\s+(my|all|the)\s+(tasks|work|items|requests)/i,
+    /\b(what'?s|what is)\s+(on|in)\s+(my|the)\s+(plate|list|queue)/i,
+    /(조회|확인|보여|찾|검색|알려|리스트)/,
+  ];
+
+  // Report/analytics patterns
+  const reportPatterns = [
+    /\b(generate|create|make|show|display)\s+(report|summary|overview|analytics|stats|statistics)/i,
+    /\b(report|analytics|summary)\s+(on|about|for)\s+/i,
+    /\b(how many|count|total|statistics)\s+/i,
+    /(리포트|보고서|분석|통계|요약)/,
+  ];
+
+  // Approval/decision patterns
+  const approvalPatterns = [
+    /\b(approve|reject|deny|accept|decline|confirm|validate)\s+/i,
+    /\b(approve|reject)\s+(this|that|the|request|proposal|change)/i,
+    /\b(do you|should i|can i)\s+(approve|reject)/i,
+    /(승인|거절|거부|수락|확인)/,
+  ];
+
+  // Score each category
+  const scores = {
+    task_creation: scorePatterns(text, taskCreationPatterns),
+    search: scorePatterns(text, searchPatterns),
+    report: scorePatterns(text, reportPatterns),
+    approval: scorePatterns(text, approvalPatterns),
   };
 
-  for (const [intent, patterns] of Object.entries(intentPatterns)) {
-    const matchedPatterns = patterns.filter((pattern) => text.includes(pattern));
-    const matchCount = matchedPatterns.length;
+  // Find best match
+  let bestCategory: keyof typeof scores = "search";
+  let bestScore = scores.search;
 
-    if (matchCount > 0) {
-      let confidence = 0.6;
-      if (matchCount >= 2) confidence = 0.9;
-      else if (matchCount === 1) confidence = 0.7;
-
-      if (matchCount > bestMatch.matchCount) {
-        bestMatch = { intent, confidence, matchCount };
-      }
+  for (const [category, score] of Object.entries(scores)) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestCategory = category as keyof typeof scores;
     }
   }
 
-  return { intent: bestMatch.intent, confidence: bestMatch.confidence };
+  // Map category to legacy intent names for backward compatibility
+  const categoryToIntent: Record<string, string> = {
+    task_creation: "create_task",
+    search: "query_data",
+    report: "generate_content",
+    approval: "update_task",
+  };
+
+  const confidence = Math.min(bestScore, 0.95);
+  const intent = categoryToIntent[bestCategory] || "general";
+
+  return {
+    intent,
+    confidence: confidence > 0.3 ? confidence : 0.3,
+    category: bestScore > 0.3 ? (bestCategory as any) : "general_query",
+  };
+}
+
+function scorePatterns(text: string, patterns: RegExp[]): number {
+  let score = 0;
+  for (const pattern of patterns) {
+    if (pattern.test(text)) {
+      score += 0.4;
+    }
+  }
+  return Math.min(score, 1.0);
 }
 
 function extractEntities(
@@ -237,6 +304,7 @@ function extractEntitiesEnhanced(text: string): {
   assignee?: ExtractedEntity;
   dueDate?: ExtractedEntity;
   priority?: ExtractedEntity;
+  project?: ExtractedEntity;
 } {
   const entities: any = {};
 
@@ -246,6 +314,8 @@ function extractEntitiesEnhanced(text: string): {
     { regex: /\b(github|깃허브|깃헙)\b/i, value: "github", confidence: 0.9 },
     { regex: /\b(linear|리니어)\b/i, value: "linear", confidence: 0.9 },
     { regex: /\b(jira|지라)\b/i, value: "jira", confidence: 0.9 },
+    { regex: /\b(asana|아사나)\b/i, value: "asana", confidence: 0.9 },
+    { regex: /\b(airtable|에어테이블)\b/i, value: "airtable", confidence: 0.9 },
   ];
 
   for (const pattern of targetPatterns) {
@@ -265,7 +335,12 @@ function extractEntitiesEnhanced(text: string): {
     { regex: /\b(생성|만들|추가|작성|create|add)\b/i, value: "create", confidence: 0.85 },
     { regex: /\b(수정|변경|업데이트|update|modify|change)\b/i, value: "update", confidence: 0.85 },
     { regex: /\b(삭제|제거|delete|remove)\b/i, value: "delete", confidence: 0.85 },
-    { regex: /\b(조회|확인|보여|알려|show|list|get|find)\b/i, value: "query", confidence: 0.85 },
+    {
+      regex: /\b(조회|확인|보여|알려|show|list|get|find|search)\b/i,
+      value: "query",
+      confidence: 0.85,
+    },
+    { regex: /\b(approve|reject|승인|거절)\b/i, value: "approve", confidence: 0.85 },
   ];
 
   for (const pattern of actionPatterns) {
@@ -273,6 +348,27 @@ function extractEntitiesEnhanced(text: string): {
     if (match) {
       entities.action = {
         type: "action",
+        value: pattern.value,
+        confidence: pattern.confidence,
+        position: match.index,
+      };
+      break;
+    }
+  }
+
+  const objectPatterns = [
+    { regex: /\b(task|tasks|태스크|작업|이슈|issue)\b/i, value: "task", confidence: 0.9 },
+    { regex: /\b(document|documents|문서|doc|docs)\b/i, value: "document", confidence: 0.9 },
+    { regex: /\b(workflow|workflows|워크플로우)\b/i, value: "workflow", confidence: 0.9 },
+    { regex: /\b(page|pages|페이지)\b/i, value: "page", confidence: 0.9 },
+    { regex: /\b(request|requests|요청)\b/i, value: "request", confidence: 0.9 },
+  ];
+
+  for (const pattern of objectPatterns) {
+    const match = text.match(pattern.regex);
+    if (match) {
+      entities.object = {
+        type: "object",
         value: pattern.value,
         confidence: pattern.confidence,
         position: match.index,
@@ -289,6 +385,44 @@ function extractEntitiesEnhanced(text: string): {
       confidence: 0.95,
       position: assigneeMatch.index,
     };
+  } else {
+    const userPatterns = [
+      /(?:for|to|assign to|allocate to)\s+(\w+)/i,
+      /(?:user|person|team)\s+(\w+)/i,
+    ];
+    for (const pattern of userPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        entities.assignee = {
+          type: "assignee",
+          value: match[1],
+          confidence: 0.7,
+          position: match.index,
+        };
+        break;
+      }
+    }
+  }
+
+  const projectPatterns = [
+    /(?:project|in|for)\s+["']?([A-Z][A-Za-z0-9\s-]+)["']?/,
+    /\b(project|프로젝트)\s+(\w+)/i,
+  ];
+
+  for (const pattern of projectPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const projectName = match[match.length - 1];
+      if (projectName && projectName.length > 1) {
+        entities.project = {
+          type: "project",
+          value: projectName,
+          confidence: 0.75,
+          position: match.index,
+        };
+        break;
+      }
+    }
   }
 
   try {
@@ -311,9 +445,9 @@ function extractEntitiesEnhanced(text: string): {
   }
 
   const priorityPatterns = [
-    { regex: /\b(긴급|urgent|critical|high)\b/i, value: "high", confidence: 0.9 },
-    { regex: /\b(보통|normal|medium)\b/i, value: "medium", confidence: 0.85 },
-    { regex: /\b(낮음|low)\b/i, value: "low", confidence: 0.85 },
+    { regex: /\b(긴급|urgent|critical|high|asap|immediately)\b/i, value: "high", confidence: 0.9 },
+    { regex: /\b(보통|normal|medium|regular)\b/i, value: "medium", confidence: 0.85 },
+    { regex: /\b(낮음|low|whenever|eventually)\b/i, value: "low", confidence: 0.85 },
   ];
 
   for (const pattern of priorityPatterns) {
@@ -396,4 +530,86 @@ function assessComplexity(
   if (text.split(" ").length > 10) return "high";
   if (text.length > 200) return "medium";
   return "low";
+}
+
+function detectAmbiguity(
+  text: string,
+  entities: any,
+): { isAmbiguous: boolean; clarifyingQuestions?: string[]; ambiguousTerms?: string[] } {
+  const ambiguousTerms: string[] = [];
+  const clarifyingQuestions: string[] = [];
+
+  if (!entities.assignee && /\b(for|to|assign|allocate)\b/i.test(text)) {
+    ambiguousTerms.push("assignee");
+    clarifyingQuestions.push("Who should this be assigned to?");
+  }
+
+  if (!entities.dueDate && /\b(by|before|until|deadline|when)\b/i.test(text)) {
+    ambiguousTerms.push("dueDate");
+    clarifyingQuestions.push("When is the deadline?");
+  }
+
+  if (!entities.priority && /\b(priority|urgent|important|asap)\b/i.test(text)) {
+    ambiguousTerms.push("priority");
+    clarifyingQuestions.push("What priority level should this have?");
+  }
+
+  if (!entities.project && /\b(project|in|for)\b/i.test(text)) {
+    ambiguousTerms.push("project");
+    clarifyingQuestions.push("Which project is this for?");
+  }
+
+  const pronounPatterns = /\b(it|this|that|them|those)\b/i;
+  if (pronounPatterns.test(text) && !entities.object) {
+    ambiguousTerms.push("referent");
+    clarifyingQuestions.push("What are you referring to?");
+  }
+
+  return {
+    isAmbiguous: ambiguousTerms.length > 0,
+    ambiguousTerms: ambiguousTerms.length > 0 ? ambiguousTerms : undefined,
+    clarifyingQuestions: clarifyingQuestions.length > 0 ? clarifyingQuestions : undefined,
+  };
+}
+
+function detectFollowUp(
+  text: string,
+  context?: {
+    previousMessages?: Array<{ role: string; content: string }>;
+    sessionMetadata?: Record<string, any>;
+  },
+): { isFollowUp: boolean; relatedTo?: string } {
+  if (!context?.previousMessages || context.previousMessages.length === 0) {
+    return { isFollowUp: false };
+  }
+
+  const followUpPatterns = [
+    /\b(also|additionally|and|plus|furthermore|moreover)\b/i,
+    /\b(same|similar|like|as before)\b/i,
+    /\b(update|modify|change|adjust)\s+(it|that|the previous)/i,
+    /\b(what about|how about|what if)\b/i,
+  ];
+
+  const isFollowUp = followUpPatterns.some((pattern) => pattern.test(text));
+
+  if (isFollowUp) {
+    const lastMessage = context.previousMessages[context.previousMessages.length - 1];
+    const relatedTo = extractMainTopicFromMessage(lastMessage.content);
+    return { isFollowUp: true, relatedTo };
+  }
+
+  return { isFollowUp: false };
+}
+
+function extractMainTopicFromMessage(message: string): string {
+  const topicPatterns = [/created?\s+(\w+)/i, /task.*?(\w+)/i, /about\s+(\w+)/i];
+
+  for (const pattern of topicPatterns) {
+    const match = message.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return "previous request";
 }

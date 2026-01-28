@@ -58,17 +58,28 @@ export function errorHandler(
     err,
   );
 
-  if (process.env.NODE_ENV === "production" && !isOperational) {
+  const isDev = process.env.NODE_ENV === "development";
+
+  if (!isDev && !isOperational) {
     res.status(500).json({
       error: "Internal server error",
       message: "An unexpected error occurred",
     });
-  } else {
-    res.status(statusCode).json({
-      error: message,
-      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-    });
+    return;
   }
+
+  if (!isDev && statusCode >= 500) {
+    res.status(statusCode).json({
+      error: "Internal server error",
+      message: "An unexpected error occurred",
+    });
+    return;
+  }
+
+  res.status(statusCode).json({
+    error: message,
+    ...(isDev && { stack: err.stack }),
+  });
 }
 
 export function asyncHandler(

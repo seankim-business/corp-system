@@ -26,7 +26,9 @@ export class WebhookQueue extends BaseQueue<WebhookEventData> {
   }
 
   async enqueueWebhook(data: WebhookEventData) {
-    return this.add("webhook", data);
+    return this.add("webhook", data, {
+      jobId: `webhook-${data.provider}-${data.eventId}`,
+    });
   }
 }
 

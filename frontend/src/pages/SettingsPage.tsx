@@ -24,9 +24,18 @@
  *     └── Logout All Devices Button
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ApiError, request } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
+
+interface ApiKeySettings {
+  anthropicApiKey?: string;
+  anthropicApiKeySet?: boolean;
+  openaiApiKey?: string;
+  openaiApiKeySet?: boolean;
+  openrouterApiKey?: string;
+  openrouterApiKeySet?: boolean;
+}
 
 export default function SettingsPage() {
   const { user, currentOrganization } = useAuthStore();
@@ -172,7 +181,12 @@ export default function SettingsPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Members</label>
-              <div className="text-sm text-gray-500">Member management coming soon</div>
+              <a
+                href="/settings/members"
+                className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-800"
+              >
+                Manage organization members →
+              </a>
             </div>
           </div>
         </div>

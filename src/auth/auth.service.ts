@@ -15,8 +15,12 @@ export class AuthService {
     organizationSlug?: string,
     ipAddress?: string,
     userAgent?: string,
+    codeVerifier?: string,
   ) {
-    const { tokens } = await googleClient.getToken(code);
+    const { tokens } = await googleClient.getToken({
+      code,
+      codeVerifier,
+    });
     googleClient.setCredentials(tokens);
 
     const ticket = await googleClient.verifyIdToken({
@@ -146,6 +150,7 @@ export class AuthService {
 
     const refreshToken = this.createRefreshToken({
       userId: user.id,
+      organizationId: organization.id,
     });
 
     return {
@@ -214,7 +219,10 @@ export class AuthService {
       role: membership.role,
     });
 
-    const refreshToken = this.createRefreshToken({ userId: user.id });
+    const refreshToken = this.createRefreshToken({
+      userId: user.id,
+      organizationId: organization.id,
+    });
 
     return {
       user,
@@ -257,7 +265,10 @@ export class AuthService {
       role: membership.role,
     });
 
-    const refreshToken = this.createRefreshToken({ userId: user.id });
+    const refreshToken = this.createRefreshToken({
+      userId: user.id,
+      organizationId: membership.organization.id,
+    });
 
     return {
       user,
@@ -275,17 +286,28 @@ export class AuthService {
     ipAddress?: string;
     userAgent?: string;
   }) {
-    const options: any = {
-      expiresIn: process.env.JWT_EXPIRES_IN || "7d",
-    };
-    return jwt.sign(payload, process.env.JWT_SECRET as string, options);
+    const expiresIn = (process.env.JWT_EXPIRES_IN || "1h") as jwt.SignOptions["expiresIn"];
+    return jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn });
   }
 
-  createRefreshToken(payload: { userId: string }) {
-    const options: any = {
-      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
-    };
-    return jwt.sign(payload, process.env.JWT_SECRET as string, options);
+  createRefreshToken(payload: { userId: string; organizationId: string }) {
+    const expiresIn = (process.env.JWT_REFRESH_EXPIRES_IN || "7d") as jwt.SignOptions["expiresIn"];
+    return jwt.sign({ ...payload, type: "refresh" }, process.env.JWT_SECRET as string, {
+      expiresIn,
+    });
+  }
+
+  verifyRefreshToken(token: string): {
+    userId: string;
+    organizationId: string;
+    type: string;
+    exp: number;
+  } {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    if (payload.type !== "refresh") {
+      throw new Error("Invalid refresh token");
+    }
+    return payload;
   }
 
   verifySessionToken(token: string): {
@@ -296,6 +318,36 @@ export class AuthService {
     userAgent?: string;
   } {
     return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  }
+
+  async storeSessionMetadata(data: {
+    userId: string;
+    organizationId: string;
+    ipAddress?: string;
+    userAgent?: string;
+    source?: string;
+  }) {
+    try {
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await db.session.create({
+        data: {
+          id: sessionId,
+          userId: data.userId,
+          organizationId: data.organizationId,
+          ipAddress: data.ipAddress || null,
+          userAgent: data.userAgent || null,
+          source: data.source || "web",
+          expiresAt,
+        },
+      });
+
+      return sessionId;
+    } catch (error) {
+      console.error("Failed to store session metadata:", error);
+      return null;
+    }
   }
 
   async switchOrganization(userId: string, targetOrgId: string) {
@@ -327,7 +379,10 @@ export class AuthService {
       role: membership.role,
     });
 
-    const refreshToken = this.createRefreshToken({ userId });
+    const refreshToken = this.createRefreshToken({
+      userId,
+      organizationId: targetOrgId,
+    });
 
     return {
       user,

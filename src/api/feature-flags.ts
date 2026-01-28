@@ -1,12 +1,14 @@
 import { Router, Request, Response } from "express";
 import { db as prisma } from "../db/client";
 import { evaluateFeatureFlag, invalidateFeatureFlagCache } from "../features/feature-flags";
-import { requireAdmin } from "../middleware/auth.middleware";
+import { requireAuth } from "../middleware/auth.middleware";
+import { requireRole } from "../middleware/require-permission";
+import { Role } from "../auth/rbac";
 
 export const featureFlagsRouter = Router();
 export const featureFlagsAdminRouter = Router();
 
-featureFlagsAdminRouter.use(requireAdmin);
+featureFlagsAdminRouter.use(requireAuth, requireRole(Role.ADMIN));
 
 // Evaluate one or more flags for the current organization.
 // GET /api/flags?keys=a,b,c

@@ -1,23 +1,27 @@
 import { PrismaClient } from "@prisma/client";
 import { getOrganizationContext } from "../utils/async-context";
+import { logger } from "../utils/logger";
+import { getCircuitBreaker, CircuitBreakerError } from "../utils/circuit-breaker";
 
-// Create base Prisma client
-function createBasePrismaClient() {
-  return new PrismaClient({
+const DB_CIRCUIT_BREAKER_NAME = "postgresql";
+const DB_QUERY_TIMEOUT_MS = parseInt(process.env.DB_QUERY_TIMEOUT_MS || "30000", 10);
+
+const dbCircuitBreaker = getCircuitBreaker(DB_CIRCUIT_BREAKER_NAME, {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: DB_QUERY_TIMEOUT_MS,
+  resetTimeout: 60000,
+});
+
+function createPrismaClient(): PrismaClient {
+  const baseClient = new PrismaClient({
     log: process.env.NODE_ENV === "production" ? [] : ["warn", "error"],
   });
-}
-
-// Extend Prisma client with RLS middleware using $extends (Prisma 6+ pattern)
-// This replaces the deprecated $use middleware API
-function createExtendedPrismaClient() {
-  const baseClient = createBasePrismaClient();
 
   return baseClient.$extends({
     query: {
       $allModels: {
-        async $allOperations({ args, query, operation }) {
-          // Skip RLS context for raw queries
+        async $allOperations({ args, query, operation, model }: any) {
           const rawActions = new Set([
             "$executeRaw",
             "$executeRawUnsafe",
@@ -29,36 +33,60 @@ function createExtendedPrismaClient() {
             return query(args);
           }
 
-          // Set organization context for RLS before each query
-          const organizationId = getOrganizationContext()?.organizationId ?? null;
+          const context = getOrganizationContext();
+          const organizationId = context?.organizationId ?? null;
 
           if (organizationId) {
-            await baseClient.$executeRaw`SELECT set_current_organization(${organizationId})`;
+            try {
+              await baseClient.$executeRaw`SELECT set_current_organization(${organizationId})`;
+              logger.debug("RLS context set", {
+                organizationId,
+                operation,
+                model,
+              });
+            } catch (error) {
+              logger.error(
+                "Failed to set RLS context",
+                {
+                  organizationId,
+                  operation,
+                  model,
+                },
+                error instanceof Error ? error : new Error(String(error)),
+              );
+              throw error;
+            }
+          } else {
+            logger.warn("No organization context available for RLS", {
+              operation,
+              model,
+            });
           }
 
-          return query(args);
+          return dbCircuitBreaker.execute(() => query(args));
         },
       },
     },
-  });
+  }) as unknown as PrismaClient;
 }
 
-// Type for the extended client
-type ExtendedPrismaClient = ReturnType<typeof createExtendedPrismaClient>;
+export function getDatabaseCircuitBreakerStats() {
+  return dbCircuitBreaker.getStats();
+}
 
-// Singleton pattern for Prisma Client
-let prisma: ExtendedPrismaClient;
+export { CircuitBreakerError };
+
+let prisma: PrismaClient;
 
 if (process.env.NODE_ENV === "production") {
-  prisma = createExtendedPrismaClient();
+  prisma = createPrismaClient();
 } else {
-  // Prevent multiple instances in development
   const globalWithPrisma = global as typeof globalThis & {
-    prisma: ExtendedPrismaClient;
+    prisma: PrismaClient;
   };
 
   if (!globalWithPrisma.prisma) {
-    globalWithPrisma.prisma = createExtendedPrismaClient();
+    globalWithPrisma.prisma = createPrismaClient();
   }
 
   prisma = globalWithPrisma.prisma;

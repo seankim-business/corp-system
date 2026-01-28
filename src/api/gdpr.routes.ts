@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
+import { requirePermission } from "../middleware/require-permission";
+import { Permission } from "../auth/rbac";
 import { auditLogger, AuditAction } from "../services/audit-logger";
 import { exportUserData, DataExportError } from "../services/data-exporter";
 import { deleteUserAccount, AccountDeletionError } from "../services/account-deletion";
@@ -187,52 +189,56 @@ router.delete("/user/account", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/audit-logs", async (req: Request, res: Response) => {
-  const user = req.user;
-  if (!user) return res.status(401).json({ error: "Authentication required" });
+router.get(
+  "/audit-logs",
+  requirePermission(Permission.AUDIT_READ),
+  async (req: Request, res: Response) => {
+    const user = req.user;
+    if (!user) return res.status(401).json({ error: "Authentication required" });
 
-  const limit = parseLimit(req.query.limit ? String(req.query.limit) : undefined, 50, 1000);
-  const offset = parseOffset(req.query.offset ? String(req.query.offset) : undefined);
-  const actionParam = req.query.action ? String(req.query.action) : undefined;
-  const action = actionParam && isAuditAction(actionParam) ? actionParam : undefined;
+    const limit = parseLimit(req.query.limit ? String(req.query.limit) : undefined, 50, 1000);
+    const offset = parseOffset(req.query.offset ? String(req.query.offset) : undefined);
+    const actionParam = req.query.action ? String(req.query.action) : undefined;
+    const action = actionParam && isAuditAction(actionParam) ? actionParam : undefined;
 
-  if (actionParam && !action) {
-    return res.status(400).json({ error: "Invalid action filter" });
-  }
+    if (actionParam && !action) {
+      return res.status(400).json({ error: "Invalid action filter" });
+    }
 
-  const startDate = parseDate(req.query.startDate ? String(req.query.startDate) : undefined);
-  const endDate = parseDate(req.query.endDate ? String(req.query.endDate) : undefined);
+    const startDate = parseDate(req.query.startDate ? String(req.query.startDate) : undefined);
+    const endDate = parseDate(req.query.endDate ? String(req.query.endDate) : undefined);
 
-  if (req.query.startDate && !startDate) {
-    return res.status(400).json({ error: "Invalid startDate" });
-  }
+    if (req.query.startDate && !startDate) {
+      return res.status(400).json({ error: "Invalid startDate" });
+    }
 
-  if (req.query.endDate && !endDate) {
-    return res.status(400).json({ error: "Invalid endDate" });
-  }
+    if (req.query.endDate && !endDate) {
+      return res.status(400).json({ error: "Invalid endDate" });
+    }
 
-  const { logs, total } = await auditLogger.query({
-    organizationId: user.organizationId,
-    userId: user.id,
-    action,
-    startDate,
-    endDate,
-    limit,
-    offset,
-  });
+    const { logs, total } = await auditLogger.query({
+      organizationId: user.organizationId,
+      userId: user.id,
+      action,
+      startDate,
+      endDate,
+      limit,
+      offset,
+    });
 
-  return res.json({
-    total,
-    limit,
-    offset,
-    logs: logs.map((log) => ({
-      action: log.action,
-      timestamp: log.timestamp,
-      ipAddress: log.ipAddress,
-      userAgent: log.userAgent,
-      metadata: log.details,
-    })),
-  });
-});
+    return res.json({
+      total,
+      limit,
+      offset,
+      logs: logs.map((log) => ({
+        action: log.action,
+        timestamp: log.timestamp,
+        ipAddress: log.ipAddress,
+        userAgent: log.userAgent,
+        metadata: log.details,
+      })),
+    });
+  },
+);
 
 export default router;

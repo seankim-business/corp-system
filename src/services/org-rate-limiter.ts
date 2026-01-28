@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { redis, withQueueConnection } from "../db/redis";
+import { redis } from "../db/redis";
 import { logger } from "../utils/logger";
 
 interface RateLimitConfig {
@@ -62,33 +62,40 @@ async function checkRateLimit(
 }> {
   const now = Date.now();
   const redisKey = `ratelimit:${key}`;
+  const ttlSeconds = Math.ceil(config.windowMs / 1000);
 
   try {
-    const countStr = await redis.get(redisKey);
-    let count = countStr ? parseInt(countStr, 10) : 0;
+    // ATOMIC increment - fixes TOCTOU race condition
+    // INCR creates key with value 1 if it doesn't exist
+    const newCount = await redis.incr(redisKey);
 
-    if (count >= config.maxRequests) {
+    // Set expiry only on first request (when count becomes 1)
+    // This is atomic: if another request incremented first, we skip expiry
+    if (newCount === 1) {
+      await redis.expire(redisKey, ttlSeconds);
+    }
+
+    const allowed = newCount <= config.maxRequests;
+
+    if (!allowed) {
       const ttl = await getTTL(redisKey);
       return {
         allowed: false,
         remaining: 0,
         resetAt: now + (ttl > 0 ? ttl * 1000 : config.windowMs),
-        current: count,
+        current: newCount,
       };
     }
 
-    count++;
-    const ttlSeconds = Math.ceil(config.windowMs / 1000);
-    await redis.set(redisKey, count.toString(), ttlSeconds);
-
     return {
       allowed: true,
-      remaining: Math.max(0, config.maxRequests - count),
+      remaining: Math.max(0, config.maxRequests - newCount),
       resetAt: now + config.windowMs,
-      current: count,
+      current: newCount,
     };
   } catch (error) {
     logger.error("Rate limit check failed", { error, key });
+    // Fail open: allow request if Redis is down
     return {
       allowed: true,
       remaining: config.maxRequests,
@@ -99,11 +106,7 @@ async function checkRateLimit(
 }
 
 async function getTTL(key: string): Promise<number> {
-  try {
-    return await withQueueConnection((client) => client.ttl(key));
-  } catch {
-    return -1;
-  }
+  return redis.ttl(key);
 }
 
 export function createOrgRateLimiter(limitType: LimitType) {

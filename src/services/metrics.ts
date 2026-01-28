@@ -50,7 +50,12 @@ class MetricsCollector {
     if (!histogram.has(key)) {
       histogram.set(key, []);
     }
-    histogram.get(key)!.push(value);
+    const values = histogram.get(key)!;
+    values.push(value);
+    const MAX_HISTOGRAM_SIZE = 10000;
+    if (values.length > MAX_HISTOGRAM_SIZE) {
+      values.splice(0, values.length - MAX_HISTOGRAM_SIZE);
+    }
   }
 
   describeMetric(name: string, definition: MetricDefinition): void {

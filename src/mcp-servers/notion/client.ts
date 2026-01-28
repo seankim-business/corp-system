@@ -347,6 +347,49 @@ export class NotionClient {
     );
   }
 
+  async search(
+    query: string,
+    limit: number = 10,
+  ): Promise<
+    Array<{
+      id: string;
+      title: string;
+      snippet: string;
+      url: string;
+      type: string;
+      createdTime?: string;
+      lastEditedTime?: string;
+    }>
+  > {
+    return this.executeWithMetrics(
+      "search",
+      { "notion.query": query, "notion.limit": limit },
+      async () => {
+        const response: any = await this.executeWithAuth(() =>
+          this.client.search({
+            query,
+            page_size: limit,
+            sort: { direction: "descending", timestamp: "last_edited_time" },
+          }),
+        );
+
+        return response.results.map((result: any) => ({
+          id: result.id,
+          title:
+            this.extractTitle(result.properties?.Name || result.properties?.title) || "Untitled",
+          snippet: result.properties?.Description?.rich_text?.[0]?.plain_text || "",
+          url: result.url || `https://notion.so/${result.id.replace(/-/g, "")}`,
+          type: result.object,
+          createdTime: result.created_time,
+          lastEditedTime: result.last_edited_time,
+        }));
+      },
+      (results: any[], span: any) => {
+        span.setAttribute("result.count", results.length);
+      },
+    );
+  }
+
   private pageToTask(page: any): NotionTask {
     const properties = page.properties || {};
 

@@ -88,3 +88,13 @@ export interface NotionConnection {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface NotionSearchResult {
+  id: string;
+  type: "page" | "database";
+  title: string;
+  snippet: string;
+  url: string;
+  createdTime: string;
+  lastEditedTime: string;
+}

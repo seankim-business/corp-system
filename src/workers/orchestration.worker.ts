@@ -7,6 +7,8 @@ import { orchestrate } from "../orchestrator";
 import { logger } from "../utils/logger";
 import { buildSuccessMessage, buildErrorMessage } from "../services/slack-block-kit";
 import { emitOrgEvent } from "../services/sse-service";
+import { emitJobProgress, PROGRESS_STAGES, PROGRESS_PERCENTAGES } from "../events/job-progress";
+import { runWithContext } from "../utils/async-context";
 
 export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
   constructor() {
@@ -22,7 +24,32 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
     const { userRequest, sessionId, organizationId, userId, eventId, slackChannel, slackThreadTs } =
       job.data;
 
-    await job.updateProgress(10);
+    return runWithContext({ organizationId, userId }, () =>
+      this.processWithContext(job, {
+        userRequest,
+        sessionId,
+        organizationId,
+        userId,
+        eventId,
+        slackChannel,
+        slackThreadTs,
+      }),
+    );
+  }
+
+  private async processWithContext(
+    job: Job<OrchestrationData>,
+    data: OrchestrationData,
+  ): Promise<void> {
+    const { userRequest, sessionId, organizationId, userId, eventId, slackChannel, slackThreadTs } =
+      data;
+
+    await job.updateProgress(PROGRESS_PERCENTAGES.STARTED);
+    await emitJobProgress(job.id || "", PROGRESS_STAGES.STARTED, PROGRESS_PERCENTAGES.STARTED, {
+      eventId,
+      sessionId,
+    });
+
     logger.info(`Executing orchestration for event ${eventId}`, {
       sessionId,
       organizationId,
@@ -32,7 +59,17 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
     try {
       const startTime = Date.now();
 
-      await job.updateProgress(30);
+      await job.updateProgress(PROGRESS_PERCENTAGES.VALIDATED);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.VALIDATED,
+        PROGRESS_PERCENTAGES.VALIDATED,
+        {
+          eventId,
+          action: "analyzing_request",
+        },
+      );
+
       const result = await orchestrate({
         userRequest,
         sessionId,
@@ -40,7 +77,18 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         userId,
       });
 
-      await job.updateProgress(70);
+      await job.updateProgress(PROGRESS_PERCENTAGES.PROCESSING);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.PROCESSING,
+        PROGRESS_PERCENTAGES.PROCESSING,
+        {
+          eventId,
+          category: result.metadata.category,
+          skills: result.metadata.skills,
+        },
+      );
+
       const duration = Date.now() - startTime;
 
       logger.info(`Orchestration completed for event ${eventId}`, {
@@ -56,7 +104,17 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         model: result.metadata.model,
       });
 
-      await job.updateProgress(90);
+      await job.updateProgress(PROGRESS_PERCENTAGES.FINALIZING);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.FINALIZING,
+        PROGRESS_PERCENTAGES.FINALIZING,
+        {
+          eventId,
+          action: "sending_notification",
+        },
+      );
+
       await notificationQueue.enqueueNotification({
         channel: slackChannel,
         threadTs: slackThreadTs,
@@ -67,7 +125,18 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         eventId,
       });
 
-      await job.updateProgress(100);
+      await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.COMPLETED,
+        PROGRESS_PERCENTAGES.COMPLETED,
+        {
+          eventId,
+          duration,
+          status: result.status,
+        },
+      );
+
       emitOrgEvent(organizationId, "orchestration.completed", {
         eventId,
         sessionId,
@@ -76,6 +145,11 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
       });
     } catch (error: any) {
       logger.error(`Orchestration failed for event ${eventId}:`, error);
+
+      await emitJobProgress(job.id || "", PROGRESS_STAGES.FAILED, 0, {
+        eventId,
+        error: error.message,
+      });
 
       const errorMessage = buildErrorMessage({
         error: error.message,

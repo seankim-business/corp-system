@@ -402,4 +402,40 @@ export const redis = {
       return {};
     }
   },
+
+  async incr(key: string): Promise<number> {
+    try {
+      return await withQueueConnection((client) => client.incr(getPrefixedKey(key)));
+    } catch (error: unknown) {
+      logger.error(`Redis INCR error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  },
+
+  async ttl(key: string): Promise<number> {
+    try {
+      return await withQueueConnection((client) => client.ttl(getPrefixedKey(key)));
+    } catch (error: unknown) {
+      logger.error(`Redis TTL error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return -1;
+    }
+  },
+
+  async eval(script: string, numKeys: number, ...args: (string | number)[]): Promise<unknown> {
+    try {
+      const prefixedArgs = args.map((arg, idx) =>
+        idx < numKeys && typeof arg === "string" ? getPrefixedKey(arg) : arg,
+      );
+      return await withQueueConnection((client) => client.eval(script, numKeys, ...prefixedArgs));
+    } catch (error: unknown) {
+      logger.error("Redis EVAL error", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
 };

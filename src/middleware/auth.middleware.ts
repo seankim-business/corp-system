@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../auth/auth.service";
 import { db } from "../db/client";
+import { redis } from "../db/redis";
 import { logger } from "../utils/logger";
 import { setSentryUser } from "../services/sentry";
 import { asyncLocalStorage } from "../utils/async-context";
@@ -13,6 +14,11 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     if (!token) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const isBlacklisted = await redis.get(`token_blacklist:${token}`);
+    if (isBlacklisted) {
+      return res.status(401).json({ error: "Token revoked" });
     }
 
     const payload = authService.verifySessionToken(token);

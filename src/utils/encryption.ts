@@ -44,15 +44,15 @@ export function isEncrypted(value: string): boolean {
   return value.startsWith(ENCRYPTED_PREFIX);
 }
 
-/**
- * Encrypt a plaintext value.
- * Returns the encrypted value with "enc:" prefix.
- * If encryption key is not configured, returns the plaintext value.
- */
 export function encrypt(plaintext: string): string {
   const key = getEncryptionKey();
   if (!key) {
-    // Encryption not configured, return plaintext
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "CREDENTIAL_ENCRYPTION_KEY is required in production. " +
+          "Generate with: openssl rand -base64 32",
+      );
+    }
     return plaintext;
   }
 

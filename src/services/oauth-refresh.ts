@@ -43,24 +43,45 @@ const getOptionalNumber = (value: string | undefined): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const OAUTH_REFRESH_TIMEOUT_MS = parseInt(process.env.OAUTH_REFRESH_TIMEOUT_MS || "10000", 10);
+
 const requestRefreshToken = async (
   refreshToken: string,
   config: OAuthRefreshConfig,
   provider: string,
 ): Promise<OAuthRefreshResult> => {
-  const response = await fetch(config.tokenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
-    }).toString(),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OAUTH_REFRESH_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(config.tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+      }).toString(),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new OAuthRefreshError(
+        `${provider} OAuth refresh timed out after ${OAUTH_REFRESH_TIMEOUT_MS}ms`,
+        "timeout",
+        408,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const rawText = await response.text();
   const payload = parseOAuthPayload(rawText);

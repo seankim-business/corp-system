@@ -23,10 +23,17 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import WorkflowsPage from "./pages/WorkflowsPage";
+import WorkflowDetailPage from "./pages/WorkflowDetailPage";
 import ExecutionsPage from "./pages/ExecutionsPage";
+import ExecutionDetailPage from "./pages/ExecutionDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotionSettingsPage from "./pages/NotionSettingsPage";
 import SlackSettingsPage from "./pages/SlackSettingsPage";
+import MembersPage from "./pages/MembersPage";
+import ApprovalsPage from "./pages/ApprovalsPage";
+import AgentActivityPage from "./pages/AgentActivityPage";
+import OrgChangesPage from "./pages/OrgChangesPage";
+import OKRPage from "./pages/OKRPage";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -48,6 +55,17 @@ function App() {
         />
 
         <Route
+          path="/okr"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <OKRPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/workflows"
           element={
             <ProtectedRoute>
@@ -59,11 +77,33 @@ function App() {
         />
 
         <Route
+          path="/workflows/:id"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <WorkflowDetailPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/executions"
           element={
             <ProtectedRoute>
               <DashboardLayout>
                 <ExecutionsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/executions/:id"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ExecutionDetailPage />
               </DashboardLayout>
             </ProtectedRoute>
           }
@@ -97,6 +137,50 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <SlackSettingsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings/members"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <MembersPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/approvals"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ApprovalsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/activity"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AgentActivityPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/org-changes"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <OrgChangesPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

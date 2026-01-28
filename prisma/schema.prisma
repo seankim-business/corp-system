@@ -86,6 +86,11 @@ model Membership {
   joinedAt       DateTime? @map("joined_at") @db.Timestamptz(6)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  // Daily briefing preferences
+  dailyBriefingEnabled  Boolean @default(false) @map("daily_briefing_enabled")
+  dailyBriefingTime     String  @default("09:00") @map("daily_briefing_time") @db.VarChar(5)
+  dailyBriefingTimezone String  @default("UTC") @map("daily_briefing_timezone") @db.VarChar(50)
+
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -131,6 +136,10 @@ model Session {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   lastUsedAt     DateTime @default(now()) @map("last_used_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Session hijacking prevention
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -347,6 +356,10 @@ model Workflow {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  // SOP (Standard Operating Procedure) fields
+  sopEnabled Boolean @default(false) @map("sop_enabled")
+  sopSteps   Json?   @map("sop_steps") @db.JsonB // Array of step definitions
+
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   executions   WorkflowExecution[]
 
@@ -392,6 +405,10 @@ model OrchestratorExecution {
   outputData   Json?   @map("output_data") @db.JsonB
   errorMessage String? @map("error_message") @db.Text
   metadata     Json?   @default("{}") @db.JsonB
+
+  // SOP execution tracking
+  currentStep Int?  @map("current_step")
+  stepResults Json? @map("step_results") @db.JsonB
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -603,4 +620,149 @@ model AuditLog {
   @@index([action, createdAt(sort: Desc)])
   @@index([resourceType, resourceId])
   @@map("audit_logs")
+}
+
+// ============================================================================
+// APPROVAL WORKFLOW TABLES
+// ============================================================================
+
+/// Approvals (Budget, deployment, content approvals)
+model Approval {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  requesterId        String    @map("requester_id") @db.Uuid
+  approverId         String    @map("approver_id") @db.Uuid
+  fallbackApproverId String?   @map("fallback_approver_id") @db.Uuid
+  type               String    @db.VarChar(50) // budget, deployment, content
+  title              String    @db.VarChar(500)
+  description        String    @db.Text
+  context            Json?     @db.JsonB
+  status             String    @default("pending") @db.VarChar(50) // pending, approved, rejected, expired
+  responseNote       String?   @map("response_note") @db.Text
+  slackMessageTs     String?   @map("slack_message_ts") @db.VarChar(50)
+  slackChannelId     String?   @map("slack_channel_id") @db.VarChar(50)
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(6)
+  respondedAt        DateTime? @map("responded_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId, status])
+  @@index([approverId, status])
+  @@index([requesterId])
+  @@index([expiresAt])
+  @@map("approvals")
+}
+
+// ============================================================================
+// OKR (OBJECTIVES AND KEY RESULTS) TABLES
+// ============================================================================
+
+/// Objectives (OKR Objectives)
+model Objective {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  title          String   @db.VarChar(500)
+  description    String?  @db.Text
+  quarter        String   @db.VarChar(10) // e.g., "2026-Q1"
+  ownerId        String   @map("owner_id") @db.Uuid
+  status         String   @default("on_track") @db.VarChar(50) // on_track, at_risk, behind
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  keyResults KeyResult[]
+
+  @@index([organizationId, quarter])
+  @@index([ownerId])
+  @@map("objectives")
+}
+
+/// Key Results (OKR Key Results)
+model KeyResult {
+  id          String   @id @default(uuid()) @db.Uuid
+  objectiveId String   @map("objective_id") @db.Uuid
+  title       String   @db.VarChar(500)
+  target      Float
+  current     Float    @default(0)
+  unit        String   @db.VarChar(50) // percentage, count, currency, etc.
+  ownerId     String?  @map("owner_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  objective Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  @@index([objectiveId])
+  @@index([ownerId])
+  @@map("key_results")
+}
+
+// ============================================================================
+// ORGANIZATION CHANGE MANAGEMENT TABLES
+// ============================================================================
+
+/// Organization Changes (Track organizational changes and responses)
+model OrganizationChange {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  title          String   @db.VarChar(500)
+  description    String   @db.Text
+  type           String   @db.VarChar(50) // new_agent, process_modification, integration_update, role_change
+  status         String   @default("pending") @db.VarChar(50) // pending, in_progress, completed, cancelled
+  impactLevel    String   @default("low") @map("impact_level") @db.VarChar(20) // low, medium, high
+  requestedBy    String   @map("requested_by") @db.Uuid
+  impactAnalysis String?  @map("impact_analysis") @db.Text
+  prUrl          String?  @map("pr_url") @db.Text
+  metadata       Json?    @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId, status])
+  @@index([requestedBy])
+  @@index([type])
+  @@index([impactLevel])
+  @@map("organization_changes")
+}
+
+// ============================================================================
+// GOOGLE DRIVE INTEGRATION TABLES
+// ============================================================================
+
+/// Drive Connections (Google Drive OAuth connections)
+model DriveConnection {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @unique @map("organization_id") @db.Uuid
+  accessToken     String    @map("access_token") @db.Text // Encrypted
+  refreshToken    String?   @map("refresh_token") @db.Text // Encrypted
+  expiresAt       DateTime? @map("expires_at") @db.Timestamptz(6)
+  defaultFolderId String?   @map("default_folder_id") @db.VarChar(255)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@map("drive_connections")
+}
+
+// ============================================================================
+// SECURITY TABLES
+// ============================================================================
+
+/// Session Hijacking Attempts (Security monitoring)
+model SessionHijackingAttempt {
+  id             String   @id @default(uuid()) @db.Uuid
+  sessionId      String   @map("session_id") @db.VarChar(255)
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  type           String   @db.VarChar(50) // ip_change, user_agent_change, suspicious_activity
+  mismatchType   String?  @map("mismatch_type") @db.VarChar(50) // ip_mismatch, user_agent_mismatch, both
+  originalIp     String?  @map("original_ip") @db.VarChar(45)
+  attemptedIp    String?  @map("attempted_ip") @db.VarChar(45)
+  originalAgent  String?  @map("original_agent") @db.Text
+  attemptedAgent String?  @map("attempted_agent") @db.Text
+  blocked        Boolean  @default(true)
+  metadata       Json?    @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([sessionId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("session_hijacking_attempts")
 }

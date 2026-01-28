@@ -8,6 +8,9 @@ import { metrics } from "../utils/metrics";
 import { randomUUID } from "crypto";
 import { getSlackIntegrationByWorkspace } from "./slack-integration";
 import { redis } from "../db/redis";
+import { db as prisma } from "../db/client";
+import { updateApprovalMessage } from "../services/approval-slack";
+import { createAuditLog } from "../services/audit-logger";
 
 let slackApp: App | null = null;
 
@@ -156,26 +159,26 @@ function setupEventHandlers(app: App): void {
         });
       }
 
-       const cleanedText = text.replace(/<@[A-Z0-9]+>/g, "").trim();
+      const cleanedText = text.replace(/<@[A-Z0-9]+>/g, "").trim();
 
       const eventId = randomUUID();
 
-       await slackEventQueue.enqueueEvent({
-         type: "app_mention",
-         channel,
-         user,
-         text: cleanedText,
-         ts: messageTs,
-         organizationId: organization.id,
-         userId: nubabelUser.id,
-         sessionId: session.id,
-         eventId,
-       });
+      await slackEventQueue.enqueueEvent({
+        type: "app_mention",
+        channel,
+        user,
+        text: cleanedText,
+        ts: messageTs,
+        organizationId: organization.id,
+        userId: nubabelUser.id,
+        sessionId: session.id,
+        eventId,
+      });
 
-       await say({
-         text: `🤔 Processing your request...`,
-         thread_ts: messageTs,
-       });
+      await say({
+        text: `🤔 Processing your request...`,
+        thread_ts: messageTs,
+      });
 
       logger.info("Slack event enqueued", {
         eventId,
@@ -343,6 +346,162 @@ function setupEventHandlers(app: App): void {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error("Slash command error", { error: errorMessage });
       await say(`Error: ${errorMessage}`);
+    }
+  });
+
+  app.action(/^approve_/, async ({ action, ack, body, client }) => {
+    await ack();
+
+    try {
+      const actionValue = (action as { value?: string }).value;
+      if (!actionValue) {
+        logger.warn("Approval action without value");
+        return;
+      }
+
+      const approvalId = actionValue;
+      const slackUserId = body.user.id;
+
+      const nubabelUser = await getUserBySlackId(slackUserId, client as WebClient);
+      if (!nubabelUser) {
+        logger.warn("Nubabel user not found for Slack approver", { slackUserId });
+        return;
+      }
+
+      const approval = await prisma.approval.findUnique({ where: { id: approvalId } });
+      if (!approval) {
+        logger.warn("Approval not found", { approvalId });
+        return;
+      }
+
+      const isApprover = approval.approverId === nubabelUser.id;
+      const isFallbackApprover = approval.fallbackApproverId === nubabelUser.id;
+
+      if (!isApprover && !isFallbackApprover) {
+        logger.warn("User not authorized to approve", { userId: nubabelUser.id, approvalId });
+        return;
+      }
+
+      if (approval.status !== "pending") {
+        logger.info("Approval already responded", { approvalId, status: approval.status });
+        return;
+      }
+
+      if (new Date() > approval.expiresAt) {
+        await prisma.approval.update({ where: { id: approvalId }, data: { status: "expired" } });
+        logger.info("Approval expired", { approvalId });
+        return;
+      }
+
+      const updatedApproval = await prisma.approval.update({
+        where: { id: approvalId },
+        data: { status: "approved", respondedAt: new Date() },
+      });
+
+      await createAuditLog({
+        organizationId: approval.organizationId,
+        action: "approval.approved",
+        userId: nubabelUser.id,
+        resourceType: "Approval",
+        resourceId: approval.id,
+        details: { type: approval.type, title: approval.title, requesterId: approval.requesterId },
+      });
+
+      await updateApprovalMessage({
+        approval: {
+          ...updatedApproval,
+          context: updatedApproval.context as Record<string, unknown> | null,
+        },
+        responderId: nubabelUser.id,
+        organizationId: approval.organizationId,
+      });
+
+      metrics.increment("slack.approval.approved");
+      logger.info("Approval approved via Slack", { approvalId, userId: nubabelUser.id });
+    } catch (error) {
+      logger.error(
+        "Slack approve action error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+  });
+
+  app.action(/^reject_/, async ({ action, ack, body, client }) => {
+    await ack();
+
+    try {
+      const actionValue = (action as { value?: string }).value;
+      if (!actionValue) {
+        logger.warn("Rejection action without value");
+        return;
+      }
+
+      const approvalId = actionValue;
+      const slackUserId = body.user.id;
+
+      const nubabelUser = await getUserBySlackId(slackUserId, client as WebClient);
+      if (!nubabelUser) {
+        logger.warn("Nubabel user not found for Slack rejector", { slackUserId });
+        return;
+      }
+
+      const approval = await prisma.approval.findUnique({ where: { id: approvalId } });
+      if (!approval) {
+        logger.warn("Approval not found", { approvalId });
+        return;
+      }
+
+      const isApprover = approval.approverId === nubabelUser.id;
+      const isFallbackApprover = approval.fallbackApproverId === nubabelUser.id;
+
+      if (!isApprover && !isFallbackApprover) {
+        logger.warn("User not authorized to reject", { userId: nubabelUser.id, approvalId });
+        return;
+      }
+
+      if (approval.status !== "pending") {
+        logger.info("Approval already responded", { approvalId, status: approval.status });
+        return;
+      }
+
+      if (new Date() > approval.expiresAt) {
+        await prisma.approval.update({ where: { id: approvalId }, data: { status: "expired" } });
+        logger.info("Approval expired", { approvalId });
+        return;
+      }
+
+      const updatedApproval = await prisma.approval.update({
+        where: { id: approvalId },
+        data: { status: "rejected", respondedAt: new Date() },
+      });
+
+      await createAuditLog({
+        organizationId: approval.organizationId,
+        action: "approval.rejected",
+        userId: nubabelUser.id,
+        resourceType: "Approval",
+        resourceId: approval.id,
+        details: { type: approval.type, title: approval.title, requesterId: approval.requesterId },
+      });
+
+      await updateApprovalMessage({
+        approval: {
+          ...updatedApproval,
+          context: updatedApproval.context as Record<string, unknown> | null,
+        },
+        responderId: nubabelUser.id,
+        organizationId: approval.organizationId,
+      });
+
+      metrics.increment("slack.approval.rejected");
+      logger.info("Approval rejected via Slack", { approvalId, userId: nubabelUser.id });
+    } catch (error) {
+      logger.error(
+        "Slack reject action error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   });
 }

@@ -160,6 +160,28 @@ export interface GetRepositoriesOutput {
   repositories: GitHubRepository[];
 }
 
+export interface GetFileInput {
+  owner: string;
+  repo: string;
+  path: string;
+  ref?: string; // branch, tag, or commit SHA
+}
+
+export interface GitHubFileContent {
+  name: string;
+  path: string;
+  sha: string;
+  size: number;
+  content: string; // base64 decoded content
+  encoding: string;
+  htmlUrl: string;
+  downloadUrl?: string;
+}
+
+export interface GetFileOutput {
+  file: GitHubFileContent;
+}
+
 export interface GitHubConnection {
   id: string;
   organizationId: string;

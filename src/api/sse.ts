@@ -155,9 +155,10 @@ class SSEManager extends EventEmitter {
 
 export const sseManager = new SSEManager();
 
-setInterval(() => sseManager.sendHeartbeat(), 30000);
+const heartbeatInterval = setInterval(() => sseManager.sendHeartbeat(), 30000);
 
 export async function shutdownSSE(): Promise<void> {
+  clearInterval(heartbeatInterval);
   await sseManager.shutdown();
 }
 

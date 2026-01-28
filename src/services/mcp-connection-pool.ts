@@ -82,6 +82,10 @@ export class ConnectionPool<T extends object> {
 
     if (this.totalCount() < this.config.max) {
       const item = this.addConnection();
+      const idx = this.available.indexOf(item);
+      if (idx !== -1) {
+        this.available.splice(idx, 1);
+      }
       this.inUse.add(item);
       item.lastUsedAt = Date.now();
       return item.resource;

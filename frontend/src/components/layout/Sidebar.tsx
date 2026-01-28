@@ -34,9 +34,17 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
   { name: "Dashboard", path: "/dashboard", icon: "🏠" },
+  { name: "OKRs", path: "/okr", icon: "🎯" },
   { name: "Workflows", path: "/workflows", icon: "📋" },
   { name: "Executions", path: "/executions", icon: "⏱️" },
+  { name: "Activity", path: "/activity", icon: "📡" },
   { name: "Settings", path: "/settings", icon: "⚙️" },
+];
+
+const organizationNavItems: NavItem[] = [
+  { name: "Members", path: "/settings/members", icon: "👥" },
+  { name: "Approvals", path: "/approvals", icon: "✅" },
+  { name: "Changes", path: "/org-changes", icon: "📊" },
 ];
 
 const integrationNavItems: NavItem[] = [
@@ -72,6 +80,13 @@ export default function Sidebar() {
         <div className="space-y-6">
           <div>
             <ul className="space-y-2">{renderNavItems(mainNavItems)}</ul>
+          </div>
+
+          <div>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Organization
+            </h3>
+            <ul className="space-y-2">{renderNavItems(organizationNavItems)}</ul>
           </div>
 
           <div>

@@ -23,15 +23,27 @@ export interface BaseQueueOptions {
     max: number;
     duration: number;
   };
+  maxQueueDepth?: number;
 }
+
+export class QueueDepthExceededError extends Error {
+  constructor(queueName: string, currentDepth: number, maxDepth: number) {
+    super(`Queue ${queueName} depth (${currentDepth}) exceeds limit (${maxDepth})`);
+    this.name = "QueueDepthExceededError";
+  }
+}
+
+const DEFAULT_MAX_QUEUE_DEPTH = parseInt(process.env.MAX_QUEUE_DEPTH || "10000", 10);
 
 export class BaseQueue<T = any> {
   protected queue: Queue<T>;
   protected queueName: string;
   protected connection: Redis;
+  protected maxQueueDepth: number;
 
   constructor(options: BaseQueueOptions) {
     this.queueName = options.name;
+    this.maxQueueDepth = options.maxQueueDepth ?? DEFAULT_MAX_QUEUE_DEPTH;
 
     this.connection = getQueueConnectionSync();
 
@@ -66,6 +78,14 @@ export class BaseQueue<T = any> {
 
   async add(jobName: string, data: T, opts?: any): Promise<Job<any, any, string>> {
     try {
+      if (this.maxQueueDepth > 0) {
+        const counts = await this.queue.getJobCounts("waiting", "active", "delayed");
+        const currentDepth = counts.waiting + counts.active + counts.delayed;
+        if (currentDepth >= this.maxQueueDepth) {
+          throw new QueueDepthExceededError(this.queueName, currentDepth, this.maxQueueDepth);
+        }
+      }
+
       const job = await this.queue.add(jobName as any, data as any, opts);
       logger.debug(`Job ${job.id} added to ${this.queueName}`, {
         jobName,
@@ -73,9 +93,20 @@ export class BaseQueue<T = any> {
       });
       return job as any;
     } catch (error: any) {
-      logger.error(`Failed to add job to ${this.queueName}:`, error);
+      if (error instanceof QueueDepthExceededError) {
+        logger.warn(`Queue depth limit exceeded for ${this.queueName}`, {
+          maxDepth: this.maxQueueDepth,
+        });
+      } else {
+        logger.error(`Failed to add job to ${this.queueName}:`, error);
+      }
       throw error;
     }
+  }
+
+  async getQueueDepth(): Promise<number> {
+    const counts = await this.queue.getJobCounts("waiting", "active", "delayed");
+    return counts.waiting + counts.active + counts.delayed;
   }
 
   async close(): Promise<void> {

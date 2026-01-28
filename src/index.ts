@@ -1,4 +1,5 @@
 import "dotenv/config";
+import * as path from "path";
 import * as Sentry from "@sentry/node";
 import { initSentry } from "./services/sentry";
 
@@ -38,10 +39,22 @@ import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
+import { organizationSettingsRouter } from "./api/organization-settings";
 import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
 import { webhooksRouter } from "./api/webhooks";
 import { sidecarCallbacksRouter } from "./api/sidecar-callbacks";
 import gdprRoutes from "./api/gdpr.routes";
+import dashboardRoutes from "./api/dashboard";
+import membersRoutes from "./api/members";
+import approvalsRoutes from "./api/approvals";
+import okrRoutes from "./api/okr";
+import orgChangesRoutes from "./api/org-changes";
+import searchRoutes from "./api/search";
+import driveRoutes from "./api/drive";
+import githubRoutes from "./api/github";
+import sopRoutes from "./api/sop";
+import sopGeneratorRoutes from "./api/sop-generator";
+import dailyBriefingRoutes from "./api/daily-briefing";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
 import { startWorkers, gracefulShutdown as gracefulWorkerShutdown } from "./workers";
@@ -348,6 +361,18 @@ app.use(
   featureFlagsAdminRouter,
 );
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, gdprRoutes);
+app.use("/api/dashboard", apiRateLimiter, authenticate, sentryUserContext, dashboardRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, membersRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, approvalsRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, okrRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, orgChangesRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, searchRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, driveRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSettingsRouter);
 app.use("/api", sseRouter);
 
 app.use(
@@ -371,7 +396,6 @@ app.use(errorHandler);
 
 // Serve static files (production)
 if (process.env.NODE_ENV === "production") {
-  const path = require("path");
   const frontendPath = path.join(__dirname, "../frontend/dist");
   const landingPath = path.join(__dirname, "../landing");
 

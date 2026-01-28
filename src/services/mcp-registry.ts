@@ -19,6 +19,36 @@ import {
   MCPResponseCacheOptions,
   mcpResponseCache,
 } from "./mcp-response-cache";
+import { withQueueConnection } from "../db/redis";
+
+const TOKEN_REFRESH_LOCK_TTL_MS = 30000;
+const TOKEN_REFRESH_WAIT_INTERVAL_MS = 100;
+const TOKEN_REFRESH_MAX_WAIT_MS = 35000;
+
+const pendingRefreshes = new Map<string, Promise<MCPConnection>>();
+
+async function acquireRefreshLock(connectionId: string): Promise<string | null> {
+  const lockKey = `token_refresh_lock:${connectionId}`;
+  const lockValue = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const acquired = await withQueueConnection((client) =>
+    client.set(lockKey, lockValue, "PX", TOKEN_REFRESH_LOCK_TTL_MS, "NX"),
+  );
+
+  return acquired === "OK" ? lockValue : null;
+}
+
+async function releaseRefreshLock(connectionId: string, lockValue: string): Promise<void> {
+  const lockKey = `token_refresh_lock:${connectionId}`;
+  const script = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    else
+      return 0
+    end
+  `;
+  await withQueueConnection((client) => client.eval(script, 1, lockKey, lockValue));
+}
 
 type ToolExecutionRequest = {
   params: {
@@ -356,156 +386,203 @@ const refreshTokenForProvider = async (
 };
 
 export async function refreshOAuthToken(connectionId: string): Promise<MCPConnection> {
-  const connectionRecord = await prisma.mCPConnection.findUnique({
-    where: { id: connectionId },
-  });
-
-  if (!connectionRecord) {
-    throw new Error(`MCP connection not found: ${connectionId}`);
+  const existingRefresh = pendingRefreshes.get(connectionId);
+  if (existingRefresh) {
+    return existingRefresh;
   }
 
-  const rawConnection = connectionRecord as RawMCPConnection;
-  const provider = getProviderNamespace(rawConnection.provider);
-  const config = rawConnection.config as Record<string, unknown>;
-  const refreshToken = getRefreshTokenFromConnection(rawConnection, config);
-
-  if (!refreshToken) {
-    throw new Error(`Missing refresh token for MCP connection ${connectionId}`);
-  }
-
-  const oauthConfig = getOAuthRefreshConfig(provider, config);
-
-  let attempt = 0;
-  let lastError: unknown;
-
-  while (attempt < MAX_REFRESH_ATTEMPTS) {
-    attempt += 1;
-
-    try {
-      await auditLogger.log({
-        action: "mcp.tool_call",
-        organizationId: rawConnection.organizationId,
-        resourceType: "mcp_connection",
-        resourceId: rawConnection.id,
-        details: {
-          event: "token_refresh_attempt",
-          provider,
-          attempt,
-        },
-        success: true,
-      });
-
-      const refreshed = await refreshTokenForProvider(provider, refreshToken, oauthConfig);
-      if (!isEncryptionEnabled()) {
-        throw new Error("Credential encryption not configured; refusing to store tokens");
+  const lockValue = await acquireRefreshLock(connectionId);
+  if (!lockValue) {
+    const startWait = Date.now();
+    while (Date.now() - startWait < TOKEN_REFRESH_MAX_WAIT_MS) {
+      await new Promise((r) => setTimeout(r, TOKEN_REFRESH_WAIT_INTERVAL_MS));
+      const pending = pendingRefreshes.get(connectionId);
+      if (pending) {
+        return pending;
       }
-      const updatedConfig = updateConfigWithAccessToken(config, refreshed.accessToken);
-      const encryptedRefreshToken = refreshed.refreshToken
-        ? encryptIfNeeded(refreshed.refreshToken)
-        : (rawConnection.refreshToken ?? null);
-      const expiresAt = getExpiresAt(provider, refreshed.expiresIn);
+      const retryLock = await acquireRefreshLock(connectionId);
+      if (retryLock) {
+        return doRefreshOAuthToken(connectionId, retryLock);
+      }
+    }
+    throw new Error(`Token refresh lock timeout for connection ${connectionId}`);
+  }
 
-      const updated = await (
-        prisma.mCPConnection as unknown as {
-          update: (args: {
-            where: { id: string };
-            data: {
-              config?: Prisma.InputJsonValue;
-              refreshToken?: string | null;
-              expiresAt?: Date | null;
-              enabled?: boolean;
-            };
-          }) => Promise<RawMCPConnection>;
-        }
-      ).update({
-        where: { id: rawConnection.id },
-        data: {
-          config: updatedConfig as Prisma.InputJsonValue,
-          refreshToken: encryptedRefreshToken,
-          expiresAt,
-        },
-      });
+  return doRefreshOAuthToken(connectionId, lockValue);
+}
 
-      await auditLogger.log({
-        action: "mcp.tool_call",
-        organizationId: rawConnection.organizationId,
-        resourceType: "mcp_connection",
-        resourceId: rawConnection.id,
-        details: {
-          event: "token_refresh_success",
-          provider,
-          attempt,
-        },
-        success: true,
-      });
+async function doRefreshOAuthToken(
+  connectionId: string,
+  lockValue: string,
+): Promise<MCPConnection> {
+  const refreshPromise = executeTokenRefresh(connectionId, lockValue);
+  pendingRefreshes.set(connectionId, refreshPromise);
 
-      return mapConnectionRecord(updated as RawMCPConnection);
-    } catch (error) {
-      lastError = error;
-      const message = error instanceof Error ? error.message : String(error);
+  try {
+    return await refreshPromise;
+  } finally {
+    pendingRefreshes.delete(connectionId);
+  }
+}
 
-      await auditLogger.log({
-        action: "mcp.tool_call",
-        organizationId: rawConnection.organizationId,
-        resourceType: "mcp_connection",
-        resourceId: rawConnection.id,
-        details: {
-          event: "token_refresh_failed",
-          provider,
-          attempt,
-        },
-        success: false,
-        errorMessage: message,
-      });
+async function executeTokenRefresh(
+  connectionId: string,
+  lockValue: string,
+): Promise<MCPConnection> {
+  try {
+    const connectionRecord = await prisma.mCPConnection.findUnique({
+      where: { id: connectionId },
+    });
 
-      if (isInvalidGrantError(error)) {
-        await (
-          prisma.mCPConnection as unknown as {
-            update: (args: {
-              where: { id: string };
-              data: { enabled: boolean };
-            }) => Promise<RawMCPConnection>;
-          }
-        ).update({
-          where: { id: rawConnection.id },
-          data: { enabled: false },
-        });
+    if (!connectionRecord) {
+      throw new Error(`MCP connection not found: ${connectionId}`);
+    }
 
+    const rawConnection = connectionRecord as RawMCPConnection;
+    const provider = getProviderNamespace(rawConnection.provider);
+    const config = rawConnection.config as Record<string, unknown>;
+    const refreshToken = getRefreshTokenFromConnection(rawConnection, config);
+
+    if (!refreshToken) {
+      throw new Error(`Missing refresh token for MCP connection ${connectionId}`);
+    }
+
+    const oauthConfig = getOAuthRefreshConfig(provider, config);
+
+    let attempt = 0;
+    let lastError: unknown;
+
+    while (attempt < MAX_REFRESH_ATTEMPTS) {
+      attempt += 1;
+
+      try {
         await auditLogger.log({
-          action: "mcp.disconnect",
+          action: "mcp.tool_call",
           organizationId: rawConnection.organizationId,
           resourceType: "mcp_connection",
           resourceId: rawConnection.id,
           details: {
-            event: "token_refresh_invalid_grant",
+            event: "token_refresh_attempt",
             provider,
+            attempt,
           },
           success: true,
         });
 
-        await enqueueReauthNotification(
-          mapConnectionRecord({
-            ...rawConnection,
-            enabled: false,
-          }),
-          "refresh token invalid or expired",
-        );
+        const refreshed = await refreshTokenForProvider(provider, refreshToken, oauthConfig);
+        if (!isEncryptionEnabled()) {
+          throw new Error("Credential encryption not configured; refusing to store tokens");
+        }
+        const updatedConfig = updateConfigWithAccessToken(config, refreshed.accessToken);
+        const encryptedRefreshToken = refreshed.refreshToken
+          ? encryptIfNeeded(refreshed.refreshToken)
+          : (rawConnection.refreshToken ?? null);
+        const expiresAt = getExpiresAt(provider, refreshed.expiresIn);
 
-        throw error;
+        const updated = await (
+          prisma.mCPConnection as unknown as {
+            update: (args: {
+              where: { id: string };
+              data: {
+                config?: Prisma.InputJsonValue;
+                refreshToken?: string | null;
+                expiresAt?: Date | null;
+                enabled?: boolean;
+              };
+            }) => Promise<RawMCPConnection>;
+          }
+        ).update({
+          where: { id: rawConnection.id },
+          data: {
+            config: updatedConfig as Prisma.InputJsonValue,
+            refreshToken: encryptedRefreshToken,
+            expiresAt,
+          },
+        });
+
+        await auditLogger.log({
+          action: "mcp.tool_call",
+          organizationId: rawConnection.organizationId,
+          resourceType: "mcp_connection",
+          resourceId: rawConnection.id,
+          details: {
+            event: "token_refresh_success",
+            provider,
+            attempt,
+          },
+          success: true,
+        });
+
+        return mapConnectionRecord(updated as RawMCPConnection);
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : String(error);
+
+        await auditLogger.log({
+          action: "mcp.tool_call",
+          organizationId: rawConnection.organizationId,
+          resourceType: "mcp_connection",
+          resourceId: rawConnection.id,
+          details: {
+            event: "token_refresh_failed",
+            provider,
+            attempt,
+          },
+          success: false,
+          errorMessage: message,
+        });
+
+        if (isInvalidGrantError(error)) {
+          await (
+            prisma.mCPConnection as unknown as {
+              update: (args: {
+                where: { id: string };
+                data: { enabled: boolean };
+              }) => Promise<RawMCPConnection>;
+            }
+          ).update({
+            where: { id: rawConnection.id },
+            data: { enabled: false },
+          });
+
+          await auditLogger.log({
+            action: "mcp.disconnect",
+            organizationId: rawConnection.organizationId,
+            resourceType: "mcp_connection",
+            resourceId: rawConnection.id,
+            details: {
+              event: "token_refresh_invalid_grant",
+              provider,
+            },
+            success: true,
+          });
+
+          await enqueueReauthNotification(
+            mapConnectionRecord({
+              ...rawConnection,
+              enabled: false,
+            }),
+            "refresh token invalid or expired",
+          );
+
+          throw error;
+        }
+
+        logger.warn("Token refresh attempt failed", {
+          connectionId: rawConnection.id,
+          provider,
+          attempt,
+          error: message,
+        });
       }
-
-      logger.warn("Token refresh attempt failed", {
-        connectionId: rawConnection.id,
-        provider,
-        attempt,
-        error: message,
-      });
     }
-  }
 
-  const finalMessage =
-    lastError instanceof Error ? lastError.message : "Unknown token refresh error";
-  throw new Error(`Failed to refresh OAuth token: ${finalMessage}`);
+    const finalMessage =
+      lastError instanceof Error ? lastError.message : "Unknown token refresh error";
+    throw new Error(`Failed to refresh OAuth token: ${finalMessage}`);
+  } finally {
+    await releaseRefreshLock(connectionId, lockValue);
+  }
 }
 
 export async function createMCPConnection(params: {
@@ -525,6 +602,11 @@ export async function createMCPConnection(params: {
     },
   });
 
+  // Invalidate cache for this organization's MCP connections
+  const cacheKey = `mcp:${params.organizationId}`;
+  const cacheOptions = { ttl: 300, prefix: "mcp-connections" };
+  await cache.del(cacheKey, cacheOptions);
+
   return {
     id: connection.id,
     organizationId: connection.organizationId,
@@ -542,16 +624,26 @@ export async function updateMCPConnection(
   connectionId: string,
   updates: Partial<Pick<MCPConnection, "name" | "config" | "enabled">>,
 ): Promise<void> {
-  await prisma.mCPConnection.update({
+  const connection = await prisma.mCPConnection.update({
     where: { id: connectionId },
     data: updates,
+    select: { organizationId: true },
   });
+
+  const cacheKey = `mcp:${connection.organizationId}`;
+  const cacheOptions = { ttl: 300, prefix: "mcp-connections" };
+  await cache.del(cacheKey, cacheOptions);
 }
 
 export async function deleteMCPConnection(connectionId: string): Promise<void> {
-  await prisma.mCPConnection.delete({
+  const connection = await prisma.mCPConnection.delete({
     where: { id: connectionId },
+    select: { organizationId: true },
   });
+
+  const cacheKey = `mcp:${connection.organizationId}`;
+  const cacheOptions = { ttl: 300, prefix: "mcp-connections" };
+  await cache.del(cacheKey, cacheOptions);
 }
 
 export function validateToolAccess(

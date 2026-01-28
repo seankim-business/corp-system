@@ -4,6 +4,7 @@ import { updateIssueTool } from "./tools/updateIssue";
 import { getPullRequestsTool } from "./tools/getPullRequests";
 import { createPullRequestTool } from "./tools/createPullRequest";
 import { getRepositoriesTool } from "./tools/getRepositories";
+import { getFileTool } from "./tools/getFile";
 import {
   MCPExecuteToolOptions,
   executeTool,
@@ -19,6 +20,7 @@ const legacyToolMap: Record<string, string> = {
   get_pull_requests: "getPullRequests",
   create_pull_request: "createPullRequest",
   get_repositories: "getRepositories",
+  get_file: "getFile",
 };
 
 export function registerTools(): string[] {
@@ -29,6 +31,7 @@ export function registerTools(): string[] {
     "github__getPullRequests",
     "github__createPullRequest",
     "github__getRepositories",
+    "github__getFile",
   ];
 }
 
@@ -78,6 +81,9 @@ export async function executeGitHubTool(
 
           case "getRepositories":
             return await getRepositoriesTool(accessToken, input, connection, userId);
+
+          case "getFile":
+            return await getFileTool(accessToken, input, connection, userId);
 
           default:
             throw new Error(`Unknown GitHub tool: ${toolName}`);

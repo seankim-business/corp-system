@@ -114,6 +114,79 @@ export async function checkBudgetSufficient(
   return remaining >= estimatedCostCents;
 }
 
+export async function reserveBudget(
+  organizationId: string,
+  estimatedCostCents: number,
+): Promise<{ allowed: boolean; remaining: number }> {
+  if (!Number.isFinite(estimatedCostCents) || estimatedCostCents <= 0) {
+    return { allowed: true, remaining: Number.POSITIVE_INFINITY };
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: {
+      monthlyBudgetCents: true,
+      currentMonthSpendCents: true,
+      budgetResetAt: true,
+    },
+  });
+
+  if (!org) {
+    throw new Error(`Organization not found: ${organizationId}`);
+  }
+
+  if (org.monthlyBudgetCents == null) {
+    return { allowed: true, remaining: Number.POSITIVE_INFINITY };
+  }
+
+  const currentRemaining = org.monthlyBudgetCents - org.currentMonthSpendCents;
+  if (currentRemaining < estimatedCostCents) {
+    recordBudgetRemainingCents(organizationId, Math.max(0, currentRemaining));
+    return { allowed: false, remaining: Math.max(0, currentRemaining) };
+  }
+
+  const resetAt = org.budgetResetAt ?? startOfMonth();
+  const updated = await prisma.organization.updateMany({
+    where: {
+      id: organizationId,
+      currentMonthSpendCents: org.currentMonthSpendCents,
+    },
+    data: {
+      currentMonthSpendCents: { increment: Math.round(estimatedCostCents) },
+      budgetResetAt: resetAt,
+    },
+  });
+
+  if (updated.count === 0) {
+    return reserveBudget(organizationId, estimatedCostCents);
+  }
+
+  const newRemaining = currentRemaining - estimatedCostCents;
+  recordBudgetRemainingCents(organizationId, Math.max(0, newRemaining));
+  return { allowed: true, remaining: Math.max(0, newRemaining) };
+}
+
+export async function refundBudget(organizationId: string, refundCents: number): Promise<void> {
+  if (!Number.isFinite(refundCents) || refundCents <= 0) {
+    return;
+  }
+
+  try {
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        currentMonthSpendCents: { decrement: Math.round(refundCents) },
+      },
+    });
+  } catch (error) {
+    logger.error("Failed to refund budget", {
+      organizationId,
+      refundCents,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export async function updateSpend(organizationId: string, actualCostCents: number): Promise<void> {
   if (!Number.isFinite(actualCostCents) || actualCostCents <= 0) {
     return;
