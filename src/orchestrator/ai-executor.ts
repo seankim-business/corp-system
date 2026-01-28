@@ -4,6 +4,7 @@ import { Category } from "./types";
 import { trackUsage } from "../services/cost-tracker";
 import { recordAiRequest } from "../services/metrics";
 import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
+import { getOrganizationApiKey } from "../api/organization-settings";
 
 export interface AIExecutionParams {
   category: Category;
@@ -117,17 +118,34 @@ function estimateInputTokens(prompt: string, systemPrompt: string): number {
   return combined.split(/\s+/).filter(Boolean).length;
 }
 
-let anthropicClient: Anthropic | null = null;
+const anthropicClientCache = new Map<string, Anthropic>();
 
-function getAnthropicClient(): Anthropic {
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY is not configured");
-    }
-    anthropicClient = new Anthropic({ apiKey });
+async function getAnthropicClient(organizationId?: string): Promise<Anthropic> {
+  const cacheKey = organizationId || "default";
+
+  if (anthropicClientCache.has(cacheKey)) {
+    return anthropicClientCache.get(cacheKey)!;
   }
-  return anthropicClient;
+
+  let apiKey: string | null = null;
+
+  if (organizationId) {
+    apiKey = await getOrganizationApiKey(organizationId, "anthropicApiKey");
+  }
+
+  if (!apiKey) {
+    apiKey = process.env.ANTHROPIC_API_KEY || null;
+  }
+
+  if (!apiKey) {
+    throw new Error(
+      "ANTHROPIC_API_KEY is not configured. Set it in organization settings or as an environment variable.",
+    );
+  }
+
+  const client = new Anthropic({ apiKey });
+  anthropicClientCache.set(cacheKey, client);
+  return client;
 }
 
 export async function executeWithAI(params: AIExecutionParams): Promise<AIExecutionResult> {
@@ -146,7 +164,7 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
       span.setAttribute("environment", environment);
 
       try {
-        const client = getAnthropicClient();
+        const client = await getAnthropicClient(params.organizationId);
 
         logger.info("Executing AI request", {
           model,

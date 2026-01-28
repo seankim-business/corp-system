@@ -155,7 +155,7 @@ router.delete(
 
       await prisma.organization.update({
         where: { id: organizationId },
-        data: { settings: updatedSettings },
+        data: { settings: updatedSettings as object },
       });
 
       return res.json({

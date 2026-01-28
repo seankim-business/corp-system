@@ -1,5 +1,6 @@
 import { Category, RequestAnalysis } from "./types";
 import { estimateCostForCategory, getBudgetRemaining } from "../services/budget-enforcer";
+import { getOrganizationApiKey } from "../api/organization-settings";
 
 export type CategorySelectionMethod = "keyword" | "complexity-fallback" | "llm-fallback";
 
@@ -332,12 +333,23 @@ Respond with JSON only:
   "reasoning": "brief explanation (1-2 sentences)"
 }`;
 
-async function classifyWithLLM(userRequest: string): Promise<CategorySelection> {
+async function classifyWithLLM(
+  userRequest: string,
+  organizationId?: string,
+): Promise<CategorySelection> {
   try {
+    let apiKey = process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey && organizationId) {
+      apiKey = (await getOrganizationApiKey(organizationId, "anthropicApiKey")) || undefined;
+    }
+
+    if (!apiKey) {
+      throw new Error("No API key available for LLM classification");
+    }
+
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    const client = new Anthropic({ apiKey });
 
     const response = await client.messages.create({
       model: "claude-3-5-haiku-20241022",
@@ -395,9 +407,14 @@ async function classifyWithLLM(userRequest: string): Promise<CategorySelection> 
 export async function selectCategoryHybrid(
   userRequest: string,
   analysis: RequestAnalysis,
-  options: { minConfidence?: number; enableLLM?: boolean; enableCache?: boolean } = {},
+  options: {
+    minConfidence?: number;
+    enableLLM?: boolean;
+    enableCache?: boolean;
+    organizationId?: string;
+  } = {},
 ): Promise<CategorySelection> {
-  const { minConfidence = 0.7, enableLLM = true, enableCache = true } = options;
+  const { minConfidence = 0.7, enableLLM = true, enableCache = true, organizationId } = options;
 
   const cacheKey = generateCacheKey(userRequest);
 
@@ -425,11 +442,17 @@ export async function selectCategoryHybrid(
     return keywordResult;
   }
 
-  if (!enableLLM || !process.env.ANTHROPIC_API_KEY) {
+  let hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+  if (!hasApiKey && organizationId) {
+    const dbKey = await getOrganizationApiKey(organizationId, "anthropicApiKey");
+    hasApiKey = !!dbKey;
+  }
+
+  if (!enableLLM || !hasApiKey) {
     return keywordResult;
   }
 
-  const llmResult = await classifyWithLLM(userRequest);
+  const llmResult = await classifyWithLLM(userRequest, organizationId);
 
   const finalResult = llmResult.confidence > keywordResult.confidence ? llmResult : keywordResult;
 
@@ -446,7 +469,10 @@ export async function selectCategoryWithBudget(
   analysis: RequestAnalysis,
   options: { minConfidence?: number; enableLLM?: boolean; enableCache?: boolean } = {},
 ): Promise<BudgetAwareCategorySelection> {
-  const baseSelection = await selectCategoryHybrid(userRequest, analysis, options);
+  const baseSelection = await selectCategoryHybrid(userRequest, analysis, {
+    ...options,
+    organizationId,
+  });
   const estimatedCost = estimateCostForCategory(baseSelection.category);
   const budgetRemaining = await getBudgetRemaining(organizationId);
 

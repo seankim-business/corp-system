@@ -3,6 +3,7 @@ import { getCircuitBreaker } from "../utils/circuit-breaker";
 import { executeWithAI } from "./ai-executor";
 import { Category } from "./types";
 import { getOpencodeSessionId, createSessionMapping } from "./session-mapping";
+import { getOrganizationApiKey } from "../api/organization-settings";
 
 export interface DelegateTaskParams {
   category: string;
@@ -43,8 +44,21 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+async function hasApiKeyConfigured(organizationId?: string): Promise<boolean> {
+  if (process.env.ANTHROPIC_API_KEY) {
+    return true;
+  }
+  if (organizationId) {
+    const dbKey = await getOrganizationApiKey(organizationId, "anthropicApiKey");
+    return !!dbKey;
+  }
+  return false;
+}
+
 export async function delegateTask(params: DelegateTaskParams): Promise<DelegateTaskResult> {
-  if (!OPENCODE_SIDECAR_URL && USE_BUILTIN_AI && process.env.ANTHROPIC_API_KEY) {
+  const hasApiKey = await hasApiKeyConfigured(params.organizationId);
+
+  if (!OPENCODE_SIDECAR_URL && USE_BUILTIN_AI && hasApiKey) {
     logger.info("Using built-in AI executor", { category: params.category });
     const result = await executeWithAI({
       category: params.category as Category,
