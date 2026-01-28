@@ -8,6 +8,15 @@ import { generateCodeVerifier, generateCodeChallenge } from "./pkce";
 import { redis } from "../db/redis";
 import { logger } from "../utils/logger";
 
+// Helper to get clean cookie domain (strips quotes if present)
+function getCookieDomain(): string | undefined {
+  const domain = process.env.COOKIE_DOMAIN;
+  if (!domain) return undefined;
+  // Strip surrounding quotes if present (dotenv issue)
+  const cleaned = domain.replace(/^["']|["']$/g, '');
+  return cleaned || undefined;
+}
+
 const router = express.Router();
 const authService = new AuthService();
 
@@ -46,7 +55,14 @@ router.get("/google", async (_req: Request, res: Response) => {
     return res.status(500).send("Failed to initialize authentication session. Please try again.");
   }
 
-  logger.info("PKCE session created", { sessionId });
+  // Verify the session was stored correctly
+  const verification = await redis.get(sessionId);
+  if (!verification) {
+    logger.error("PKCE session verification failed - stored but cannot retrieve", { sessionId });
+    return res.status(500).send("Session storage verification failed. Please try again.");
+  }
+
+  logger.info("PKCE session created and verified", { sessionId, verifierLength: verifier.length });
 
   let authUrl = googleClient.generateAuthUrl({
     access_type: "offline",
@@ -83,12 +99,22 @@ router.get("/google/callback", async (req: Request, res: Response) => {
   try {
     logger.info("Processing OAuth callback", { state, hasCode: !!code });
 
+    // Check if Redis is connected by checking the key exists first
+    const keyExists = await redis.exists(state as string);
+    logger.info("PKCE key existence check", {
+      state,
+      keyExists,
+      statePrefix: (state as string).substring(0, 20),
+    });
+
     const verifier = await redis.get(state as string);
     if (!verifier) {
       logger.warn("PKCE session not found or expired", {
         state,
         stateType: typeof state,
         stateLength: (state as string).length,
+        keyExisted: keyExists,
+        redisConnected: keyExists !== undefined,
       });
       const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "https://nubabel.com";
       return res.redirect(`${frontendUrl}/login?error=session_expired`);
@@ -116,23 +142,41 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       source: "web",
     });
 
-    res.cookie("session", result.sessionToken, {
+    // Redirect to the same domain as the auth server (where the SPA is hosted)
+    // BASE_URL is auth.nubabel.com which serves the frontend SPA
+    // FRONTEND_URL is nubabel.com which serves the landing page
+    const redirectUrl = `${process.env.BASE_URL}/dashboard`;
+
+    const cookieDomain = getCookieDomain();
+
+    logger.info("OAuth login successful, setting cookies and redirecting", {
+      userId: result.user.id,
+      organizationId: result.organization.id,
+      ipAddress,
+      userAgent: userAgent?.substring(0, 50),
+      redirectUrl,
+      cookieDomain: cookieDomain || 'not set (using host default)',
+      rawEnvDomain: process.env.COOKIE_DOMAIN,
+    });
+
+    // Cookie options - domain is optional, browser defaults to exact host if not set
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      sameSite: "lax" as const,
+      ...(cookieDomain && { domain: cookieDomain }),
+    };
+
+    res.cookie("session", result.sessionToken, {
+      ...cookieOptions,
+      maxAge: 1 * 60 * 60 * 1000, // 1 hour
     });
 
     res.cookie("refresh", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    const redirectUrl = `${process.env.BASE_URL}/dashboard`;
     return res.redirect(redirectUrl);
   } catch (error) {
     logger.error("Google OAuth error", { error });
@@ -167,20 +211,22 @@ router.post("/register", loginLimiter, async (req: Request, res: Response) => {
       source: "web",
     });
 
-    res.cookie("session", result.sessionToken, {
+    const cookieDomain = getCookieDomain();
+    const registerCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax" as const,
+      ...(cookieDomain && { domain: cookieDomain }),
+    };
+
+    res.cookie("session", result.sessionToken, {
+      ...registerCookieOptions,
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
     });
 
     res.cookie("refresh", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      ...registerCookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
     });
 
     return res.status(201).json({
@@ -215,20 +261,22 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       source: "web",
     });
 
-    res.cookie("session", result.sessionToken, {
+    const cookieDomain = getCookieDomain();
+    const loginCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax" as const,
+      ...(cookieDomain && { domain: cookieDomain }),
+    };
+
+    res.cookie("session", result.sessionToken, {
+      ...loginCookieOptions,
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
     });
 
     res.cookie("refresh", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      ...loginCookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
     });
 
     return res.json({
@@ -255,8 +303,10 @@ router.post("/logout", async (req: Request, res: Response) => {
     }
   }
 
-  res.clearCookie("session", { domain: process.env.COOKIE_DOMAIN });
-  res.clearCookie("refresh", { domain: process.env.COOKIE_DOMAIN });
+  const cookieDomain = getCookieDomain();
+  const clearOptions = cookieDomain ? { domain: cookieDomain } : {};
+  res.clearCookie("session", clearOptions);
+  res.clearCookie("refresh", clearOptions);
   return res.json({ success: true });
 });
 
@@ -278,8 +328,10 @@ router.post("/logout-all", authenticate, requireAuth, async (req: Request, res: 
       where: { userId },
     });
 
-    res.clearCookie("session", { domain: process.env.COOKIE_DOMAIN });
-    res.clearCookie("refresh", { domain: process.env.COOKIE_DOMAIN });
+    const cookieDomain = getCookieDomain();
+    const clearOptions = cookieDomain ? { domain: cookieDomain } : {};
+    res.clearCookie("session", clearOptions);
+    res.clearCookie("refresh", clearOptions);
 
     return res.json({
       success: true,
@@ -327,12 +379,13 @@ router.post("/refresh", async (req: Request, res: Response) => {
       role: membership.role,
     });
 
+    const cookieDomain = getCookieDomain();
     res.cookie("session", newSessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      ...(cookieDomain && { domain: cookieDomain }),
     });
 
     return res.json({ success: true });
@@ -351,20 +404,22 @@ router.post("/switch-org", authenticate, async (req: Request, res: Response) => 
   try {
     const result = await authService.switchOrganization(req.user!.id, organizationId);
 
-    res.cookie("session", result.sessionToken, {
+    const cookieDomain = getCookieDomain();
+    const switchCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax" as const,
+      ...(cookieDomain && { domain: cookieDomain }),
+    };
+
+    res.cookie("session", result.sessionToken, {
+      ...switchCookieOptions,
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
     });
 
     res.cookie("refresh", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      ...switchCookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
     });
 
     const redirectUrl = `https://${result.organization.slug}.${process.env.BASE_DOMAIN}/dashboard`;
@@ -375,7 +430,40 @@ router.post("/switch-org", authenticate, async (req: Request, res: Response) => 
   }
 });
 
+router.get("/health", async (_req: Request, res: Response) => {
+  try {
+    const testKey = `health:${Date.now()}`;
+    const setResult = await redis.set(testKey, "test", 10);
+    const getResult = await redis.get(testKey);
+    await redis.del(testKey);
+
+    const isHealthy = setResult && getResult === "test";
+
+    res.json({
+      status: isHealthy ? "healthy" : "degraded",
+      redis: {
+        set: setResult,
+        get: getResult === "test",
+        connected: isHealthy,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Health check failed", { error });
+    res.status(503).json({
+      status: "unhealthy",
+      redis: { connected: false, error: (error as Error).message },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 router.get("/me", authenticate, requireAuth, async (req: Request, res: Response) => {
+  logger.debug("/auth/me called successfully", {
+    userId: req.user!.id,
+    organizationId: req.user!.organizationId,
+  });
+
   const userId = req.user!.id;
   const currentOrganizationId = req.user!.organizationId;
 

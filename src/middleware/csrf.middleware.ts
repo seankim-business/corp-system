@@ -22,6 +22,15 @@ const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";
 const CSRF_TOKEN_LENGTH = 32;
 
+// Helper to get clean cookie domain (strips quotes if present)
+function getCookieDomain(): string | undefined {
+  const domain = process.env.COOKIE_DOMAIN;
+  if (!domain) return undefined;
+  // Strip surrounding quotes if present
+  const cleaned = domain.replace(/^["']|["']$/g, '');
+  return cleaned || undefined;
+}
+
 // Methods that don't require CSRF protection (safe methods)
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -87,12 +96,14 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
 
   // Set/refresh the CSRF cookie
   if (!existingToken) {
+    const cookieDomain = getCookieDomain();
     res.cookie(CSRF_COOKIE_NAME, csrfToken, {
       httpOnly: false, // Must be readable by JavaScript
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax", // Changed from strict to lax for cross-subdomain compatibility
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: "/",
+      ...(cookieDomain && { domain: cookieDomain }),
     });
   }
 
@@ -168,12 +179,14 @@ export function csrfTokenEndpoint(req: Request, res: Response): void {
 
   if (!csrfToken) {
     csrfToken = generateCsrfToken();
+    const cookieDomain = getCookieDomain();
     res.cookie(CSRF_COOKIE_NAME, csrfToken, {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000,
       path: "/",
+      ...(cookieDomain && { domain: cookieDomain }),
     });
   }
 
