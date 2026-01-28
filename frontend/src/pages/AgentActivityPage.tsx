@@ -29,7 +29,7 @@ export default function AgentActivityPage() {
   }, []);
 
   const { isConnected, error, reconnect } = useSSE({
-    url: "/api/sse/events",
+    url: "/api/events",
     onEvent: handleEvent,
   });
 

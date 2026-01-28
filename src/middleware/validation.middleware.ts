@@ -303,3 +303,36 @@ export type OkrObjectiveInput = z.infer<typeof okrObjectiveSchema>;
 export type UpdateOkrObjectiveInput = z.infer<typeof updateOkrObjectiveSchema>;
 export type KeyResultInput = z.infer<typeof keyResultSchema>;
 export type UpdateKeyResultInput = z.infer<typeof updateKeyResultSchema>;
+
+export const delegationScopeSchema = z.object({
+  resourceTypes: z.array(z.string()).optional(),
+  resourceIds: z.array(z.string().uuid()).optional(),
+  maxAmount: z.number().positive().optional(),
+  conditions: z.record(z.unknown()).optional(),
+});
+
+export const createDelegationSchema = z.object({
+  delegateeId: z.string().uuid("Invalid delegatee ID"),
+  permissions: z.array(z.string().min(1)).min(1, "At least one permission is required"),
+  scope: delegationScopeSchema.optional().nullable(),
+  validFrom: z.string().datetime().optional(),
+  validUntil: z.string().datetime(),
+  reason: z.string().min(1, "Reason is required").max(1000),
+});
+
+export const revokeDelegationSchema = z.object({
+  reason: z.string().max(1000).optional().nullable(),
+});
+
+export const listDelegationsQuerySchema = z.object({
+  role: z.enum(["delegator", "delegatee", "both"]).optional().default("both"),
+  includeExpired: z.coerce.boolean().optional().default(false),
+  includeRevoked: z.coerce.boolean().optional().default(false),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export type DelegationScopeInput = z.infer<typeof delegationScopeSchema>;
+export type CreateDelegationInput = z.infer<typeof createDelegationSchema>;
+export type RevokeDelegationInput = z.infer<typeof revokeDelegationSchema>;
+export type ListDelegationsQuery = z.infer<typeof listDelegationsQuerySchema>;

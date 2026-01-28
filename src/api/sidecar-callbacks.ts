@@ -2,6 +2,8 @@ import { Router } from "express";
 import { db } from "../db/client";
 import { withQueueConnection } from "../db/redis";
 import { executeNotionTool } from "../mcp-servers/notion";
+import { executeLinearTool } from "../mcp-servers/linear";
+import { executeGitHubTool } from "../mcp-servers/github";
 import { getMCPConnectionsByProvider, getAccessTokenFromConfig } from "../services/mcp-registry";
 import { logger } from "../utils/logger";
 import { EventEmitter } from "events";
@@ -89,10 +91,34 @@ sidecarCallbacksRouter.post("/sidecar/mcp/invoke", async (req, res) => {
         );
         break;
       }
-      case "linear":
-        throw new Error("Linear provider not yet implemented");
-      case "github":
-        throw new Error("GitHub provider not yet implemented");
+      case "linear": {
+        const linearToken = getAccessTokenFromConfig(connection.config as any);
+        if (!linearToken) {
+          throw new Error("No access token found for Linear connection");
+        }
+        result = await executeLinearTool(
+          linearToken,
+          toolName,
+          args || {},
+          organizationId,
+          connection,
+        );
+        break;
+      }
+      case "github": {
+        const githubToken = getAccessTokenFromConfig(connection.config as any);
+        if (!githubToken) {
+          throw new Error("No access token found for GitHub connection");
+        }
+        result = await executeGitHubTool(
+          githubToken,
+          toolName,
+          args || {},
+          organizationId,
+          connection,
+        );
+        break;
+      }
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }

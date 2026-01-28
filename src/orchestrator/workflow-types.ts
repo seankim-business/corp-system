@@ -1,50 +1,5 @@
 import { z } from "zod";
 
-export interface WorkflowContext {
-  organizationId: string;
-  userId: string;
-  sessionId: string;
-  variables: Record<string, unknown>;
-  nodeResults: Record<string, NodeResult>;
-  currentNode: string;
-  status: "pending" | "running" | "waiting_approval" | "completed" | "failed";
-  startedAt: Date;
-  completedAt?: Date;
-}
-
-export interface NodeResult {
-  nodeId: string;
-  status: "pending" | "running" | "success" | "failed" | "skipped";
-  output?: unknown;
-  error?: string;
-  duration?: number;
-}
-
-export interface WorkflowNode {
-  id: string;
-  type: "agent" | "condition" | "parallel" | "human_approval";
-  agentId?: string;
-  condition?: string;
-  parallelAgents?: string[];
-  approvalType?: string;
-  timeout?: number;
-}
-
-export interface WorkflowEdge {
-  from: string;
-  to: string;
-  condition?: string;
-}
-
-export interface WorkflowDefinition {
-  name: string;
-  version?: string;
-  description?: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
-  defaultTimeout?: number;
-}
-
 export const NodeResultSchema = z.object({
   nodeId: z.string(),
   status: z.enum(["pending", "running", "success", "failed", "skipped"]),
@@ -89,3 +44,9 @@ export const WorkflowDefinitionSchema = z.object({
   edges: z.array(WorkflowEdgeSchema),
   defaultTimeout: z.number().optional(),
 });
+
+export type NodeResult = z.infer<typeof NodeResultSchema>;
+export type WorkflowContext = z.infer<typeof WorkflowContextSchema>;
+export type WorkflowNode = z.infer<typeof WorkflowNodeSchema>;
+export type WorkflowEdge = z.infer<typeof WorkflowEdgeSchema>;
+export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;

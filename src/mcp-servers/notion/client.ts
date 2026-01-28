@@ -150,7 +150,7 @@ export class NotionClient {
         const response: any = await this.client.search({
           filter: {
             property: "object",
-            value: "database",
+            value: "data_source",
           } as any,
         });
 
@@ -386,6 +386,111 @@ export class NotionClient {
       },
       (results: any[], span: any) => {
         span.setAttribute("result.count", results.length);
+      },
+    );
+  }
+
+  /**
+   * Retrieves a Notion page by ID with all its properties
+   */
+  async getPage(pageId: string): Promise<{
+    id: string;
+    properties: Record<string, any>;
+    url: string;
+    createdTime: string;
+    lastEditedTime: string;
+    parent: { type: string; database_id?: string; page_id?: string };
+  }> {
+    return this.executeWithMetrics(
+      "getPage",
+      { "notion.page_id": pageId },
+      async () => {
+        const response: any = await this.client.pages.retrieve({
+          page_id: pageId,
+        });
+
+        return {
+          id: response.id,
+          properties: response.properties,
+          url: response.url,
+          createdTime: response.created_time,
+          lastEditedTime: response.last_edited_time,
+          parent: response.parent,
+        };
+      },
+      (_result, span) => {
+        span.setAttribute("notion.page_retrieved", true);
+      },
+    );
+  }
+
+  /**
+   * Retrieves all blocks (content) for a page, recursively fetching children
+   */
+  async getBlocks(blockId: string, options: { includeChildren?: boolean } = {}): Promise<any[]> {
+    const { includeChildren = true } = options;
+
+    return this.executeWithMetrics(
+      "getBlocks",
+      { "notion.block_id": blockId, "notion.include_children": includeChildren },
+      async () => {
+        const blocks: any[] = [];
+        let cursor: string | undefined = undefined;
+
+        do {
+          const response: any = await this.client.blocks.children.list({
+            block_id: blockId,
+            start_cursor: cursor,
+            page_size: 100,
+          });
+
+          for (const block of response.results) {
+            blocks.push(block);
+
+            if (includeChildren && block.has_children) {
+              block.children = await this.getBlocks(block.id, { includeChildren: true });
+            }
+          }
+
+          cursor = response.has_more ? response.next_cursor : undefined;
+        } while (cursor);
+
+        return blocks;
+      },
+      (result, span) => {
+        span.setAttribute("notion.blocks_count", result.length);
+      },
+    );
+  }
+
+  /**
+   * Updates a page's properties (used for status updates after sync)
+   */
+  async updatePage(
+    pageId: string,
+    properties: Record<string, any>,
+  ): Promise<{
+    id: string;
+    properties: Record<string, any>;
+    url: string;
+  }> {
+    return this.executeWithMetrics(
+      "updatePage",
+      { "notion.page_id": pageId },
+      async () => {
+        const response: any = await this.client.pages.update({
+          page_id: pageId,
+          properties,
+        });
+
+        return {
+          id: response.id,
+          properties: response.properties,
+          url: response.url,
+        };
+      },
+      (_result, span) => {
+        span.setAttribute("notion.page_updated", true);
       },
     );
   }

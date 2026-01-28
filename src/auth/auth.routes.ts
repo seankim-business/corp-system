@@ -235,6 +235,38 @@ router.post("/logout", async (req: Request, res: Response) => {
   return res.json({ success: true });
 });
 
+router.post("/logout-all", authenticate, requireAuth, async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const SESSION_REVOKE_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+  try {
+    const sessions = await db.session.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+
+    for (const session of sessions) {
+      await redis.set(`session_revoked:${session.id}`, "revoked", SESSION_REVOKE_TTL_SECONDS);
+    }
+
+    await db.session.deleteMany({
+      where: { userId },
+    });
+
+    res.clearCookie("session", { domain: process.env.COOKIE_DOMAIN });
+    res.clearCookie("refresh", { domain: process.env.COOKIE_DOMAIN });
+
+    return res.json({
+      success: true,
+      message: `Logged out from ${sessions.length} session(s)`,
+      sessionsRevoked: sessions.length,
+    });
+  } catch (error) {
+    console.error("Logout all error:", error);
+    return res.status(500).json({ error: "Failed to logout from all sessions" });
+  }
+});
+
 router.post("/refresh", async (req: Request, res: Response) => {
   try {
     const refreshToken = req.cookies.refresh;

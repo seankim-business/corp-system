@@ -417,6 +417,126 @@ export class GitHubClient {
     );
   }
 
+  async getReference(input: GetReferenceInput): Promise<GitHubReference> {
+    return this.executeWithMetrics(
+      "getReference",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        "github.ref": input.ref,
+      },
+      async () => {
+        const { owner, repo, ref } = input;
+        const response = await this.request<any>("GET", `/repos/${owner}/${repo}/git/ref/${ref}`);
+
+        return {
+          ref: response.ref,
+          sha: response.object.sha,
+          url: response.url,
+        };
+      },
+      (result, span) => {
+        span.setAttribute("github.ref_sha", result.sha);
+      },
+    );
+  }
+
+  async createBranch(input: CreateBranchInput): Promise<CreateBranchOutput> {
+    return this.executeWithMetrics(
+      "createBranch",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        "github.branch": input.branchName,
+      },
+      async () => {
+        const { owner, repo, branchName, fromRef = "heads/main" } = input;
+
+        const sourceRef = await this.getReference({ owner, repo, ref: fromRef });
+
+        const response = await this.request<any>("POST", `/repos/${owner}/${repo}/git/refs`, {
+          ref: `refs/heads/${branchName}`,
+          sha: sourceRef.sha,
+        });
+
+        return {
+          ref: response.ref,
+          sha: response.object.sha,
+        };
+      },
+      (result, span) => {
+        span.setAttribute("github.created_branch_sha", result.sha);
+      },
+    );
+  }
+
+  async createOrUpdateFile(input: CreateOrUpdateFileInput): Promise<CreateOrUpdateFileOutput> {
+    return this.executeWithMetrics(
+      "createOrUpdateFile",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        "github.path": input.path,
+        ...(input.branch ? { "github.branch": input.branch } : {}),
+      },
+      async () => {
+        const { owner, repo, path, message, content, branch, sha } = input;
+
+        const encodedContent = Buffer.from(content, "utf-8").toString("base64");
+
+        const body: Record<string, any> = {
+          message,
+          content: encodedContent,
+        };
+
+        if (branch) body.branch = branch;
+        if (sha) body.sha = sha;
+
+        const response = await this.request<any>(
+          "PUT",
+          `/repos/${owner}/${repo}/contents/${path}`,
+          body,
+        );
+
+        return {
+          path: response.content.path,
+          sha: response.content.sha,
+          htmlUrl: response.content.html_url,
+        };
+      },
+      (result, span) => {
+        span.setAttribute("github.file_sha", result.sha);
+      },
+    );
+  }
+
+  async addLabels(input: AddLabelsInput): Promise<void> {
+    return this.executeWithMetrics(
+      "addLabels",
+      {
+        "github.owner": input.owner,
+        "github.repo": input.repo,
+        "github.issue_number": input.issueNumber,
+      },
+      async () => {
+        const { owner, repo, issueNumber, labels } = input;
+
+        await this.request<any>("POST", `/repos/${owner}/${repo}/issues/${issueNumber}/labels`, {
+          labels,
+        });
+      },
+    );
+  }
+
+  async getFileSha(input: GetFileInput): Promise<string | null> {
+    try {
+      const file = await this.getFile(input);
+      return file.sha;
+    } catch {
+      return null;
+    }
+  }
+
   private mapIssue(issue: any): GitHubIssue {
     return {
       id: issue.id,
