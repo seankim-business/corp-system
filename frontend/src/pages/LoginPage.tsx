@@ -1,6 +1,26 @@
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import GoogleButton from '../components/common/GoogleButton';
 
+const ERROR_MESSAGES: Record<string, string> = {
+  session_expired: 'Your login session has expired. Please try again.',
+  auth_failed: 'Authentication failed. Please try again.',
+  access_denied: 'Access was denied. Please try again and grant the required permissions.',
+  invalid_request: 'Invalid authentication request. Please try again.',
+  server_error: 'Server error occurred. Please try again later.',
+};
+
 export default function LoginPage() {
+  const [searchParams] = useSearchParams();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam && ERROR_MESSAGES[errorParam]) {
+      setError(ERROR_MESSAGES[errorParam]);
+    }
+  }, [searchParams]);
+
   const handleGoogleLogin = () => {
     window.location.href = '/auth/google';
   };
@@ -12,6 +32,12 @@ export default function LoginPage() {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Nubabel</h1>
           <p className="text-gray-600">AI-Powered Workflow Automation</p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 text-sm text-center">{error}</p>
+          </div>
+        )}
 
         <GoogleButton onClick={handleGoogleLogin} />
 
