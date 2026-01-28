@@ -23,25 +23,19 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     const payload = authService.verifySessionToken(token);
 
-    const currentIp = req.ip || req.socket.remoteAddress;
-    const currentUserAgent = req.get("user-agent");
+    // IP/User-Agent validation DISABLED
+    // These checks don't work reliably with proxies/load balancers like Railway
+    // The IP seen during token creation differs from the IP seen during validation
+    // Keeping the logging for debugging purposes only
+    const xForwardedFor = req.get('x-forwarded-for');
+    const currentIp = xForwardedFor ? xForwardedFor.split(',')[0].trim() : (req.ip || req.socket.remoteAddress);
 
     if (payload.ipAddress && payload.ipAddress !== currentIp) {
-      logger.warn("Session hijacking attempt detected: IP mismatch", {
+      logger.debug("Session IP mismatch (not blocking - expected behind proxy)", {
         userId: payload.userId,
         sessionIp: payload.ipAddress,
         currentIp,
       });
-      return res.status(401).json({ error: "Session invalid: IP mismatch" });
-    }
-
-    if (payload.userAgent && currentUserAgent && payload.userAgent !== currentUserAgent) {
-      logger.warn("Session hijacking attempt detected: User-Agent mismatch", {
-        userId: payload.userId,
-        sessionUserAgent: payload.userAgent,
-        currentUserAgent,
-      });
-      return res.status(401).json({ error: "Session invalid: User-Agent mismatch" });
     }
 
     const user = await db.user.findUnique({
