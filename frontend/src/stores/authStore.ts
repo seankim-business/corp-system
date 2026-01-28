@@ -1,6 +1,6 @@
 /**
  * Auth Store (Zustand)
- * 
+ *
  * 기획:
  * - 전역 인증 상태 관리
  * - 사용자 정보 (user)
@@ -8,7 +8,7 @@
  * - 사용자가 속한 조직 목록 (organizations)
  * - 로그인/로그아웃 액션
  * - 조직 전환 액션
- * 
+ *
  * 구조:
  * AuthStore
  * ├── State
@@ -44,21 +44,25 @@ interface AuthState {
   currentOrganization: Organization | null;
   organizations: Organization[];
   isLoading: boolean;
-  
+  hasCheckedAuth: boolean;
+
   fetchUser: () => Promise<void>;
   logout: () => Promise<void>;
   switchOrganization: (organizationId: string) => Promise<void>;
   setUser: (user: User | null) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   currentOrganization: null,
   organizations: [],
-  isLoading: false,
+  isLoading: true,
+  hasCheckedAuth: false,
 
   fetchUser: async () => {
-    set({ isLoading: true });
+    if (get().hasCheckedAuth) return;
+
+    set({ isLoading: true, hasCheckedAuth: true });
     try {
       const data = await request<{
         user: User;
