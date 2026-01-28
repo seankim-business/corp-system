@@ -142,10 +142,10 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       source: "web",
     });
 
-    // Redirect to the same domain as the auth server (where the SPA is hosted)
-    // BASE_URL is auth.nubabel.com which serves the frontend SPA
-    // FRONTEND_URL is nubabel.com which serves the landing page
-    const redirectUrl = `${process.env.BASE_URL}/dashboard`;
+    // Redirect to the frontend app after successful OAuth
+    // FRONTEND_URL is app.nubabel.com (the actual app)
+    // BASE_URL is auth.nubabel.com (the auth server)
+    const redirectUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL}/dashboard`;
 
     const cookieDomain = getCookieDomain();
 
