@@ -25,6 +25,7 @@
  */
 
 import { Link, useLocation } from "react-router-dom";
+import { useAuthStore } from "../../stores/authStore";
 
 interface NavItem {
   name: string;
@@ -36,7 +37,17 @@ const mainNavItems: NavItem[] = [
   { name: "Dashboard", path: "/dashboard", icon: "🏠" },
   { name: "Workflows", path: "/workflows", icon: "📋" },
   { name: "Executions", path: "/executions", icon: "⏱️" },
+  { name: "Conversations", path: "/conversations", icon: "💬" },
+  { name: "Search", path: "/search", icon: "🔍" },
   { name: "Settings", path: "/settings", icon: "⚙️" },
+];
+
+const activityNavItems: NavItem[] = [
+  { name: "Activity", path: "/activity", icon: "📡" },
+  { name: "Metrics", path: "/metrics/agents", icon: "📊" },
+  { name: "OKR", path: "/okr", icon: "🎯" },
+  { name: "Approvals", path: "/approvals", icon: "✅" },
+  { name: "Changes", path: "/org-changes", icon: "📝" },
 ];
 
 const integrationNavItems: NavItem[] = [
@@ -44,8 +55,20 @@ const integrationNavItems: NavItem[] = [
   { name: "Slack Settings", path: "/settings/slack", icon: "💬" },
 ];
 
+const adminNavItems: NavItem[] = [
+  { name: "Admin Dashboard", path: "/admin", icon: "🔧" },
+  { name: "System Health", path: "/admin/system", icon: "💓" },
+  { name: "Organizations", path: "/admin/organizations", icon: "🏢" },
+  { name: "Agents", path: "/admin/agents", icon: "🤖" },
+  { name: "Skills", path: "/admin/skills", icon: "⚡" },
+  { name: "SOP Library", path: "/admin/sops", icon: "📖" },
+];
+
 export default function Sidebar() {
   const location = useLocation();
+  const { membership } = useAuthStore();
+
+  const isAdmin = membership?.role === "admin" || membership?.role === "owner";
 
   const renderNavItems = (items: NavItem[]) => {
     return items.map((item) => {
@@ -76,10 +99,26 @@ export default function Sidebar() {
 
           <div>
             <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Activity
+            </h3>
+            <ul className="space-y-2">{renderNavItems(activityNavItems)}</ul>
+          </div>
+
+          <div>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Integrations
             </h3>
             <ul className="space-y-2">{renderNavItems(integrationNavItems)}</ul>
           </div>
+
+          {isAdmin && (
+            <div>
+              <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                Admin
+              </h3>
+              <ul className="space-y-2">{renderNavItems(adminNavItems)}</ul>
+            </div>
+          )}
         </div>
       </nav>
     </aside>

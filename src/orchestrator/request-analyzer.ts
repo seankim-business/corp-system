@@ -145,34 +145,37 @@ function classifyIntent(
 
   // Task creation patterns
   const taskCreationPatterns = [
-    /\b(create|add|make|new|assign|allocate|schedule)\s+(task|job|work|assignment)/i,
-    /\b(create|add|make)\s+\w+\s+(for|to)\s+@?\w+/i,
-    /\b(create task for|assign to|allocate to)\s+/i,
-    /(생성|만들|추가|작성|할당)\s+(태스크|작업|이슈)/,
+    /(create|add|make|new|assign|allocate|schedule)\s+(task|job|work|assignment)/i,
+    /(create|add|make).*?(task|job|work).*?(for|to)/i,  // More flexible for mixed language
+    /(create task for|assign to|allocate to)\s+/i,
+    /(생성|만들|추가|작성|할당).*?(태스크|작업|이슈)/,  // More flexible Korean pattern
+    /(새|신규)\s+(태스크|작업|이슈)/,  // "new task" pattern
   ];
 
   // Search/query patterns
   const searchPatterns = [
-    /\b(search|find|look for|show|list|get|retrieve|query|what|where|which)\b/i,
-    /\b(show|list|display)\s+(my|all|the)\s+(tasks|work|items|requests)/i,
-    /\b(what'?s|what is)\s+(on|in)\s+(my|the)\s+(plate|list|queue)/i,
-    /(조회|확인|보여|찾|검색|알려|리스트)/,
+    /(search|find|look for|show|list|get|retrieve|query|what|where|which)/i,
+    /(show|list|display)\s+(my|all|the)\s+(tasks|work|items|requests)/i,
+    /(what'?s|what is)\s+(on|in)\s+(my|the)\s+(plate|list|queue)/i,
+    /(조회|보여|찾|검색|알려|리스트)/,  // Removed 확인 as it conflicts with approval patterns
   ];
 
   // Report/analytics patterns
   const reportPatterns = [
-    /\b(generate|create|make|show|display)\s+(report|summary|overview|analytics|stats|statistics)/i,
-    /\b(report|analytics|summary)\s+(on|about|for)\s+/i,
-    /\b(how many|count|total|statistics)\s+/i,
+    /(generate|create|make|show|display)\s+(report|summary|overview|analytics|stats|statistics)/i,
+    /(report|analytics|summary)\s+(on|about|for)\s+/i,
+    /(how many|count|total|statistics)\s+/i,
     /(리포트|보고서|분석|통계|요약)/,
   ];
 
-  // Approval/decision patterns
+  // Approval/decision patterns (including updates)
   const approvalPatterns = [
-    /\b(approve|reject|deny|accept|decline|confirm|validate)\s+/i,
-    /\b(approve|reject)\s+(this|that|the|request|proposal|change)/i,
-    /\b(do you|should i|can i)\s+(approve|reject)/i,
-    /(승인|거절|거부|수락|확인)/,
+    /(approve|reject|deny|accept|decline|confirm|validate)\s+/i,
+    /(approve|reject)\s+(this|that|the|request|proposal|change)/i,
+    /(do you|should i|can i)\s+(approve|reject)/i,
+    /(승인|거절|거부|수락)/,  // Removed 확인 to reduce conflicts
+    /(태스크|작업|상태).*?(업데이트|변경|수정)/,  // Flexible update pattern
+    /(업데이트|변경|수정).*?(태스크|작업|상태)/,  // Reverse order
   ];
 
   // Score each category
@@ -309,13 +312,13 @@ function extractEntitiesEnhanced(text: string): {
   const entities: any = {};
 
   const targetPatterns = [
-    { regex: /\b(notion|노션)\b/i, value: "notion", confidence: 0.9 },
-    { regex: /\b(slack|슬랙)\b/i, value: "slack", confidence: 0.9 },
-    { regex: /\b(github|깃허브|깃헙)\b/i, value: "github", confidence: 0.9 },
-    { regex: /\b(linear|리니어)\b/i, value: "linear", confidence: 0.9 },
-    { regex: /\b(jira|지라)\b/i, value: "jira", confidence: 0.9 },
-    { regex: /\b(asana|아사나)\b/i, value: "asana", confidence: 0.9 },
-    { regex: /\b(airtable|에어테이블)\b/i, value: "airtable", confidence: 0.9 },
+    { regex: /(notion|노션)/i, value: "notion", confidence: 0.9 },
+    { regex: /(slack|슬랙)/i, value: "slack", confidence: 0.9 },
+    { regex: /(github|깃허브|깃헙)/i, value: "github", confidence: 0.9 },
+    { regex: /(linear|리니어)/i, value: "linear", confidence: 0.9 },
+    { regex: /(jira|지라)/i, value: "jira", confidence: 0.9 },
+    { regex: /(asana|아사나)/i, value: "asana", confidence: 0.9 },
+    { regex: /(airtable|에어테이블)/i, value: "airtable", confidence: 0.9 },
   ];
 
   for (const pattern of targetPatterns) {
@@ -332,15 +335,15 @@ function extractEntitiesEnhanced(text: string): {
   }
 
   const actionPatterns = [
-    { regex: /\b(생성|만들|추가|작성|create|add)\b/i, value: "create", confidence: 0.85 },
-    { regex: /\b(수정|변경|업데이트|update|modify|change)\b/i, value: "update", confidence: 0.85 },
-    { regex: /\b(삭제|제거|delete|remove)\b/i, value: "delete", confidence: 0.85 },
+    { regex: /(생성|만들|추가|작성|create|add)/i, value: "create", confidence: 0.85 },
+    { regex: /(수정|변경|업데이트|update|modify|change)/i, value: "update", confidence: 0.85 },
+    { regex: /(삭제|제거|delete|remove)/i, value: "delete", confidence: 0.85 },
     {
-      regex: /\b(조회|확인|보여|알려|show|list|get|find|search)\b/i,
+      regex: /(조회|확인|보여|알려|show|list|get|find|search)/i,
       value: "query",
       confidence: 0.85,
     },
-    { regex: /\b(approve|reject|승인|거절)\b/i, value: "approve", confidence: 0.85 },
+    { regex: /(approve|reject|승인|거절)/i, value: "approve", confidence: 0.85 },
   ];
 
   for (const pattern of actionPatterns) {
@@ -357,11 +360,11 @@ function extractEntitiesEnhanced(text: string): {
   }
 
   const objectPatterns = [
-    { regex: /\b(task|tasks|태스크|작업|이슈|issue)\b/i, value: "task", confidence: 0.9 },
-    { regex: /\b(document|documents|문서|doc|docs)\b/i, value: "document", confidence: 0.9 },
-    { regex: /\b(workflow|workflows|워크플로우)\b/i, value: "workflow", confidence: 0.9 },
-    { regex: /\b(page|pages|페이지)\b/i, value: "page", confidence: 0.9 },
-    { regex: /\b(request|requests|요청)\b/i, value: "request", confidence: 0.9 },
+    { regex: /(task|tasks|태스크|작업|이슈|issue)/i, value: "task", confidence: 0.9 },
+    { regex: /(document|documents|문서|doc|docs)/i, value: "document", confidence: 0.9 },
+    { regex: /(workflow|workflows|워크플로우)/i, value: "workflow", confidence: 0.9 },
+    { regex: /(page|pages|페이지)/i, value: "page", confidence: 0.9 },
+    { regex: /(request|requests|요청)/i, value: "request", confidence: 0.9 },
   ];
 
   for (const pattern of objectPatterns) {
@@ -406,7 +409,7 @@ function extractEntitiesEnhanced(text: string): {
 
   const projectPatterns = [
     /(?:project|in|for)\s+["']?([A-Z][A-Za-z0-9\s-]+)["']?/,
-    /\b(project|프로젝트)\s+(\w+)/i,
+    /(project|프로젝트)\s+(\w+)/i,
   ];
 
   for (const pattern of projectPatterns) {
@@ -425,29 +428,69 @@ function extractEntitiesEnhanced(text: string): {
     }
   }
 
-  try {
-    const parsed = chrono.parse(text, new Date(), { forwardDate: true });
-    if (parsed.length > 0) {
-      const dateMatch = parsed[0];
-      const parsedDate = dateMatch.start.date();
+  // Korean date patterns
+  const koreanDatePatterns = [
+    { regex: /(오늘|today)/i, days: 0 },
+    { regex: /(내일|tomorrow)/i, days: 1 },
+    { regex: /(모레)/i, days: 2 },
+    { regex: /(\d+)일\s*후/i, daysFromMatch: true },
+    { regex: /이번\s*주/i, days: 7 },
+    { regex: /다음\s*주/i, days: 7 },
+  ];
 
-      if (isValid(parsedDate)) {
-        entities.dueDate = {
-          type: "dueDate",
-          value: format(parsedDate, "yyyy-MM-dd"),
-          confidence: dateMatch.start.isCertain("day") ? 0.9 : 0.6,
-          position: dateMatch.index,
-        };
+  let dateFound = false;
+  for (const pattern of koreanDatePatterns) {
+    const match = text.match(pattern.regex);
+    if (match) {
+      const today = new Date();
+      let daysToAdd = 0;
+
+      if (pattern.daysFromMatch && match[1]) {
+        daysToAdd = parseInt(match[1], 10);
+      } else {
+        daysToAdd = pattern.days || 0;
       }
+
+      const futureDate = new Date(today);
+      futureDate.setDate(today.getDate() + daysToAdd);
+
+      entities.dueDate = {
+        type: "dueDate",
+        value: format(futureDate, "yyyy-MM-dd"),
+        confidence: 0.85,
+        position: match.index,
+      };
+      dateFound = true;
+      break;
     }
-  } catch (error) {
-    void error;
+  }
+
+  // Fallback to chrono-node for English dates
+  if (!dateFound) {
+    try {
+      const parsed = chrono.parse(text, new Date(), { forwardDate: true });
+      if (parsed.length > 0) {
+        const dateMatch = parsed[0];
+        const parsedDate = dateMatch.start.date();
+
+        if (isValid(parsedDate)) {
+          entities.dueDate = {
+            type: "dueDate",
+            value: format(parsedDate, "yyyy-MM-dd"),
+            confidence: dateMatch.start.isCertain("day") ? 0.9 : 0.6,
+            position: dateMatch.index,
+          };
+        }
+      }
+    } catch (error) {
+      void error;
+    }
   }
 
   const priorityPatterns = [
-    { regex: /\b(긴급|urgent|critical|high|asap|immediately)\b/i, value: "high", confidence: 0.9 },
-    { regex: /\b(보통|normal|medium|regular)\b/i, value: "medium", confidence: 0.85 },
-    { regex: /\b(낮음|low|whenever|eventually)\b/i, value: "low", confidence: 0.85 },
+    { regex: /(긴급|urgent|critical|high|asap|immediately)/i, value: "high", confidence: 0.9 },
+    { regex: /(보통|normal|medium|regular)/i, value: "medium", confidence: 0.85 },
+    { regex: /(낮음|low|whenever|eventually)/i, value: "low", confidence: 0.85 },
   ];
 
   for (const pattern of priorityPatterns) {
@@ -584,10 +627,11 @@ function detectFollowUp(
   }
 
   const followUpPatterns = [
-    /\b(also|additionally|and|plus|furthermore|moreover)\b/i,
-    /\b(same|similar|like|as before)\b/i,
-    /\b(update|modify|change|adjust)\s+(it|that|the previous)/i,
-    /\b(what about|how about|what if)\b/i,
+    /(also|additionally|and|plus|furthermore|moreover)/i,
+    /(same|similar|like|as before)/i,
+    /(update|modify|change|adjust|수정|변경)\s+(it|that|the previous|해|해줘)/i,
+    /(what about|how about|what if)/i,
+    /(수정|변경|추가|더)해줘?/i,  // Korean follow-up patterns
   ];
 
   const isFollowUp = followUpPatterns.some((pattern) => pattern.test(text));

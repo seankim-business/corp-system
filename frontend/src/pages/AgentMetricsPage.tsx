@@ -31,7 +31,7 @@ export default function AgentMetricsPage() {
     const fetchMetrics = async () => {
       try {
         const data = await request<MetricsResponse>({
-          url: "/api/agent-metrics",
+          url: "/api/metrics/agents",
           method: "GET",
         });
         setMetrics(data);

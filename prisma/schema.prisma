@@ -17,16 +17,16 @@ datasource db {
 /// Organizations (Tenants)
 /// Each organization represents a separate company/workspace
 model Organization {
-  id        String   @id @default(uuid()) @db.Uuid
-  slug      String   @unique @db.VarChar(50) // Subdomain: kyndof, clientco
-  name      String   @db.VarChar(255)
-  logoUrl   String?  @map("logo_url") @db.Text
-  settings  Json     @default("{}") @db.JsonB
-  monthlyBudgetCents     Int?     @map("monthly_budget_cents")
-  currentMonthSpendCents Int      @default(0) @map("current_month_spend_cents")
+  id                     String    @id @default(uuid()) @db.Uuid
+  slug                   String    @unique @db.VarChar(50) // Subdomain: kyndof, clientco
+  name                   String    @db.VarChar(255)
+  logoUrl                String?   @map("logo_url") @db.Text
+  settings               Json      @default("{}") @db.JsonB
+  monthlyBudgetCents     Int?      @map("monthly_budget_cents")
+  currentMonthSpendCents Int       @default(0) @map("current_month_spend_cents")
   budgetResetAt          DateTime? @map("budget_reset_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   workspaceDomains       WorkspaceDomain[]
@@ -45,6 +45,10 @@ model Organization {
   orchestratorExecutions OrchestratorExecution[]
   featureFlagOverrides   FeatureFlagOverride[]
   featureFlagAuditLogs   FeatureFlagAuditLog[]
+  aiProvider             OrganizationAIProvider?
+  functions              Function[]
+  skills                 Skill[]
+  sops                   Sop[]
 
   @@map("organizations")
 }
@@ -144,13 +148,13 @@ model Session {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-   @@index([userId])
-   @@index([organizationId])
-   @@index([organizationId, expiresAt])
-   @@index([tokenHash])
-   @@index([expiresAt])
-   @@index([source])
-   @@map("sessions")
+  @@index([userId])
+  @@index([organizationId])
+  @@index([organizationId, expiresAt])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([source])
+  @@map("sessions")
 }
 
 // ============================================================================
@@ -166,6 +170,7 @@ model Agent {
   role           String    @db.Text // "K-POP 무대 의상 디자이너"
   managerId      String?   @map("manager_id") @db.Uuid // Reports to which agent
   teamId         String?   @map("team_id") @db.Uuid
+  functionId     String?   @map("function_id") @db.Uuid
   skills         String[]  @db.VarChar(100) // [fashion-design, clo3d, adobe-suite]
   sessionId      String?   @map("session_id") @db.VarChar(255) // Persistent session for continuity
   hiredAt        DateTime  @default(now()) @map("hired_at") @db.Timestamptz(6)
@@ -181,10 +186,13 @@ model Agent {
   manager      Agent?       @relation("AgentHierarchy", fields: [managerId], references: [id])
   subordinates Agent[]      @relation("AgentHierarchy")
   team         Team?        @relation(fields: [teamId], references: [id])
+  function     Function?    @relation(fields: [functionId], references: [id])
+  agentSkills  AgentSkill[]
 
   @@index([organizationId])
   @@index([managerId])
   @@index([teamId])
+  @@index([functionId])
   @@index([type])
   @@index([status])
   @@map("agents")
@@ -207,6 +215,119 @@ model Team {
 
   @@index([organizationId])
   @@map("teams")
+}
+
+// ============================================================================
+// FUNCTION & SKILL TABLES (Organizational structure)
+// ============================================================================
+
+/// Function (기능 조직 - Functional organization units)
+model Function {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(255)
+  nameKo         String?  @map("name_ko") @db.VarChar(255) // Korean name
+  description    String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agents       Agent[]
+  sops         Sop[]
+
+  @@index([organizationId])
+  @@map("functions")
+}
+
+/// Skill (Capabilities that agents can possess)
+model Skill {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  skillId        String   @unique @map("skill_id") @db.VarChar(100) // e.g., "campaign-brief-creation"
+  name           String   @db.VarChar(255)
+  description    String?  @db.Text
+  category       String?  @db.VarChar(100)
+  triggers       String[] @default([]) @db.VarChar(255) // keywords that trigger this skill
+  parameters     Json?    @db.JsonB // input parameters schema
+  outputs        Json?    @db.JsonB // output schema
+  toolsRequired  String[] @default([]) @map("tools_required") @db.VarChar(100) // MCP tools needed
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agents       AgentSkill[]
+
+  @@index([organizationId])
+  @@index([skillId])
+  @@index([category])
+  @@map("skills")
+}
+
+/// AgentSkill (Many-to-many relationship between agents and skills)
+model AgentSkill {
+  id        String   @id @default(uuid()) @db.Uuid
+  agentId   String   @map("agent_id") @db.Uuid
+  skillId   String   @map("skill_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, skillId])
+  @@index([agentId])
+  @@index([skillId])
+  @@map("agent_skills")
+}
+
+/// Sop (Standard Operating Procedures)
+model Sop {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  sopId            String   @unique @map("sop_id") @db.VarChar(100) // e.g., "customer-onboarding"
+  name             String   @db.VarChar(255)
+  description      String?  @db.Text
+  functionId       String?  @map("function_id") @db.Uuid
+  steps            Json     @db.JsonB // array of step definitions
+  triggers         String[] @default([]) @db.VarChar(255)
+  approvalRequired Boolean  @default(false) @map("approval_required")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  function     Function?       @relation(fields: [functionId], references: [id])
+  executions   SopExecution[]
+
+  @@index([organizationId])
+  @@index([sopId])
+  @@index([functionId])
+  @@map("sops")
+}
+
+/// SopExecution (Tracks SOP execution history)
+model SopExecution {
+  id             String    @id @default(uuid()) @db.Uuid
+  sopId          String    @map("sop_id") @db.Uuid
+  status         String    @db.VarChar(50) // pending, in_progress, completed, failed
+  currentStep    Int       @default(0) @map("current_step")
+  stepResults    Json      @default("[]") @map("step_results") @db.JsonB
+  inputData      Json?     @map("input_data") @db.JsonB
+  outputData     Json?     @map("output_data") @db.JsonB
+  errorMessage   String?   @map("error_message") @db.Text
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  sop Sop @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  @@index([sopId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("sop_executions")
 }
 
 // ============================================================================
@@ -265,11 +386,11 @@ model Task {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project?     @relation(fields: [projectId], references: [id])
 
-   @@index([organizationId, id])
-   @@index([organizationId, status])
-   @@index([organizationId, dueDate])
-   @@index([organizationId, projectId])
-   @@map("tasks")
+  @@index([organizationId, id])
+  @@index([organizationId, status])
+  @@index([organizationId, dueDate])
+  @@index([organizationId, projectId])
+  @@map("tasks")
 }
 
 /// Goals (Hierarchical)
@@ -384,10 +505,10 @@ model WorkflowExecution {
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
-   @@index([workflowId])
-   @@index([status])
-   @@index([createdAt(sort: Desc)])
-   @@map("workflow_executions")
+  @@index([workflowId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("workflow_executions")
 }
 
 /// Orchestrator Executions (Conversation / delegation history)
@@ -417,12 +538,12 @@ model OrchestratorExecution {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-   @@index([organizationId, createdAt(sort: Desc)])
-   @@index([organizationId, status])
-   @@index([userId, createdAt(sort: Desc)])
-   @@index([sessionId])
-   @@index([status])
-   @@map("orchestrator_executions")
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@index([status])
+  @@map("orchestrator_executions")
 }
 
 // ============================================================================
@@ -446,11 +567,11 @@ model MCPConnection {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-   @@index([organizationId])
-   @@index([organizationId, enabled])
-   @@index([provider])
-   @@index([namespace])
-   @@map("mcp_connections")
+  @@index([organizationId])
+  @@index([organizationId, enabled])
+  @@index([provider])
+  @@index([namespace])
+  @@map("mcp_connections")
 }
 
 /// Legacy Notion Connections (Backward compatibility)
@@ -514,6 +635,45 @@ model SlackIntegration {
   @@map("slack_integrations")
 }
 
+/// SlackUser (Maps Slack users to Nubabel users)
+model SlackUser {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  slackUserId    String   @map("slack_user_id") @db.VarChar(50) // U01234ABCD
+  userId         String?  @map("user_id") @db.Uuid // Link to Nubabel user (nullable for unlinked)
+  slackUsername  String?  @map("slack_username") @db.VarChar(255)
+  slackEmail     String?  @map("slack_email") @db.VarChar(255)
+  isBot          Boolean  @default(false) @map("is_bot")
+  metadata       Json     @default("{}") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, slackUserId])
+  @@index([organizationId])
+  @@index([slackUserId])
+  @@index([userId])
+  @@map("slack_users")
+}
+
+/// SlackWorkspace (Additional workspace metadata)
+model SlackWorkspace {
+  id                 String   @id @default(uuid()) @db.Uuid
+  slackWorkspaceId   String   @unique @map("slack_workspace_id") @db.VarChar(50) // T01234ABCD
+  name               String   @db.VarChar(255)
+  domain             String?  @db.VarChar(255) // workspace.slack.com
+  iconUrl            String?  @map("icon_url") @db.Text
+  enterpriseId       String?  @map("enterprise_id") @db.VarChar(50) // For Enterprise Grid
+  enterpriseName     String?  @map("enterprise_name") @db.VarChar(255)
+  memberCount        Int?     @map("member_count")
+  lastSyncAt         DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  metadata           Json     @default("{}") @db.JsonB
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([slackWorkspaceId])
+  @@map("slack_workspaces")
+}
+
 // ==========================================================================
 // FEATURE FLAGS (Safe release / rollout)
 // ==========================================================================
@@ -550,10 +710,10 @@ model FeatureFlagRule {
 
   featureFlag FeatureFlag @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
 
-   @@index([featureFlagId, priority])
-   @@index([enabled, priority])
-   @@index([type])
-   @@map("feature_flag_rules")
+  @@index([featureFlagId, priority])
+  @@index([enabled, priority])
+  @@index([type])
+  @@map("feature_flag_rules")
 }
 
 model FeatureFlagOverride {
@@ -651,12 +811,12 @@ model Approval {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-   @@index([organizationId, status])
-   @@index([approverId, status])
-   @@index([fallbackApproverId])
-   @@index([requesterId])
-   @@index([expiresAt])
-   @@map("approvals")
+  @@index([organizationId, status])
+  @@index([approverId, status])
+  @@index([fallbackApproverId])
+  @@index([requesterId])
+  @@index([expiresAt])
+  @@map("approvals")
 }
 
 // ============================================================================
@@ -810,6 +970,80 @@ model GoogleCalendarConnection {
 }
 
 // ============================================================================
+// PUBLIC API TABLES
+// ============================================================================
+
+/// API Keys (Public API authentication)
+model APIKey {
+  id                String    @id @default(uuid()) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  name              String    @db.VarChar(255)
+  keyHash           String    @unique @map("key_hash") @db.VarChar(64)
+  keyPrefix         String    @map("key_prefix") @db.VarChar(12)
+  scopes            String[]  @default([]) @db.VarChar(50)
+  rateLimitTier     String    @default("free") @map("rate_limit_tier") @db.VarChar(20)
+  requestsPerMinute Int       @default(60) @map("requests_per_minute")
+  requestsPerDay    Int       @default(1000) @map("requests_per_day")
+  lastUsedAt        DateTime? @map("last_used_at") @db.Timestamptz(6)
+  totalRequests     Int       @default(0) @map("total_requests")
+  status            String    @default("active") @db.VarChar(20)
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy         String    @map("created_by") @db.Uuid
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@index([keyPrefix])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("api_keys")
+}
+
+/// Public Webhooks (Organization webhook endpoints)
+model PublicWebhook {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  url            String    @db.Text
+  events         String[]  @default([]) @db.VarChar(100)
+  secret         String    @db.VarChar(64)
+  status         String    @default("active") @db.VarChar(20)
+  failureCount   Int       @default(0) @map("failure_count")
+  lastFailure    DateTime? @map("last_failure") @db.Timestamptz(6)
+  lastSuccess    DateTime? @map("last_success") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  deliveries WebhookDelivery[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([organizationId, status])
+  @@map("public_webhooks")
+}
+
+/// Webhook Deliveries (Webhook delivery logs)
+model WebhookDelivery {
+  id             String    @id @default(uuid()) @db.Uuid
+  webhookId      String    @map("webhook_id") @db.Uuid
+  event          String    @db.VarChar(100)
+  payload        Json      @db.JsonB
+  status         String    @default("pending") @db.VarChar(20)
+  attempts       Int       @default(0)
+  lastAttemptAt  DateTime? @map("last_attempt_at") @db.Timestamptz(6)
+  responseStatus Int?      @map("response_status")
+  responseBody   String?   @map("response_body") @db.Text
+  error          String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  webhook PublicWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("webhook_deliveries")
+}
+
+// ============================================================================
 // SECURITY TABLES
 // ============================================================================
 
@@ -833,4 +1067,266 @@ model SessionHijackingAttempt {
   @@index([userId, createdAt(sort: Desc)])
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("session_hijacking_attempts")
+}
+
+// ============================================================================
+// BILLING & SUBSCRIPTION TABLES
+// ============================================================================
+
+/// Subscription (Organization billing subscriptions)
+/// Tracks Stripe subscription status and plan details
+model Subscription {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @unique @map("organization_id") @db.Uuid
+
+  // Stripe IDs
+  stripeCustomerId     String? @unique @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id") @db.VarChar(255)
+  stripePriceId        String? @map("stripe_price_id") @db.VarChar(255)
+
+  // Plan details
+  planId          String @default("free") @map("plan_id") @db.VarChar(50)
+  status          String @default("active") @db.VarChar(50)
+  billingInterval String @default("monthly") @map("billing_interval") @db.VarChar(20)
+
+  // Billing period
+  currentPeriodStart DateTime? @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd   DateTime? @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt         DateTime? @map("canceled_at") @db.Timestamptz(6)
+
+  // Trial
+  trialStart DateTime? @map("trial_start") @db.Timestamptz(6)
+  trialEnd   DateTime? @map("trial_end") @db.Timestamptz(6)
+
+  // Custom limits override
+  customLimits Json? @map("custom_limits") @db.JsonB
+
+  // Metadata
+  metadata Json @default("{}") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  invoices Invoice[]
+
+  @@index([organizationId])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+  @@index([planId])
+  @@map("subscriptions")
+}
+
+/// Invoice (Billing invoices synced from Stripe)
+model Invoice {
+  id             String  @id @default(uuid()) @db.Uuid
+  subscriptionId String? @map("subscription_id") @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+
+  // Stripe IDs
+  stripeInvoiceId       String? @unique @map("stripe_invoice_id") @db.VarChar(255)
+  stripePaymentIntentId String? @map("stripe_payment_intent_id") @db.VarChar(255)
+
+  // Invoice details
+  number   String? @db.VarChar(100)
+  status   String  @default("draft") @db.VarChar(50)
+  amount   Int     @default(0) // In cents
+  currency String  @default("usd") @db.VarChar(3)
+
+  // Dates
+  periodStart DateTime  @map("period_start") @db.Timestamptz(6)
+  periodEnd   DateTime  @map("period_end") @db.Timestamptz(6)
+  dueDate     DateTime? @map("due_date") @db.Timestamptz(6)
+  paidAt      DateTime? @map("paid_at") @db.Timestamptz(6)
+
+  // URLs
+  hostedInvoiceUrl String? @map("hosted_invoice_url") @db.Text
+  invoicePdfUrl    String? @map("invoice_pdf_url") @db.Text
+
+  // Line items
+  lineItems Json @default("[]") @map("line_items") @db.JsonB
+  metadata  Json @default("{}") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([organizationId])
+  @@index([stripeInvoiceId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("invoices")
+}
+
+/// UsageRecord (Usage tracking per organization)
+/// Tracks usage metrics per period for billing and limits
+model UsageRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  metric String @db.VarChar(50) // executions, api_requests, storage_bytes, team_members, agents, workflows
+  value  Int    @default(0)
+  period String @db.VarChar(7) // YYYY-MM format
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, metric, period])
+  @@index([organizationId])
+  @@index([metric])
+  @@index([period])
+  @@map("usage_records")
+}
+
+/// OrganizationAIProvider (AI provider preferences per organization)
+/// Stores preferred AI provider, fallback settings, and usage limits
+model OrganizationAIProvider {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @unique @map("organization_id") @db.Uuid
+
+  preferredProvider String  @default("anthropic") @map("preferred_provider") @db.VarChar(50) // anthropic, openai, google-ai, github-models, openrouter
+  fallbackProvider  String? @map("fallback_provider") @db.VarChar(50)
+  autoFallback      Boolean @default(true) @map("auto_fallback")
+
+  // Usage limits (optional)
+  monthlyTokenLimit BigInt? @map("monthly_token_limit")
+  dailyTokenLimit   BigInt? @map("daily_token_limit")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  usageRecords AIProviderUsageRecord[]
+
+  @@index([organizationId])
+  @@map("organization_ai_providers")
+}
+
+/// AIProviderUsageRecord (Token usage tracking per AI request)
+/// Tracks token consumption and costs per provider/model
+model AIProviderUsageRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  aiProviderId   String @map("ai_provider_id") @db.Uuid
+
+  provider     String  @db.VarChar(50) // anthropic, openai, google-ai, github-models, openrouter
+  model        String  @db.VarChar(100) // claude-3-sonnet, gpt-4, gemini-pro, etc.
+  inputTokens  Int     @map("input_tokens")
+  outputTokens Int     @map("output_tokens")
+  totalTokens  Int     @map("total_tokens")
+  costCents    Int     @default(0) @map("cost_cents") // Cost in cents for billing
+  requestType  String? @map("request_type") @db.VarChar(50) // chat, completion, embedding
+
+  // Context
+  sessionId String? @map("session_id") @db.Uuid
+  agentId   String? @map("agent_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  aiProvider OrganizationAIProvider @relation(fields: [aiProviderId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([aiProviderId])
+  @@index([provider])
+  @@index([createdAt(sort: Desc)])
+  @@map("ai_provider_usage_records")
+}
+
+// ============================================================================
+// ONBOARDING TABLES
+// ============================================================================
+
+/// OnboardingState (Tracks organization onboarding progress)
+model OnboardingState {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @unique @map("organization_id") @db.Uuid
+  currentStep    String    @default("company_info") @map("current_step") @db.VarChar(50)
+  completedSteps String[]  @default([]) @map("completed_steps") @db.VarChar(50)
+  skippedSteps   String[]  @default([]) @map("skipped_steps") @db.VarChar(50)
+  data           Json      @default("{}") @db.JsonB
+  templateId     String?   @map("template_id") @db.VarChar(100)
+  lastActivityAt DateTime  @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@index([currentStep])
+  @@map("onboarding_states")
+}
+
+/// OnboardingChecklistItem (Tracks individual checklist item completion)
+model OnboardingChecklistItem {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  itemId         String    @map("item_id") @db.VarChar(100)
+  status         String    @default("pending") @db.VarChar(20) // pending, in_progress, completed, skipped
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  metadata       Json?     @db.JsonB
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, itemId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("onboarding_checklist_items")
+}
+
+// ============================================================================
+// MEMORY TABLES (AI Agent Memory System)
+// ============================================================================
+
+/// EntityMemory (Stores entity-specific memories - people, projects, companies)
+model EntityMemory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  entityType     String   @map("entity_type") @db.VarChar(50) // person, project, company, product, team
+  entityName     String   @map("entity_name") @db.VarChar(255)
+  attributes     Json     @default("{}") @db.JsonB // Key-value pairs
+  relationships  Json     @default("[]") @db.JsonB // Array of {entityId, relationship}
+  notes          Json     @default("[]") @db.JsonB // Array of notes
+  lastMentioned  DateTime @default(now()) @map("last_mentioned") @db.Timestamptz(6)
+  mentionCount   Int      @default(0) @map("mention_count")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@index([organizationId, entityType])
+  @@index([organizationId, entityName])
+  @@index([lastMentioned(sort: Desc)])
+  @@index([mentionCount(sort: Desc)])
+  @@map("entity_memories")
+}
+
+/// Memory (Long-term memory storage with scoping)
+model Memory {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  scope          String    @db.VarChar(50) // user, team, org, project, agent
+  scopeId        String    @map("scope_id") @db.Uuid
+  type           String    @db.VarChar(50) // preference, fact, context, instruction
+  key            String    @db.VarChar(255)
+  value          String    @db.Text
+  importance     String    @default("medium") @db.VarChar(20) // low, medium, high, critical
+  sourceType     String    @default("explicit") @map("source_type") @db.VarChar(50) // explicit, inferred, learned
+  sourceId       String?   @map("source_id") @db.Uuid
+  lastAccessedAt DateTime  @default(now()) @map("last_accessed_at") @db.Timestamptz(6)
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, scope, scopeId, key])
+  @@index([organizationId])
+  @@index([organizationId, scope, scopeId])
+  @@index([key])
+  @@index([expiresAt])
+  @@index([lastAccessedAt(sort: Desc)])
+  @@map("memories")
 }

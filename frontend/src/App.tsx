@@ -38,6 +38,7 @@ import OrgChangesPage from "./pages/OrgChangesPage";
 import OKRPage from "./pages/OKRPage";
 import AgentsPage from "./pages/AgentsPage";
 import SkillsPage from "./pages/SkillsPage";
+import SOPLibraryPage from "./pages/SOPLibraryPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import SearchPage from "./pages/SearchPage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
@@ -235,6 +236,17 @@ function App() {
             <AdminRoute>
               <DashboardLayout>
                 <SkillsPage />
+              </DashboardLayout>
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/sops"
+          element={
+            <AdminRoute>
+              <DashboardLayout>
+                <SOPLibraryPage />
               </DashboardLayout>
             </AdminRoute>
           }
