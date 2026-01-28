@@ -1,26 +1,8 @@
 # Multi-stage build for Kyndof Corp System
+# Note: Frontend is pre-built and committed to git to reduce build memory usage
 
 # ============================================================================
-# Stage 1: Frontend Builder
-# ============================================================================
-FROM node:20-alpine AS frontend-builder
-
-WORKDIR /app/frontend
-
-# Copy frontend package files
-COPY frontend/package*.json ./
-
-# Install frontend dependencies
-RUN npm ci
-
-# Copy frontend source code
-COPY frontend/ ./
-
-# Build frontend (generates dist/ folder)
-RUN npm run build
-
-# ============================================================================
-# Stage 2: Backend Builder
+# Stage 1: Backend Builder
 # ============================================================================
 FROM node:20-alpine AS backend-builder
 
@@ -47,7 +29,7 @@ COPY src ./src
 RUN npm run build
 
 # ============================================================================
-# Stage 3: Production Runtime
+# Stage 2: Production Runtime
 # ============================================================================
 FROM node:20-alpine AS runtime
 
@@ -76,8 +58,8 @@ RUN npx prisma generate
 # Copy built application from backend-builder
 COPY --from=backend-builder /app/dist ./dist
 
-# Copy built frontend from frontend-builder
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+# Copy pre-built frontend (committed to git)
+COPY frontend/dist ./frontend/dist
 
 # Copy landing page
 COPY landing ./landing
