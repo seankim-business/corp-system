@@ -1,0 +1,105 @@
+schema_version: "1.0"
+kind: SOP
+
+metadata:
+  id: employee-onboarding
+  name: 신규 직원 온보딩
+  function: hr
+  owner: hr-team-lead
+  version: 1.0.0
+
+triggers:
+  - pattern: "신규 직원 온보딩"
+  - pattern: "입사자 온보딩"
+  - pattern: "new employee onboarding"
+
+steps:
+  - id: document-collection
+    name: 입사 서류 수집
+    description: 신규 직원의 필수 서류를 수집합니다.
+    type: manual
+    requires_approval: false
+    assignee: hr-specialist
+    checklist:
+      - 신분증 사본
+      - 통장 사본
+      - 졸업증명서
+      - 경력증명서
+
+  - id: account-creation
+    name: 계정 생성
+    description: IT 시스템 계정을 생성합니다.
+    type: automated
+    agent: hr-agent
+    tool: create_accounts
+    input:
+      email: "{{employee.email}}"
+      name: "{{employee.name}}"
+      department: "{{employee.department}}"
+      systems:
+        - google_workspace
+        - slack
+        - notion
+    timeout: 30m
+
+  - id: equipment-setup
+    name: 장비 설정
+    description: 업무용 장비를 준비하고 설정합니다.
+    type: approval_required
+    approver: ops-team-lead
+    timeout: 48h
+    input:
+      laptop_type: "{{employee.equipment_type}}"
+      accessories:
+        - 모니터
+        - 키보드
+        - 마우스
+
+  - id: orientation-schedule
+    name: 오리엔테이션 일정
+    description: 신규 직원 오리엔테이션 일정을 수립합니다.
+    type: manual
+    requires_approval: false
+    assignee: hr-manager
+    checklist:
+      - 회사 소개
+      - 부서 소개
+      - 시스템 교육
+      - 복리후생 안내
+
+  - id: buddy-assignment
+    name: 버디 배정
+    description: 신규 직원에게 버디를 배정합니다.
+    type: approval_required
+    approver: department-lead
+    timeout: 24h
+    input:
+      buddy_criteria:
+        - 같은 부서
+        - 2년 이상 근속
+
+  - id: welcome-notification
+    name: 입사 환영 공지
+    description: 전사에 신규 입사자를 공지합니다.
+    type: automated
+    agent: hr-agent
+    tool: notify_slack
+    input:
+      channel: "#general"
+      message: |
+        새로운 가족을 소개합니다!
+        이름: {{employee.name}}
+        부서: {{employee.department}}
+        포지션: {{employee.position}}
+
+exception_handling:
+  - condition: "step.failed"
+    action: notify_owner
+    message: "HR SOP 단계 실패: {{step.name}}"
+  - condition: "documents.missing"
+    action: send_reminder
+    target: "{{employee.email}}"
+    message: "누락된 서류가 있습니다: {{missing_documents}}"
+  - condition: "step.timeout"
+    action: escalate
+    target: hr-team-lead

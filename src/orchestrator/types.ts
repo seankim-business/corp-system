@@ -18,13 +18,15 @@ export interface OrchestrationRequest {
 
 export interface OrchestrationResult {
   output: string;
-  status: "success" | "failed";
+  status: "success" | "failed" | "pending";
   metadata: {
     category: Category;
     skills: Skill[];
     duration: number;
     model: string;
     sessionId: string;
+    approvalId?: string;
+    approvalType?: string;
   };
 }
 

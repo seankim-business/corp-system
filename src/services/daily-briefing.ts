@@ -8,6 +8,8 @@ import { WebClient } from "@slack/web-api";
 import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
 import { getSlackIntegrationByOrg } from "../api/slack-integration";
+import { getActiveAlerts, ProactiveAlert } from "./proactive-monitor";
+import { getLearningInsights, LearningInsight } from "./learning-system";
 
 export interface DailyBriefingData {
   pendingApprovals: {
@@ -36,6 +38,22 @@ export interface DailyBriefingData {
     enabledWorkflows: number;
     executionsToday: number;
     successRate: number;
+  };
+  proactiveAlerts: {
+    total: number;
+    items: Array<{
+      type: string;
+      severity: string;
+      title: string;
+      suggestedActions: string[];
+    }>;
+  };
+  learningInsights: {
+    total: number;
+    items: Array<{
+      insight: string;
+      suggestedAutomation?: string;
+    }>;
   };
 }
 
@@ -152,6 +170,13 @@ export async function generateDailyBriefing(
     },
   });
 
+  const [alerts, insights] = await Promise.all([
+    getActiveAlerts(organizationId),
+    getLearningInsights(organizationId),
+  ]);
+
+  const unacknowledgedAlerts = alerts.filter((a: ProactiveAlert) => !a.acknowledgedAt);
+
   return {
     pendingApprovals: {
       total: totalPendingApprovals,
@@ -179,6 +204,22 @@ export async function generateDailyBriefing(
       enabledWorkflows,
       executionsToday,
       successRate,
+    },
+    proactiveAlerts: {
+      total: unacknowledgedAlerts.length,
+      items: unacknowledgedAlerts.slice(0, 5).map((a: ProactiveAlert) => ({
+        type: a.type,
+        severity: a.severity,
+        title: a.title,
+        suggestedActions: a.suggestedActions,
+      })),
+    },
+    learningInsights: {
+      total: insights.length,
+      items: insights.slice(0, 3).map((i: LearningInsight) => ({
+        insight: i.insight,
+        suggestedAutomation: i.suggestedAutomation,
+      })),
     },
   };
 }
@@ -318,6 +359,53 @@ export function formatDailyBriefingBlocks(
     ],
   });
 
+  if (data.proactiveAlerts.total > 0) {
+    blocks.push({ type: "divider" });
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Proactive Alerts* (${data.proactiveAlerts.total})`,
+      },
+    });
+
+    for (const alert of data.proactiveAlerts.items) {
+      const severityEmoji = alert.severity === "critical" ? ":rotating_light:" : ":warning:";
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `${severityEmoji} *${alert.title}*\n_Suggested: ${alert.suggestedActions[0] || "Review the issue"}_`,
+        },
+      });
+    }
+  }
+
+  if (data.learningInsights.total > 0) {
+    blocks.push({ type: "divider" });
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Learning Insights* :bulb:`,
+      },
+    });
+
+    for (const insight of data.learningInsights.items) {
+      let text = `• ${insight.insight}`;
+      if (insight.suggestedAutomation) {
+        text += `\n  _Suggestion: ${insight.suggestedAutomation}_`;
+      }
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text,
+        },
+      });
+    }
+  }
+
   blocks.push({ type: "divider" });
   blocks.push({
     type: "context",
@@ -329,7 +417,8 @@ export function formatDailyBriefingBlocks(
     ],
   });
 
-  const summaryText = `Daily briefing: ${data.pendingApprovals.total} pending approvals, ${data.recentExecutions.total} recent executions, ${data.workflowStats.executionsToday} workflow runs today.`;
+  const alertText = data.proactiveAlerts.total > 0 ? `, ${data.proactiveAlerts.total} alerts` : "";
+  const summaryText = `Daily briefing: ${data.pendingApprovals.total} pending approvals, ${data.recentExecutions.total} recent executions, ${data.workflowStats.executionsToday} workflow runs today${alertText}.`;
 
   return { text: summaryText, blocks };
 }

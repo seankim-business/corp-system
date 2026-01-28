@@ -1,0 +1,38 @@
+name: product-launch
+version: "1.0.0"
+description: "Product launch workflow with analysis, parallel prep, budget check, and approval"
+defaultTimeout: 300000
+
+nodes:
+  - id: analyze
+    type: agent
+    agentId: product-agent
+    timeout: 60000
+
+  - id: parallel-prep
+    type: parallel
+    parallelAgents:
+      - brand-agent
+      - ops-agent
+    timeout: 120000
+
+  - id: budget-check
+    type: agent
+    agentId: finance-agent
+    timeout: 60000
+
+  - id: approval
+    type: human_approval
+    approvalType: product_launch
+
+edges:
+  - from: START
+    to: analyze
+  - from: analyze
+    to: parallel-prep
+  - from: parallel-prep
+    to: budget-check
+  - from: budget-check
+    to: approval
+  - from: approval
+    to: END

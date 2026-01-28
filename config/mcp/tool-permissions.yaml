@@ -1,0 +1,72 @@
+tool_permissions:
+  notion__getTasks:
+    allowed_agents: [brand-agent, ops-agent, cs-agent]
+
+  notion__createTask:
+    allowed_agents: [brand-agent, ops-agent]
+
+  notion__updateTask:
+    allowed_agents: [brand-agent, ops-agent]
+
+  notion__deleteTask:
+    allowed_agents: [brand-agent]
+    requires_approval:
+      condition: "action == 'delete'"
+      approver: function_owner
+
+  notion__createPage:
+    allowed_agents: [brand-agent]
+    requires_approval:
+      condition: "database == 'official-docs'"
+      approver: function_owner
+
+  github__getIssues:
+    allowed_agents: [all]
+
+  github__createIssue:
+    allowed_agents: [all]
+
+  github__updateIssue:
+    allowed_agents: [all]
+
+  github__getPullRequests:
+    allowed_agents: [all]
+
+  github__createPullRequest:
+    allowed_agents: [all]
+    requires_approval:
+      condition: "target_branch == 'main'"
+      approver: tech_lead
+
+  github__getRepositories:
+    allowed_agents: [all]
+
+  github__getFile:
+    allowed_agents: [all]
+
+  linear__getIssues:
+    allowed_agents: [product-agent, ops-agent]
+
+  linear__createIssue:
+    allowed_agents: [product-agent]
+
+  linear__updateIssue:
+    allowed_agents: [product-agent, ops-agent]
+
+  linear__getTeams:
+    allowed_agents: [all]
+
+  drive__listFiles:
+    allowed_agents: [all]
+
+  drive__readFile:
+    allowed_agents: [all]
+
+  drive__readSheet:
+    allowed_agents: [all]
+
+  drive__writeSheet:
+    allowed_agents: [finance-agent]
+    requires_approval:
+      condition: "amount > 1000000"
+      approver: function_owner

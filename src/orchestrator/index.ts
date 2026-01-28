@@ -22,6 +22,7 @@ import {
   updateSpend,
 } from "../services/budget-enforcer";
 import { recordBudgetDowngrade, recordBudgetRejection, recordAiRequest } from "../services/metrics";
+import { checkApprovalRequired, createApprovalRequest } from "../services/approval-checker";
 
 const tracer = trace.getTracer("orchestrator");
 
@@ -288,6 +289,61 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
           },
         };
         return failureResult;
+      }
+
+      const approvalCheck = await checkApprovalRequired(organizationId, userRequest, userId);
+      if (approvalCheck.required && approvalCheck.suggestedApprover) {
+        const approvalId = await createApprovalRequest(
+          organizationId,
+          userId,
+          approvalCheck.suggestedApprover,
+          approvalCheck.type!,
+          `Approval required: ${userRequest.substring(0, 100)}`,
+          userRequest,
+          {
+            category: categorySelection.category,
+            skills,
+            estimatedValue: approvalCheck.estimatedValue,
+          },
+        );
+
+        logger.info("Approval request created, halting execution", {
+          approvalId,
+          approvalType: approvalCheck.type,
+          reason: approvalCheck.reason,
+        });
+
+        await saveExecution({
+          organizationId,
+          userId,
+          sessionId,
+          category: categorySelection.category,
+          skills,
+          prompt: userRequest,
+          result: `Approval required: ${approvalCheck.reason}`,
+          status: "pending_approval",
+          duration: 0,
+          metadata: {
+            approvalId,
+            approvalType: approvalCheck.type,
+            approvalReason: approvalCheck.reason,
+            suggestedApprover: approvalCheck.suggestedApprover,
+          },
+        });
+
+        return {
+          output: `This request requires ${approvalCheck.type} approval. An approval request has been sent to your administrator. You will be notified when it's approved.`,
+          status: "pending" as const,
+          metadata: {
+            category: categorySelection.category,
+            skills,
+            duration: 0,
+            model: "none",
+            sessionId,
+            approvalId,
+            approvalType: approvalCheck.type,
+          },
+        };
       }
 
       const result = await tracer.startActiveSpan("orchestrator.execute", async (execSpan) => {

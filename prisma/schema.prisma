@@ -654,6 +654,53 @@ model Approval {
 }
 
 // ============================================================================
+// PERMISSION DELEGATION TABLES
+// ============================================================================
+
+/// Delegations (Permission transfers between users)
+model Delegation {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  delegatorId    String    @map("delegator_id") @db.Uuid
+  delegateeId    String    @map("delegatee_id") @db.Uuid
+  permissions    String[]  @db.VarChar(100)
+  scope          Json?     @db.JsonB
+  validFrom      DateTime  @map("valid_from") @db.Timestamptz(6)
+  validUntil     DateTime  @map("valid_until") @db.Timestamptz(6)
+  reason         String    @db.Text
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+  revokedReason  String?   @map("revoked_reason") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId, delegateeId])
+  @@index([organizationId, delegatorId])
+  @@index([delegateeId, validUntil])
+  @@index([validUntil])
+  @@map("delegations")
+}
+
+/// Agent Permission Overrides (Custom permissions for specific agents)
+model AgentPermissionOverride {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  agentId        String   @map("agent_id") @db.Uuid
+  readPatterns   String[] @default([]) @map("read_patterns") @db.VarChar(255)
+  writePatterns  String[] @default([]) @map("write_patterns") @db.VarChar(255)
+  tools          String[] @default([]) @db.VarChar(255)
+  restricted     String[] @default([]) @db.VarChar(255)
+  approvalRules  Json?    @map("approval_rules") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, agentId])
+  @@index([organizationId])
+  @@index([agentId])
+  @@map("agent_permission_overrides")
+}
+
+// ============================================================================
 // OKR (OBJECTIVES AND KEY RESULTS) TABLES
 // ============================================================================
 
@@ -739,6 +786,21 @@ model DriveConnection {
 
   @@index([organizationId])
   @@map("drive_connections")
+}
+
+/// Google Calendar Connections (Google Calendar OAuth connections)
+model GoogleCalendarConnection {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @unique @map("organization_id") @db.Uuid
+  accessToken    String    @map("access_token") @db.Text // Encrypted
+  refreshToken   String?   @map("refresh_token") @db.Text // Encrypted
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
+  calendarId     String?   @map("calendar_id") @db.VarChar(255) // Primary calendar ID (usually email)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@map("google_calendar_connections")
 }
 
 // ============================================================================

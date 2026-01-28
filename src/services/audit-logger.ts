@@ -26,7 +26,13 @@ export type AuditAction =
   | "approval.created"
   | "approval.approved"
   | "approval.rejected"
-  | "approval.expired";
+  | "approval.expired"
+  | "delegation.created"
+  | "delegation.revoked"
+  | "delegation.expired"
+  | "agent.permission_denied"
+  | "agent.approval_required"
+  | "workflow.exception";
 
 export interface AuditLogEntry {
   id?: string;

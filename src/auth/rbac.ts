@@ -8,6 +8,16 @@
  * - admin: All permissions except org deletion and billing management
  * - member: CRUD on own resources, execute workflows
  * - viewer: Read-only access
+ *
+ * AGENT PERMISSIONS:
+ * - Agents have resource-based permissions (read/write patterns)
+ * - Agents have tool-level permissions (allowed MCP tools)
+ * - Some operations require approval based on conditions
+ *
+ * DELEGATION:
+ * - Users can delegate their permissions to other users
+ * - Delegations are time-limited and scope-restricted
+ * - Delegations are tracked in audit logs
  */
 
 // =============================================================================
@@ -335,4 +345,214 @@ export function isRoleAtLeast(role: string, minimumRole: Role): boolean {
     return false;
   }
   return ROLE_HIERARCHY[role as Role] >= ROLE_HIERARCHY[minimumRole];
+}
+
+// =============================================================================
+// AGENT PERMISSIONS
+// =============================================================================
+
+export interface ApprovalRequirement {
+  pattern: string;
+  condition?: string; // e.g., "amount > 1000000"
+}
+
+export interface AgentPermissions {
+  agentId: string;
+  organizationId: string;
+  read: string[]; // Resource patterns (e.g., "workflow:*", "execution:own")
+  write: string[]; // Resource patterns
+  tools: string[]; // Allowed MCP tools (e.g., "notion:*", "slack:sendMessage")
+  restricted: string[]; // Explicitly denied patterns (overrides read/write)
+  approvalRequired: ApprovalRequirement[];
+}
+
+export const DEFAULT_AGENT_PERMISSIONS: Omit<AgentPermissions, "agentId" | "organizationId"> = {
+  read: ["workflow:own", "execution:own"],
+  write: [],
+  tools: [],
+  restricted: ["billing:*", "member:*", "org:*"],
+  approvalRequired: [],
+};
+
+// =============================================================================
+// DELEGATION
+// =============================================================================
+
+export interface DelegationScope {
+  resourceTypes?: string[]; // e.g., ["workflow", "execution"]
+  resourceIds?: string[]; // Specific resource IDs
+  maxAmount?: number; // For budget-related delegations
+  conditions?: Record<string, unknown>; // Custom conditions
+}
+
+export interface Delegation {
+  id: string;
+  organizationId: string;
+  delegatorId: string; // Who is delegating
+  delegateeId: string; // Who receives authority
+  permissions: string[]; // Which permissions (e.g., ["approval:respond", "workflow:execute"])
+  scope?: DelegationScope;
+  validFrom: Date;
+  validUntil: Date;
+  reason: string;
+  createdAt: Date;
+  revokedAt?: Date;
+  revokedBy?: string;
+  revokedReason?: string;
+}
+
+// =============================================================================
+// AGENT PERMISSION CHECKS
+// =============================================================================
+
+function matchesPattern(resource: string, pattern: string): boolean {
+  if (pattern === "*") return true;
+  if (pattern === resource) return true;
+
+  const patternParts = pattern.split(":");
+  const resourceParts = resource.split(":");
+
+  if (patternParts.length !== resourceParts.length) return false;
+
+  return patternParts.every((part, i) => {
+    if (part === "*") return true;
+    return part === resourceParts[i];
+  });
+}
+
+export function checkAgentResourcePermission(
+  agentPermissions: AgentPermissions,
+  resource: string,
+  action: "read" | "write",
+): boolean {
+  // Check restricted patterns first (deny list)
+  if (agentPermissions.restricted.some((pattern) => matchesPattern(resource, pattern))) {
+    return false;
+  }
+
+  // Check allowed patterns
+  const patterns = action === "read" ? agentPermissions.read : agentPermissions.write;
+  return patterns.some((pattern) => matchesPattern(resource, pattern));
+}
+
+export function checkAgentToolPermission(
+  agentPermissions: AgentPermissions,
+  tool: string,
+): boolean {
+  // Check restricted patterns first
+  if (agentPermissions.restricted.some((pattern) => matchesPattern(tool, pattern))) {
+    return false;
+  }
+
+  return agentPermissions.tools.some((pattern) => matchesPattern(tool, pattern));
+}
+
+export function checkApprovalRequired(
+  agentPermissions: AgentPermissions,
+  resource: string,
+  context?: Record<string, unknown>,
+): ApprovalRequirement | null {
+  for (const requirement of agentPermissions.approvalRequired) {
+    if (matchesPattern(resource, requirement.pattern)) {
+      // If there's a condition, evaluate it
+      if (requirement.condition && context) {
+        if (evaluateCondition(requirement.condition, context)) {
+          return requirement;
+        }
+      } else if (!requirement.condition) {
+        return requirement;
+      }
+    }
+  }
+  return null;
+}
+
+function evaluateCondition(condition: string, context: Record<string, unknown>): boolean {
+  // Simple condition evaluator for expressions like "amount > 1000000"
+  // Supports: >, <, >=, <=, ==, !=
+  const operators = [">=", "<=", "!=", "==", ">", "<"];
+
+  for (const op of operators) {
+    if (condition.includes(op)) {
+      const [field, valueStr] = condition.split(op).map((s) => s.trim());
+      const contextValue = context[field];
+      const compareValue = parseFloat(valueStr) || valueStr;
+
+      if (contextValue === undefined) return false;
+
+      switch (op) {
+        case ">":
+          return Number(contextValue) > Number(compareValue);
+        case "<":
+          return Number(contextValue) < Number(compareValue);
+        case ">=":
+          return Number(contextValue) >= Number(compareValue);
+        case "<=":
+          return Number(contextValue) <= Number(compareValue);
+        case "==":
+          return contextValue === compareValue;
+        case "!=":
+          return contextValue !== compareValue;
+      }
+    }
+  }
+
+  return false;
+}
+
+// =============================================================================
+// DELEGATION CHECKS
+// =============================================================================
+
+export function isDelegationValid(delegation: Delegation): boolean {
+  const now = new Date();
+  return !delegation.revokedAt && delegation.validFrom <= now && delegation.validUntil > now;
+}
+
+export function checkDelegatedPermission(
+  delegation: Delegation,
+  permission: string,
+  resource?: { type?: string; id?: string; amount?: number },
+): boolean {
+  // Check if delegation is still valid
+  if (!isDelegationValid(delegation)) {
+    return false;
+  }
+
+  // Check if the permission is delegated
+  if (!delegation.permissions.includes(permission) && !delegation.permissions.includes("*")) {
+    return false;
+  }
+
+  // Check scope restrictions if present
+  if (delegation.scope && resource) {
+    // Check resource type restriction
+    if (
+      delegation.scope.resourceTypes &&
+      resource.type &&
+      !delegation.scope.resourceTypes.includes(resource.type)
+    ) {
+      return false;
+    }
+
+    // Check resource ID restriction
+    if (
+      delegation.scope.resourceIds &&
+      resource.id &&
+      !delegation.scope.resourceIds.includes(resource.id)
+    ) {
+      return false;
+    }
+
+    // Check max amount restriction
+    if (
+      delegation.scope.maxAmount !== undefined &&
+      resource.amount !== undefined &&
+      resource.amount > delegation.scope.maxAmount
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }

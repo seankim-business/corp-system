@@ -5,6 +5,7 @@ import { slackEventQueue } from "./slack-event.queue";
 import { orchestrationQueue } from "./orchestration.queue";
 import { notificationQueue } from "./notification.queue";
 import { deadLetterQueue } from "./dead-letter.queue";
+import { scheduledTaskQueue } from "./scheduled-task.queue";
 
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/admin/queues");
@@ -15,6 +16,7 @@ createBullBoard({
     new BullMQAdapter(orchestrationQueue.getQueue()),
     new BullMQAdapter(notificationQueue.getQueue()),
     new BullMQAdapter(deadLetterQueue.getQueue()),
+    new BullMQAdapter(scheduledTaskQueue.getQueue()),
   ],
   serverAdapter,
 });

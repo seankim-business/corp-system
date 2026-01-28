@@ -438,4 +438,8 @@ export const redis = {
       throw error;
     }
   },
+
+  async setex(key: string, ttl: number, value: string): Promise<boolean> {
+    return this.set(key, value, ttl);
+  },
 };

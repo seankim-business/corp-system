@@ -1,0 +1,114 @@
+schema_version: "1.0"
+kind: SOP
+
+metadata:
+  id: campaign-brief
+  name: 캠페인 브리프 작성
+  function: brand
+  owner: brand-team-lead
+  version: 1.1.0
+
+triggers:
+  - pattern: "캠페인 브리프"
+  - pattern: "마케팅 캠페인 시작"
+  - pattern: "campaign brief"
+
+steps:
+  - id: objective-definition
+    name: 캠페인 목표 정의
+    description: 캠페인의 목표와 KPI를 정의합니다.
+    type: manual
+    requires_approval: false
+    assignee: brand-manager
+    checklist:
+      - 비즈니스 목표 확인
+      - 타겟 고객 정의
+      - 성공 지표(KPI) 설정
+      - 예산 범위 확인
+
+  - id: market-research
+    name: 시장 조사
+    description: 경쟁사 및 시장 동향을 분석합니다.
+    type: automated
+    agent: brand-agent
+    tool: market_analysis
+    input:
+      industry: "{{campaign.industry}}"
+      competitors: "{{campaign.competitors}}"
+      keywords: "{{campaign.keywords}}"
+    timeout: 2h
+
+  - id: creative-concept
+    name: 크리에이티브 컨셉 개발
+    description: 캠페인의 핵심 메시지와 비주얼 컨셉을 개발합니다.
+    type: manual
+    requires_approval: true
+    approver: creative-director
+    timeout: 72h
+    checklist:
+      - 핵심 메시지 도출
+      - 무드보드 작성
+      - 비주얼 방향성 설정
+      - 톤앤매너 가이드
+
+  - id: budget-approval
+    name: 예산 승인
+    description: Finance 팀의 예산 승인을 받습니다.
+    type: approval_required
+    approver: finance-team-lead
+    timeout: 48h
+    input:
+      budget_amount: "{{campaign.budget}}"
+      budget_breakdown:
+        media: "{{campaign.media_budget}}"
+        creative: "{{campaign.creative_budget}}"
+        production: "{{campaign.production_budget}}"
+
+  - id: channel-planning
+    name: 채널 계획 수립
+    description: 캠페인 집행 채널과 일정을 계획합니다.
+    type: manual
+    requires_approval: false
+    assignee: media-planner
+    checklist:
+      - 채널 선정
+      - 미디어 믹스 설계
+      - 집행 일정 수립
+      - 예산 배분
+
+  - id: brief-finalization
+    name: 브리프 최종 확정
+    description: 모든 이해관계자의 최종 승인을 받습니다.
+    type: approval_required
+    approver: brand-team-lead
+    timeout: 24h
+    required_approvals:
+      - brand-team-lead
+      - creative-director
+
+  - id: kickoff-notification
+    name: 킥오프 공지
+    description: 관련 팀에 캠페인 킥오프를 공지합니다.
+    type: automated
+    agent: brand-agent
+    tool: notify_slack
+    input:
+      channel: "#marketing"
+      message: |
+        캠페인 브리프가 확정되었습니다!
+        캠페인명: {{campaign.name}}
+        목표: {{campaign.objective}}
+        기간: {{campaign.start_date}} ~ {{campaign.end_date}}
+
+exception_handling:
+  - condition: "approval.rejected"
+    action: request_revision
+    notify: brand-manager
+    message: "브리프 수정이 필요합니다: {{rejection_reason}}"
+  - condition: "budget.exceeded"
+    action: escalate
+    target: finance-team-lead
+    message: "예산 초과 검토 필요: {{budget_overage}}"
+  - condition: "step.timeout"
+    action: notify_owner
+    message: "단계 지연: {{step.name}} - {{elapsed_time}}"

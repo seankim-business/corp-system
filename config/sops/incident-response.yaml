@@ -1,0 +1,164 @@
+schema_version: "1.0"
+kind: SOP
+
+metadata:
+  id: incident-response
+  name: 장애 대응
+  function: ops
+  owner: ops-team-lead
+  version: 2.0.0
+
+triggers:
+  - pattern: "장애 발생"
+  - pattern: "서비스 장애"
+  - pattern: "incident"
+  - pattern: "system down"
+
+steps:
+  - id: incident-detection
+    name: 장애 감지 및 분류
+    description: 장애를 감지하고 심각도를 분류합니다.
+    type: automated
+    agent: ops-agent
+    tool: incident_classifier
+    input:
+      alert_source: "{{incident.source}}"
+      metrics: "{{incident.metrics}}"
+      affected_services: "{{incident.services}}"
+    output:
+      severity: enum # P1, P2, P3, P4
+      category: string
+      affected_users: number
+    timeout: 5m
+
+  - id: initial-notification
+    name: 초기 알림
+    description: 관련 팀에 장애 발생을 알립니다.
+    type: automated
+    agent: ops-agent
+    tool: incident_broadcast
+    input:
+      channels:
+        - "#incident-response"
+        - "#engineering"
+      severity: "{{severity}}"
+      message: |
+        [{{severity}}] 장애 발생
+        영향 서비스: {{incident.services}}
+        영향 사용자: {{affected_users}}
+        상태: 조사 중
+    timeout: 2m
+
+  - id: team-assembly
+    name: 대응팀 소집
+    description: 심각도에 따라 대응팀을 소집합니다.
+    type: automated
+    agent: ops-agent
+    tool: page_oncall
+    conditional:
+      when: "{{severity}} in ['P1', 'P2']"
+    input:
+      escalation_policy: "{{severity}}-policy"
+      message: "긴급 대응 필요: {{incident.title}}"
+    timeout: 5m
+
+  - id: root-cause-analysis
+    name: 원인 분석
+    description: 장애의 근본 원인을 분석합니다.
+    type: manual
+    requires_approval: false
+    assignee: oncall-engineer
+    timeout: 30m
+    checklist:
+      - 로그 분석
+      - 메트릭 확인
+      - 최근 배포 확인
+      - 외부 의존성 확인
+
+  - id: mitigation
+    name: 장애 완화
+    description: 장애 영향을 최소화하는 조치를 취합니다.
+    type: approval_required
+    approver: ops-team-lead
+    timeout: 15m
+    conditional:
+      when: "{{mitigation_action.risk}} == 'high'"
+    input:
+      action_type: "{{mitigation_action.type}}"
+      rollback_plan: "{{mitigation_action.rollback}}"
+
+  - id: status-update
+    name: 상태 업데이트
+    description: 고객과 이해관계자에게 상태를 업데이트합니다.
+    type: automated
+    agent: ops-agent
+    tool: status_page_update
+    input:
+      status: "{{incident.status}}"
+      message: "{{status_message}}"
+      eta: "{{resolution_eta}}"
+    timeout: 5m
+
+  - id: resolution-verification
+    name: 해결 확인
+    description: 장애가 해결되었는지 확인합니다.
+    type: manual
+    requires_approval: true
+    approver: oncall-engineer
+    timeout: 30m
+    checklist:
+      - 서비스 정상 작동 확인
+      - 메트릭 정상화 확인
+      - 영향받은 기능 테스트
+      - 모니터링 알림 해제
+
+  - id: post-incident-review
+    name: 사후 분석 예약
+    description: 장애 사후 분석 미팅을 예약합니다.
+    type: automated
+    agent: ops-agent
+    tool: schedule_meeting
+    conditional:
+      when: "{{severity}} in ['P1', 'P2']"
+    input:
+      title: "PIR: {{incident.title}}"
+      attendees: "{{incident.responders}}"
+      duration: 60m
+      within_days: 3
+
+  - id: final-notification
+    name: 종료 알림
+    description: 장애 종료를 공지합니다.
+    type: automated
+    agent: ops-agent
+    tool: incident_broadcast
+    input:
+      channels:
+        - "#incident-response"
+        - "#engineering"
+        - "#general"
+      message: |
+        [RESOLVED] {{incident.title}}
+        원인: {{root_cause}}
+        해결: {{resolution}}
+        총 영향 시간: {{incident.duration}}
+
+exception_handling:
+  - condition: "severity.escalated"
+    action: page_executive
+    target: cto
+    when: "{{severity}} == 'P1' && {{duration}} >= 30m"
+    message: "P1 장애 30분 경과: {{incident.title}}"
+  - condition: "mitigation.failed"
+    action: escalate_and_retry
+    target: senior-engineer
+    message: "완화 조치 실패: {{mitigation_action}}"
+  - condition: "communication.delayed"
+    action: auto_update
+    message: "자동 상태 업데이트: 조사 진행 중"
+  - condition: "step.timeout"
+    action: escalate
+    target: ops-team-lead
+    message: "대응 단계 지연: {{step.name}}"
+  - condition: "step.failed"
+    action: notify_owner

@@ -1,0 +1,135 @@
+schema_version: "1.0"
+kind: SOP
+
+metadata:
+  id: contract-review
+  name: 계약서 검토
+  function: finance
+  owner: finance-team-lead
+  version: 1.0.0
+
+triggers:
+  - pattern: "계약서 검토"
+  - pattern: "계약 검토 요청"
+  - pattern: "contract review"
+
+steps:
+  - id: document-receipt
+    name: 계약서 접수
+    description: 검토할 계약서를 접수하고 분류합니다.
+    type: automated
+    agent: finance-agent
+    tool: document_intake
+    input:
+      document_type: contract
+      source: "{{contract.source}}"
+      priority: "{{contract.priority}}"
+    timeout: 15m
+
+  - id: initial-review
+    name: 초기 검토
+    description: 계약서의 기본 조건을 검토합니다.
+    type: manual
+    requires_approval: false
+    assignee: finance-specialist
+    checklist:
+      - 계약 당사자 확인
+      - 계약 기간 확인
+      - 금액 및 지급 조건 확인
+      - 필수 조항 포함 여부
+
+  - id: risk-assessment
+    name: 리스크 평가
+    description: 계약의 잠재적 리스크를 평가합니다.
+    type: automated
+    agent: finance-agent
+    tool: risk_analysis
+    input:
+      contract_value: "{{contract.value}}"
+      contract_type: "{{contract.type}}"
+      counterparty: "{{contract.counterparty}}"
+    output:
+      risk_score: number
+      risk_factors: array
+    timeout: 30m
+
+  - id: legal-review
+    name: 법률 검토
+    description: 법무 팀의 법률 검토를 진행합니다.
+    type: approval_required
+    approver: legal-counsel
+    timeout: 72h
+    conditional:
+      when: "{{risk_score}} >= 7"
+    checklist:
+      - 법적 용어 검토
+      - 책임 조항 검토
+      - 분쟁 해결 조항 검토
+      - 지적재산권 조항 검토
+
+  - id: financial-review
+    name: 재무 검토
+    description: CFO의 재무적 관점 검토를 진행합니다.
+    type: approval_required
+    approver: cfo
+    timeout: 48h
+    conditional:
+      when: "{{contract.value}} >= 100000000"
+    input:
+      financial_impact: "{{contract.financial_impact}}"
+      budget_alignment: "{{contract.budget_code}}"
+
+  - id: negotiation-points
+    name: 협상 포인트 정리
+    description: 수정이 필요한 조항을 정리합니다.
+    type: manual
+    requires_approval: false
+    assignee: finance-manager
+    conditional:
+      when: "{{requires_negotiation}}"
+    checklist:
+      - 수정 요청 조항 목록
+      - 협상 우선순위 설정
+      - 대안 조건 준비
+
+  - id: final-approval
+    name: 최종 승인
+    description: 계약서 최종 승인을 진행합니다.
+    type: approval_required
+    approver: finance-team-lead
+    timeout: 24h
+    input:
+      approval_type: final
+      required_signatures:
+        - finance-team-lead
+        - department-head
+
+  - id: completion-notification
+    name: 검토 완료 알림
+    description: 계약서 검토 완료를 알립니다.
+    type: automated
+    agent: finance-agent
+    tool: notify_slack
+    input:
+      channel: "#finance"
+      message: |
+        계약서 검토가 완료되었습니다.
+        계약명: {{contract.name}}
+        상대방: {{contract.counterparty}}
+        결과: {{review_result}}
+
+exception_handling:
+  - condition: "risk_score.critical"
+    action: halt_and_escalate
+    target: cfo
+    message: "고위험 계약 감지: {{contract.name}} (Risk Score: {{risk_score}})"
+  - condition: "approval.rejected"
+    action: return_to_step
+    step: negotiation-points
+    message: "계약 조건 재협상 필요"
+  - condition: "deadline.approaching"
+    action: notify_owner
+    when: "{{remaining_time}} <= 24h"
+    message: "계약 검토 마감 임박: {{contract.deadline}}"
+  - condition: "step.failed"
+    action: notify_owner
