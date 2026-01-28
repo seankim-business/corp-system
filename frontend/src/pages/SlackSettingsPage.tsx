@@ -39,6 +39,8 @@ export default function SlackSettingsPage() {
         invalid_state: "Invalid state parameter. Please try again.",
         token_exchange_failed: "Failed to exchange token with Slack",
         server_error: "Server error occurred. Please try again.",
+        slack_not_configured:
+          "Slack integration is not yet configured for this deployment. Please contact your administrator to set up Slack credentials (SLACK_CLIENT_ID, SLACK_CLIENT_SECRET).",
       };
       setMessage({ type: "error", text: errorMessages[error] || `Error: ${error}` });
       setSearchParams({});

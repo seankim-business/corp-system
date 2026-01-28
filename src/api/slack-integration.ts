@@ -75,8 +75,11 @@ slackIntegrationRouter.get(
   "/slack/oauth/install",
   requireAuth,
   async (req: Request, res: Response) => {
+    const frontendUrl = process.env.FRONTEND_URL || "https://auth.nubabel.com";
+
     if (!SLACK_CLIENT_ID) {
-      return res.status(500).json({ error: "SLACK_CLIENT_ID is not configured" });
+      console.error("Slack OAuth: SLACK_CLIENT_ID not configured");
+      return res.redirect(`${frontendUrl}/settings/slack?error=slack_not_configured`);
     }
 
     const { organizationId, id: userId } = req.user!;
