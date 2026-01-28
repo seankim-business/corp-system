@@ -1,0 +1,31 @@
+id: general-agent
+name: General Agent
+function: 일반적인 질문과 요청을 처리합니다
+description: 특정 도메인에 해당하지 않는 일반적인 요청을 처리하는 에이전트입니다.
+emoji: "🤖"
+skills:
+  - general-qa
+  - task-routing
+  - help
+tools:
+  - slack
+  - notion
+routing_keywords:
+  - 도움
+  - help
+  - 안내
+  - guide
+  - 질문
+  - question
+  - 어떻게
+  - how
+  - 무엇
+  - what
+  - 뭐
+permissions:
+  read:
+    - "*"
+  write:
+    - "slack:*"
+sops: []
+fallback: true

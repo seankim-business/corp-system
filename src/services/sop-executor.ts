@@ -16,6 +16,11 @@ import {
   SOPDefinition,
   SOPExceptionHandler,
 } from "../config/sop-loader";
+import { getMCPConnectionsByProvider, getAccessTokenFromConfig } from "./mcp-registry";
+import { executeNotionTool } from "../mcp-servers/notion";
+import { executeLinearTool } from "../mcp-servers/linear";
+import { executeGitHubTool } from "../mcp-servers/github";
+import { delegateTask } from "../orchestrator/delegate-task";
 
 export interface SopStep {
   id: string;
@@ -633,6 +638,7 @@ class SopExecutor {
   ): Promise<Record<string, unknown>> {
     const config = step.config || {};
     const inputData = execution.metadata?.inputData || {};
+    const organizationId = execution.organizationId;
 
     logger.info("Executing automated step", {
       stepId: step.id,
@@ -646,8 +652,35 @@ class SopExecutor {
       inputData,
     );
 
+    if (config.agent && config.tool) {
+      const sessionId = `sop-step-${execution.id}-${step.id}`;
+      const delegationResult = await delegateTask({
+        category: "quick",
+        load_skills: [],
+        prompt: `Execute step "${step.name}": ${step.description || ""}\nInput: ${JSON.stringify(interpolatedInput)}`,
+        session_id: sessionId,
+        organizationId,
+        userId: execution.userId,
+        context: {
+          sopStepId: step.id,
+          sopExecutionId: execution.id,
+          availableMCPs: [],
+        },
+      });
+
+      return {
+        message: `Automated step "${step.name}" executed`,
+        timestamp: new Date().toISOString(),
+        agent: config.agent,
+        tool: config.tool,
+        input: interpolatedInput,
+        output: delegationResult.output,
+        status: delegationResult.status,
+      };
+    }
+
     return {
-      message: `Automated step "${step.name}" executed successfully`,
+      message: `Automated step "${step.name}" executed (no agent configured)`,
       timestamp: new Date().toISOString(),
       agent: config.agent,
       tool: config.tool,
@@ -661,6 +694,7 @@ class SopExecutor {
   ): Promise<Record<string, unknown>> {
     const config = step.config || {};
     const inputData = execution.metadata?.inputData || {};
+    const organizationId = execution.organizationId;
 
     logger.info("Executing MCP call step", {
       stepId: step.id,
@@ -674,12 +708,70 @@ class SopExecutor {
       inputData,
     );
 
+    const provider = config.provider as string;
+    const toolName = config.tool as string;
+
+    if (!provider || !toolName) {
+      return {
+        message: `MCP call step "${step.name}" skipped - no provider or tool configured`,
+        timestamp: new Date().toISOString(),
+        input: interpolatedInput,
+      };
+    }
+
+    const connections = await getMCPConnectionsByProvider(organizationId, provider);
+    if (connections.length === 0) {
+      throw new Error(`No ${provider} connection found for organization ${organizationId}`);
+    }
+
+    const connection = connections[0];
+    const accessToken = getAccessTokenFromConfig(connection.config as any);
+
+    if (!accessToken) {
+      throw new Error(`No access token found for ${provider} connection`);
+    }
+
+    let result: any;
+
+    switch (provider.toLowerCase()) {
+      case "notion":
+        result = await executeNotionTool(
+          accessToken,
+          toolName,
+          interpolatedInput,
+          organizationId,
+          connection,
+        );
+        break;
+      case "linear":
+        result = await executeLinearTool(
+          accessToken,
+          toolName,
+          interpolatedInput,
+          organizationId,
+          connection,
+        );
+        break;
+      case "github":
+        result = await executeGitHubTool(
+          accessToken,
+          toolName,
+          interpolatedInput,
+          organizationId,
+          connection,
+        );
+        break;
+      default:
+        throw new Error(`Unsupported MCP provider: ${provider}`);
+    }
+
     return {
-      message: `MCP call step "${step.name}" delegated to workflow engine`,
+      message: `MCP call step "${step.name}" executed successfully`,
       timestamp: new Date().toISOString(),
-      agent: config.agent,
-      tool: config.tool,
+      provider,
+      tool: toolName,
       input: interpolatedInput,
+      result,
     };
   }
 

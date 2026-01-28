@@ -4,10 +4,16 @@ import { requireAuth } from "../middleware/auth.middleware";
 import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
 import { encrypt, decrypt } from "../utils/encryption";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
-const SECRET_KEYS = ["anthropicApiKey", "openaiApiKey", "openrouterApiKey"] as const;
+const SECRET_KEYS = [
+  "anthropicApiKey",
+  "openaiApiKey",
+  "openrouterApiKey",
+  "googleAiApiKey",
+] as const;
 type SecretKeyName = (typeof SECRET_KEYS)[number];
 
 function isSecretKey(key: string): key is SecretKeyName {
@@ -45,7 +51,9 @@ router.get(
 
       return res.json({ settings: maskedSettings });
     } catch (error) {
-      console.error("Get organization settings error:", error);
+      logger.error("Get organization settings error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to fetch settings" });
     }
   },
@@ -58,7 +66,7 @@ router.put(
   async (req: Request, res: Response) => {
     try {
       const { organizationId } = req.user!;
-      const { anthropicApiKey, openaiApiKey, openrouterApiKey } = req.body;
+      const { anthropicApiKey, openaiApiKey, openrouterApiKey, googleAiApiKey } = req.body;
 
       const organization = await prisma.organization.findUnique({
         where: { id: organizationId },
@@ -111,6 +119,19 @@ router.put(
         }
       }
 
+      if (googleAiApiKey !== undefined) {
+        if (googleAiApiKey === "" || googleAiApiKey === null) {
+          delete updatedSettings.googleAiApiKey;
+        } else {
+          if (!googleAiApiKey.startsWith("AIza")) {
+            return res
+              .status(400)
+              .json({ error: "Invalid Google AI API key format. Should start with 'AIza'" });
+          }
+          updatedSettings.googleAiApiKey = encrypt(googleAiApiKey);
+        }
+      }
+
       await prisma.organization.update({
         where: { id: organizationId },
         data: { settings: updatedSettings as object },
@@ -121,7 +142,9 @@ router.put(
         message: "API keys updated successfully",
       });
     } catch (error) {
-      console.error("Update API keys error:", error);
+      logger.error("Update API keys error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to update API keys" });
     }
   },
@@ -163,7 +186,9 @@ router.delete(
         message: `${keyName} deleted successfully`,
       });
     } catch (error) {
-      console.error("Delete API key error:", error);
+      logger.error("Delete API key error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to delete API key" });
     }
   },
@@ -192,7 +217,9 @@ export async function getOrganizationApiKey(
   try {
     return decrypt(encryptedKey);
   } catch (error) {
-    console.error(`Failed to decrypt ${keyName}:`, error);
+    logger.error(`Failed to decrypt ${keyName}`, {
+      error: error instanceof Error ? error.message : error,
+    });
     return null;
   }
 }

@@ -29,9 +29,11 @@ import ExecutionDetailPage from "./pages/ExecutionDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import NotionSettingsPage from "./pages/NotionSettingsPage";
 import SlackSettingsPage from "./pages/SlackSettingsPage";
+import GoogleCalendarSettingsPage from "./pages/GoogleCalendarSettingsPage";
 import MembersPage from "./pages/MembersPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
 import AgentActivityPage from "./pages/AgentActivityPage";
+import AgentMetricsPage from "./pages/AgentMetricsPage";
 import OrgChangesPage from "./pages/OrgChangesPage";
 import OKRPage from "./pages/OKRPage";
 import DashboardLayout from "./components/layout/DashboardLayout";
@@ -143,6 +145,17 @@ function App() {
         />
 
         <Route
+          path="/settings/google-calendar"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <GoogleCalendarSettingsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/settings/members"
           element={
             <ProtectedRoute>
@@ -170,6 +183,17 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <AgentActivityPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/metrics/agents"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AgentMetricsPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

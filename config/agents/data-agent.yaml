@@ -1,0 +1,41 @@
+id: data-agent
+name: Data Agent
+function: 데이터 분석 및 리포팅을 담당합니다
+description: 데이터 조회, 분석, 리포트 생성을 담당하는 에이전트입니다.
+emoji: "📊"
+skills:
+  - data-analysis
+  - reporting
+  - visualization
+tools:
+  - airtable
+  - notion
+  - google-sheets
+routing_keywords:
+  - 데이터
+  - data
+  - 분석
+  - analysis
+  - 리포트
+  - report
+  - 통계
+  - statistics
+  - 차트
+  - chart
+  - 대시보드
+  - dashboard
+  - 조회
+  - query
+  - 메트릭
+  - metric
+permissions:
+  read:
+    - "airtable:*"
+    - "notion:*"
+    - "google-sheets:*"
+  write:
+    - "notion:reports/*"
+    - "slack:*"
+sops:
+  - /sops/data/weekly-report.yaml
+  - /sops/data/metrics-analysis.yaml

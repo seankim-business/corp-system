@@ -92,12 +92,59 @@ export async function prioritizeTasks(
     backup: string[];
   }
 
+  const tasksByProject = new Map<string, TaskRecord[]>();
+  for (const task of tasks) {
+    const projectKey = task.projectId || "no-project";
+    if (!tasksByProject.has(projectKey)) {
+      tasksByProject.set(projectKey, []);
+    }
+    tasksByProject.get(projectKey)!.push(task);
+  }
+
+  const blockerMap = new Map<string, string[]>();
+  const dependentMap = new Map<string, string[]>();
+
+  for (const [, projectTasks] of tasksByProject) {
+    const inProgressTasks = projectTasks.filter((t) => t.status === "2_InProgress");
+    const todoTasks = projectTasks.filter((t) => t.status === "1_ToDo");
+
+    for (const todoTask of todoTasks) {
+      const blockers = inProgressTasks
+        .filter((inProgress) => {
+          if (!todoTask.dueDate || !inProgress.dueDate) return false;
+          return inProgress.dueDate < todoTask.dueDate;
+        })
+        .map((t) => t.id);
+
+      if (blockers.length > 0) {
+        blockerMap.set(todoTask.id, blockers);
+      }
+    }
+
+    for (const inProgress of inProgressTasks) {
+      const dependents = todoTasks
+        .filter((todo) => {
+          if (!todo.dueDate || !inProgress.dueDate) return false;
+          return inProgress.dueDate < todo.dueDate;
+        })
+        .map((t) => t.id);
+
+      if (dependents.length > 0) {
+        dependentMap.set(inProgress.id, dependents);
+      }
+    }
+  }
+
   const prioritizedTasks: PrioritizedTask[] = tasks.map((task: TaskRecord) => {
     const urgency = normalizeScore(task.urgencyScore || 0);
     const importance = normalizeScore(task.importanceScore || 0);
     const dueDateScore = calculateDueDateScore(task.dueDate);
-    const blockerScore = 0;
-    const dependentScore = 0;
+
+    const taskBlockers = blockerMap.get(task.id) || [];
+    const taskDependents = dependentMap.get(task.id) || [];
+
+    const blockerScore = normalizeScore(taskBlockers.length, 5);
+    const dependentScore = normalizeScore(taskDependents.length, 5);
 
     const priorityScore =
       urgency * weights.urgency +
@@ -119,8 +166,8 @@ export async function prioritizeTasks(
       importanceScore: importance,
       priorityScore: Math.round(priorityScore * 100),
       eisenhowerQuadrant: quadrant,
-      blockers: [],
-      dependents: [],
+      blockers: taskBlockers,
+      dependents: taskDependents,
       suggestedAction: getSuggestedAction(quadrant, task.status),
     };
   });

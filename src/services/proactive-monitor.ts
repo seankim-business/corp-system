@@ -1,7 +1,10 @@
 import Redis from "ioredis";
+import { WebClient } from "@slack/web-api";
 import { logger } from "../utils/logger";
 import { metrics } from "../utils/metrics";
 import { db as prisma } from "../db/client";
+import { getSlackIntegrationByOrg } from "../api/slack-integration";
+import { emitOrgEvent } from "./sse-service";
 
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
@@ -365,6 +368,8 @@ async function processAlert(alert: ProactiveAlert): Promise<void> {
 
   await redis.setex(cacheKey, ALERT_CACHE_TTL, JSON.stringify(alert));
 
+  await deliverAlert(alert);
+
   metrics.increment("proactive_alert.generated", {
     type: alert.type,
     severity: alert.severity,
@@ -377,6 +382,184 @@ async function processAlert(alert: ProactiveAlert): Promise<void> {
     severity: alert.severity,
     title: alert.title,
   });
+}
+
+async function deliverAlert(alert: ProactiveAlert): Promise<void> {
+  const deliveryPromises: Promise<void>[] = [];
+
+  deliveryPromises.push(deliverViaSSE(alert));
+
+  if (alert.severity === "critical" || alert.severity === "warning") {
+    deliveryPromises.push(deliverViaSlack(alert));
+  }
+
+  deliveryPromises.push(deliverViaWebhook(alert));
+
+  const results = await Promise.allSettled(deliveryPromises);
+
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    logger.warn("Some alert delivery channels failed", {
+      alertId: alert.id,
+      failedCount: failures.length,
+      totalChannels: results.length,
+    });
+  }
+}
+
+async function deliverViaSSE(alert: ProactiveAlert): Promise<void> {
+  try {
+    emitOrgEvent(alert.organizationId, "proactive_alert", {
+      id: alert.id,
+      type: alert.type,
+      severity: alert.severity,
+      title: alert.title,
+      description: alert.description,
+      suggestedActions: alert.suggestedActions,
+      createdAt: alert.createdAt.toISOString(),
+    });
+
+    metrics.increment("proactive_alert.delivered", { channel: "sse" });
+  } catch (error) {
+    logger.error(
+      "Failed to deliver alert via SSE",
+      { alertId: alert.id },
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    throw error;
+  }
+}
+
+async function deliverViaSlack(alert: ProactiveAlert): Promise<void> {
+  try {
+    const integration = await getSlackIntegrationByOrg(alert.organizationId);
+
+    if (!integration || !integration.enabled) {
+      logger.debug("Slack integration not available for alert delivery", {
+        organizationId: alert.organizationId,
+      });
+      return;
+    }
+
+    const org = await prisma.organization.findUnique({
+      where: { id: alert.organizationId },
+      select: { settings: true },
+    });
+    const orgSettings = org?.settings as Record<string, unknown> | null;
+    const adminChannel = (orgSettings?.slackAlertChannel as string) || "#nubabel-alerts";
+
+    const slackClient = new WebClient(integration.botToken);
+
+    const severityEmoji =
+      alert.severity === "critical" ? "🚨" : alert.severity === "warning" ? "⚠️" : "ℹ️";
+
+    const blocks = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: `${severityEmoji} ${alert.title}`,
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: alert.description,
+        },
+      },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `*Type:* ${alert.type} | *Severity:* ${alert.severity.toUpperCase()}`,
+          },
+        ],
+      },
+    ];
+
+    if (alert.suggestedActions.length > 0) {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*Suggested Actions:*\n${alert.suggestedActions.map((a) => `• ${a}`).join("\n")}`,
+        },
+      });
+    }
+
+    await slackClient.chat.postMessage({
+      channel: adminChannel,
+      text: `${severityEmoji} ${alert.title}: ${alert.description}`,
+      blocks,
+    });
+
+    metrics.increment("proactive_alert.delivered", { channel: "slack" });
+    logger.debug("Alert delivered via Slack", { alertId: alert.id, channel: adminChannel });
+  } catch (error) {
+    logger.error(
+      "Failed to deliver alert via Slack",
+      { alertId: alert.id },
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
+}
+
+async function deliverViaWebhook(alert: ProactiveAlert): Promise<void> {
+  try {
+    const org = await prisma.organization.findUnique({
+      where: { id: alert.organizationId },
+      select: { settings: true },
+    });
+
+    const settings = org?.settings as Record<string, unknown> | null;
+    const webhookUrl = settings?.alertWebhookUrl as string | undefined;
+
+    if (!webhookUrl) {
+      return;
+    }
+
+    const payload = {
+      event: "proactive_alert",
+      timestamp: new Date().toISOString(),
+      alert: {
+        id: alert.id,
+        type: alert.type,
+        severity: alert.severity,
+        title: alert.title,
+        description: alert.description,
+        metadata: alert.metadata,
+        suggestedActions: alert.suggestedActions,
+        createdAt: alert.createdAt.toISOString(),
+      },
+    };
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Nubabel-Event": "proactive_alert",
+        "X-Nubabel-Alert-Severity": alert.severity,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Webhook returned ${response.status}: ${response.statusText}`);
+    }
+
+    metrics.increment("proactive_alert.delivered", { channel: "webhook" });
+    logger.debug("Alert delivered via webhook", { alertId: alert.id, webhookUrl });
+  } catch (error) {
+    logger.error(
+      "Failed to deliver alert via webhook",
+      { alertId: alert.id },
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
 }
 
 async function storeAlert(alert: ProactiveAlert): Promise<void> {

@@ -7,6 +7,7 @@ import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
 import { encrypt, decrypt } from "../utils/encryption";
 import { redis } from "../db/redis";
+import { logger } from "../utils/logger";
 
 const slackOAuthRouter = Router();
 const slackIntegrationRouter = Router();
@@ -81,7 +82,7 @@ slackIntegrationRouter.get(
     const frontendUrl = process.env.FRONTEND_URL || "https://auth.nubabel.com";
 
     if (!SLACK_CLIENT_ID) {
-      console.error("Slack OAuth: SLACK_CLIENT_ID not configured");
+      logger.error("Slack OAuth: SLACK_CLIENT_ID not configured");
       return res.redirect(`${frontendUrl}/settings/slack?error=slack_not_configured`);
     }
 
@@ -103,7 +104,7 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
   const frontendUrl = process.env.FRONTEND_URL || "https://auth.nubabel.com";
 
   if (error) {
-    console.error("Slack OAuth error:", error);
+    logger.error("Slack OAuth error", { error });
     return res.redirect(`${frontendUrl}/settings/slack?error=${encodeURIComponent(String(error))}`);
   }
 
@@ -112,13 +113,13 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
   }
 
   if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
-    console.error("Slack OAuth: Missing CLIENT_ID or CLIENT_SECRET");
+    logger.error("Slack OAuth: Missing CLIENT_ID or CLIENT_SECRET");
     return res.redirect(`${frontendUrl}/settings/slack?error=server_config`);
   }
 
   const stateData = await decodeState(String(state));
   if (!stateData) {
-    console.error("Slack OAuth: Invalid state parameter");
+    logger.error("Slack OAuth: Invalid state parameter");
     return res.redirect(`${frontendUrl}/settings/slack?error=invalid_state`);
   }
 
@@ -137,7 +138,7 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
     const tokenData = (await tokenResponse.json()) as SlackOAuthResponse;
 
     if (!tokenData.ok || !tokenData.access_token || !tokenData.team) {
-      console.error("Slack OAuth token exchange failed:", tokenData.error);
+      logger.error("Slack OAuth token exchange failed", { error: tokenData.error });
       return res.redirect(
         `${frontendUrl}/settings/slack?error=${encodeURIComponent(tokenData.error || "token_exchange_failed")}`,
       );
@@ -153,7 +154,7 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
     const envSigningSecret = process.env.SLACK_SIGNING_SECRET;
 
     if (!envSigningSecret) {
-      console.error("Slack OAuth: SLACK_SIGNING_SECRET not configured");
+      logger.error("Slack OAuth: SLACK_SIGNING_SECRET not configured");
       return res.redirect(`${frontendUrl}/settings/slack?error=server_config`);
     }
 
@@ -201,10 +202,12 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
       });
     }
 
-    console.log(`Slack OAuth success: org=${stateData.organizationId}, workspace=${workspaceName}`);
+    logger.info(`Slack OAuth success: org=${stateData.organizationId}, workspace=${workspaceName}`);
     return res.redirect(`${frontendUrl}/settings/slack?success=true`);
   } catch (error) {
-    console.error("Slack OAuth callback error:", error);
+    logger.error("Slack OAuth callback error", {
+      error: error instanceof Error ? error.message : error,
+    });
     return res.redirect(`${frontendUrl}/settings/slack?error=server_error`);
   }
 });
@@ -242,7 +245,9 @@ slackIntegrationRouter.get(
         },
       });
     } catch (error) {
-      console.error("Get Slack integration error:", error);
+      logger.error("Get Slack integration error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to fetch Slack integration" });
     }
   },
@@ -325,7 +330,9 @@ slackIntegrationRouter.put(
         },
       });
     } catch (error) {
-      console.error("Upsert Slack integration error:", error);
+      logger.error("Upsert Slack integration error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to save Slack integration" });
     }
   },
@@ -364,7 +371,9 @@ slackIntegrationRouter.post(
         },
       });
     } catch (error: unknown) {
-      console.error("Test Slack connection error:", error);
+      logger.error("Test Slack connection error", {
+        error: error instanceof Error ? error.message : error,
+      });
       const errorMessage = error instanceof Error ? error.message : "Invalid bot token";
       return res.status(400).json({
         success: false,
@@ -396,7 +405,9 @@ slackIntegrationRouter.delete(
 
       return res.json({ success: true });
     } catch (error) {
-      console.error("Delete Slack integration error:", error);
+      logger.error("Delete Slack integration error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to delete Slack integration" });
     }
   },

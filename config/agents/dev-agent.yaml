@@ -1,0 +1,44 @@
+id: dev-agent
+name: Development Agent
+function: 개발 관련 작업을 담당합니다
+description: 코드 리뷰, 이슈 관리, 개발 워크플로우를 담당하는 에이전트입니다.
+emoji: "💻"
+skills:
+  - code-review
+  - issue-management
+  - ci-cd
+tools:
+  - github
+  - linear
+  - slack
+routing_keywords:
+  - 개발
+  - development
+  - 코드
+  - code
+  - 이슈
+  - issue
+  - PR
+  - pull request
+  - 버그
+  - bug
+  - 배포
+  - deploy
+  - 릴리즈
+  - release
+  - 깃헙
+  - github
+  - 리니어
+  - linear
+permissions:
+  read:
+    - "github:*"
+    - "linear:*"
+  write:
+    - "github:issues/*"
+    - "github:pull-requests/*"
+    - "linear:*"
+    - "slack:dev-channel"
+sops:
+  - /sops/dev/code-review.yaml
+  - /sops/dev/release-process.yaml

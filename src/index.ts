@@ -39,6 +39,7 @@ import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
+import { googleAiOAuthRouter } from "./api/google-ai-oauth";
 import { organizationSettingsRouter } from "./api/organization-settings";
 import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
 import { webhooksRouter } from "./api/webhooks";
@@ -51,10 +52,14 @@ import okrRoutes from "./api/okr";
 import orgChangesRoutes from "./api/org-changes";
 import searchRoutes from "./api/search";
 import driveRoutes from "./api/drive";
+import googleCalendarRoutes from "./api/google-calendar";
 import githubRoutes from "./api/github";
 import sopRoutes from "./api/sop";
 import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
+import syncRoutes from "./api/sync";
+import delegationRoutes from "./api/delegations";
+import agentMetricsRoutes from "./api/agent-metrics";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
 import { startWorkers, gracefulShutdown as gracefulWorkerShutdown } from "./workers";
@@ -345,8 +350,10 @@ app.use("/auth", authRateLimiter, authRoutes);
 
 app.use("/api", apiRateLimiter, webhooksRouter);
 app.use("/api", apiRateLimiter, sidecarCallbacksRouter);
+app.use("/api", apiRateLimiter, syncRoutes); // Sync webhooks (Notion/GitHub) - no auth required
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
+app.use("/api", apiRateLimiter, googleAiOAuthRouter);
 
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, notionRoutes);
@@ -368,11 +375,14 @@ app.use("/api/okr", apiRateLimiter, authenticate, sentryUserContext, okrRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, orgChangesRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, searchRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, driveRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, googleCalendarRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSettingsRouter);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
 app.use("/api", sseRouter);
 
 app.use(
@@ -388,6 +398,50 @@ app.get("/api/user", authenticate, sentryUserContext, (req, res) => {
     user: req.user,
     organization: req.organization,
     membership: req.membership,
+  });
+});
+
+app.get("/api/user/profile", authenticate, sentryUserContext, async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: req.user.id },
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  return res.json({
+    id: user.id,
+    email: user.email,
+    name: user.displayName || user.email?.split("@")[0] || "User",
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    organization: req.organization
+      ? {
+          id: req.organization.id,
+          name: req.organization.name,
+          slug: req.organization.slug,
+        }
+      : null,
+    membership: req.membership
+      ? {
+          role: req.membership.role,
+          joinedAt: req.membership.createdAt,
+        }
+      : null,
   });
 });
 

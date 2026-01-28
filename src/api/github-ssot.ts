@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { createHmac, timingSafeEqual } from "crypto";
 import { requireAuth } from "../middleware/auth.middleware";
 import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
@@ -16,6 +17,35 @@ import {
   SSOTWebhookEvent,
 } from "../services/github-ssot";
 import { logger } from "../utils/logger";
+
+function verifyGitHubWebhookSignature(
+  payload: Buffer | string,
+  signature: string | undefined,
+  secret: string,
+): boolean {
+  if (!signature) {
+    return false;
+  }
+
+  const signaturePrefix = "sha256=";
+  if (!signature.startsWith(signaturePrefix)) {
+    return false;
+  }
+
+  const payloadBuffer = typeof payload === "string" ? Buffer.from(payload, "utf8") : payload;
+  const expectedSignature = createHmac("sha256", secret).update(payloadBuffer).digest("hex");
+
+  const receivedSignature = signature.slice(signaturePrefix.length);
+
+  try {
+    return timingSafeEqual(
+      Buffer.from(expectedSignature, "hex"),
+      Buffer.from(receivedSignature, "hex"),
+    );
+  } catch {
+    return false;
+  }
+}
 
 const router = Router();
 
@@ -274,8 +304,21 @@ router.post(
     try {
       const organizationId = String(req.params.organizationId);
 
-      // TODO: Validate GitHub webhook signature (X-Hub-Signature-256)
-      // For now, we accept all requests but should add HMAC validation
+      const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        const signature = req.headers["x-hub-signature-256"] as string | undefined;
+        const rawBody = (req as any).rawBody;
+
+        if (!rawBody) {
+          logger.warn("Missing raw body for webhook signature validation", { organizationId });
+          return res.status(400).json({ error: "Missing request body" });
+        }
+
+        if (!verifyGitHubWebhookSignature(rawBody, signature, webhookSecret)) {
+          logger.warn("Invalid GitHub webhook signature", { organizationId });
+          return res.status(401).json({ error: "Invalid signature" });
+        }
+      }
 
       const event: SSOTWebhookEvent = {
         action: req.body.action,

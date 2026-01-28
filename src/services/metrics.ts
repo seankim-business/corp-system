@@ -371,6 +371,82 @@ export const mcpCacheSizeBytes = new Gauge({
   labelNames: ["provider"],
 });
 
+// =============================================================================
+// Agent Metrics
+// =============================================================================
+
+export const activeAgentSessions = new Gauge({
+  name: "active_agent_sessions",
+  help: "Currently active agent sessions",
+  labelNames: ["agent_id"],
+});
+
+// Agent execution histogram tracking
+class Histogram {
+  private name: string;
+  // Buckets stored for potential future Prometheus exposition format
+  private _buckets: number[];
+
+  constructor(config: { name: string; help: string; labelNames: string[]; buckets: number[] }) {
+    this.name = config.name;
+    this._buckets = config.buckets;
+    metricsCollector.describeMetric(config.name, { help: config.help, type: "histogram" });
+  }
+
+  observe(labels: Record<string, string>, value: number): void {
+    metricsCollector.observeHistogram(this.name, labels, value);
+  }
+
+  getBuckets(): number[] {
+    return this._buckets;
+  }
+}
+
+class Counter {
+  private name: string;
+
+  constructor(config: { name: string; help: string; labelNames: string[] }) {
+    this.name = config.name;
+    metricsCollector.describeMetric(config.name, { help: config.help, type: "counter" });
+  }
+
+  inc(labels: Record<string, string> = {}, value = 1): void {
+    metricsCollector.incrementCounter(this.name, labels, value);
+  }
+}
+
+export const agentExecutionDuration = new Histogram({
+  name: "agent_execution_duration_seconds",
+  help: "Agent execution duration",
+  labelNames: ["agent_id", "status", "workflow_id"],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60],
+});
+
+export const agentToolCalls = new Counter({
+  name: "agent_tool_calls_total",
+  help: "Total tool calls by agent",
+  labelNames: ["agent_id", "tool_name", "status"],
+});
+
+export const workflowStepDuration = new Histogram({
+  name: "workflow_step_duration_seconds",
+  help: "Workflow step duration",
+  labelNames: ["workflow_id", "step_id", "step_type"],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120],
+});
+
+export const agentErrors = new Counter({
+  name: "agent_errors_total",
+  help: "Agent errors by type",
+  labelNames: ["agent_id", "error_type"],
+});
+
+export const agentDelegations = new Counter({
+  name: "agent_delegations_total",
+  help: "Total agent delegations",
+  labelNames: ["from_agent", "to_agent", "status"],
+});
+
 export const organizationBudgetRemainingCents = new Gauge({
   name: "organization_budget_remaining_cents",
   help: "Organization budget remaining (cents)",
@@ -733,4 +809,165 @@ function percentile(values: number[], percentileValue: number): number {
 function shouldRecordMetrics(): boolean {
   const env = process.env.NODE_ENV;
   return env !== "development" && env !== "test";
+}
+
+// =============================================================================
+// Agent Metrics Recording Functions
+// =============================================================================
+
+interface AgentExecutionMetrics {
+  agentId: string;
+  status: "success" | "failed" | "timeout";
+  workflowId?: string;
+  duration: number;
+}
+
+interface AgentToolCallMetrics {
+  agentId: string;
+  toolName: string;
+  status: "success" | "failed";
+}
+
+interface WorkflowStepMetrics {
+  workflowId: string;
+  stepId: string;
+  stepType: string;
+  duration: number;
+}
+
+interface AgentErrorMetrics {
+  agentId: string;
+  errorType: string;
+}
+
+const activeAgentSessionsMap = new Map<string, number>();
+const agentLastError = new Map<string, { message: string; timestamp: Date }>();
+
+export function recordAgentExecution(params: AgentExecutionMetrics): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const { agentId, status, workflowId, duration } = params;
+  agentExecutionDuration.observe(
+    {
+      agent_id: agentId,
+      status,
+      workflow_id: workflowId || "standalone",
+    },
+    duration / 1000,
+  );
+}
+
+export function recordAgentToolCall(params: AgentToolCallMetrics): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const { agentId, toolName, status } = params;
+  agentToolCalls.inc({
+    agent_id: agentId,
+    tool_name: toolName,
+    status,
+  });
+}
+
+export function recordWorkflowStep(params: WorkflowStepMetrics): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const { workflowId, stepId, stepType, duration } = params;
+  workflowStepDuration.observe(
+    {
+      workflow_id: workflowId,
+      step_id: stepId,
+      step_type: stepType,
+    },
+    duration / 1000,
+  );
+}
+
+export function recordAgentError(params: AgentErrorMetrics): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const { agentId, errorType } = params;
+  agentErrors.inc({
+    agent_id: agentId,
+    error_type: errorType,
+  });
+
+  agentLastError.set(agentId, {
+    message: errorType,
+    timestamp: new Date(),
+  });
+}
+
+export function recordAgentDelegation(
+  fromAgent: string,
+  toAgent: string,
+  status: "success" | "failed",
+): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  agentDelegations.inc({
+    from_agent: fromAgent,
+    to_agent: toAgent,
+    status,
+  });
+}
+
+export function incrementAgentSession(agentId: string): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const current = activeAgentSessionsMap.get(agentId) || 0;
+  activeAgentSessionsMap.set(agentId, current + 1);
+  activeAgentSessions.set(current + 1, { agent_id: agentId });
+}
+
+export function decrementAgentSession(agentId: string): void {
+  if (!shouldRecordMetrics()) {
+    return;
+  }
+
+  const current = activeAgentSessionsMap.get(agentId) || 0;
+  const newValue = Math.max(0, current - 1);
+  activeAgentSessionsMap.set(agentId, newValue);
+  activeAgentSessions.set(newValue, { agent_id: agentId });
+}
+
+export function getAgentLastError(agentId: string): { message: string; timestamp: Date } | undefined {
+  return agentLastError.get(agentId);
+}
+
+export function getAllAgentSessions(): Map<string, number> {
+  return new Map(activeAgentSessionsMap);
+}
+
+export function getAgentMetricsSummary(): Array<{
+  agentId: string;
+  activeSessions: number;
+  lastError?: { message: string; timestamp: Date };
+}> {
+  const summary: Array<{
+    agentId: string;
+    activeSessions: number;
+    lastError?: { message: string; timestamp: Date };
+  }> = [];
+
+  for (const [agentId, sessions] of activeAgentSessionsMap) {
+    summary.push({
+      agentId,
+      activeSessions: sessions,
+      lastError: agentLastError.get(agentId),
+    });
+  }
+
+  return summary;
 }

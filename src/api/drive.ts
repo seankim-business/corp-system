@@ -3,6 +3,7 @@ import { db as prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
 import { getDriveClient } from "../mcp-servers/drive/client";
 import { encrypt } from "../utils/encryption";
+import { logger } from "../utils/logger";
 import {
   validate,
   driveConnectionSchema,
@@ -51,7 +52,11 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Create Drive connection error:", error);
+      logger.error(
+        "Create Drive connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to create Drive connection" });
     }
   },
@@ -80,7 +85,11 @@ router.get("/drive/connection", requireAuth, async (req: Request, res: Response)
       },
     });
   } catch (error) {
-    console.error("Get Drive connection error:", error);
+    logger.error(
+      "Get Drive connection error",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return res.status(500).json({ error: "Failed to fetch Drive connection" });
   }
 });
@@ -132,7 +141,11 @@ router.put(
         },
       });
     } catch (error) {
-      console.error("Update Drive connection error:", error);
+      logger.error(
+        "Update Drive connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to update Drive connection" });
     }
   },
@@ -156,7 +169,11 @@ router.delete("/drive/connection", requireAuth, async (req: Request, res: Respon
 
     return res.json({ success: true });
   } catch (error) {
-    console.error("Delete Drive connection error:", error);
+    logger.error(
+      "Delete Drive connection error",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return res.status(500).json({ error: "Failed to delete Drive connection" });
   }
 });
@@ -196,7 +213,11 @@ router.get("/drive/files", requireAuth, async (req: Request, res: Response) => {
       release();
     }
   } catch (error) {
-    console.error("List Drive files error:", error);
+    logger.error(
+      "List Drive files error",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return res.status(500).json({ error: "Failed to list Drive files" });
   }
 });
@@ -227,7 +248,11 @@ router.post("/drive/test", requireAuth, async (req: Request, res: Response) => {
       release();
     }
   } catch (error: any) {
-    console.error("Test Drive connection error:", error);
+    logger.error(
+      "Test Drive connection error",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return res.status(400).json({
       success: false,
       error: error.message || "Invalid Google Drive credentials",

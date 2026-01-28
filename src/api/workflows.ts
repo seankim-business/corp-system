@@ -27,6 +27,7 @@ import { executeNotionTool } from "../mcp-servers/notion";
 import { executeLinearTool } from "../mcp-servers/linear";
 import { executeGitHubTool } from "../mcp-servers/github";
 import { MCPConnection } from "../orchestrator/types";
+import { logger } from "../utils/logger";
 import {
   validate,
   uuidParamSchema,
@@ -55,7 +56,11 @@ router.get(
 
       return res.json({ workflows });
     } catch (error) {
-      console.error("List workflows error:", error);
+      logger.error(
+        "List workflows error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch workflows" });
     }
   },
@@ -83,7 +88,11 @@ router.post(
 
       return res.status(201).json({ workflow });
     } catch (error) {
-      console.error("Create workflow error:", error);
+      logger.error(
+        "Create workflow error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to create workflow" });
     }
   },
@@ -115,7 +124,11 @@ router.get(
 
       return res.json({ workflow });
     } catch (error) {
-      console.error("Get workflow error:", error);
+      logger.error(
+        "Get workflow error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch workflow" });
     }
   },
@@ -152,7 +165,11 @@ router.put(
 
       return res.json({ workflow });
     } catch (error) {
-      console.error("Update workflow error:", error);
+      logger.error(
+        "Update workflow error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to update workflow" });
     }
   },
@@ -182,7 +199,11 @@ router.delete(
 
       return res.json({ success: true });
     } catch (error) {
-      console.error("Delete workflow error:", error);
+      logger.error(
+        "Delete workflow error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to delete workflow" });
     }
   },
@@ -380,7 +401,11 @@ router.post(
             },
           });
         } catch (error: any) {
-          console.error("Execution background error:", error);
+          logger.error(
+            "Execution background error",
+            {},
+            error instanceof Error ? error : new Error(String(error)),
+          );
           await prisma.workflowExecution.update({
             where: { id: execution.id },
             data: {
@@ -394,7 +419,11 @@ router.post(
 
       return res.status(202).json({ execution });
     } catch (error) {
-      console.error("Execute workflow error:", error);
+      logger.error(
+        "Execute workflow error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to execute workflow" });
     }
   },
@@ -426,7 +455,11 @@ router.get(
 
       return res.json({ executions });
     } catch (error) {
-      console.error("Get executions error:", error);
+      logger.error(
+        "Get executions error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch executions" });
     }
   },
@@ -459,7 +492,11 @@ router.get(
 
       return res.json({ executions });
     } catch (error) {
-      console.error("List executions error:", error);
+      logger.error(
+        "List executions error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch executions" });
     }
   },
@@ -488,7 +525,11 @@ router.get(
 
       return res.json({ execution });
     } catch (error) {
-      console.error("Get execution error:", error);
+      logger.error(
+        "Get execution error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch execution" });
     }
   },

@@ -6,6 +6,7 @@ import { authenticate, requireAuth } from "../middleware/auth.middleware";
 import { db } from "../db/client";
 import { generateCodeVerifier, generateCodeChallenge } from "./pkce";
 import { redis } from "../db/redis";
+import { logger } from "../utils/logger";
 
 const router = express.Router();
 const authService = new AuthService();
@@ -110,7 +111,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
     const redirectUrl = `${process.env.BASE_URL}/dashboard`;
     return res.redirect(redirectUrl);
   } catch (error) {
-    console.error("Google OAuth error:", error);
+    logger.error("Google OAuth error", { error });
     return res.status(500).send("Authentication failed");
   }
 });
@@ -164,7 +165,7 @@ router.post("/register", loginLimiter, async (req: Request, res: Response) => {
       membership: result.membership,
     });
   } catch (error) {
-    console.error("Registration error:", error);
+    logger.error("Registration error", { error });
     return res.status(400).json({ error: (error as Error).message });
   }
 });
@@ -212,7 +213,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       membership: result.membership,
     });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error", { error });
     return res.status(401).json({ error: "Invalid credentials" });
   }
 });
@@ -262,7 +263,7 @@ router.post("/logout-all", authenticate, requireAuth, async (req: Request, res: 
       sessionsRevoked: sessions.length,
     });
   } catch (error) {
-    console.error("Logout all error:", error);
+    logger.error("Logout all error", { error });
     return res.status(500).json({ error: "Failed to logout from all sessions" });
   }
 });
@@ -345,7 +346,7 @@ router.post("/switch-org", authenticate, async (req: Request, res: Response) => 
     const redirectUrl = `https://${result.organization.slug}.${process.env.BASE_DOMAIN}/dashboard`;
     return res.json({ redirectUrl });
   } catch (error) {
-    console.error("Switch org error:", error);
+    logger.error("Switch org error", { error });
     return res.status(403).json({ error: (error as Error).message });
   }
 });

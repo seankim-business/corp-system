@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db/client";
 import { withQueueConnection } from "../db/redis";
 import { executeNotionTool } from "../mcp-servers/notion";
@@ -10,6 +10,28 @@ import { EventEmitter } from "events";
 
 export const sidecarCallbacksRouter = Router();
 export const progressEmitter = new EventEmitter();
+
+// Internal API key authentication for sidecar endpoints
+// This ensures only the sidecar service can access these routes
+const SIDECAR_API_KEY = process.env.SIDECAR_API_KEY || "internal-sidecar-key";
+
+function requireSidecarAuth(req: Request, res: Response, next: NextFunction): void {
+  const apiKey = req.headers["x-sidecar-api-key"];
+
+  if (!apiKey || apiKey !== SIDECAR_API_KEY) {
+    logger.warn("Unauthorized sidecar callback attempt", {
+      ip: req.ip,
+      path: req.path,
+    });
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  next();
+}
+
+// Apply sidecar auth to all routes
+sidecarCallbacksRouter.use(requireSidecarAuth);
 
 // Session state updates
 sidecarCallbacksRouter.post("/sidecar/sessions/:sessionId/update", async (req, res) => {

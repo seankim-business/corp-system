@@ -2,6 +2,7 @@ import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { db } from "../db/client";
+import { logger } from "../utils/logger";
 
 const googleClient = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
@@ -345,7 +346,7 @@ export class AuthService {
 
       return sessionId;
     } catch (error) {
-      console.error("Failed to store session metadata:", error);
+      logger.error("Failed to store session metadata", { error });
       return null;
     }
   }

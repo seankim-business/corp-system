@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { requireAuth } from "../middleware/auth.middleware";
+import { authenticate } from "../middleware/auth.middleware";
 import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
 import {
@@ -28,7 +28,7 @@ function getDefaultSyncConfig(): SyncConfig {
 
 router.post(
   "/sync/promote",
-  requireAuth,
+  authenticate,
   requirePermission(Permission.INTEGRATION_MANAGE),
   async (req: Request, res: Response) => {
     try {
@@ -83,18 +83,19 @@ router.post(
 
 router.get(
   "/sync/status/:pageId",
-  requireAuth,
+  authenticate,
   requirePermission(Permission.INTEGRATION_READ),
   async (req: Request, res: Response) => {
     try {
       const { organizationId, id: userId } = req.user!;
-      const { pageId } = req.params;
-      const { owner, repo } = req.query;
+      const pageId = req.params.pageId as string;
+      const owner = req.query.owner as string | undefined;
+      const repo = req.query.repo as string | undefined;
 
       const defaultConfig = getDefaultSyncConfig();
       const config: SyncConfig = {
-        owner: (owner as string) || defaultConfig.owner,
-        repo: (repo as string) || defaultConfig.repo,
+        owner: owner || defaultConfig.owner,
+        repo: repo || defaultConfig.repo,
         baseBranch: defaultConfig.baseBranch,
       };
 
@@ -117,7 +118,7 @@ router.get(
 
 router.get(
   "/sync/ready",
-  requireAuth,
+  authenticate,
   requirePermission(Permission.INTEGRATION_READ),
   async (req: Request, res: Response) => {
     try {
@@ -128,11 +129,16 @@ router.get(
         return res.status(400).json({ error: "databaseId is required" });
       }
 
-      const pages = await findPagesReadyForPromotion(
-        organizationId,
-        userId,
-        databaseId,
-      );
+      const pages = await findPagesReadyForPromotion(organizationId, userId, databaseId);
+
+      return res.json({ pages });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      logger.error("Find ready pages error", { error: message });
+      return res.status(500).json({ error: "Failed to find pages ready for promotion" });
+    }
+  },
+);
 
 router.post("/webhooks/notion", async (req: Request, res: Response) => {
   try {
@@ -205,7 +211,7 @@ router.post("/webhooks/github/sync", async (req: Request, res: Response) => {
     }
 
     const event = req.headers["x-github-event"] as string;
-    const { action, pull_request, repository } = req.body;
+    const { action, pull_request } = req.body;
 
     logger.info("GitHub webhook received", { event, action });
 

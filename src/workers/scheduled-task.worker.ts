@@ -9,6 +9,7 @@ import { recordTaskExecution } from "../services/scheduled-tasks";
 import { db as prisma } from "../db/client";
 import { runWithContext } from "../utils/async-context";
 import { emitOrgEvent } from "../services/sse-service";
+import { emitJobProgress, PROGRESS_STAGES, PROGRESS_PERCENTAGES } from "../events/job-progress";
 
 export class ScheduledTaskWorker extends BaseWorker<ScheduledTaskData> {
   constructor() {
@@ -34,6 +35,13 @@ export class ScheduledTaskWorker extends BaseWorker<ScheduledTaskData> {
 
     const startTime = Date.now();
 
+    await job.updateProgress(PROGRESS_PERCENTAGES.STARTED);
+    await emitJobProgress(job.id || "", PROGRESS_STAGES.STARTED, PROGRESS_PERCENTAGES.STARTED, {
+      scheduleId,
+      taskType,
+      taskName,
+    });
+
     logger.info("Processing scheduled task", {
       scheduleId,
       organizationId,
@@ -42,6 +50,18 @@ export class ScheduledTaskWorker extends BaseWorker<ScheduledTaskData> {
     });
 
     try {
+      await job.updateProgress(PROGRESS_PERCENTAGES.VALIDATED);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.VALIDATED,
+        PROGRESS_PERCENTAGES.VALIDATED,
+        {
+          scheduleId,
+          taskType,
+          action: "executing_task",
+        },
+      );
+
       switch (taskType) {
         case "workflow":
           await this.executeWorkflow(organizationId, workflowId!, payload, createdBy);
@@ -67,9 +87,33 @@ export class ScheduledTaskWorker extends BaseWorker<ScheduledTaskData> {
           throw new Error(`Unknown task type: ${taskType}`);
       }
 
+      await job.updateProgress(PROGRESS_PERCENTAGES.PROCESSING);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.PROCESSING,
+        PROGRESS_PERCENTAGES.PROCESSING,
+        {
+          scheduleId,
+          taskType,
+          action: "recording_execution",
+        },
+      );
+
       const duration = Date.now() - startTime;
 
       await recordTaskExecution(organizationId, scheduleId, true);
+
+      await job.updateProgress(PROGRESS_PERCENTAGES.FINALIZING);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.FINALIZING,
+        PROGRESS_PERCENTAGES.FINALIZING,
+        {
+          scheduleId,
+          taskType,
+          action: "emitting_events",
+        },
+      );
 
       metrics.increment("scheduled_task.completed", { taskType });
       metrics.histogram("scheduled_task.duration_ms", duration, { taskType });
@@ -81,6 +125,19 @@ export class ScheduledTaskWorker extends BaseWorker<ScheduledTaskData> {
         duration,
       });
 
+      await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);
+      await emitJobProgress(
+        job.id || "",
+        PROGRESS_STAGES.COMPLETED,
+        PROGRESS_PERCENTAGES.COMPLETED,
+        {
+          scheduleId,
+          taskType,
+          duration,
+          status: "success",
+        },
+      );
+
       logger.info("Scheduled task completed", {
         scheduleId,
         taskType,
@@ -88,6 +145,12 @@ export class ScheduledTaskWorker extends BaseWorker<ScheduledTaskData> {
       });
     } catch (error: any) {
       logger.error("Scheduled task failed", {
+        scheduleId,
+        taskType,
+        error: error.message,
+      });
+
+      await emitJobProgress(job.id || "", PROGRESS_STAGES.FAILED, 0, {
         scheduleId,
         taskType,
         error: error.message,

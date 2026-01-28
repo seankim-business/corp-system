@@ -23,6 +23,7 @@ import {
 } from "../services/budget-enforcer";
 import { recordBudgetDowngrade, recordBudgetRejection, recordAiRequest } from "../services/metrics";
 import { checkApprovalRequired, createApprovalRequest } from "../services/approval-checker";
+import { shouldUseMultiAgent, orchestrateMultiAgent } from "./multi-agent-orchestrator";
 
 const tracer = trace.getTracer("orchestrator");
 
@@ -149,6 +150,8 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
       span.setAttribute("category", categorySelection.category);
       span.setAttribute("skills.names", skills.join(","));
 
+      const useMultiAgent = shouldUseMultiAgent(userRequest);
+
       logger.debug("Request analyzed", {
         sessionDepth: sessionState?.conversationDepth || 0,
         isFollowUp,
@@ -167,6 +170,7 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         skillConflicts: skillSelection.conflicts,
         intent: analysis.intent,
         complexity: analysis.complexity,
+        useMultiAgent,
       });
 
       metrics.increment("orchestration.category_selected", {
@@ -289,6 +293,34 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
           },
         };
         return failureResult;
+      }
+
+      if (useMultiAgent && analysis.complexity === "high") {
+        logger.info("Routing to multi-agent orchestration", {
+          sessionId,
+          complexity: analysis.complexity,
+        });
+
+        const multiAgentResult = await orchestrateMultiAgent({
+          userRequest,
+          sessionId,
+          organizationId,
+          userId,
+          enableMultiAgent: true,
+          enableParallel: true,
+        });
+
+        await updateSessionState(sessionId, {
+          lastCategory: "unspecified-high",
+          lastIntent: analysis.intent,
+          metadata: {
+            lastSkills: skills,
+            lastComplexity: analysis.complexity,
+            multiAgent: true,
+          },
+        });
+
+        return multiAgentResult;
       }
 
       const approvalCheck = await checkApprovalRequired(organizationId, userRequest, userId);

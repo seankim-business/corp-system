@@ -5,6 +5,7 @@ import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
 import { getGitHubClient } from "../mcp-servers/github/client";
 import { encrypt } from "../utils/encryption";
+import { logger } from "../utils/logger";
 import {
   validate,
   githubConnectionSchema,
@@ -59,7 +60,11 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Create GitHub connection error:", error);
+      logger.error(
+        "Create GitHub connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to create GitHub connection" });
     }
   },
@@ -93,7 +98,11 @@ router.get(
         },
       });
     } catch (error) {
-      console.error("Get GitHub connection error:", error);
+      logger.error(
+        "Get GitHub connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch GitHub connection" });
     }
   },
@@ -147,7 +156,11 @@ router.put(
         },
       });
     } catch (error) {
-      console.error("Update GitHub connection error:", error);
+      logger.error(
+        "Update GitHub connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to update GitHub connection" });
     }
   },
@@ -175,7 +188,11 @@ router.delete(
 
       return res.json({ success: true });
     } catch (error) {
-      console.error("Delete GitHub connection error:", error);
+      logger.error(
+        "Delete GitHub connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to delete GitHub connection" });
     }
   },
@@ -217,7 +234,11 @@ router.get(
         release();
       }
     } catch (error) {
-      console.error("Get GitHub repos error:", error);
+      logger.error(
+        "Get GitHub repos error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch GitHub repositories" });
     }
   },
@@ -252,7 +273,11 @@ router.post(
         release();
       }
     } catch (error: unknown) {
-      console.error("Test GitHub connection error:", error);
+      logger.error(
+        "Test GitHub connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       const message = error instanceof Error ? error.message : "Invalid GitHub access token";
       return res.status(400).json({
         success: false,

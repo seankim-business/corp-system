@@ -211,6 +211,24 @@ export const updateDriveConnectionSchema = z
     message: "At least one field must be provided",
   });
 
+export const googleCalendarConnectionSchema = z.object({
+  accessToken: z.string().min(1, "Access token is required"),
+  refreshToken: z.string().optional().nullable(),
+  expiresAt: z.string().datetime().optional().nullable(),
+  calendarId: z.string().optional().nullable(),
+});
+
+export const updateGoogleCalendarConnectionSchema = z
+  .object({
+    accessToken: z.string().min(1).optional(),
+    refreshToken: z.string().optional().nullable(),
+    expiresAt: z.string().datetime().optional().nullable(),
+    calendarId: z.string().optional().nullable(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided",
+  });
+
 export const featureFlagSchema = z.object({
   key: z
     .string()
@@ -294,6 +312,10 @@ export type GithubConnectionInput = z.infer<typeof githubConnectionSchema>;
 export type UpdateGithubConnectionInput = z.infer<typeof updateGithubConnectionSchema>;
 export type DriveConnectionInput = z.infer<typeof driveConnectionSchema>;
 export type UpdateDriveConnectionInput = z.infer<typeof updateDriveConnectionSchema>;
+export type GoogleCalendarConnectionInput = z.infer<typeof googleCalendarConnectionSchema>;
+export type UpdateGoogleCalendarConnectionInput = z.infer<
+  typeof updateGoogleCalendarConnectionSchema
+>;
 export type FeatureFlagInput = z.infer<typeof featureFlagSchema>;
 export type UpdateFeatureFlagInput = z.infer<typeof updateFeatureFlagSchema>;
 export type FeatureFlagRuleInput = z.infer<typeof featureFlagRuleSchema>;

@@ -21,6 +21,7 @@ import { requireAuth } from "../middleware/auth.middleware";
 import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
 import { getNotionClient } from "../mcp-servers/notion/client";
+import { logger } from "../utils/logger";
 import {
   validate,
   notionSettingsSchema,
@@ -67,7 +68,11 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Create Notion connection error:", error);
+      logger.error(
+        "Create Notion connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to create Notion connection" });
     }
   },
@@ -99,7 +104,11 @@ router.get(
         },
       });
     } catch (error) {
-      console.error("Get Notion connection error:", error);
+      logger.error(
+        "Get Notion connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch Notion connection" });
     }
   },
@@ -140,7 +149,11 @@ router.put(
         },
       });
     } catch (error) {
-      console.error("Update Notion connection error:", error);
+      logger.error(
+        "Update Notion connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to update Notion connection" });
     }
   },
@@ -168,7 +181,11 @@ router.delete(
 
       return res.json({ success: true });
     } catch (error) {
-      console.error("Delete Notion connection error:", error);
+      logger.error(
+        "Delete Notion connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to delete Notion connection" });
     }
   },
@@ -202,7 +219,11 @@ router.get(
         release();
       }
     } catch (error) {
-      console.error("Get Notion databases error:", error);
+      logger.error(
+        "Get Notion databases error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(500).json({ error: "Failed to fetch Notion databases" });
     }
   },
@@ -233,7 +254,11 @@ router.post(
         release();
       }
     } catch (error: any) {
-      console.error("Test Notion connection error:", error);
+      logger.error(
+        "Test Notion connection error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
       return res.status(400).json({
         success: false,
         error: error.message || "Invalid Notion API key",

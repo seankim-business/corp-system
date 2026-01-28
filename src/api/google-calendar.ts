@@ -1,21 +1,9 @@
-/**
- * Google Calendar API Routes
- *
- * Endpoints:
- * - POST /api/google-calendar/connection - Create connection
- * - GET /api/google-calendar/connection - Get connection
- * - PUT /api/google-calendar/connection - Update connection
- * - DELETE /api/google-calendar/connection - Delete connection
- * - POST /api/google-calendar/test - Test connection
- * - GET /api/google-calendar/events - List events
- * - GET /api/google-calendar/calendars - List calendars
- */
-
 import { Router, Request, Response } from "express";
 import { db as prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
 import { getGoogleCalendarClient } from "../mcp-servers/google-calendar/client";
 import { encrypt } from "../utils/encryption";
+import { logger } from "../utils/logger";
 import {
   validate,
   googleCalendarConnectionSchema,
@@ -24,7 +12,6 @@ import {
 
 const router = Router();
 
-// Create Google Calendar connection
 router.post(
   "/google-calendar/connection",
   requireAuth,
@@ -65,13 +52,14 @@ router.post(
         },
       });
     } catch (error) {
-      console.error("Create Google Calendar connection error:", error);
+      logger.error("Create Google Calendar connection error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to create Google Calendar connection" });
     }
   },
 );
 
-// Get Google Calendar connection
 router.get("/google-calendar/connection", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
@@ -95,12 +83,13 @@ router.get("/google-calendar/connection", requireAuth, async (req: Request, res:
       },
     });
   } catch (error) {
-    console.error("Get Google Calendar connection error:", error);
+    logger.error("Get Google Calendar connection error", {
+      error: error instanceof Error ? error.message : error,
+    });
     return res.status(500).json({ error: "Failed to fetch Google Calendar connection" });
   }
 });
 
-// Update Google Calendar connection
 router.put(
   "/google-calendar/connection",
   requireAuth,
@@ -148,13 +137,14 @@ router.put(
         },
       });
     } catch (error) {
-      console.error("Update Google Calendar connection error:", error);
+      logger.error("Update Google Calendar connection error", {
+        error: error instanceof Error ? error.message : error,
+      });
       return res.status(500).json({ error: "Failed to update Google Calendar connection" });
     }
   },
 );
 
-// Delete Google Calendar connection
 router.delete("/google-calendar/connection", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
@@ -173,12 +163,13 @@ router.delete("/google-calendar/connection", requireAuth, async (req: Request, r
 
     return res.json({ success: true });
   } catch (error) {
-    console.error("Delete Google Calendar connection error:", error);
+    logger.error("Delete Google Calendar connection error", {
+      error: error instanceof Error ? error.message : error,
+    });
     return res.status(500).json({ error: "Failed to delete Google Calendar connection" });
   }
 });
 
-// Test Google Calendar connection
 router.post("/google-calendar/test", requireAuth, async (req: Request, res: Response) => {
   try {
     const { accessToken, refreshToken } = req.body;
@@ -206,7 +197,9 @@ router.post("/google-calendar/test", requireAuth, async (req: Request, res: Resp
       release();
     }
   } catch (error: any) {
-    console.error("Test Google Calendar connection error:", error);
+    logger.error("Test Google Calendar connection error", {
+      error: error instanceof Error ? error.message : error,
+    });
     return res.status(400).json({
       success: false,
       error: error.message || "Invalid Google Calendar credentials",
@@ -214,7 +207,6 @@ router.post("/google-calendar/test", requireAuth, async (req: Request, res: Resp
   }
 });
 
-// List calendars
 router.get("/google-calendar/calendars", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
@@ -243,12 +235,11 @@ router.get("/google-calendar/calendars", requireAuth, async (req: Request, res: 
       release();
     }
   } catch (error) {
-    console.error("List calendars error:", error);
+    logger.error("List calendars error", { error: error instanceof Error ? error.message : error });
     return res.status(500).json({ error: "Failed to list calendars" });
   }
 });
 
-// List events
 router.get("/google-calendar/events", requireAuth, async (req: Request, res: Response) => {
   try {
     const { organizationId } = req.user!;
@@ -287,7 +278,7 @@ router.get("/google-calendar/events", requireAuth, async (req: Request, res: Res
       release();
     }
   } catch (error) {
-    console.error("List events error:", error);
+    logger.error("List events error", { error: error instanceof Error ? error.message : error });
     return res.status(500).json({ error: "Failed to list events" });
   }
 });

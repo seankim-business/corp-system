@@ -10,6 +10,9 @@ import { logger } from "../utils/logger";
 import { getSlackIntegrationByOrg } from "../api/slack-integration";
 import { getActiveAlerts, ProactiveAlert } from "./proactive-monitor";
 import { getLearningInsights, LearningInsight } from "./learning-system";
+import { getTodayEventsTool } from "../mcp-servers/google-calendar/tools/listEvents";
+import { CalendarEvent } from "../mcp-servers/google-calendar/types";
+import { decrypt } from "../utils/encryption";
 
 export interface DailyBriefingData {
   pendingApprovals: {
@@ -53,6 +56,16 @@ export interface DailyBriefingData {
     items: Array<{
       insight: string;
       suggestedAutomation?: string;
+    }>;
+  };
+  calendarEvents: {
+    total: number;
+    items: Array<{
+      title: string;
+      startTime: string;
+      endTime: string;
+      isAllDay: boolean;
+      location?: string;
     }>;
   };
 }
@@ -196,6 +209,36 @@ export async function generateDailyBriefing(
 
   const unacknowledgedAlerts = alerts.filter((a: ProactiveAlert) => !a.acknowledgedAt);
 
+  let calendarEvents: CalendarEvent[] = [];
+  try {
+    const calendarConnection = await (prisma as any).googleCalendarConnection.findUnique({
+      where: { organizationId },
+    });
+
+    if (calendarConnection) {
+      const decryptedConnection = {
+        id: calendarConnection.id,
+        organizationId: calendarConnection.organizationId,
+        accessToken: decrypt(calendarConnection.accessToken),
+        refreshToken: calendarConnection.refreshToken
+          ? decrypt(calendarConnection.refreshToken)
+          : null,
+        expiresAt: calendarConnection.expiresAt,
+        calendarId: calendarConnection.calendarId,
+        createdAt: calendarConnection.createdAt,
+        updatedAt: calendarConnection.updatedAt,
+      };
+
+      const result = await getTodayEventsTool(decryptedConnection, "Asia/Seoul", userId);
+      calendarEvents = result.events;
+    }
+  } catch (error) {
+    logger.warn("Failed to fetch calendar events for daily briefing", {
+      organizationId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   return {
     pendingApprovals: {
       total: totalPendingApprovals,
@@ -240,6 +283,16 @@ export async function generateDailyBriefing(
         suggestedAutomation: i.suggestedAutomation,
       })),
     },
+    calendarEvents: {
+      total: calendarEvents.length,
+      items: calendarEvents.slice(0, 10).map((e: CalendarEvent) => ({
+        title: e.title,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        isAllDay: e.isAllDay,
+        location: e.location,
+      })),
+    },
   };
 }
 
@@ -275,6 +328,34 @@ export function formatDailyBriefingBlocks(
     },
     { type: "divider" },
   ];
+
+  if (data.calendarEvents.total > 0) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `:calendar: *오늘 일정* (${data.calendarEvents.total})`,
+      },
+    });
+
+    const eventLines = data.calendarEvents.items.map((event, index) => {
+      const isLast = index === data.calendarEvents.items.length - 1;
+      const prefix = isLast ? "└─" : "├─";
+      const timeStr = event.isAllDay ? "종일" : formatEventTime(event.startTime);
+      const locationStr = event.location ? ` @ ${event.location}` : "";
+      return `${prefix} ${timeStr} ${event.title}${locationStr}`;
+    });
+
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: eventLines.join("\n"),
+      },
+    });
+
+    blocks.push({ type: "divider" });
+  }
 
   if (data.pendingApprovals.total > 0) {
     blocks.push({
@@ -437,7 +518,9 @@ export function formatDailyBriefingBlocks(
   });
 
   const alertText = data.proactiveAlerts.total > 0 ? `, ${data.proactiveAlerts.total} alerts` : "";
-  const summaryText = `Daily briefing: ${data.pendingApprovals.total} pending approvals, ${data.recentExecutions.total} recent executions, ${data.workflowStats.executionsToday} workflow runs today${alertText}.`;
+  const calendarText =
+    data.calendarEvents.total > 0 ? `, ${data.calendarEvents.total} calendar events` : "";
+  const summaryText = `Daily briefing: ${data.pendingApprovals.total} pending approvals, ${data.recentExecutions.total} recent executions, ${data.workflowStats.executionsToday} workflow runs today${alertText}${calendarText}.`;
 
   return { text: summaryText, blocks };
 }
@@ -577,4 +660,11 @@ function getTypeEmoji(type: string): string {
     default:
       return ":clipboard:";
   }
+}
+
+function formatEventTime(isoString: string): string {
+  const date = new Date(isoString);
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  return `${hours}:${minutes}`;
 }

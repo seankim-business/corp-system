@@ -160,7 +160,7 @@ describe("Workflows API", () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ workflows: [] });
       expect(db.workflow.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-123" },
+        where: { organizationId: "550e8400-e29b-41d4-a716-446655440001" },
         orderBy: { createdAt: "desc" },
       });
     });
@@ -168,7 +168,7 @@ describe("Workflows API", () => {
     it("should return workflows for authenticated user", async () => {
       const workflows = [
         mockWorkflow,
-        { ...mockWorkflow, id: "workflow-456", name: "Another Workflow" },
+        { ...mockWorkflow, id: "550e8400-e29b-41d4-a716-446655440006", name: "Another Workflow" },
       ];
       (db.workflow.findMany as jest.Mock).mockResolvedValue(workflows);
 
@@ -186,7 +186,7 @@ describe("Workflows API", () => {
       await request(app).get("/api/workflows");
 
       expect(db.workflow.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-123" },
+        where: { organizationId: "550e8400-e29b-41d4-a716-446655440001" },
         orderBy: { createdAt: "desc" },
       });
     });
@@ -194,7 +194,7 @@ describe("Workflows API", () => {
     it("should order workflows by createdAt descending", async () => {
       const workflows = [
         { ...mockWorkflow, createdAt: new Date("2026-01-28") },
-        { ...mockWorkflow, id: "workflow-456", createdAt: new Date("2026-01-27") },
+        { ...mockWorkflow, id: "550e8400-e29b-41d4-a716-446655440006", createdAt: new Date("2026-01-27") },
       ];
       (db.workflow.findMany as jest.Mock).mockResolvedValue(workflows);
 
@@ -303,7 +303,7 @@ describe("Workflows API", () => {
       expect(response.body.workflow.name).toBe("Test Workflow");
       expect(db.workflow.create).toHaveBeenCalledWith({
         data: {
-          organizationId: "org-123",
+          organizationId: "550e8400-e29b-41d4-a716-446655440001",
           name: "New Workflow",
           description: null,
           config: {},
@@ -374,7 +374,7 @@ describe("Workflows API", () => {
       expect(db.workflow.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            organizationId: "org-123",
+            organizationId: "550e8400-e29b-41d4-a716-446655440001",
           }),
         }),
       );
@@ -445,8 +445,8 @@ describe("Workflows API", () => {
       expect(response.status).toBe(404);
       expect(db.workflow.findFirst).toHaveBeenCalledWith({
         where: {
-          id: "workflow-123",
-          organizationId: "org-123",
+          id: "550e8400-e29b-41d4-a716-446655440002",
+          organizationId: "550e8400-e29b-41d4-a716-446655440001",
         },
         include: {
           executions: {
@@ -460,7 +460,7 @@ describe("Workflows API", () => {
     it("should return workflow with recent executions", async () => {
       const workflowWithExecutions = {
         ...mockWorkflow,
-        executions: [mockExecution, { ...mockExecution, id: "execution-456" }],
+        executions: [mockExecution, { ...mockExecution, id: "550e8400-e29b-41d4-a716-446655440005" }],
       };
       (db.workflow.findFirst as jest.Mock).mockResolvedValue(workflowWithExecutions);
 
@@ -578,7 +578,7 @@ describe("Workflows API", () => {
 
       expect(response.status).toBe(200);
       expect(db.workflow.update).toHaveBeenCalledWith({
-        where: { id: "workflow-123" },
+        where: { id: "550e8400-e29b-41d4-a716-446655440002" },
         data: {
           name: "Updated Name",
         },
@@ -598,7 +598,7 @@ describe("Workflows API", () => {
 
       expect(response.status).toBe(200);
       expect(db.workflow.update).toHaveBeenCalledWith({
-        where: { id: "workflow-123" },
+        where: { id: "550e8400-e29b-41d4-a716-446655440002" },
         data: {
           description: "Updated description",
         },
@@ -618,7 +618,7 @@ describe("Workflows API", () => {
 
       expect(response.status).toBe(200);
       expect(db.workflow.update).toHaveBeenCalledWith({
-        where: { id: "workflow-123" },
+        where: { id: "550e8400-e29b-41d4-a716-446655440002" },
         data: {
           enabled: false,
         },
@@ -639,7 +639,7 @@ describe("Workflows API", () => {
 
       expect(response.status).toBe(200);
       expect(db.workflow.update).toHaveBeenCalledWith({
-        where: { id: "workflow-123" },
+        where: { id: "550e8400-e29b-41d4-a716-446655440002" },
         data: {
           config: newConfig,
         },
@@ -661,7 +661,7 @@ describe("Workflows API", () => {
 
       expect(response.status).toBe(200);
       expect(db.workflow.update).toHaveBeenCalledWith({
-        where: { id: "workflow-123" },
+        where: { id: "550e8400-e29b-41d4-a716-446655440002" },
         data: {
           name: "Updated",
           enabled: false,
@@ -734,7 +734,7 @@ describe("Workflows API", () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ success: true });
       expect(db.workflow.delete).toHaveBeenCalledWith({
-        where: { id: "workflow-123" },
+        where: { id: "550e8400-e29b-41d4-a716-446655440002" },
       });
     });
 
@@ -746,8 +746,8 @@ describe("Workflows API", () => {
 
       expect(db.workflow.findFirst).toHaveBeenCalledWith({
         where: {
-          id: "workflow-123",
-          organizationId: "org-123",
+          id: "550e8400-e29b-41d4-a716-446655440002",
+          organizationId: "550e8400-e29b-41d4-a716-446655440001",
         },
       });
     });
@@ -831,7 +831,7 @@ describe("Workflows API", () => {
       expect(response.status).toBe(202);
       expect(db.workflowExecution.create).toHaveBeenCalledWith({
         data: {
-          workflowId: "workflow-123",
+          workflowId: "550e8400-e29b-41d4-a716-446655440002",
           status: "pending",
           inputData: undefined,
           startedAt: expect.any(Date),
@@ -852,7 +852,7 @@ describe("Workflows API", () => {
       expect(response.status).toBe(202);
       expect(db.workflowExecution.create).toHaveBeenCalledWith({
         data: {
-          workflowId: "workflow-123",
+          workflowId: "550e8400-e29b-41d4-a716-446655440002",
           status: "pending",
           inputData,
           startedAt: expect.any(Date),
@@ -876,8 +876,8 @@ describe("Workflows API", () => {
       const response = await request(app).post("/api/workflows/workflow-123/execute").send({});
 
       expect(response.body.execution).toMatchObject({
-        id: "execution-123",
-        workflowId: "workflow-123",
+        id: "550e8400-e29b-41d4-a716-446655440003",
+        workflowId: "550e8400-e29b-41d4-a716-446655440002",
         status: "pending",
       });
     });
@@ -890,8 +890,8 @@ describe("Workflows API", () => {
 
       expect(db.workflow.findFirst).toHaveBeenCalledWith({
         where: {
-          id: "workflow-123",
-          organizationId: "org-123",
+          id: "550e8400-e29b-41d4-a716-446655440002",
+          organizationId: "550e8400-e29b-41d4-a716-446655440001",
           enabled: true,
         },
       });
@@ -962,7 +962,7 @@ describe("Workflows API", () => {
     });
 
     it("should return executions for workflow", async () => {
-      const executions = [mockExecution, { ...mockExecution, id: "execution-456" }];
+      const executions = [mockExecution, { ...mockExecution, id: "550e8400-e29b-41d4-a716-446655440005" }];
       (db.workflow.findFirst as jest.Mock).mockResolvedValue(mockWorkflow);
       (db.workflowExecution.findMany as jest.Mock).mockResolvedValue(executions);
 
@@ -979,7 +979,7 @@ describe("Workflows API", () => {
       await request(app).get("/api/workflows/workflow-123/executions");
 
       expect(db.workflowExecution.findMany).toHaveBeenCalledWith({
-        where: { workflowId: "workflow-123" },
+        where: { workflowId: "550e8400-e29b-41d4-a716-446655440002" },
         orderBy: { createdAt: "desc" },
         take: 50,
       });
@@ -993,8 +993,8 @@ describe("Workflows API", () => {
 
       expect(db.workflow.findFirst).toHaveBeenCalledWith({
         where: {
-          id: "workflow-123",
-          organizationId: "org-123",
+          id: "550e8400-e29b-41d4-a716-446655440002",
+          organizationId: "550e8400-e29b-41d4-a716-446655440001",
         },
       });
     });
@@ -1047,7 +1047,7 @@ describe("Workflows API", () => {
     });
 
     it("should return all executions for organization", async () => {
-      const executions = [mockExecution, { ...mockExecution, id: "execution-456" }];
+      const executions = [mockExecution, { ...mockExecution, id: "550e8400-e29b-41d4-a716-446655440005" }];
       (db.workflowExecution.findMany as jest.Mock).mockResolvedValue(executions);
 
       const response = await request(app).get("/api/executions");
@@ -1077,7 +1077,7 @@ describe("Workflows API", () => {
       expect(db.workflowExecution.findMany).toHaveBeenCalledWith({
         where: {
           workflow: {
-            organizationId: "org-123",
+            organizationId: "550e8400-e29b-41d4-a716-446655440001",
           },
         },
         include: {
@@ -1101,7 +1101,7 @@ describe("Workflows API", () => {
         expect.objectContaining({
           where: {
             workflow: {
-              organizationId: "org-123",
+              organizationId: "550e8400-e29b-41d4-a716-446655440001",
             },
           },
         }),
@@ -1164,7 +1164,7 @@ describe("Workflows API", () => {
     it("should return 404 when execution belongs to different organization", async () => {
       const executionDifferentOrg = {
         ...mockExecution,
-        workflow: { ...mockWorkflow, organizationId: "org-456" },
+        workflow: { ...mockWorkflow, organizationId: "550e8400-e29b-41d4-a716-446655440004" },
       };
       (db.workflowExecution.findFirst as jest.Mock).mockResolvedValue(executionDifferentOrg);
 
@@ -1193,7 +1193,7 @@ describe("Workflows API", () => {
       await request(app).get("/api/executions/execution-123");
 
       expect(db.workflowExecution.findFirst).toHaveBeenCalledWith({
-        where: { id: "execution-123" },
+        where: { id: "550e8400-e29b-41d4-a716-446655440003" },
         include: {
           workflow: true,
         },
@@ -1216,7 +1216,7 @@ describe("Workflows API", () => {
 
   describe("Multi-tenant isolation", () => {
     it("should not allow user from org-456 to access workflows from org-123", async () => {
-      const otherOrgApp = createTestApp({ organizationId: "org-456" });
+      const otherOrgApp = createTestApp({ organizationId: "550e8400-e29b-41d4-a716-446655440004" });
       (db.workflow.findFirst as jest.Mock).mockResolvedValue(null);
 
       const response = await request(otherOrgApp).get("/api/workflows/workflow-123");
@@ -1224,8 +1224,8 @@ describe("Workflows API", () => {
       expect(response.status).toBe(404);
       expect(db.workflow.findFirst).toHaveBeenCalledWith({
         where: {
-          id: "workflow-123",
-          organizationId: "org-456",
+          id: "550e8400-e29b-41d4-a716-446655440002",
+          organizationId: "550e8400-e29b-41d4-a716-446655440004",
         },
         include: {
           executions: {
@@ -1237,22 +1237,22 @@ describe("Workflows API", () => {
     });
 
     it("should filter list workflows by organization", async () => {
-      const otherOrgApp = createTestApp({ organizationId: "org-456" });
+      const otherOrgApp = createTestApp({ organizationId: "550e8400-e29b-41d4-a716-446655440004" });
       (db.workflow.findMany as jest.Mock).mockResolvedValue([]);
 
       await request(otherOrgApp).get("/api/workflows");
 
       expect(db.workflow.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org-456" },
+        where: { organizationId: "550e8400-e29b-41d4-a716-446655440004" },
         orderBy: { createdAt: "desc" },
       });
     });
 
     it("should create workflows in user's organization only", async () => {
-      const otherOrgApp = createTestApp({ organizationId: "org-456" });
+      const otherOrgApp = createTestApp({ organizationId: "550e8400-e29b-41d4-a716-446655440004" });
       (db.workflow.create as jest.Mock).mockResolvedValue({
         ...mockWorkflow,
-        organizationId: "org-456",
+        organizationId: "550e8400-e29b-41d4-a716-446655440004",
       });
 
       await request(otherOrgApp).post("/api/workflows").send({
@@ -1261,7 +1261,7 @@ describe("Workflows API", () => {
 
       expect(db.workflow.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          organizationId: "org-456",
+          organizationId: "550e8400-e29b-41d4-a716-446655440004",
         }),
       });
     });

@@ -17,6 +17,27 @@ import { Permission, Role, canAssignRole, canChangeRole, isValidRole } from "../
 import { validate } from "../middleware/validation.middleware";
 import { logger } from "../utils/logger";
 
+async function sendInviteNotification(params: {
+  email: string;
+  organizationName: string;
+  inviterName: string;
+  role: string;
+  organizationId: string;
+}): Promise<void> {
+  const { email, organizationName, inviterName, role, organizationId } = params;
+  const inviteUrl = `${process.env.BASE_URL}/accept-invite?org=${organizationId}`;
+
+  logger.info("Member invite notification", {
+    email,
+    organizationId,
+    organizationName,
+    inviterName,
+    role,
+    inviteUrl,
+    emailStatus: "pending_email_service_integration",
+  });
+}
+
 const router = Router();
 
 const orgIdParamSchema = z.object({
@@ -172,7 +193,17 @@ router.post(
         },
       });
 
-      // TODO: Send email notification (stub for now)
+      const inviter = await prisma.user.findUnique({ where: { id: inviterId } });
+      const organization = await prisma.organization.findUnique({ where: { id: orgId } });
+
+      await sendInviteNotification({
+        email,
+        organizationName: organization?.name || "Unknown Organization",
+        inviterName: inviter?.displayName || inviter?.email || "A team member",
+        role,
+        organizationId: orgId,
+      });
+
       logger.info("Member invitation created", {
         organizationId: orgId,
         invitedEmail: email,
