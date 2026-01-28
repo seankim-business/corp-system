@@ -10,9 +10,17 @@ import { logger } from "../utils/logger";
 import { getSlackIntegrationByOrg } from "../api/slack-integration";
 import { getActiveAlerts, ProactiveAlert } from "./proactive-monitor";
 import { getLearningInsights, LearningInsight } from "./learning-system";
-import { getTodayEventsTool } from "../mcp-servers/google-calendar/tools/listEvents";
-import { CalendarEvent } from "../mcp-servers/google-calendar/types";
-import { decrypt } from "../utils/encryption";
+// TODO: Re-enable when google-calendar tools are restored
+// import { getTodayEventsTool } from "../mcp-servers/google-calendar/tools/listEvents";
+// import { CalendarEvent } from "../mcp-servers/google-calendar/types";
+
+interface CalendarEvent {
+  title: string;
+  startTime: string;
+  endTime: string;
+  isAllDay: boolean;
+  location?: string;
+}
 
 export interface DailyBriefingData {
   pendingApprovals: {
@@ -209,35 +217,9 @@ export async function generateDailyBriefing(
 
   const unacknowledgedAlerts = alerts.filter((a: ProactiveAlert) => !a.acknowledgedAt);
 
-  let calendarEvents: CalendarEvent[] = [];
-  try {
-    const calendarConnection = await (prisma as any).googleCalendarConnection.findUnique({
-      where: { organizationId },
-    });
-
-    if (calendarConnection) {
-      const decryptedConnection = {
-        id: calendarConnection.id,
-        organizationId: calendarConnection.organizationId,
-        accessToken: decrypt(calendarConnection.accessToken),
-        refreshToken: calendarConnection.refreshToken
-          ? decrypt(calendarConnection.refreshToken)
-          : null,
-        expiresAt: calendarConnection.expiresAt,
-        calendarId: calendarConnection.calendarId,
-        createdAt: calendarConnection.createdAt,
-        updatedAt: calendarConnection.updatedAt,
-      };
-
-      const result = await getTodayEventsTool(decryptedConnection, "Asia/Seoul", userId);
-      calendarEvents = result.events;
-    }
-  } catch (error) {
-    logger.warn("Failed to fetch calendar events for daily briefing", {
-      organizationId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  // TODO: Re-enable when google-calendar tools are restored
+  const calendarEvents: CalendarEvent[] = [];
+  // Calendar events temporarily disabled - tools not implemented
 
   return {
     pendingApprovals: {
