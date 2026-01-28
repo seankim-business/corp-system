@@ -1,0 +1,10 @@
+id: ops-agent
+name: Ops Agent
+function: ops
+description: "운영 프로세스, 일정 관리, 리소스 배분 담당"
+skills: [resource-planning, schedule-management, process-optimization]
+tools: [notion_query, calendar_manage, notify_slack]
+routing_keywords: [운영, 일정, 리소스, 프로세스, 스케줄]
+permissions:
+  read: ["/sops/ops/*", "/docs/internal/*"]
+  write: ["/sops/ops/*", "/schedules/*"]

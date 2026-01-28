@@ -1,0 +1,10 @@
+id: finance-agent
+name: Finance Agent
+function: finance
+description: "예산, 비용, 결제 관리 담당"
+skills: [budget-analysis, expense-tracking, payment-processing]
+tools: [sheet_read, sheet_write, notify_slack]
+routing_keywords: [예산, 비용, 결제, 재무, 영수증]
+permissions:
+  read: ["/sops/finance/*", "/financial-reports/*"]
+  write: ["/sops/finance/*", "/financial-reports/*"]

@@ -1,0 +1,10 @@
+id: product-agent
+name: Product Agent
+function: product
+description: "제품 기획, 로드맵, 기능 명세 담당"
+skills: [product-planning, roadmap-management, spec-writing]
+tools: [notion_query, linear_api, notify_slack]
+routing_keywords: [제품, 기획, 로드맵, 기능, 스펙]
+permissions:
+  read: ["/sops/product/*", "/specs/*"]
+  write: ["/sops/product/*", "/specs/*"]

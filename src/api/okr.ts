@@ -69,6 +69,40 @@ function addProgressToObjective(
   };
 }
 
+// Meta routes MUST be before /:id routes to avoid route conflicts
+router.get("/meta/quarters", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { organizationId } = req.user!;
+
+    const objectives = await prisma.objective.findMany({
+      where: { organizationId },
+      select: { quarter: true },
+      distinct: ["quarter"],
+      orderBy: { quarter: "desc" },
+    });
+
+    const quarters = objectives.map((obj: { quarter: string }) => obj.quarter);
+
+    const now = new Date();
+    const currentQuarter = `${now.getFullYear()}-Q${Math.ceil((now.getMonth() + 1) / 3)}`;
+    if (!quarters.includes(currentQuarter)) {
+      quarters.unshift(currentQuarter);
+    }
+
+    res.json({ quarters });
+  } catch (error) {
+    logger.error(
+      "Failed to fetch quarters",
+      { organizationId: req.user?.organizationId },
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    res.status(500).json({
+      error: "Failed to fetch quarters",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
 router.get("/", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { organizationId } = req.user!;
@@ -416,38 +450,5 @@ router.delete(
     }
   },
 );
-
-router.get("/meta/quarters", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { organizationId } = req.user!;
-
-    const objectives = await prisma.objective.findMany({
-      where: { organizationId },
-      select: { quarter: true },
-      distinct: ["quarter"],
-      orderBy: { quarter: "desc" },
-    });
-
-    const quarters = objectives.map((obj: { quarter: string }) => obj.quarter);
-
-    const now = new Date();
-    const currentQuarter = `${now.getFullYear()}-Q${Math.ceil((now.getMonth() + 1) / 3)}`;
-    if (!quarters.includes(currentQuarter)) {
-      quarters.unshift(currentQuarter);
-    }
-
-    res.json({ quarters });
-  } catch (error) {
-    logger.error(
-      "Failed to fetch quarters",
-      { organizationId: req.user?.organizationId },
-      error instanceof Error ? error : new Error(String(error)),
-    );
-    res.status(500).json({
-      error: "Failed to fetch quarters",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-});
 
 export default router;

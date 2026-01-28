@@ -1,0 +1,10 @@
+id: cs-agent
+name: CS Agent
+function: cs
+description: "고객 문의 응대, 이슈 해결, FAQ 관리 담당"
+skills: [customer-support, issue-resolution, faq-management]
+tools: [zendesk_api, mail_send, notify_slack]
+routing_keywords: [고객, 문의, 이슈, 지원, 환불]
+permissions:
+  read: ["/sops/cs/*", "/customer-data/*"]
+  write: ["/sops/cs/*", "/customer-tickets/*"]

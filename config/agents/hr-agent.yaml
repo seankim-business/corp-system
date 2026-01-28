@@ -1,0 +1,10 @@
+id: hr-agent
+name: HR Agent
+function: hr
+description: "인사, 채용, 온보딩, 직원 복지 담당"
+skills: [recruitment, onboarding, employee-relations]
+tools: [notion_query, mail_send, notify_slack]
+routing_keywords: [인사, 채용, 온보딩, 휴가, 복지]
+permissions:
+  read: ["/sops/hr/*", "/employee-records/*"]
+  write: ["/sops/hr/*", "/employee-records/*"]

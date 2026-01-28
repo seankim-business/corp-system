@@ -1,0 +1,10 @@
+id: brand-agent
+name: Brand Agent
+function: brand
+description: "마케팅 캠페인, 콘텐츠, 브랜드 가이드라인 담당"
+skills: [content-creation, brand-guidelines, campaign-planning]
+tools: [notion_query, drive_read, notify_slack]
+routing_keywords: [캠페인, 브리프, 콘텐츠, 브랜드, 마케팅]
+permissions:
+  read: ["/sops/brand/*", "/docs/marketing/*"]
+  write: ["/sops/brand/*"]

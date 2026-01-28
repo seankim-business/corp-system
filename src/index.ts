@@ -364,7 +364,7 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, gdprRoutes);
 app.use("/api/dashboard", apiRateLimiter, authenticate, sentryUserContext, dashboardRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, membersRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, approvalsRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, okrRoutes);
+app.use("/api/okr", apiRateLimiter, authenticate, sentryUserContext, okrRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, orgChangesRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, searchRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, driveRoutes);
