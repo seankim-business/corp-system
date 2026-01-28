@@ -84,8 +84,9 @@ router.get("/google/callback", async (req: Request, res: Response) => {
   // Handle OAuth error (user denied access, etc.)
   if (oauthError) {
     logger.warn("OAuth error from Google", { error: oauthError, state });
-    const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "https://nubabel.com";
-    return res.redirect(`${frontendUrl}/login?error=${oauthError}`);
+    const errorRedirectUrl = process.env.FRONTEND_URL ||
+      (process.env.NODE_ENV === "production" ? "https://app.nubabel.com" : "http://localhost:5173");
+    return res.redirect(`${errorRedirectUrl}/login?error=${oauthError}`);
   }
 
   if (!code) {
@@ -116,8 +117,9 @@ router.get("/google/callback", async (req: Request, res: Response) => {
         keyExisted: keyExists,
         redisConnected: keyExists !== undefined,
       });
-      const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "https://nubabel.com";
-      return res.redirect(`${frontendUrl}/login?error=session_expired`);
+      const sessionExpiredRedirectUrl = process.env.FRONTEND_URL ||
+        (process.env.NODE_ENV === "production" ? "https://app.nubabel.com" : "http://localhost:5173");
+      return res.redirect(`${sessionExpiredRedirectUrl}/login?error=session_expired`);
     }
 
     logger.info("PKCE session validated", { state });
@@ -144,8 +146,15 @@ router.get("/google/callback", async (req: Request, res: Response) => {
 
     // Redirect to the frontend app after successful OAuth
     // FRONTEND_URL is app.nubabel.com (the actual app)
-    // BASE_URL is auth.nubabel.com (the auth server)
-    const redirectUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL}/dashboard`;
+    // BASE_URL is auth.nubabel.com (the auth server) - should NOT be used for redirect
+    // If FRONTEND_URL is not set, explicitly use app.nubabel.com in production
+    const frontendUrl = process.env.FRONTEND_URL ||
+      (process.env.NODE_ENV === "production" ? "https://app.nubabel.com" : process.env.BASE_URL || "http://localhost:5173");
+    const redirectUrl = `${frontendUrl}/dashboard`;
+
+    if (!process.env.FRONTEND_URL) {
+      logger.warn("FRONTEND_URL not set, using fallback", { fallback: frontendUrl });
+    }
 
     const cookieDomain = getCookieDomain();
 
@@ -160,10 +169,12 @@ router.get("/google/callback", async (req: Request, res: Response) => {
     });
 
     // Cookie options - domain is optional, browser defaults to exact host if not set
+    // NOTE: sameSite must be "none" for cross-site cookie sharing between
+    // auth.nubabel.com (sets cookie) and app.nubabel.com (reads cookie via API)
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
       ...(cookieDomain && { domain: cookieDomain }),
     };
 
@@ -215,7 +226,7 @@ router.post("/register", loginLimiter, async (req: Request, res: Response) => {
     const registerCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
       ...(cookieDomain && { domain: cookieDomain }),
     };
 
@@ -265,7 +276,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     const loginCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
       ...(cookieDomain && { domain: cookieDomain }),
     };
 
@@ -383,7 +394,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
     res.cookie("session", newSessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 1 * 60 * 60 * 1000,
       ...(cookieDomain && { domain: cookieDomain }),
     });
@@ -408,7 +419,7 @@ router.post("/switch-org", authenticate, async (req: Request, res: Response) => 
     const switchCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
       ...(cookieDomain && { domain: cookieDomain }),
     };
 
