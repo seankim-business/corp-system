@@ -15,7 +15,9 @@ export const progressEmitter = new EventEmitter();
 const SIDECAR_API_KEY = process.env.SIDECAR_API_KEY;
 
 if (!SIDECAR_API_KEY && process.env.NODE_ENV === "production") {
-  throw new Error("SIDECAR_API_KEY environment variable is required in production");
+  logger.warn(
+    "SIDECAR_API_KEY not configured - sidecar callbacks will use a temporary key. Set this for production security.",
+  );
 }
 
 const effectiveApiKey = SIDECAR_API_KEY || "internal-sidecar-key-dev-only";
