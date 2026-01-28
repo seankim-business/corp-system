@@ -1,172 +1,163 @@
 /**
  * AgentActivityPage
  *
- * Real-time agent activity visualization using SSE
+ * Agent activity and execution history
  */
 
-import { useState, useCallback } from "react";
-import { useSSE, SSEEvent } from "../hooks/useSSE";
+import { useEffect, useState } from "react";
+import { request } from "../api/client";
 
-interface ActivityEvent {
+interface Activity {
   id: string;
-  type: string;
-  data: Record<string, unknown>;
-  timestamp: number;
+  agentId: string;
+  agentName: string;
+  action: string;
+  status: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
 }
 
 export default function AgentActivityPage() {
-  const [events, setEvents] = useState<ActivityEvent[]>([]);
-  const [filter, setFilter] = useState<string>("all");
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  const handleEvent = useCallback((event: SSEEvent) => {
-    const newEvent: ActivityEvent = {
-      id: `${event.timestamp}-${Math.random().toString(36).slice(2)}`,
-      type: event.type,
-      data: event.data as Record<string, unknown>,
-      timestamp: event.timestamp,
-    };
-    setEvents((prev) => [newEvent, ...prev].slice(0, 100)); // Keep last 100
+  const fetchActivities = async () => {
+    try {
+      const data = await request<{ activities: Activity[] }>({
+        url: "/api/agent-activity",
+        method: "GET",
+      });
+      setActivities(data.activities || []);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Failed to fetch activities:", error);
+      setError(error instanceof Error ? error.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActivities();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchActivities();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const { isConnected, error, reconnect } = useSSE({
-    url: "/api/events",
-    onEvent: handleEvent,
-  });
-
-  const filteredEvents = events.filter((e) => {
-    if (filter === "all") return true;
-    return e.type === filter;
-  });
-
-  const getEventTypeColor = (type: string) => {
-    if (type.includes("started")) return "bg-blue-100 text-blue-800";
-    if (type.includes("completed")) return "bg-green-100 text-green-800";
-    if (type.includes("failed") || type.includes("error")) return "bg-red-100 text-red-800";
-    if (type.includes("progress")) return "bg-yellow-100 text-yellow-800";
-    return "bg-gray-100 text-gray-800";
+  const handleRefresh = () => {
+    fetchActivities();
   };
 
-  const getEventIcon = (type: string) => {
-    if (type.includes("started")) return "🚀";
-    if (type.includes("completed")) return "✅";
-    if (type.includes("failed")) return "❌";
-    if (type.includes("progress")) return "⏳";
-    if (type.includes("notification")) return "🔔";
-    return "📌";
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "success":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      case "running":
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
   };
 
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString();
-  };
-
-  const eventTypes = [
-    "all",
-    "execution:started",
-    "execution:progress",
-    "execution:completed",
-    "execution:failed",
-    "workflow:updated",
-    "notification",
-  ];
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+          <p className="mt-4 text-gray-600">Loading activity...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Agent Activity</h1>
-        <p className="text-gray-600">Real-time monitoring of agent operations</p>
-      </div>
-
-      <div className="mb-4 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-block w-3 h-3 rounded-full ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
-          />
-          <span className="text-sm text-gray-600">
-            {isConnected ? "Connected" : "Disconnected"}
-          </span>
+    <div>
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Agent Activity</h1>
+            <p className="text-gray-600">View agent execution history and actions</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleRefresh}
+              className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            >
+              Refresh
+            </button>
+            <span className="text-sm text-gray-500">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          </div>
         </div>
-        {!isConnected && (
-          <button onClick={reconnect} className="text-sm text-blue-600 hover:text-blue-800">
-            Reconnect
-          </button>
-        )}
-        {error && <span className="text-sm text-red-600">{error}</span>}
       </div>
 
-      <div className="mb-6 flex gap-2 flex-wrap">
-        {eventTypes.map((type) => (
-          <button
-            key={type}
-            onClick={() => setFilter(type)}
-            className={`px-3 py-1 rounded-full text-sm ${
-              filter === type
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {type === "all" ? "All Events" : type.replace(":", ": ")}
-          </button>
-        ))}
-      </div>
+      {error && <div className="text-red-500 p-4">{error}</div>}
 
-      <div className="mb-4 text-sm text-gray-500">
-        Showing {filteredEvents.length} events
-        {filter !== "all" && ` (filtered by ${filter})`}
-      </div>
-
-      {filteredEvents.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
-          <div className="text-4xl mb-4">📡</div>
-          <h2 className="text-xl font-semibold text-gray-700">Waiting for events...</h2>
-          <p className="text-gray-500 mt-2">
-            Events will appear here in real-time as agents execute workflows
-          </p>
+      {activities.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="max-w-md mx-auto">
+            <div className="text-6xl mb-4">📊</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              No activity yet
+            </h2>
+            <p className="text-gray-600">
+              Agent activity will appear here when agents perform actions
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredEvents.map((event) => (
-            <div
-              key={event.id}
-              className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{getEventIcon(event.type)}</span>
-                  <div>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Agent
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Action
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Time
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {activities.map((activity) => (
+                <tr key={activity.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {activity.agentName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {activity.action}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`inline-block px-2 py-1 rounded text-xs font-medium ${getEventTypeColor(
-                        event.type,
+                      className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                        activity.status
                       )}`}
                     >
-                      {event.type}
+                      {activity.status}
                     </span>
-                    <p className="text-sm text-gray-500 mt-1">{formatTime(event.timestamp)}</p>
-                  </div>
-                </div>
-              </div>
-
-              {Object.keys(event.data).length > 0 && (
-                <div className="mt-3 p-3 bg-gray-50 rounded text-sm">
-                  <pre className="text-gray-700 overflow-x-auto">
-                    {JSON.stringify(event.data, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {events.length > 0 && (
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setEvents([])}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            Clear all events
-          </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(activity.createdAt).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

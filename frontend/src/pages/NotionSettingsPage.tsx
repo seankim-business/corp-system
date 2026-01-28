@@ -1,11 +1,11 @@
 /**
  * Notion Settings Page
- *
+ * 
  * 기획:
  * - Organization의 Notion API Key 설정
  * - 데이터베이스 목록 조회
  * - 연결 테스트
- *
+ * 
  * 구조:
  * NotionSettingsPage
  * ├── API Key Input Form
@@ -33,31 +33,12 @@ interface NotionDatabase {
 export default function NotionSettingsPage() {
   const [connection, setConnection] = useState<NotionConnection | null>(null);
   const [databases, setDatabases] = useState<NotionDatabase[]>([]);
-  const [apiKey, setApiKey] = useState("");
-  const [defaultDatabaseId, setDefaultDatabaseId] = useState("");
+  const [apiKey, setApiKey] = useState('');
+  const [defaultDatabaseId, setDefaultDatabaseId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [isResettingCircuit, setIsResettingCircuit] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const isCircuitBreakerError = message?.text?.toLowerCase().includes("circuit breaker");
-
-  const resetCircuitBreaker = async () => {
-    setIsResettingCircuit(true);
-    try {
-      await request({
-        url: "/health/circuits/reset",
-        method: "POST",
-        data: { name: "notion-api" },
-      });
-      setMessage({ type: "success", text: "Circuit breaker reset. Please try again." });
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to reset circuit breaker" });
-    } finally {
-      setIsResettingCircuit(false);
-    }
-  };
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     fetchConnection();
@@ -97,7 +78,7 @@ export default function NotionSettingsPage() {
 
   const testConnection = async () => {
     if (!apiKey) {
-      setMessage({ type: "error", text: "Please enter an API key" });
+      setMessage({ type: 'error', text: 'Please enter an API key' });
       return;
     }
 
@@ -127,67 +108,67 @@ export default function NotionSettingsPage() {
     }
   };
 
-  const saveConnection = async () => {
-    if (!apiKey) {
-      setMessage({ type: "error", text: "Please enter an API key" });
-      return;
-    }
+   const saveConnection = async () => {
+     if (!apiKey) {
+       setMessage({ type: 'error', text: 'Please enter an API key' });
+       return;
+     }
 
-    setIsSaving(true);
-    setMessage(null);
+     setIsSaving(true);
+     setMessage(null);
 
-    try {
-      const method = connection ? "PUT" : "POST";
-      interface SaveConnectionResponse {
-        connection: NotionConnection;
-        error?: string;
-      }
-      const data = await request<SaveConnectionResponse>({
-        url: "/api/notion/connection",
-        method,
-        data: { apiKey, defaultDatabaseId },
-      });
+     try {
+       const method = connection ? 'PUT' : 'POST';
+       interface SaveConnectionResponse {
+         connection: NotionConnection;
+         error?: string;
+       }
+       const data = await request<SaveConnectionResponse>({
+         url: '/api/notion/connection',
+         method,
+         data: { apiKey, defaultDatabaseId },
+       });
 
-      setConnection(data.connection);
-      setMessage({ type: "success", text: "Notion connection saved successfully" });
-      await fetchDatabases();
-      setApiKey("");
-    } catch (error) {
-      const text = error instanceof ApiError ? error.message : "Failed to save connection";
-      setMessage({ type: "error", text });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+       setConnection(data.connection);
+       setMessage({ type: 'success', text: 'Notion connection saved successfully' });
+       await fetchDatabases();
+       setApiKey('');
+     } catch (error) {
+       const text = error instanceof ApiError ? error.message : 'Failed to save connection';
+       setMessage({ type: 'error', text });
+     } finally {
+       setIsSaving(false);
+     }
+   };
 
-  const deleteConnection = async () => {
-    if (!confirm("Are you sure you want to delete the Notion connection?")) {
-      return;
-    }
+   const deleteConnection = async () => {
+     if (!confirm('Are you sure you want to delete the Notion connection?')) {
+       return;
+     }
 
-    setIsSaving(true);
-    setMessage(null);
+     setIsSaving(true);
+     setMessage(null);
 
-    try {
-      interface DeleteConnectionResponse {
-        success: boolean;
-      }
-      await request<DeleteConnectionResponse>({
-        url: "/api/notion/connection",
-        method: "DELETE",
-      });
+     try {
+       interface DeleteConnectionResponse {
+         success: boolean;
+       }
+       await request<DeleteConnectionResponse>({
+         url: '/api/notion/connection',
+         method: 'DELETE',
+       });
 
-      setConnection(null);
-      setDatabases([]);
-      setDefaultDatabaseId("");
-      setMessage({ type: "success", text: "Notion connection deleted" });
-    } catch (error) {
-      const text = error instanceof ApiError ? error.message : "Failed to delete connection";
-      setMessage({ type: "error", text });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+       setConnection(null);
+       setDatabases([]);
+       setDefaultDatabaseId('');
+       setMessage({ type: 'success', text: 'Notion connection deleted' });
+     } catch (error) {
+       const text = error instanceof ApiError ? error.message : 'Failed to delete connection';
+       setMessage({ type: 'error', text });
+     } finally {
+       setIsSaving(false);
+     }
+   };
 
   if (isLoading) {
     return (
@@ -210,23 +191,12 @@ export default function NotionSettingsPage() {
       {message && (
         <div
           className={`mb-6 p-4 rounded-lg ${
-            message.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
+            message.type === 'success'
+              ? 'bg-green-50 text-green-800 border border-green-200'
+              : 'bg-red-50 text-red-800 border border-red-200'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span>{message.text}</span>
-            {isCircuitBreakerError && (
-              <button
-                onClick={resetCircuitBreaker}
-                disabled={isResettingCircuit}
-                className="ml-4 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
-              >
-                {isResettingCircuit ? "Resetting..." : "Reset Circuit Breaker"}
-              </button>
-            )}
-          </div>
+          {message.text}
         </div>
       )}
 
@@ -242,11 +212,11 @@ export default function NotionSettingsPage() {
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder={connection ? "••••••••••••••••" : "secret_..."}
+            placeholder={connection ? '••••••••••••••••' : 'secret_...'}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
           <p className="mt-2 text-sm text-gray-500">
-            Create an integration at{" "}
+            Create an integration at{' '}
             <a
               href="https://www.notion.so/my-integrations"
               target="_blank"
@@ -264,7 +234,7 @@ export default function NotionSettingsPage() {
             disabled={isTesting || !apiKey}
             className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isTesting ? "Testing..." : "Test Connection"}
+            {isTesting ? 'Testing...' : 'Test Connection'}
           </button>
 
           <button
@@ -272,7 +242,7 @@ export default function NotionSettingsPage() {
             disabled={isSaving || !apiKey}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSaving ? "Saving..." : connection ? "Update" : "Save"}
+            {isSaving ? 'Saving...' : connection ? 'Update' : 'Save'}
           </button>
 
           {connection && (
@@ -339,54 +309,10 @@ export default function NotionSettingsPage() {
       {connection && databases.length === 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h3 className="text-lg font-medium text-yellow-900 mb-2">No databases found</h3>
-          <p className="text-yellow-700 mb-4">
-            Your Notion integration is connected, but it doesn't have access to any databases yet.
+          <p className="text-yellow-700">
+            Make sure your integration has access to at least one database. Share a database with
+            your integration in Notion.
           </p>
-          <div className="bg-yellow-100 rounded-md p-4 mb-4">
-            <p className="text-sm font-medium text-yellow-800 mb-2">How to grant access:</p>
-            <ol className="text-sm text-yellow-700 list-decimal list-inside space-y-1">
-              <li>Open the database you want to connect in Notion</li>
-              <li>
-                Click the <strong>...</strong> menu in the top-right corner
-              </li>
-              <li>
-                Select <strong>Connections</strong> (or Add connections)
-              </li>
-              <li>Find and add your integration</li>
-            </ol>
-          </div>
-          <div className="flex gap-3">
-            <a
-              href="https://notion.so"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700"
-            >
-              Open Notion
-              <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </a>
-            <button
-              onClick={() => fetchDatabases()}
-              className="inline-flex items-center px-4 py-2 bg-white border border-yellow-300 text-yellow-700 text-sm font-medium rounded-md hover:bg-yellow-50"
-            >
-              <svg className="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh Databases
-            </button>
-          </div>
         </div>
       )}
     </div>

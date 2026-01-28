@@ -1,28 +1,22 @@
-import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import GoogleButton from '../components/common/GoogleButton';
 
 const ERROR_MESSAGES: Record<string, string> = {
-  session_expired: 'Your login session has expired. Please try again.',
-  auth_failed: 'Authentication failed. Please try again.',
-  access_denied: 'Access was denied. Please try again and grant the required permissions.',
-  invalid_request: 'Invalid authentication request. Please try again.',
-  server_error: 'Server error occurred. Please try again later.',
+  session_expired: 'Your login session expired. Please try again.',
+  access_denied: 'Access was denied. Please try again.',
+  invalid_request: 'Invalid login request. Please try again.',
+  server_error: 'A server error occurred. Please try again later.',
 };
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const errorParam = searchParams.get('error');
-    if (errorParam && ERROR_MESSAGES[errorParam]) {
-      setError(ERROR_MESSAGES[errorParam]);
-    }
-  }, [searchParams]);
+  const error = searchParams.get('error');
+  const errorMessage = error ? ERROR_MESSAGES[error] || `Login failed: ${error}` : null;
 
   const handleGoogleLogin = () => {
-    window.location.href = '/auth/google';
+    // Auth routes are on auth.nubabel.com, redirect there for OAuth flow
+    const authBaseUrl = import.meta.env.VITE_AUTH_URL || 'https://auth.nubabel.com';
+    window.location.href = `${authBaseUrl}/auth/google`;
   };
 
   return (
@@ -33,9 +27,9 @@ export default function LoginPage() {
           <p className="text-gray-600">AI-Powered Workflow Automation</p>
         </div>
 
-        {error && (
+        {errorMessage && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700 text-sm text-center">{error}</p>
+            <p className="text-sm text-red-700">{errorMessage}</p>
           </div>
         )}
 

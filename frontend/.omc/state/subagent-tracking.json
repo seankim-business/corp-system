@@ -1,0 +1,80 @@
+{
+  "agents": [
+    {
+      "agent_id": "a8f0081",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-01-28T15:28:33.163Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:28:57.331Z",
+      "duration_ms": 24168
+    },
+    {
+      "agent_id": "aed9fda",
+      "agent_type": "oh-my-claudecode:build-fixer",
+      "started_at": "2026-01-28T15:28:33.212Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:29:51.024Z",
+      "duration_ms": 77812
+    },
+    {
+      "agent_id": "aa53e78",
+      "agent_type": "oh-my-claudecode:build-fixer",
+      "started_at": "2026-01-28T15:28:33.216Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:29:50.251Z",
+      "duration_ms": 77035
+    },
+    {
+      "agent_id": "a187eb8",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-01-28T15:28:33.269Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:31:39.584Z",
+      "duration_ms": 186315
+    },
+    {
+      "agent_id": "a29fa5f",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-01-28T15:28:33.322Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:30:22.151Z",
+      "duration_ms": 108829
+    },
+    {
+      "agent_id": "a11e7ec",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-01-28T15:44:07.275Z",
+      "parent_mode": "ultrawork",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:48:56.833Z",
+      "duration_ms": 289558
+    },
+    {
+      "agent_id": "a95db6d",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-01-28T15:44:07.360Z",
+      "parent_mode": "ultrawork",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:44:57.755Z",
+      "duration_ms": 50395
+    },
+    {
+      "agent_id": "a681a60",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-01-28T15:49:21.300Z",
+      "parent_mode": "ultrawork",
+      "status": "failed",
+      "completed_at": "2026-01-28T15:59:31.971Z",
+      "duration_ms": 610671
+    }
+  ],
+  "total_spawned": 8,
+  "total_completed": 0,
+  "total_failed": 8,
+  "last_updated": "2026-01-28T16:02:52.860Z"
+}

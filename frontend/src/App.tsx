@@ -36,8 +36,16 @@ import AgentActivityPage from "./pages/AgentActivityPage";
 import AgentMetricsPage from "./pages/AgentMetricsPage";
 import OrgChangesPage from "./pages/OrgChangesPage";
 import OKRPage from "./pages/OKRPage";
+import AgentsPage from "./pages/AgentsPage";
+import SkillsPage from "./pages/SkillsPage";
+import ConversationsPage from "./pages/ConversationsPage";
+import SearchPage from "./pages/SearchPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminOrganizationsPage from "./pages/admin/AdminOrganizationsPage";
+import MetaAgentDashboardPage from "./pages/MetaAgentDashboardPage";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 
 function App() {
   return (
@@ -205,6 +213,83 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <OrgChangesPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/agents"
+          element={
+            <AdminRoute>
+              <DashboardLayout>
+                <AgentsPage />
+              </DashboardLayout>
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/skills"
+          element={
+            <AdminRoute>
+              <DashboardLayout>
+                <SkillsPage />
+              </DashboardLayout>
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <DashboardLayout>
+                <AdminDashboardPage />
+              </DashboardLayout>
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/organizations"
+          element={
+            <AdminRoute>
+              <DashboardLayout>
+                <AdminOrganizationsPage />
+              </DashboardLayout>
+            </AdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/system"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <MetaAgentDashboardPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/conversations"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ConversationsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/search"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <SearchPage />
               </DashboardLayout>
             </ProtectedRoute>
           }
