@@ -61,7 +61,7 @@ export class WorkflowExecutor {
         context.currentNode = node.id;
 
         const result = await this.executeNode(node, context, workflow);
-        context.nodeResults.set(node.id, result as any);
+        context.nodeResults[node.id] = result;
         lastResult = result;
 
         if (result.status === "failed") {

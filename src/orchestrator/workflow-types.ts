@@ -1,128 +1,33 @@
 import { z } from "zod";
 
-export type WorkflowStatus =
-  | "pending"
-  | "running"
-  | "waiting_approval"
-  | "completed"
-  | "failed"
-  | "success"
-  | "cancelled";
-
-export interface PendingApproval {
-  approvalId: string;
-  nodeId: string;
-  reason: string;
-  requestedAt: Date;
-  expiresAt: Date;
-}
-
 export interface WorkflowContext {
-  executionId: string;
-  workflowName: string;
   organizationId: string;
   userId: string;
   sessionId: string;
   variables: Record<string, unknown>;
-  nodeResults: Map<string, WorkflowStepResult>;
+  nodeResults: Record<string, NodeResult>;
   currentNode: string;
-  status: WorkflowStatus;
+  status: "pending" | "running" | "waiting_approval" | "completed" | "failed";
   startedAt: Date;
   completedAt?: Date;
-  input?: Record<string, unknown>;
-  output?: Record<string, unknown>;
-  history: WorkflowHistoryEntry[];
-  error?: { code: string; message: string };
-  pendingApproval?: PendingApproval;
 }
 
 export interface NodeResult {
   nodeId: string;
-  status: "pending" | "running" | "success" | "failed" | "skipped" | "waiting";
-  output?: unknown;
-  error?: string;
-  duration?: number;
-}
-
-export interface WorkflowStepResult {
-  nodeId: string;
-  status: "pending" | "running" | "success" | "failed" | "skipped" | "waiting";
-  output: unknown;
-  duration: number;
-  error?: { code: string; message: string };
-  metadata?: Record<string, unknown>;
-}
-
-export interface WorkflowHistoryEntry {
-  nodeId: string;
   status: "pending" | "running" | "success" | "failed" | "skipped";
-  startedAt: Date;
-  completedAt?: Date;
-  duration?: number;
   output?: unknown;
   error?: string;
-}
-
-export interface WorkflowExecutionOptions {
-  input?: Record<string, unknown>;
-  dryRun?: boolean;
-  resumeFromNode?: string;
-  contextOverrides?: Partial<WorkflowContext>;
-}
-
-export interface WorkflowExecutionResult {
-  executionId: string;
-  workflowName: string;
-  status: WorkflowStatus;
-  output?: Record<string, unknown>;
-  duration: number;
-  stats: {
-    totalNodes: number;
-    executedNodes: number;
-    successNodes: number;
-    failedNodes: number;
-    skippedNodes: number;
-  };
-  history: WorkflowHistoryEntry[];
-  error?: { code: string; message: string };
-  pendingApproval?: {
-    id: string;
-    executionId: string;
-    nodeId: string;
-    organizationId: string;
-    requestedBy: string;
-    type: string;
-    reason: string;
-    contextData: Record<string, unknown>;
-    status: string;
-    createdAt: Date;
-    expiresAt: Date;
-  };
-}
-
-export interface ParallelExecutionResult {
-  results: WorkflowStepResult[];
-  allSucceeded: boolean;
-  duration: number;
-}
-
-export interface RetryConfig {
-  maxAttempts: number;
-  backoffMs: number;
+  duration?: number;
 }
 
 export interface WorkflowNode {
   id: string;
-  type: "agent" | "condition" | "parallel" | "human_approval" | "function";
+  type: "agent" | "condition" | "parallel" | "human_approval";
   agentId?: string;
   condition?: string;
   parallelAgents?: string[];
   approvalType?: string;
   timeout?: number;
-  description?: string;
-  handler?: (context: WorkflowContext) => Promise<WorkflowStepResult>;
-  function?: string;
-  retry?: RetryConfig;
 }
 
 export interface WorkflowEdge {

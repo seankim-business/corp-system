@@ -72,12 +72,6 @@ interface ExecutionItem {
   createdAt: Date;
 }
 
-interface UserBasic {
-  id: string;
-  displayName: string | null;
-  email: string;
-}
-
 interface MembershipBriefing {
   userId: string;
   organizationId: string;
@@ -94,24 +88,49 @@ export async function generateDailyBriefing(
 
   const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const pendingApprovals = await prisma.approval.findMany({
-    where: {
-      organizationId,
-      status: "pending",
-      OR: [{ approverId: userId }, { fallbackApproverId: userId }],
-    },
-    orderBy: { expiresAt: "asc" },
-    take: 5,
-  });
+  // Fetch approvals with requester data in a single optimized query
+  const pendingApprovalsWithRequesters = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      type: string;
+      title: string;
+      requesterId: string;
+      expiresAt: Date;
+      requesterDisplayName: string | null;
+      requesterEmail: string;
+    }>
+  >`
+     SELECT 
+       a.id,
+       a.type,
+       a.title,
+       a.requester_id as "requesterId",
+       a.expires_at as "expiresAt",
+       u.display_name as "requesterDisplayName",
+       u.email as "requesterEmail"
+     FROM approvals a
+     LEFT JOIN users u ON a.requester_id = u.id
+     WHERE a.organization_id = ${organizationId}::uuid
+       AND a.status = 'pending'
+       AND (a.approver_id = ${userId}::uuid OR a.fallback_approver_id = ${userId}::uuid)
+     ORDER BY a.expires_at ASC
+     LIMIT 5
+   `;
 
-  const requesterIds = [...new Set(pendingApprovals.map((a: ApprovalItem) => a.requesterId))];
-  const requesters = await prisma.user.findMany({
-    where: { id: { in: requesterIds } },
-    select: { id: true, displayName: true, email: true },
-  });
   const requesterMap = new Map(
-    requesters.map((r: UserBasic) => [r.id, r.displayName || r.email || "Unknown"]),
+    pendingApprovalsWithRequesters.map((a: any) => [
+      a.requesterId,
+      a.requesterDisplayName || a.requesterEmail || "Unknown",
+    ]),
   );
+
+  const pendingApprovals = pendingApprovalsWithRequesters.map((a: any) => ({
+    id: a.id,
+    type: a.type,
+    title: a.title,
+    requesterId: a.requesterId,
+    expiresAt: a.expiresAt,
+  }));
 
   const recentExecutions = await prisma.orchestratorExecution.findMany({
     where: {

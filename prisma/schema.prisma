@@ -144,12 +144,13 @@ model Session {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([organizationId])
-  @@index([tokenHash])
-  @@index([expiresAt])
-  @@index([source])
-  @@map("sessions")
+   @@index([userId])
+   @@index([organizationId])
+   @@index([organizationId, expiresAt])
+   @@index([tokenHash])
+   @@index([expiresAt])
+   @@index([source])
+   @@map("sessions")
 }
 
 // ============================================================================
@@ -264,10 +265,11 @@ model Task {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project?     @relation(fields: [projectId], references: [id])
 
-  @@index([organizationId, id])
-  @@index([organizationId, status])
-  @@index([organizationId, dueDate])
-  @@map("tasks")
+   @@index([organizationId, id])
+   @@index([organizationId, status])
+   @@index([organizationId, dueDate])
+   @@index([organizationId, projectId])
+   @@map("tasks")
 }
 
 /// Goals (Hierarchical)
@@ -382,10 +384,10 @@ model WorkflowExecution {
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
-  @@index([workflowId])
-  @@index([status])
-  @@index([createdAt(sort: Desc)])
-  @@map("workflow_executions")
+   @@index([workflowId])
+   @@index([status])
+   @@index([createdAt(sort: Desc)])
+   @@map("workflow_executions")
 }
 
 /// Orchestrator Executions (Conversation / delegation history)
@@ -415,11 +417,12 @@ model OrchestratorExecution {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId, createdAt(sort: Desc)])
-  @@index([userId, createdAt(sort: Desc)])
-  @@index([sessionId])
-  @@index([status])
-  @@map("orchestrator_executions")
+   @@index([organizationId, createdAt(sort: Desc)])
+   @@index([organizationId, status])
+   @@index([userId, createdAt(sort: Desc)])
+   @@index([sessionId])
+   @@index([status])
+   @@map("orchestrator_executions")
 }
 
 // ============================================================================
@@ -443,10 +446,11 @@ model MCPConnection {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId])
-  @@index([provider])
-  @@index([namespace])
-  @@map("mcp_connections")
+   @@index([organizationId])
+   @@index([organizationId, enabled])
+   @@index([provider])
+   @@index([namespace])
+   @@map("mcp_connections")
 }
 
 /// Legacy Notion Connections (Backward compatibility)
@@ -546,9 +550,10 @@ model FeatureFlagRule {
 
   featureFlag FeatureFlag @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
 
-  @@index([featureFlagId, priority])
-  @@index([type])
-  @@map("feature_flag_rules")
+   @@index([featureFlagId, priority])
+   @@index([enabled, priority])
+   @@index([type])
+   @@map("feature_flag_rules")
 }
 
 model FeatureFlagOverride {
@@ -646,11 +651,12 @@ model Approval {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([organizationId, status])
-  @@index([approverId, status])
-  @@index([requesterId])
-  @@index([expiresAt])
-  @@map("approvals")
+   @@index([organizationId, status])
+   @@index([approverId, status])
+   @@index([fallbackApproverId])
+   @@index([requesterId])
+   @@index([expiresAt])
+   @@map("approvals")
 }
 
 // ============================================================================

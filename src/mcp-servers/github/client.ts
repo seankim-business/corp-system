@@ -11,12 +11,19 @@ import {
   GitHubPullRequest,
   GitHubRepository,
   GitHubFileContent,
+  GitHubReference,
   GetIssuesInput,
   CreateIssueInput,
   UpdateIssueInput,
   GetPullRequestsInput,
   CreatePullRequestInput,
   GetFileInput,
+  GetReferenceInput,
+  CreateBranchInput,
+  CreateBranchOutput,
+  CreateOrUpdateFileInput,
+  CreateOrUpdateFileOutput,
+  AddLabelsInput,
 } from "./types";
 import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
 import { MCPConnection } from "../../orchestrator/types";

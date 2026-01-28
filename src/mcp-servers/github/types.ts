@@ -190,3 +190,56 @@ export interface GitHubConnection {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface GitHubReference {
+  ref: string;
+  sha: string;
+  url: string;
+}
+
+export interface GetReferenceInput {
+  owner: string;
+  repo: string;
+  ref: string;
+}
+
+export interface CreateBranchInput {
+  owner: string;
+  repo: string;
+  branchName: string;
+  fromRef?: string;
+}
+
+export interface CreateBranchOutput {
+  ref: string;
+  sha: string;
+}
+
+export interface CreateOrUpdateFileInput {
+  owner: string;
+  repo: string;
+  path: string;
+  message: string;
+  content: string;
+  branch?: string;
+  sha?: string;
+}
+
+export interface CreateOrUpdateFileOutput {
+  path: string;
+  sha: string;
+  htmlUrl: string;
+}
+
+export interface AddLabelsInput {
+  owner: string;
+  repo: string;
+  issueNumber: number;
+  labels: string[];
+}
+
+export interface GitHubCommit {
+  sha: string;
+  message: string;
+  htmlUrl: string;
+}
