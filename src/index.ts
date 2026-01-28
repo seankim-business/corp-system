@@ -60,6 +60,7 @@ import googleCalendarRoutes from "./api/google-calendar";
 import githubRoutes from "./api/github";
 import githubSsotRoutes from "./api/github-ssot";
 import sopRoutes from "./api/sop";
+import sopsRoutes from "./api/sops";
 // import sopEditorRoutes from "./api/sop-editor";
 import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
@@ -67,6 +68,9 @@ import dailyBriefingRoutes from "./api/daily-briefing";
 import syncRoutes from "./api/sync";
 import delegationRoutes from "./api/delegations";
 import agentMetricsRoutes from "./api/agent-metrics";
+import agentHierarchyRoutes from "./api/agent-hierarchy";
+import agentActivityRoutes from "./api/agent-activity";
+import regionsRoutes from "./api/regions";
 // import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
 // import onboardingRoutes from "./api/onboarding";
@@ -81,8 +85,8 @@ import agentMetricsRoutes from "./api/agent-metrics";
 // import alertsRoutes from "./api/alerts";
 // import analyticsRoutes from "./api/analytics";
 // import metaAgentRoutes from "./api/meta-agent";
-// import billingRoutes from "./api/billing";
-// import stripeWebhookRoutes from "./api/stripe-webhook";
+import billingRoutes from "./api/billing";
+import stripeWebhookRoutes from "./api/stripe-webhook";
 // import v1ApiRouter from "./api/v1";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
@@ -94,6 +98,7 @@ import { db } from "./db/client";
 import { shutdownOpenTelemetry } from "./instrumentation";
 import { logger } from "./utils/logger";
 import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
+import { adminRouter } from "./admin";
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
 
@@ -433,6 +438,7 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, googleCalendarR
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubSsotRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
+app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopsRoutes);
 // app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopEditorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
@@ -440,8 +446,12 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRo
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSettingsRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
+app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHierarchyRoutes);
+app.use("/api/agent-activity", apiRateLimiter, authenticate, sentryUserContext, agentActivityRoutes);
+app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
 // app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
@@ -454,8 +464,8 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRou
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
 // app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
-// app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
-// app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
+app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
+app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
 app.use("/api", sseRouter);
 
 // Public API v1 (external developer access with API key auth)
@@ -538,7 +548,6 @@ if (process.env.NODE_ENV === "production") {
   const frontendPath = path.join(__dirname, "../frontend/dist");
   const landingPath = path.join(__dirname, "../landing");
 
-  // Serve landing page for root domain (nubabel.com)
   app.use((req, res, next) => {
     const host = req.get("host") || "";
 
@@ -547,28 +556,32 @@ if (process.env.NODE_ENV === "production") {
       if (req.path === "/" || req.path === "/index.html") {
         return res.sendFile(path.join(landingPath, "index.html"));
       }
-      // Serve landing static assets (images, etc.)
       return express.static(landingPath)(req, res, next);
     }
 
-    // Subdomains (app.nubabel.com, auth.nubabel.com) → frontend app
-    next();
-  });
-
-  // Serve frontend app static files
-  app.use(express.static(frontendPath));
-
-  // SPA fallback for frontend app (excluding API routes)
-  app.use((req, res, next) => {
-    if (
-      !req.path.startsWith("/api") &&
-      !req.path.startsWith("/health") &&
-      !req.path.startsWith("/auth")
-    ) {
-      res.sendFile(path.join(frontendPath, "index.html"));
-    } else {
-      next();
+    // Auth server (auth.nubabel.com) → NO frontend, only API/auth routes
+    if (host.startsWith("auth.")) {
+      // Don't serve frontend on auth subdomain
+      return next();
     }
+
+    // App subdomain (app.nubabel.com) → frontend app
+    if (host.startsWith("app.")) {
+      // Serve static files
+      return express.static(frontendPath)(req, res, () => {
+        // SPA fallback (excluding API routes)
+        if (
+          !req.path.startsWith("/api") &&
+          !req.path.startsWith("/health") &&
+          !req.path.startsWith("/auth")
+        ) {
+          return res.sendFile(path.join(frontendPath, "index.html"));
+        }
+        next();
+      });
+    }
+
+    next();
   });
 }
 
