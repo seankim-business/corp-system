@@ -69,6 +69,8 @@ export class AuthService {
       }
     }
 
+    let isNewOrganization = false;
+
     if (!organization && hostedDomain) {
       const slug = hostedDomain.split(".")[0];
 
@@ -89,6 +91,7 @@ export class AuthService {
             },
           },
         });
+        isNewOrganization = true;
       } else {
         const existingDomain = await db.workspaceDomain.findUnique({
           where: { domain: hostedDomain },
@@ -119,11 +122,15 @@ export class AuthService {
     });
 
     if (!membership) {
+      // First user in a newly created organization becomes owner
+      // Otherwise, new members join as "member" role
+      const memberRole = isNewOrganization ? "owner" : "member";
+
       membership = await db.membership.create({
         data: {
           userId: user.id,
           organizationId: organization.id,
-          role: "member",
+          role: memberRole,
           joinedAt: new Date(),
         },
       });
