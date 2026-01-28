@@ -182,8 +182,16 @@ router.get("/me", authenticate, requireAuth, async (req: Request, res: Response)
 
   const currentOrganization = organizations.find((o) => o.id === currentOrganizationId) || null;
 
+  // Transform user object to match frontend interface (name, picture instead of displayName, avatarUrl)
+  const user = {
+    id: req.user!.id,
+    email: req.user!.email,
+    name: req.user!.displayName || req.user!.email?.split("@")[0] || "User",
+    picture: req.user!.avatarUrl || undefined,
+  };
+
   res.json({
-    user: req.user,
+    user,
     currentOrganization,
     organizations,
     membership: req.membership,

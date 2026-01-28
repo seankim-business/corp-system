@@ -1,6 +1,6 @@
 /**
  * Header Component
- * 
+ *
  * 기획:
  * - 상단 고정 헤더
  * - 좌측: Nubabel 로고
@@ -8,7 +8,7 @@
  * - 우측: 사용자 정보 + 로그아웃 버튼
  * - 높이: 64px (4rem)
  * - 배경: 흰색, 하단 border
- * 
+ *
  * 구조:
  * Header
  * ├── Logo (좌측)
@@ -18,7 +18,7 @@
  *     └── LogoutButton
  */
 
-import OrganizationSwitcher from '../OrganizationSwitcher';
+import OrganizationSwitcher from "../OrganizationSwitcher";
 
 interface User {
   name: string;
@@ -45,15 +45,11 @@ export default function Header({ user, onLogout }: HeaderProps) {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               {user.picture ? (
-                <img
-                  src={user.picture}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full"
-                />
+                <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
                   <span className="text-white text-sm font-medium">
-                    {user.name.charAt(0).toUpperCase()}
+                    {(user.name || user.email || "?").charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
