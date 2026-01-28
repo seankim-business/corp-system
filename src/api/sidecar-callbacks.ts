@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
+import crypto from "crypto";
 import { db } from "../db/client";
 import { withQueueConnection } from "../db/redis";
 import { executeNotionTool } from "../mcp-servers/notion";
@@ -11,17 +12,30 @@ import { EventEmitter } from "events";
 export const sidecarCallbacksRouter = Router();
 export const progressEmitter = new EventEmitter();
 
-// Internal API key authentication for sidecar endpoints
-// This ensures only the sidecar service can access these routes
-const SIDECAR_API_KEY = process.env.SIDECAR_API_KEY || "internal-sidecar-key";
+const SIDECAR_API_KEY = process.env.SIDECAR_API_KEY;
+
+if (!SIDECAR_API_KEY && process.env.NODE_ENV === "production") {
+  throw new Error("SIDECAR_API_KEY environment variable is required in production");
+}
+
+const effectiveApiKey = SIDECAR_API_KEY || "internal-sidecar-key-dev-only";
+
+function timingSafeApiKeyCompare(provided: string, expected: string): boolean {
+  if (provided.length !== expected.length) {
+    crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(provided));
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
 
 function requireSidecarAuth(req: Request, res: Response, next: NextFunction): void {
   const apiKey = req.headers["x-sidecar-api-key"];
 
-  if (!apiKey || apiKey !== SIDECAR_API_KEY) {
+  if (!apiKey || typeof apiKey !== "string" || !timingSafeApiKeyCompare(apiKey, effectiveApiKey)) {
     logger.warn("Unauthorized sidecar callback attempt", {
       ip: req.ip,
       path: req.path,
+      hasKey: !!apiKey,
     });
     res.status(401).json({ error: "Unauthorized" });
     return;

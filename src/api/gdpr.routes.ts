@@ -6,6 +6,10 @@ import { Permission } from "../auth/rbac";
 import { auditLogger, AuditAction } from "../services/audit-logger";
 import { exportUserData, DataExportError } from "../services/data-exporter";
 import { deleteUserAccount, AccountDeletionError } from "../services/account-deletion";
+import {
+  gdprExportRateLimiter,
+  gdprDeleteRateLimiter,
+} from "../middleware/rate-limiter.middleware";
 
 const router = Router();
 
@@ -59,7 +63,7 @@ function parseDate(value: string | undefined): Date | undefined {
 
 router.use(requireAuth);
 
-router.get("/user/data-export", async (req: Request, res: Response) => {
+router.get("/user/data-export", gdprExportRateLimiter, async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Authentication required" });
 
@@ -110,7 +114,7 @@ router.get("/user/data-export", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/user/account", async (req: Request, res: Response) => {
+router.delete("/user/account", gdprDeleteRateLimiter, async (req: Request, res: Response) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Authentication required" });
 
