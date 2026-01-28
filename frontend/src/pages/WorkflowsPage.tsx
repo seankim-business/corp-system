@@ -65,7 +65,15 @@ function CreateWorkflowModal({ isOpen, onClose, onSuccess }: CreateWorkflowModal
       setName("");
       setDescription("");
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Failed to create workflow";
+      let message = "Failed to create workflow";
+      if (err instanceof ApiError) {
+        if (err.status === 403) {
+          message =
+            "You don't have permission to create workflows. Please contact your organization admin to get elevated permissions.";
+        } else {
+          message = err.message;
+        }
+      }
       setError(message);
     } finally {
       setIsCreating(false);
