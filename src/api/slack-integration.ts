@@ -3,6 +3,8 @@ import { WebClient } from "@slack/web-api";
 import * as crypto from "crypto";
 import { db as prisma } from "../db/client";
 import { requireAuth } from "../middleware/auth.middleware";
+import { requirePermission } from "../middleware/require-permission";
+import { Permission } from "../auth/rbac";
 import { encrypt, decrypt } from "../utils/encryption";
 import { redis } from "../db/redis";
 
@@ -74,6 +76,7 @@ async function decodeState(
 slackIntegrationRouter.get(
   "/slack/oauth/install",
   requireAuth,
+  requirePermission(Permission.INTEGRATION_MANAGE),
   async (req: Request, res: Response) => {
     const frontendUrl = process.env.FRONTEND_URL || "https://auth.nubabel.com";
 
@@ -97,7 +100,7 @@ slackIntegrationRouter.get(
 
 slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response) => {
   const { code, state, error } = req.query;
-  const frontendUrl = process.env.FRONTEND_URL || "https://app.nubabel.com";
+  const frontendUrl = process.env.FRONTEND_URL || "https://auth.nubabel.com";
 
   if (error) {
     console.error("Slack OAuth error:", error);
@@ -209,6 +212,7 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
 slackIntegrationRouter.get(
   "/slack/integration",
   requireAuth,
+  requirePermission(Permission.INTEGRATION_READ),
   async (req: Request, res: Response) => {
     try {
       const { organizationId } = req.user!;
@@ -247,6 +251,7 @@ slackIntegrationRouter.get(
 slackIntegrationRouter.put(
   "/slack/integration",
   requireAuth,
+  requirePermission(Permission.INTEGRATION_MANAGE),
   async (req: Request, res: Response) => {
     try {
       const { organizationId } = req.user!;
@@ -329,6 +334,7 @@ slackIntegrationRouter.put(
 slackIntegrationRouter.post(
   "/slack/integration/test",
   requireAuth,
+  requirePermission(Permission.INTEGRATION_MANAGE),
   async (req: Request, res: Response) => {
     try {
       const { botToken } = req.body;
@@ -371,6 +377,7 @@ slackIntegrationRouter.post(
 slackIntegrationRouter.delete(
   "/slack/integration",
   requireAuth,
+  requirePermission(Permission.INTEGRATION_MANAGE),
   async (req: Request, res: Response) => {
     try {
       const { organizationId } = req.user!;
