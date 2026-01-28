@@ -18,6 +18,7 @@ export const AgentConfigSchema = z.object({
   tools: z.array(z.string()),
   routing_keywords: z.array(z.string()),
   permissions: AgentPermissionsSchema,
+  sops: z.array(z.string()).optional(),
 });
 
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;

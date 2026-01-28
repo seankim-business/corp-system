@@ -58,3 +58,29 @@ export const workflowExecuteRateLimiter = rateLimit({
   },
   handler: createRateLimitHandler("workflow execution"),
 });
+
+export const webhookRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  message: { error: "Too many webhook requests" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const orgId = (req as any).user?.organizationId;
+    return orgId || req.ip || "unknown";
+  },
+  handler: createRateLimitHandler("webhook"),
+});
+
+export const sidecarRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 500,
+  message: { error: "Too many sidecar requests" },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const orgId = (req as any).user?.organizationId;
+    return orgId || req.ip || "unknown";
+  },
+  handler: createRateLimitHandler("sidecar"),
+});

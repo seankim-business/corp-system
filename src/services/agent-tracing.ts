@@ -168,9 +168,10 @@ export function endToolSpan(span: Span, success: boolean, result?: unknown, erro
 /**
  * Start a span for workflow execution
  */
-export function startWorkflowSpan(
-  attributes: WorkflowSpanAttributes,
-): { span: Span; context: Context } {
+export function startWorkflowSpan(attributes: WorkflowSpanAttributes): {
+  span: Span;
+  context: Context;
+} {
   const span = tracer.startSpan(`workflow.execute.${attributes.workflowName}`, {
     kind: SpanKind.INTERNAL,
     attributes: {
@@ -264,7 +265,7 @@ export function endWorkflowNodeSpan(
   span: Span,
   status: "success" | "failed",
   duration: number,
-  output?: unknown,
+  _output?: unknown,
   error?: Error,
 ): void {
   span.setAttribute("workflow.node.status", status);
@@ -351,7 +352,12 @@ export async function withAgentSpan<T>(
     endAgentSpan(span, "success");
     return result;
   } catch (error) {
-    endAgentSpan(span, "failed", undefined, error instanceof Error ? error : new Error(String(error)));
+    endAgentSpan(
+      span,
+      "failed",
+      undefined,
+      error instanceof Error ? error : new Error(String(error)),
+    );
     throw error;
   }
 }
@@ -390,7 +396,12 @@ export async function withWorkflowSpan<T>(
     return { result, span };
   } catch (error) {
     const duration = Date.now() - startTime;
-    endWorkflowSpan(span, "failed", duration, error instanceof Error ? error : new Error(String(error)));
+    endWorkflowSpan(
+      span,
+      "failed",
+      duration,
+      error instanceof Error ? error : new Error(String(error)),
+    );
     throw error;
   }
 }
@@ -414,7 +425,10 @@ export function getCurrentTraceContext(): { traceId: string; spanId: string } | 
 /**
  * Add event to current span
  */
-export function addSpanEvent(name: string, attributes?: Record<string, string | number | boolean>): void {
+export function addSpanEvent(
+  name: string,
+  attributes?: Record<string, string | number | boolean>,
+): void {
   const activeSpan = trace.getActiveSpan();
   if (activeSpan) {
     activeSpan.addEvent(name, attributes);

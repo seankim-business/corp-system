@@ -12,12 +12,7 @@ import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.middleware";
 import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
-import {
-  metricsCollector,
-  getAgentMetricsSummary,
-  getAllAgentSessions,
-  getAgentLastError,
-} from "../services/metrics";
+import { metricsCollector, getAllAgentSessions, getAgentLastError } from "../services/metrics";
 import { agentRegistry } from "../orchestrator/agent-registry";
 import { logger } from "../utils/logger";
 
@@ -99,7 +94,10 @@ function getAgentExecutionMetrics(agentId?: string): {
   };
 }
 
-function getToolMetrics(agentId?: string, toolName?: string): Map<string, { total: number; success: number }> {
+function getToolMetrics(
+  agentId?: string,
+  toolName?: string,
+): Map<string, { total: number; success: number }> {
   const toolMetrics = new Map<string, { total: number; success: number }>();
   const counterValues = metricsCollector.getCounterValues("agent_tool_calls_total");
 
@@ -161,14 +159,10 @@ router.get(
           .slice(0, 5);
 
         const successRate =
-          execMetrics.executions > 0
-            ? (execMetrics.successes / execMetrics.executions) * 100
-            : 0;
+          execMetrics.executions > 0 ? (execMetrics.successes / execMetrics.executions) * 100 : 0;
 
         const errorRate =
-          execMetrics.executions > 0
-            ? (totalErrors / execMetrics.executions) * 100
-            : 0;
+          execMetrics.executions > 0 ? (totalErrors / execMetrics.executions) * 100 : 0;
 
         summaries.push({
           agentId: agent.id,
@@ -179,7 +173,8 @@ router.get(
           avgDuration:
             execMetrics.durations.length > 0
               ? Math.round(
-                  (execMetrics.durations.reduce((a, b) => a + b, 0) / execMetrics.durations.length) *
+                  (execMetrics.durations.reduce((a, b) => a + b, 0) /
+                    execMetrics.durations.length) *
                     1000,
                 ) / 1000
               : 0,
@@ -215,7 +210,7 @@ router.get(
   requirePermission(Permission.DASHBOARD_READ),
   async (req: Request, res: Response) => {
     try {
-      const agentId = req.params.id;
+      const agentId = req.params.id as string;
       const agent = agentRegistry.getAgent(agentId as any);
 
       if (!agent) {
@@ -241,9 +236,7 @@ router.get(
       }));
 
       const successRate =
-        execMetrics.executions > 0
-          ? (execMetrics.successes / execMetrics.executions) * 100
-          : 0;
+        execMetrics.executions > 0 ? (execMetrics.successes / execMetrics.executions) * 100 : 0;
 
       return res.json({
         agent: {
@@ -262,7 +255,8 @@ router.get(
           avgDuration:
             execMetrics.durations.length > 0
               ? Math.round(
-                  (execMetrics.durations.reduce((a, b) => a + b, 0) / execMetrics.durations.length) *
+                  (execMetrics.durations.reduce((a, b) => a + b, 0) /
+                    execMetrics.durations.length) *
                     1000,
                 ) / 1000
               : 0,
@@ -380,7 +374,10 @@ router.get(
                   (histogramValues.reduce((a, b) => a + b, 0) / histogramValues.length) * 1000,
                 ) / 1000
               : 0,
-          p95: histogramValues.length > 0 ? Math.round(percentile(histogramValues, 0.95) * 1000) / 1000 : 0,
+          p95:
+            histogramValues.length > 0
+              ? Math.round(percentile(histogramValues, 0.95) * 1000) / 1000
+              : 0,
         },
         timestamp: new Date().toISOString(),
       });
@@ -522,7 +519,8 @@ router.get(
         targets: Array.from(data.targets.entries()).map(([toAgent, stats]) => ({
           toAgent,
           count: stats.total,
-          successRate: stats.total > 0 ? Math.round((stats.success / stats.total) * 10000) / 100 : 0,
+          successRate:
+            stats.total > 0 ? Math.round((stats.success / stats.total) * 10000) / 100 : 0,
         })),
       }));
 

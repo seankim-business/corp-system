@@ -86,6 +86,9 @@ export enum Permission {
   APPROVAL_READ = "approval:read",
   APPROVAL_RESPOND = "approval:respond",
 
+  // Dashboard permissions
+  DASHBOARD_READ = "dashboard:read",
+
   // Legacy permission mappings (for backwards compatibility)
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   WORKFLOWS_READ = "workflow:read",
@@ -154,6 +157,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.APPROVAL_CREATE,
     Permission.APPROVAL_READ,
     Permission.APPROVAL_RESPOND,
+    // Dashboard access
+    Permission.DASHBOARD_READ,
   ],
 
   [Role.ADMIN]: [
@@ -182,6 +187,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.APPROVAL_CREATE,
     Permission.APPROVAL_READ,
     Permission.APPROVAL_RESPOND,
+    Permission.DASHBOARD_READ,
     // NO billing access
     // NO org deletion
   ],
@@ -204,6 +210,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.APPROVAL_CREATE,
     Permission.APPROVAL_READ,
     Permission.APPROVAL_RESPOND,
+    Permission.DASHBOARD_READ,
     // NO workflow delete
     // NO member management
     // NO settings update
@@ -220,6 +227,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.SETTINGS_READ,
     Permission.INTEGRATION_READ,
     Permission.APPROVAL_READ,
+    Permission.DASHBOARD_READ,
     // NO create/update/delete
     // NO execute
     // NO audit
