@@ -1088,3 +1088,208 @@ model AgentSkillAssignment {
   @@index([agentId])
   @@map("agent_skill_assignments")
 }
+
+// ============================================================================
+// BILLING & SUBSCRIPTION TABLES
+// ============================================================================
+
+/// Subscription (Organization billing subscription)
+model Subscription {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @unique @map("organization_id") @db.Uuid
+  stripeCustomerId String? @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId String? @map("stripe_subscription_id") @db.VarChar(255)
+  plan           String   @default("free") @db.VarChar(50) // free, starter, pro, enterprise
+  status         String   @default("active") @db.VarChar(50) // active, past_due, canceled, trialing
+  currentPeriodStart DateTime? @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd DateTime? @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd Boolean @default(false) @map("cancel_at_period_end")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  invoices Invoice[]
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@map("subscriptions")
+}
+
+/// Invoice (Billing invoices)
+model Invoice {
+  id             String   @id @default(uuid()) @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  stripeInvoiceId String? @unique @map("stripe_invoice_id") @db.VarChar(255)
+  amountDue      Int      @map("amount_due") // in cents
+  amountPaid     Int      @default(0) @map("amount_paid")
+  currency       String   @default("usd") @db.VarChar(10)
+  status         String   @default("draft") @db.VarChar(50) // draft, open, paid, void, uncollectible
+  invoiceUrl     String?  @map("invoice_url") @db.Text
+  pdfUrl         String?  @map("pdf_url") @db.Text
+  periodStart    DateTime? @map("period_start") @db.Timestamptz(6)
+  periodEnd      DateTime? @map("period_end") @db.Timestamptz(6)
+  dueDate        DateTime? @map("due_date") @db.Timestamptz(6)
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("invoices")
+}
+
+/// UsageRecord (Track usage for billing)
+model UsageRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  sessionId      String?  @map("session_id") @db.VarChar(255)
+  model          String   @db.VarChar(100)
+  inputTokens    Int      @map("input_tokens")
+  outputTokens   Int      @map("output_tokens")
+  costCents      Int      @map("cost_cents")
+  category       String?  @db.VarChar(50)
+  agentId        String?  @map("agent_id") @db.Uuid
+  metadata       Json?    @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, model])
+  @@index([agentId])
+  @@map("usage_records")
+}
+
+// ============================================================================
+// ONBOARDING TABLES
+// ============================================================================
+
+/// OnboardingState (Track user onboarding progress)
+model OnboardingState {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @unique @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  currentStep    String   @default("welcome") @map("current_step") @db.VarChar(50)
+  completedSteps String[] @default([]) @map("completed_steps") @db.VarChar(50)
+  skippedSteps   String[] @default([]) @map("skipped_steps") @db.VarChar(50)
+  metadata       Json?    @db.JsonB
+  startedAt      DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  checklistItems OnboardingChecklistItem[]
+
+  @@index([userId])
+  @@map("onboarding_states")
+}
+
+/// OnboardingChecklistItem (Individual onboarding tasks)
+model OnboardingChecklistItem {
+  id               String   @id @default(uuid()) @db.Uuid
+  onboardingStateId String  @map("onboarding_state_id") @db.Uuid
+  key              String   @db.VarChar(100)
+  title            String   @db.VarChar(255)
+  description      String?  @db.Text
+  category         String?  @db.VarChar(50)
+  required         Boolean  @default(false)
+  completed        Boolean  @default(false)
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz(6)
+  metadata         Json?    @db.JsonB
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  onboardingState OnboardingState @relation(fields: [onboardingStateId], references: [id], onDelete: Cascade)
+
+  @@unique([onboardingStateId, key])
+  @@index([onboardingStateId])
+  @@map("onboarding_checklist_items")
+}
+
+// ============================================================================
+// PUBLIC API & WEBHOOKS TABLES
+// ============================================================================
+
+/// APIKey (Public API keys for external integrations)
+model APIKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(255)
+  keyHash        String   @unique @map("key_hash") @db.VarChar(64) // SHA-256 hash of the key
+  keyPrefix      String   @map("key_prefix") @db.VarChar(10) // First 8 chars for identification
+  scopes         String[] @default([]) @db.VarChar(100)
+  rateLimit      Int      @default(1000) @map("rate_limit") // requests per hour
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
+  lastUsedAt     DateTime? @map("last_used_at") @db.Timestamptz(6)
+  enabled        Boolean  @default(true)
+  createdBy      String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@index([keyPrefix])
+  @@map("api_keys")
+}
+
+/// PublicWebhook (Outbound webhooks for external systems)
+model PublicWebhook {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(255)
+  url            String   @db.Text
+  secret         String   @db.VarChar(255) // For HMAC signature verification
+  events         String[] @default([]) @db.VarChar(100) // event types to send
+  enabled        Boolean  @default(true)
+  retryCount     Int      @default(3) @map("retry_count")
+  timeoutMs      Int      @default(30000) @map("timeout_ms")
+  metadata       Json?    @db.JsonB
+  createdBy      String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  deliveries WebhookDelivery[]
+
+  @@index([organizationId])
+  @@index([enabled])
+  @@map("public_webhooks")
+}
+
+/// WebhookDelivery (Track webhook delivery attempts)
+model WebhookDelivery {
+  id           String   @id @default(uuid()) @db.Uuid
+  webhookId    String   @map("webhook_id") @db.Uuid
+  eventType    String   @map("event_type") @db.VarChar(100)
+  payload      Json     @db.JsonB
+  status       String   @default("pending") @db.VarChar(50) // pending, success, failed
+  statusCode   Int?     @map("status_code")
+  responseBody String?  @map("response_body") @db.Text
+  attempts     Int      @default(0)
+  lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz(6)
+  nextRetryAt  DateTime? @map("next_retry_at") @db.Timestamptz(6)
+  errorMessage String?  @map("error_message") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  webhook PublicWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([nextRetryAt])
+  @@map("webhook_deliveries")
+}
+
+// ============================================================================
+// AI PROVIDER PREFERENCES
+// ============================================================================
+
+/// OrganizationAIProvider (Organization-level AI provider preferences)
+model OrganizationAIProvider {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @unique @map("organization_id") @db.Uuid
+  defaultProvider String  @default("anthropic") @map("default_provider") @db.VarChar(50)
+  providers      Json     @default("{}") @db.JsonB // provider-specific settings
+  modelPreferences Json   @default("{}") @map("model_preferences") @db.JsonB // category -> model mapping
+  rateLimits     Json?    @map("rate_limits") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("organization_ai_providers")
+}

@@ -314,6 +314,7 @@ export async function getConfiguredProviders(
       openai: "OpenAI (GPT)",
       "google-ai": "Google AI (Gemini)",
       openrouter: "OpenRouter",
+      "github-models": "GitHub Models",
     };
     return {
       name: p.name,

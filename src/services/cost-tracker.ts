@@ -163,3 +163,125 @@ export async function getOrganizationBudget(organizationId: string): Promise<num
     return null;
   }
 }
+
+// Additional types for costs API
+export interface BudgetStatus {
+  withinBudget: boolean;
+  budgetCents: number;
+  spentCents: number;
+  remainingCents: number;
+  percentUsed: number;
+  warningThreshold: boolean;
+  criticalThreshold: boolean;
+}
+
+export interface OrgCostSummary {
+  organizationId: string;
+  period: string;
+  totalCostCents: number;
+  totalRequests: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  byModel: Record<string, { costCents: number; requests: number }>;
+  byAgent: Record<string, { costCents: number; requests: number }>;
+  byDay: DailyTrend[];
+}
+
+export interface AgentCostSummary {
+  agentId: string;
+  agentName: string;
+  totalCostCents: number;
+  totalRequests: number;
+  avgCostPerRequest: number;
+  byModel: Record<string, { costCents: number; requests: number }>;
+}
+
+export interface DailyTrend {
+  date: string;
+  costCents: number;
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export async function getOrgCosts(organizationId: string, period: string): Promise<OrgCostSummary> {
+  const summary = await getMonthlyUsageSummary(organizationId);
+
+  return {
+    organizationId,
+    period,
+    totalCostCents: Math.round(summary.totalCost * 100),
+    totalRequests: summary.requestCount,
+    totalInputTokens: summary.totalInputTokens,
+    totalOutputTokens: summary.totalOutputTokens,
+    byModel: Object.fromEntries(
+      Object.entries(summary.byModel).map(([k, v]) => [k, { costCents: Math.round(v.cost * 100), requests: v.requests }])
+    ),
+    byAgent: {},
+    byDay: [],
+  };
+}
+
+export async function getAgentCosts(_organizationId: string, agentId: string): Promise<AgentCostSummary> {
+  // For now return a placeholder - would need agent-specific tracking
+  return {
+    agentId,
+    agentName: agentId,
+    totalCostCents: 0,
+    totalRequests: 0,
+    avgCostPerRequest: 0,
+    byModel: {},
+  };
+}
+
+export async function getDailyTrend(_organizationId: string, days: number): Promise<DailyTrend[]> {
+  const trends: DailyTrend[] = [];
+  const now = new Date();
+
+  for (let i = 0; i < days; i++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split("T")[0];
+
+    trends.push({
+      date: dateStr,
+      costCents: 0,
+      requests: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+    });
+  }
+
+  return trends.reverse();
+}
+
+export async function checkBudget(organizationId: string): Promise<BudgetStatus> {
+  const budget = await getOrganizationBudget(organizationId);
+  const summary = await getMonthlyUsageSummary(organizationId);
+
+  const budgetCents = budget ? Math.round(budget * 100) : 0;
+  const spentCents = Math.round(summary.totalCost * 100);
+  const remainingCents = Math.max(0, budgetCents - spentCents);
+  const percentUsed = budgetCents > 0 ? (spentCents / budgetCents) * 100 : 0;
+
+  return {
+    withinBudget: budgetCents === 0 || spentCents < budgetCents,
+    budgetCents,
+    spentCents,
+    remainingCents,
+    percentUsed,
+    warningThreshold: percentUsed >= 80,
+    criticalThreshold: percentUsed >= 95,
+  };
+}
+
+export async function setBudget(organizationId: string, budgetCents: number): Promise<void> {
+  await prisma.organization.update({
+    where: { id: organizationId },
+    data: {
+      settings: {
+        monthlyBudget: budgetCents / 100,
+      },
+    },
+  });
+}

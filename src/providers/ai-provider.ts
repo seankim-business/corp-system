@@ -72,7 +72,7 @@ export interface AIProvider {
   refreshAccessToken?(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }>;
 }
 
-export type ProviderName = "anthropic" | "openai" | "google-ai" | "openrouter";
+export type ProviderName = "anthropic" | "openai" | "google-ai" | "openrouter" | "github-models";
 
 const providerRegistry = new Map<
   ProviderName,

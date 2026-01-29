@@ -840,6 +840,94 @@ async function handlePullRequestEvent(
 
 export { invalidateCache as invalidateSSOTCache };
 
+export interface PendingSSOTPullRequest {
+  id: number;
+  number: number;
+  title: string;
+  body: string | null;
+  state: string;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  head: { ref: string };
+  base: { ref: string };
+  resourceType?: SSOTResourceType;
+  resourceId?: string;
+}
+
+export async function getPendingSSOTPullRequests(
+  organizationId: string,
+  userId?: string,
+): Promise<PendingSSOTPullRequest[]> {
+  return tracer.startActiveSpan("ssot.getPendingSSOTPullRequests", async (span) => {
+    span.setAttribute("organization.id", organizationId);
+
+    let release: (() => void) | undefined;
+
+    try {
+      const {
+        client,
+        release: releaseClient,
+        config,
+      } = await getGitHubClientForOrg(organizationId, userId);
+      release = releaseClient;
+
+      const pullRequests = await client.getPullRequests({
+        owner: config.owner,
+        repo: config.repo,
+        state: "open",
+      });
+
+      // Filter for SSOT-related PRs (branches starting with "ssot/")
+      const ssotPRs = pullRequests.filter((pr: GitHubPullRequest) => pr.head.ref.startsWith("ssot/"));
+
+      const result: PendingSSOTPullRequest[] = ssotPRs.map((pr: GitHubPullRequest) => {
+        // Parse resource type and id from branch name (format: ssot/{type}/{id}-{timestamp})
+        const branchParts = pr.head.ref.replace("ssot/", "").split("/");
+        const resourceType = branchParts[0] as SSOTResourceType | undefined;
+        const resourceIdPart = branchParts[1];
+        const resourceId = resourceIdPart?.split("-").slice(0, -1).join("-") || resourceIdPart;
+
+        return {
+          id: pr.id,
+          number: pr.number,
+          title: pr.title,
+          body: pr.body || null,
+          state: pr.state,
+          htmlUrl: pr.htmlUrl,
+          createdAt: pr.createdAt,
+          updatedAt: pr.updatedAt,
+          head: { ref: pr.head.ref },
+          base: { ref: pr.base.ref },
+          resourceType: Object.keys(RESOURCE_PATHS).includes(resourceType || "")
+            ? resourceType
+            : undefined,
+          resourceId,
+        };
+      });
+
+      span.setAttribute("ssot.pending_prs", result.length);
+      span.setStatus({ code: SpanStatusCode.OK });
+
+      logger.info("Fetched pending SSOT pull requests", {
+        organizationId,
+        count: result.length,
+      });
+
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message });
+      logger.error("Failed to fetch pending SSOT pull requests", { organizationId, error });
+      return [];
+    } finally {
+      if (release) release();
+      span.end();
+    }
+  });
+}
+
 export function getSupportedResourceTypes(): SSOTResourceType[] {
   return Object.keys(RESOURCE_PATHS) as SSOTResourceType[];
 }
