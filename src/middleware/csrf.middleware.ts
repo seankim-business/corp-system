@@ -90,9 +90,10 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     res.cookie(CSRF_COOKIE_NAME, csrfToken, {
       httpOnly: false, // Must be readable by JavaScript
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax", // Changed from strict to allow cross-subdomain
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: "/",
+      domain: process.env.COOKIE_DOMAIN,
     });
   }
 
@@ -171,9 +172,10 @@ export function csrfTokenEndpoint(req: Request, res: Response): void {
     res.cookie(CSRF_COOKIE_NAME, csrfToken, {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000,
       path: "/",
+      domain: process.env.COOKIE_DOMAIN,
     });
   }
 
