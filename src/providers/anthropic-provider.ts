@@ -13,6 +13,9 @@ import {
   registerProvider,
 } from "./ai-provider";
 import { Category } from "../orchestrator/types";
+import { ClaudeAccount } from "../services/account-pool/account-pool.service";
+import { EncryptionService } from "../services/account-pool/encryption.service";
+import { logger } from "../utils/logger";
 
 const ANTHROPIC_MODELS: ModelInfo[] = [
   {
@@ -48,16 +51,74 @@ export class AnthropicProvider implements AIProvider {
   readonly name = "anthropic";
   readonly displayName = "Anthropic (Claude)";
   private client: Anthropic;
+  private account?: ClaudeAccount;
 
-  constructor(credentials: ProviderCredentials) {
-    if (!credentials.apiKey) {
+  constructor(credentialsOrAccount: ProviderCredentials | { account: ClaudeAccount }) {
+    // Support both legacy credentials and new account-based initialization
+    if ("account" in credentialsOrAccount) {
+      // New multi-account mode
+      this.account = credentialsOrAccount.account;
+      const apiKey = this.getDecryptedApiKey();
+      this.client = new Anthropic({ apiKey });
+      logger.info("AnthropicProvider initialized with account", {
+        accountId: this.account.id,
+        accountName: this.account.name,
+      });
+    } else {
+      // Legacy single-account mode (backward compatibility)
+      const credentials = credentialsOrAccount;
+      if (!credentials.apiKey) {
+        throw new AIProviderError(
+          "Anthropic API key is required",
+          "anthropic",
+          AIProviderErrorCode.INVALID_CREDENTIALS,
+        );
+      }
+      this.client = new Anthropic({ apiKey: credentials.apiKey });
+      logger.info("AnthropicProvider initialized with legacy credentials");
+    }
+  }
+
+  /**
+   * Get account ID if using multi-account mode
+   */
+  getAccountId(): string | undefined {
+    return this.account?.id;
+  }
+
+  /**
+   * Decrypt API key from account metadata
+   * @private
+   */
+  private getDecryptedApiKey(): string {
+    if (!this.account) {
       throw new AIProviderError(
-        "Anthropic API key is required",
+        "No account configured",
         "anthropic",
         AIProviderErrorCode.INVALID_CREDENTIALS,
       );
     }
-    this.client = new Anthropic({ apiKey: credentials.apiKey });
+
+    const metadata = this.account.metadata as any;
+    const encryptedApiKey = metadata?.encryptedApiKey;
+
+    if (!encryptedApiKey) {
+      throw new AIProviderError(
+        `Account ${this.account.name} (${this.account.id}) has no encrypted API key`,
+        "anthropic",
+        AIProviderErrorCode.INVALID_CREDENTIALS,
+      );
+    }
+
+    try {
+      return EncryptionService.decrypt(encryptedApiKey);
+    } catch (error) {
+      throw new AIProviderError(
+        `Failed to decrypt API key for account ${this.account.name}: ${error instanceof Error ? error.message : String(error)}`,
+        "anthropic",
+        AIProviderErrorCode.INVALID_CREDENTIALS,
+      );
+    }
   }
 
   async chat(messages: Message[], options?: ChatOptions): Promise<ChatResponse> {
@@ -86,18 +147,56 @@ export class AnthropicProvider implements AIProvider {
         }
       }
 
+      const rateLimitHeaders = this.parseRateLimitHeaders(response);
+
       return {
         content,
         model: response.model,
         usage: {
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
+          cacheCreationTokens: (response.usage as any).cache_creation_input_tokens || 0,
+          cacheReadTokens: (response.usage as any).cache_read_input_tokens || 0,
+        },
+        metadata: {
+          accountId: this.account?.id,
+          accountName: this.account?.name,
+          rateLimits: rateLimitHeaders,
         },
         finishReason: response.stop_reason || "unknown",
       };
     } catch (error) {
       throw this.handleError(error);
     }
+  }
+
+  /**
+   * Parse rate limit headers from Anthropic API response
+   */
+  private parseRateLimitHeaders(response: any): {
+    remainingRpm?: number;
+    remainingItpm?: number;
+    remainingOtpm?: number;
+    retryAfter?: number;
+  } {
+    const headers = response.response?.headers || {};
+
+    return {
+      remainingRpm: this.parseHeaderInt(headers["anthropic-ratelimit-requests-remaining"]),
+      remainingItpm: this.parseHeaderInt(headers["anthropic-ratelimit-input-tokens-remaining"]),
+      remainingOtpm: this.parseHeaderInt(headers["anthropic-ratelimit-output-tokens-remaining"]),
+      retryAfter: this.parseHeaderInt(headers["retry-after"]),
+    };
+  }
+
+  /**
+   * Parse header value to integer
+   */
+  private parseHeaderInt(value: string | string[] | undefined): number | undefined {
+    if (!value) return undefined;
+    const str = Array.isArray(value) ? value[0] : value;
+    const parsed = parseInt(str, 10);
+    return isNaN(parsed) ? undefined : parsed;
   }
 
   getAvailableModels(): ModelInfo[] {
@@ -142,10 +241,14 @@ export class AnthropicProvider implements AIProvider {
   }
 
   private handleError(error: unknown): AIProviderError {
+    const accountContext = this.account
+      ? ` (Account: ${this.account.name} [${this.account.id}])`
+      : "";
+
     if (error instanceof Anthropic.APIError) {
       if (error.status === 401) {
         return new AIProviderError(
-          "Invalid Anthropic API key",
+          `Invalid Anthropic API key${accountContext}`,
           "anthropic",
           AIProviderErrorCode.INVALID_CREDENTIALS,
           401,
@@ -153,14 +256,14 @@ export class AnthropicProvider implements AIProvider {
       }
       if (error.status === 429) {
         return new AIProviderError(
-          "Anthropic rate limit exceeded",
+          `Anthropic rate limit exceeded${accountContext}`,
           "anthropic",
           AIProviderErrorCode.RATE_LIMITED,
           429,
         );
       }
       return new AIProviderError(
-        error.message,
+        `${error.message}${accountContext}`,
         "anthropic",
         AIProviderErrorCode.PROVIDER_ERROR,
         error.status,
@@ -168,14 +271,18 @@ export class AnthropicProvider implements AIProvider {
     }
     if (error instanceof Error) {
       return new AIProviderError(
-        error.message,
+        `${error.message}${accountContext}`,
         "anthropic",
         AIProviderErrorCode.NETWORK_ERROR,
         undefined,
         error,
       );
     }
-    return new AIProviderError("Unknown error", "anthropic", AIProviderErrorCode.PROVIDER_ERROR);
+    return new AIProviderError(
+      `Unknown error${accountContext}`,
+      "anthropic",
+      AIProviderErrorCode.PROVIDER_ERROR,
+    );
   }
 }
 

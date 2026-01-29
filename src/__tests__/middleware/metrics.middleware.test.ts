@@ -2,9 +2,13 @@ import { EventEmitter } from "events";
 import { metricsMiddleware } from "../../middleware/metrics.middleware";
 import { recordHttpRequest } from "../../services/metrics";
 
-jest.mock("../../services/metrics", () => ({
-  recordHttpRequest: jest.fn(),
-}));
+jest.mock("../../services/metrics", () => {
+  const { createMetricsMock } = require("../utils/mock-metrics");
+  return {
+    ...createMetricsMock(),
+    recordHttpRequest: jest.fn(),
+  };
+});
 
 describe("metricsMiddleware", () => {
   afterEach(() => {

@@ -12,14 +12,7 @@
 import * as yaml from "js-yaml";
 import * as fs from "fs";
 import * as path from "path";
-import {
-  setupTestDatabase,
-  teardownTestDatabase,
-  createMockSOPExecution,
-  createMockApproval,
-  waitForCondition,
-  generateTestCustomer,
-} from "./setup";
+import { setupTestDatabase, teardownTestDatabase, generateTestCustomer } from "./setup";
 
 // Types for SOP execution
 interface SOPStep {
@@ -108,10 +101,7 @@ class MockSOPExecutor {
     return mockSop;
   }
 
-  async startExecution(
-    sopId: string,
-    context: Record<string, unknown>,
-  ): Promise<SOPExecution> {
+  async startExecution(sopId: string, context: Record<string, unknown>): Promise<SOPExecution> {
     const sop = this.loadSOP(sopId);
     if (!sop) {
       throw new Error(`SOP not found: ${sopId}`);
@@ -120,8 +110,8 @@ class MockSOPExecutor {
     const execution: SOPExecution = {
       id: `exec-${Date.now()}`,
       sopId,
-      organizationId: context.organizationId as string || "test-org",
-      userId: context.userId as string || "test-user",
+      organizationId: (context.organizationId as string) || "test-org",
+      userId: (context.userId as string) || "test-user",
       status: "running",
       currentStepIndex: 0,
       stepResults: [],
@@ -477,7 +467,6 @@ describe("SOP Execution E2E", () => {
     });
 
     it("calculates total execution duration", async () => {
-      const startTime = Date.now();
       const execution = await sopExecutor.startExecution("customer-onboarding", {});
 
       // Complete a few steps
@@ -588,9 +577,7 @@ describe("SOP Execution E2E", () => {
 
   describe("SOP completion", () => {
     it("marks SOP as completed when all steps finish", async () => {
-      // Use a simple mock SOP that can be completed
       sopExecutor.loadSOP("simple-test");
-      const sop = sopExecutor.loadSOP("simple-test");
 
       // Override with a simple SOP
       (sopExecutor as any).sops.set("simple-auto", {

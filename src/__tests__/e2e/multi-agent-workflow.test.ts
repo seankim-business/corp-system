@@ -12,21 +12,14 @@
  */
 
 import { WorkflowEngine } from "../../orchestrator/workflow-engine";
-import { WorkflowExecutor, WorkflowExecutionResult } from "../../orchestrator/workflow-executor";
+import { WorkflowExecutor } from "../../orchestrator/workflow-executor";
 import {
   orchestrateMultiAgent,
   shouldUseMultiAgent,
   getSuggestedAgents,
 } from "../../orchestrator/multi-agent-orchestrator";
-import { WorkflowDefinition, WorkflowContext } from "../../orchestrator/workflow-types";
-import {
-  setupTestDatabase,
-  teardownTestDatabase,
-  createMockContext,
-  createTestOrchestrationRequest,
-  createMockWorkflow,
-  waitForCondition,
-} from "./setup";
+import { WorkflowDefinition } from "../../orchestrator/workflow-types";
+import { setupTestDatabase, teardownTestDatabase, createTestOrchestrationRequest } from "./setup";
 import { delegateTask } from "../../orchestrator/delegate-task";
 
 // Mock delegateTask for controlled testing
@@ -352,9 +345,7 @@ describe("Multi-Agent Workflow E2E", () => {
     it("evaluates complex JavaScript conditions", async () => {
       const conditionalWorkflow: WorkflowDefinition = {
         name: "conditional-complex-test",
-        nodes: [
-          { id: "check-condition", type: "condition", condition: "variables.amount > 100" },
-        ],
+        nodes: [{ id: "check-condition", type: "condition", condition: "variables.amount > 100" }],
         edges: [
           { from: "START", to: "check-condition" },
           { from: "check-condition", to: "END" },

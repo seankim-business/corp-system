@@ -216,3 +216,39 @@ sseRouter.get("/events", authenticate, (req: Request, res: Response) => {
     sseManager.removeClient(clientId);
   });
 });
+
+sseRouter.get("/activity/stream", authenticate, async (req: Request, res: Response) => {
+  const clientId = `activity-${req.user!.id}-${Date.now()}`;
+  const lastEventIdHeader = req.header("Last-Event-ID");
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  res.write(`event: connected\n`);
+  res.write(`data: {"clientId": "${clientId}"}\n\n`);
+
+  const client = {
+    id: clientId,
+    organizationId: req.organization!.id,
+    res,
+  };
+
+  const { agentActivityService } = await import("../services/monitoring/agent-activity.service");
+  agentActivityService.addSSEClient(client);
+
+  if (lastEventIdHeader) {
+    try {
+      const recentActivities = await agentActivityService.getRecent(req.organization!.id, 100);
+      res.write(`event: initial\n`);
+      res.write(`data: ${JSON.stringify({ activities: recentActivities })}\n\n`);
+    } catch (err) {
+      logger.error("Failed to send initial activities", { error: String(err) });
+    }
+  }
+
+  req.on("close", () => {
+    agentActivityService.removeSSEClient(clientId);
+  });
+});

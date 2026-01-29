@@ -11,10 +11,13 @@ jest.mock("@anthropic-ai/sdk", () => {
   };
 });
 
-jest.mock("../../services/metrics", () => ({
-  recordAiRequest: jest.fn(),
-  recordMcpToolCall: jest.fn(),
-}));
+jest.mock("../../services/metrics", () => {
+  const { createMetricsMock } = require("../utils/mock-metrics");
+  return {
+    ...createMetricsMock(),
+    recordMcpToolCall: jest.fn(),
+  };
+});
 
 jest.mock("../../services/cost-tracker", () => ({
   trackUsage: jest.fn().mockResolvedValue(undefined),

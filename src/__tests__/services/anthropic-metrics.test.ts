@@ -15,14 +15,16 @@ jest.mock("../../db/redis", () => ({
   },
 }));
 
-jest.mock("../../services/metrics", () => ({
-  metricsCollector: {
-    incrementCounter: jest.fn(),
-    observeHistogram: jest.fn(),
-    describeMetric: jest.fn(),
-    getCounterValues: jest.fn(),
-  },
-}));
+jest.mock("../../services/metrics", () => {
+  const { createMetricsMock } = require("../utils/mock-metrics");
+  return {
+    metricsCollector: {
+      ...createMetricsMock().metricsCollector,
+      observeHistogram: jest.fn(),
+      getCounterValues: jest.fn(),
+    },
+  };
+});
 
 jest.mock("../../utils/logger", () => ({
   logger: {

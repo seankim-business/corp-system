@@ -1,6 +1,10 @@
-jest.mock("../../services/metrics", () => ({
-  recordMcpToolCall: jest.fn(),
-}));
+jest.mock("../../services/metrics", () => {
+  const { createMetricsMock } = require("../utils/mock-metrics");
+  return {
+    ...createMetricsMock(),
+    recordMcpToolCall: jest.fn(),
+  };
+});
 
 jest.mock("../../utils/circuit-breaker", () => ({
   getCircuitBreaker: jest.fn().mockReturnValue({

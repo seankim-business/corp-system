@@ -4,6 +4,10 @@ import { executeWithAI } from "./ai-executor";
 import { Category } from "./types";
 import { getOpencodeSessionId, createSessionMapping } from "./session-mapping";
 import { getOrganizationApiKey } from "../api/organization-settings";
+import { createAccountPoolService } from "../services/account-pool";
+import { agentActivityService } from "../services/monitoring/agent-activity.service";
+import { estimateCostForCategory } from "../services/budget-enforcer";
+import { db } from "../db/client";
 
 export interface DelegateTaskParams {
   category: string;
@@ -17,7 +21,7 @@ export interface DelegateTaskParams {
 
 export interface DelegateTaskResult {
   output: string;
-  status: "success" | "failed";
+  status: "success" | "failed" | "rate_limited";
   metadata: {
     model: string;
     duration?: number;
@@ -26,6 +30,9 @@ export interface DelegateTaskResult {
     cost?: number;
     error?: string;
     opencodeSessionId?: string;
+    accountId?: string;
+    accountName?: string;
+    activityId?: string;
   };
 }
 
@@ -60,28 +67,211 @@ export async function delegateTask(params: DelegateTaskParams): Promise<Delegate
 
   if (!OPENCODE_SIDECAR_URL && USE_BUILTIN_AI && hasApiKey) {
     logger.info("Using built-in AI executor", { category: params.category });
-    const result = await executeWithAI({
-      category: params.category as Category,
-      skills: params.load_skills,
-      prompt: params.prompt,
-      sessionId: params.session_id,
-      organizationId: params.organizationId || "system",
-      userId: params.userId || "system",
-      context: params.context,
-    });
 
-    return {
-      output: result.output,
-      status: result.status,
-      metadata: {
-        model: result.metadata.model,
-        duration: result.metadata.duration,
-        inputTokens: result.metadata.inputTokens,
-        outputTokens: result.metadata.outputTokens,
-        cost: result.metadata.cost,
-        error: result.metadata.error,
-      },
-    };
+    const organizationId = params.organizationId || "system";
+    const userId = params.userId || "system";
+    let activityId: string | undefined;
+
+    try {
+      const accountPoolService = createAccountPoolService();
+      const estimatedTokens = estimateCostForCategory(params.category as Category);
+
+      const selectedAccount = await accountPoolService.selectAccount({
+        organizationId,
+        estimatedTokens,
+        category: params.category,
+      });
+
+      if (selectedAccount) {
+        logger.info("Selected account for AI execution", {
+          accountId: selectedAccount.id,
+          accountName: selectedAccount.name,
+          category: params.category,
+        });
+      }
+
+      activityId = await agentActivityService.trackStart({
+        organizationId,
+        sessionId: params.session_id,
+        agentType: "ai_executor",
+        agentName: "built-in",
+        category: params.category,
+        inputData: {
+          prompt: params.prompt,
+          skills: params.load_skills,
+        },
+        metadata: {
+          accountId: selectedAccount?.id,
+          accountName: selectedAccount?.name,
+        },
+      });
+
+      const MAX_RETRY_ATTEMPTS = 3;
+      const usedAccountIds = new Set<string>();
+      let lastError: Error | undefined;
+
+      for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+        try {
+          let currentAccount = selectedAccount;
+
+          if (attempt > 1) {
+            const allAccounts = await (db as any).claudeAccount.findMany({
+              where: {
+                organizationId,
+                status: "active",
+              },
+            });
+
+            const availableAccountIds = allAccounts
+              .map((a: any) => a.id)
+              .filter((id: string) => !usedAccountIds.has(id));
+
+            if (availableAccountIds.length === 0) {
+              logger.warn("No alternative account available for retry", {
+                attempt,
+                usedAccounts: Array.from(usedAccountIds),
+                totalAccounts: allAccounts.length,
+              });
+              break;
+            }
+
+            currentAccount = await accountPoolService.selectAccount({
+              organizationId,
+              estimatedTokens,
+              category: params.category,
+              allowedAccountIds: availableAccountIds,
+            });
+
+            if (!currentAccount) {
+              logger.warn("Account selection returned null despite available accounts", {
+                attempt,
+                availableAccountIds,
+              });
+              break;
+            }
+          }
+
+          if (currentAccount) {
+            usedAccountIds.add(currentAccount.id);
+          }
+
+          const result = await executeWithAI({
+            category: params.category as Category,
+            skills: params.load_skills,
+            prompt: params.prompt,
+            sessionId: params.session_id,
+            organizationId,
+            userId,
+            context: params.context,
+            selectedAccount: currentAccount || undefined,
+          });
+
+          if (currentAccount && result.status !== "rate_limited") {
+            const isCacheRead = (result.metadata.cacheReadTokens || 0) > 0;
+            await accountPoolService.recordRequest(currentAccount.id, {
+              success: result.status === "success",
+              tokens: result.metadata.inputTokens + result.metadata.outputTokens,
+              isCacheRead,
+              error: result.metadata.error,
+            });
+          }
+
+          if (result.status === "rate_limited" && attempt < MAX_RETRY_ATTEMPTS) {
+            logger.warn("Rate limited, retrying with different account", {
+              attempt,
+              accountId: currentAccount?.id,
+              accountName: currentAccount?.name,
+            });
+
+            await agentActivityService.trackProgress(activityId, {
+              message: `Rate limited on attempt ${attempt}, retrying...`,
+              progress: (attempt / MAX_RETRY_ATTEMPTS) * 100,
+            });
+
+            continue;
+          }
+
+          await agentActivityService.trackComplete(activityId, {
+            outputData: {
+              output: result.output,
+              model: result.metadata.model,
+              tokens: result.metadata.inputTokens + result.metadata.outputTokens,
+            },
+            errorMessage: result.status === "failed" ? result.metadata.error : undefined,
+            metadata: {
+              accountId: result.metadata.accountId,
+              accountName: result.metadata.accountName,
+              cost: result.metadata.cost,
+            },
+          });
+
+          return {
+            output: result.output,
+            status: result.status === "rate_limited" ? "failed" : result.status,
+            metadata: {
+              model: result.metadata.model,
+              duration: result.metadata.duration,
+              inputTokens: result.metadata.inputTokens,
+              outputTokens: result.metadata.outputTokens,
+              cost: result.metadata.cost,
+              error: result.metadata.error,
+              accountId: result.metadata.accountId,
+              accountName: result.metadata.accountName,
+              activityId,
+            },
+          };
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          logger.error("AI execution attempt failed", {
+            attempt,
+            error: lastError.message,
+            accountId: selectedAccount?.id,
+          });
+
+          if (attempt === MAX_RETRY_ATTEMPTS) {
+            break;
+          }
+        }
+      }
+
+      const errorMessage = lastError?.message || "All retry attempts exhausted";
+      await agentActivityService.trackComplete(activityId, {
+        errorMessage,
+        metadata: {
+          attempts: MAX_RETRY_ATTEMPTS,
+          usedAccounts: Array.from(usedAccountIds),
+        },
+      });
+
+      return {
+        output: `AI execution failed after ${MAX_RETRY_ATTEMPTS} attempts: ${errorMessage}`,
+        status: "failed",
+        metadata: {
+          model: "unknown",
+          error: errorMessage,
+          activityId,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("Failed to execute with multi-account system", { error: errorMessage });
+
+      if (activityId) {
+        await agentActivityService.trackComplete(activityId, {
+          errorMessage,
+        });
+      }
+
+      return {
+        output: `Failed to execute: ${errorMessage}`,
+        status: "failed",
+        metadata: {
+          model: "unknown",
+          error: errorMessage,
+          activityId,
+        },
+      };
+    }
   }
 
   if (!OPENCODE_SIDECAR_URL) {

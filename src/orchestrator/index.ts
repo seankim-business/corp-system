@@ -463,9 +463,11 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
       });
 
       span.setStatus({ code: SpanStatusCode.OK });
+      const finalStatus =
+        result.execution.status === "rate_limited" ? "failed" : result.execution.status;
       return {
         output: result.execution.output,
-        status: result.execution.status,
+        status: finalStatus as "success" | "failed",
         metadata: {
           category: categorySelection.category,
           skills,

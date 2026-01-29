@@ -67,3 +67,7 @@ temp/
 # Embedded git repositories
 corp-system/
 oh-my-opencode/
+# Playwright test artifacts
+test-results/
+playwright-report/
+screenshots/

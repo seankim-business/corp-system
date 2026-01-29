@@ -18,6 +18,18 @@ export interface ChatResponse {
   usage: {
     inputTokens: number;
     outputTokens: number;
+    cacheCreationTokens?: number;
+    cacheReadTokens?: number;
+  };
+  metadata?: {
+    accountId?: string;
+    accountName?: string;
+    rateLimits?: {
+      remainingRpm?: number;
+      remainingItpm?: number;
+      remainingOtpm?: number;
+      retryAfter?: number;
+    };
   };
   finishReason: string;
 }

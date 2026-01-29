@@ -7,6 +7,8 @@ import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
 import { getOrganizationApiKey } from "../api/organization-settings";
 import { anthropicMetricsTracker } from "../services/anthropic-metrics";
 import { getSlackAlerts } from "../services/slack-anthropic-alerts";
+import { ClaudeAccount } from "../services/account-pool";
+import { AnthropicProvider } from "../providers/anthropic-provider";
 
 export interface AIExecutionParams {
   category: Category;
@@ -16,11 +18,12 @@ export interface AIExecutionParams {
   organizationId: string;
   userId: string;
   context?: Record<string, unknown>;
+  selectedAccount?: ClaudeAccount;
 }
 
 export interface AIExecutionResult {
   output: string;
-  status: "success" | "failed";
+  status: "success" | "failed" | "rate_limited";
   metadata: {
     model: string;
     inputTokens: number;
@@ -28,6 +31,10 @@ export interface AIExecutionResult {
     duration: number;
     cost: number;
     error?: string;
+    accountId?: string;
+    accountName?: string;
+    cacheReadTokens?: number;
+    retryable?: boolean;
   };
 }
 
@@ -165,8 +172,39 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
       span.setAttribute("user.id", params.userId);
       span.setAttribute("environment", environment);
 
+      if (params.selectedAccount) {
+        span.setAttribute("account.id", params.selectedAccount.id);
+        span.setAttribute("account.name", params.selectedAccount.name);
+      }
+
+      let accountId: string | undefined;
+      let accountName: string | undefined;
+
       try {
-        const client = await getAnthropicClient(params.organizationId);
+        const isMultiAccountMode = !!params.selectedAccount;
+        let client: Anthropic;
+
+        if (isMultiAccountMode) {
+          const provider = new AnthropicProvider({ account: params.selectedAccount! });
+          client = (provider as any).client;
+          accountId = params.selectedAccount!.id;
+          accountName = params.selectedAccount!.name;
+
+          logger.info("AI execution with account", {
+            accountId,
+            accountName,
+            model,
+            category: params.category,
+          });
+        } else {
+          client = await getAnthropicClient(params.organizationId);
+          accountName = "default";
+
+          logger.info("AI execution with environment key", {
+            model,
+            category: params.category,
+          });
+        }
 
         logger.info("Executing AI request", {
           model,
@@ -317,12 +355,17 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
             logger.warn("Failed to track Anthropic metrics", { error: err.message }),
           );
 
+        const cacheReadTokens = (response.usage as any).cache_read_input_tokens || 0;
+
         logger.info("AI execution completed", {
           model,
           inputTokens,
           outputTokens,
+          cacheReadTokens,
           cost: cost.toFixed(6),
           duration,
+          accountId,
+          accountName,
         });
 
         span.setStatus({ code: SpanStatusCode.OK });
@@ -335,18 +378,23 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
             outputTokens,
             duration,
             cost,
+            accountId,
+            accountName,
+            cacheReadTokens,
           },
         };
       } catch (error: unknown) {
         const duration = Date.now() - startTime;
         const errorMessage = error instanceof Error ? error.message : String(error);
+        const isRateLimited = error instanceof APIError && error.status === 429;
 
         span.recordException(error as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
 
-        if (error instanceof APIError && error.status === 429) {
+        if (isRateLimited) {
+          const trackingAccountName = accountName || "default";
           await anthropicMetricsTracker
-            .recordRateLimit("default")
+            .recordRateLimit(trackingAccountName)
             .catch((err: Error) =>
               logger.warn("Failed to track rate limit", { error: err.message }),
             );
@@ -355,7 +403,7 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
           if (slackAlerts) {
             slackAlerts
               .sendRateLimitAlert({
-                accountName: "default",
+                accountName: trackingAccountName,
                 error: error.message,
                 timestamp: new Date(),
               })
@@ -374,7 +422,6 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
           outputTokens: 0,
         });
 
-        // Track Anthropic-specific metrics for failures
         await anthropicMetricsTracker
           .recordRequest({
             model,
@@ -394,11 +441,14 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
           model,
           error: errorMessage,
           duration,
+          accountId,
+          accountName,
+          isRateLimited,
         });
 
         return {
           output: `AI execution failed: ${errorMessage}`,
-          status: "failed",
+          status: isRateLimited ? "rate_limited" : "failed",
           metadata: {
             model,
             inputTokens: 0,
@@ -406,6 +456,9 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
             duration,
             cost: 0,
             error: errorMessage,
+            accountId,
+            accountName,
+            retryable: isRateLimited,
           },
         };
       } finally {
