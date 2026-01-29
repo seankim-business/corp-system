@@ -678,11 +678,28 @@ const server = app.listen(port, "0.0.0.0", async () => {
 
     if (process.env.SLACK_BOT_TOKEN) {
       const alertChannel = process.env.SLACK_ALERT_CHANNEL || "#eng-alerts";
-      initializeSlackAlerts({
-        slackToken: process.env.SLACK_BOT_TOKEN,
-        alertChannel,
-      });
-      logger.info("✅ Slack Anthropic alerts initialized", { channel: alertChannel });
+
+      try {
+        initializeSlackAlerts({
+          slackToken: process.env.SLACK_BOT_TOKEN,
+          alertChannel,
+        });
+
+        const { getSlackAlerts } = await import("./services/slack-anthropic-alerts");
+        const alerts = getSlackAlerts();
+        if (alerts) {
+          await alerts.validateConfiguration();
+        }
+
+        logger.info("✅ Slack Anthropic alerts initialized and validated", {
+          channel: alertChannel,
+        });
+      } catch (error) {
+        logger.error("❌ Failed to initialize Slack alerts (continuing without monitoring)", {
+          error: error instanceof Error ? error.message : String(error),
+          channel: alertChannel,
+        });
+      }
     }
   } catch (error) {
     logger.warn("⚠️  Failed to start Slack Bot (continuing without Slack integration)", {
