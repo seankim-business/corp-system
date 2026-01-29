@@ -21,7 +21,7 @@ export const authRateLimiter = rateLimit({
 
 export const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: 300, // Increased from 100 for better SPA UX
   message: { error: "Too many API requests" },
   standardHeaders: true,
   legacyHeaders: false,
