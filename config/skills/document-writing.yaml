@@ -1,0 +1,50 @@
+id: document-writing
+name: 문서 작성
+description: 기술 문서, 보고서, 가이드 등 다양한 문서를 작성합니다.
+category: writing
+triggers:
+  - 문서
+  - document
+  - 작성
+  - write
+  - 보고서
+  - report
+  - 가이드
+  - guide
+  - README
+  - 매뉴얼
+  - manual
+  - 설명
+  - description
+  - 정리
+  - summarize
+parameters:
+  - name: type
+    type: string
+    description: 문서 유형 (readme, guide, report, spec, api-doc)
+    required: true
+  - name: topic
+    type: string
+    description: 문서 주제
+    required: true
+  - name: format
+    type: string
+    description: 출력 형식 (markdown, html, pdf)
+    required: false
+    default: markdown
+  - name: language
+    type: string
+    description: 문서 언어 (ko, en)
+    required: false
+    default: ko
+outputs:
+  - name: document
+    type: string
+    description: 작성된 문서 내용
+  - name: file_path
+    type: string
+    description: 저장된 파일 경로
+tools_required:
+  - file__read
+  - file__write
+  - notion__createPage

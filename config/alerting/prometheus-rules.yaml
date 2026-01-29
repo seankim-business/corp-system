@@ -1,0 +1,195 @@
+groups:
+  - name: nubabel_api_alerts
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          100 * sum(rate(nubabel_http_requests_total{status=~"5.."}[5m]))
+          / sum(rate(nubabel_http_requests_total[5m])) > 5
+        for: 5m
+        labels:
+          severity: critical
+          category: api
+        annotations:
+          summary: "High error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(nubabel_http_request_duration_ms_bucket[5m])) by (le, route)
+          ) > 2000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High latency on {{ $labels.route }}"
+          description: "P95 latency is {{ $value | humanize }}ms (threshold: 2000ms)"
+
+      - alert: VeryHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(nubabel_http_request_duration_ms_bucket[5m])) by (le, route)
+          ) > 5000
+        for: 5m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "Very high latency on {{ $labels.route }}"
+          description: "P95 latency is {{ $value | humanize }}ms (threshold: 5000ms)"
+
+  - name: nubabel_queue_alerts
+    interval: 30s
+    rules:
+      - alert: QueueBacklog
+        expr: nubabel_queue_depth{state="waiting"} > 1000
+        for: 10m
+        labels:
+          severity: warning
+          category: queue
+        annotations:
+          summary: "Large queue backlog detected"
+          description: "Queue has {{ $value }} waiting jobs (threshold: 1000)"
+
+      - alert: QueueStalled
+        expr: |
+          rate(nubabel_queue_depth{state="completed"}[5m]) == 0
+          and nubabel_queue_depth{state="waiting"} > 0
+        for: 15m
+        labels:
+          severity: critical
+          category: queue
+        annotations:
+          summary: "Queue processing appears stalled"
+          description: "No jobs completed in 15 minutes despite {{ $value }} waiting"
+
+      - alert: HighFailureRate
+        expr: |
+          100 * sum(rate(nubabel_queue_depth{state="failed"}[5m]))
+          / sum(rate(nubabel_queue_depth[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: queue
+        annotations:
+          summary: "High job failure rate"
+          description: "Job failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+  - name: nubabel_circuit_breaker_alerts
+    interval: 30s
+    rules:
+      - alert: CircuitBreakerOpen
+        expr: nubabel_circuit_breaker_state{state="open"} == 1
+        for: 5m
+        labels:
+          severity: critical
+          category: circuit_breaker
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.service }}"
+          description: "Circuit breaker has been open for 5 minutes, traffic is being blocked"
+
+      - alert: CircuitBreakerHalfOpen
+        expr: nubabel_circuit_breaker_state{state="half_open"} == 1
+        for: 10m
+        labels:
+          severity: warning
+          category: circuit_breaker
+        annotations:
+          summary: "Circuit breaker half-open for {{ $labels.service }}"
+          description: "Circuit breaker stuck in half-open state for 10 minutes"
+
+  - name: nubabel_system_alerts
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: |
+          100 * nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 90
+        for: 5m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Heap usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+
+      - alert: DatabaseLatencyHigh
+        expr: nubabel_db_query_duration_ms{quantile="0.95"} > 500
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "Database queries are slow"
+          description: "P95 database latency is {{ $value }}ms (threshold: 500ms)"
+
+      - alert: DatabaseLatencyCritical
+        expr: nubabel_db_query_duration_ms{quantile="0.95"} > 1000
+        for: 5m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "Database queries critically slow"
+          description: "P95 database latency is {{ $value }}ms (threshold: 1000ms)"
+
+      - alert: RedisLatencyHigh
+        expr: nubabel_redis_latency_ms{quantile="0.95"} > 50
+        for: 5m
+        labels:
+          severity: warning
+          category: redis
+        annotations:
+          summary: "Redis operations are slow"
+          description: "P95 Redis latency is {{ $value }}ms (threshold: 50ms)"
+
+  - name: nubabel_agent_alerts
+    interval: 30s
+    rules:
+      - alert: HighAgentErrorRate
+        expr: |
+          100 * sum(rate(nubabel_agent_errors_total[5m]))
+          / sum(rate(nubabel_agent_executions_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: agent
+        annotations:
+          summary: "High agent error rate"
+          description: "Agent error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      - alert: AgentExecutionTimeout
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(nubabel_agent_execution_duration_seconds_bucket[5m])) by (le, agent_type)
+          ) > 300
+        for: 5m
+        labels:
+          severity: warning
+          category: agent
+        annotations:
+          summary: "Slow agent execution for {{ $labels.agent_type }}"
+          description: "P95 execution time is {{ $value | humanizeDuration }} (threshold: 5m)"
+
+      - alert: BudgetExceeded
+        expr: |
+          100 * nubabel_ai_cost_total / nubabel_ai_budget_total > 100
+        for: 1m
+        labels:
+          severity: critical
+          category: budget
+        annotations:
+          summary: "AI budget exceeded for org {{ $labels.organization_id }}"
+          description: "Budget usage is {{ $value | humanizePercentage }} of allocated budget"
+
+      - alert: BudgetNearLimit
+        expr: |
+          100 * nubabel_ai_cost_total / nubabel_ai_budget_total > 90
+        for: 5m
+        labels:
+          severity: warning
+          category: budget
+        annotations:
+          summary: "AI budget near limit for org {{ $labels.organization_id }}"
+          description: "Budget usage is {{ $value | humanizePercentage }} of allocated budget"

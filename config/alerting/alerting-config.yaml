@@ -1,0 +1,283 @@
+# Alerting Configuration Template for Nubabel
+# This file provides templates for integrating with PagerDuty, Slack, and other alerting systems.
+# Copy this file to your environment-specific config and fill in the secrets.
+
+# =============================================================================
+# PagerDuty Configuration
+# =============================================================================
+# To enable PagerDuty integration:
+# 1. Create a PagerDuty integration key for your service
+# 2. Set the PAGERDUTY_INTEGRATION_KEY environment variable
+# 3. Configure Alertmanager with the configuration below
+
+pagerduty:
+  enabled: false
+  integration_key: ${PAGERDUTY_INTEGRATION_KEY}
+  # Routing rules - which alerts go to PagerDuty
+  routing_rules:
+    - severity: critical
+      send_to_pagerduty: true
+    - severity: warning
+      category: circuit_breaker
+      send_to_pagerduty: true
+    - severity: warning
+      category: queue
+      send_to_pagerduty: false # Handle in Slack only
+
+# =============================================================================
+# Slack Configuration
+# =============================================================================
+# To enable Slack integration:
+# 1. Create a Slack webhook URL for your channel
+# 2. Set the SLACK_WEBHOOK_URL environment variable
+# 3. Configure Alertmanager with the configuration below
+
+slack:
+  enabled: false
+  webhook_url: ${SLACK_WEBHOOK_URL}
+  default_channel: '#nubabel-alerts'
+  # Routing rules - which alerts go to which Slack channel
+  channels:
+    critical:
+      channel: '#nubabel-critical'
+      mention: '@channel'
+    warning:
+      channel: '#nubabel-alerts'
+      mention: ''
+    performance:
+      channel: '#nubabel-performance'
+      mention: ''
+
+# =============================================================================
+# Email Configuration
+# =============================================================================
+# To enable email alerts:
+# 1. Configure SMTP settings
+# 2. Set recipient lists for different severity levels
+
+email:
+  enabled: false
+  smtp:
+    host: smtp.gmail.com
+    port: 587
+    from: nubabel-alerts@example.com
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+  recipients:
+    critical:
+      - oncall@example.com
+      - cto@example.com
+    warning:
+      - devops-team@example.com
+
+# =============================================================================
+# Alertmanager Configuration
+# =============================================================================
+# Complete Alertmanager configuration file
+# Save this as alertmanager.yml and mount into the alertmanager container
+
+alertmanager_config: |
+  global:
+    resolve_timeout: 5m
+    slack_api_url: ${SLACK_WEBHOOK_URL}
+    pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+  # Templates for alert messages
+  templates:
+    - '/etc/alertmanager/templates/*.tmpl'
+
+  # Route tree
+  route:
+    receiver: 'default'
+    group_by: ['alertname', 'cluster', 'service']
+    group_wait: 10s
+    group_interval: 10s
+    repeat_interval: 12h
+
+    routes:
+      # Critical alerts -> PagerDuty + Slack
+      - match:
+          severity: critical
+        receiver: 'pagerduty-critical'
+        continue: true
+
+      - match:
+          severity: critical
+        receiver: 'slack-critical'
+
+      # Warning alerts -> Slack only
+      - match:
+          severity: warning
+        receiver: 'slack-warnings'
+
+      # Performance alerts -> Performance channel
+      - match:
+          category: performance
+        receiver: 'slack-performance'
+
+  # Inhibition rules - suppress certain alerts when others are firing
+  inhibit_rules:
+    # Suppress warning if critical is firing for same alert
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'cluster', 'service']
+
+    # Suppress high latency if circuit breaker is open
+    - source_match:
+        alertname: 'CircuitBreakerOpen'
+      target_match:
+        alertname: 'HighLatency'
+      equal: ['service']
+
+  # Receivers - where to send alerts
+  receivers:
+    - name: 'default'
+      slack_configs:
+        - channel: '#nubabel-alerts'
+          title: 'Nubabel Alert'
+          text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+    - name: 'pagerduty-critical'
+      pagerduty_configs:
+        - routing_key: ${PAGERDUTY_INTEGRATION_KEY}
+          severity: '{{ .CommonLabels.severity }}'
+          description: '{{ .CommonAnnotations.summary }}'
+          details:
+            firing: '{{ .Alerts.Firing | len }}'
+            resolved: '{{ .Alerts.Resolved | len }}'
+
+    - name: 'slack-critical'
+      slack_configs:
+        - channel: '#nubabel-critical'
+          username: 'Nubabel Alertmanager'
+          icon_emoji: ':rotating_light:'
+          title: ':fire: Critical Alert'
+          text: |
+            *Summary:* {{ .CommonAnnotations.summary }}
+            *Description:* {{ .CommonAnnotations.description }}
+            *Severity:* {{ .CommonLabels.severity }}
+          actions:
+            - type: button
+              text: 'View in Grafana :grafana:'
+              url: 'http://localhost:3001/d/{{ .CommonLabels.dashboard }}'
+            - type: button
+              text: 'View in Prometheus :prometheus:'
+              url: 'http://localhost:9090/alerts'
+
+    - name: 'slack-warnings'
+      slack_configs:
+        - channel: '#nubabel-alerts'
+          username: 'Nubabel Alertmanager'
+          icon_emoji: ':warning:'
+          title: 'Warning Alert'
+          text: |
+            *Summary:* {{ .CommonAnnotations.summary }}
+            *Description:* {{ .CommonAnnotations.description }}
+            *Severity:* {{ .CommonLabels.severity }}
+
+    - name: 'slack-performance'
+      slack_configs:
+        - channel: '#nubabel-performance'
+          username: 'Nubabel Alertmanager'
+          icon_emoji: ':chart_with_downwards_trend:'
+          title: 'Performance Alert'
+          text: |
+            *Summary:* {{ .CommonAnnotations.summary }}
+            *Description:* {{ .CommonAnnotations.description }}
+
+# =============================================================================
+# Webhook Configuration
+# =============================================================================
+# Generic webhook for custom integrations
+
+webhooks:
+  enabled: false
+  endpoints:
+    - name: custom-webhook
+      url: ${CUSTOM_WEBHOOK_URL}
+      headers:
+        Authorization: Bearer ${WEBHOOK_TOKEN}
+      # Payload template (JSON)
+      payload_template: |
+        {
+          "severity": "{{ .CommonLabels.severity }}",
+          "alert": "{{ .CommonAnnotations.summary }}",
+          "description": "{{ .CommonAnnotations.description }}",
+          "timestamp": "{{ .CommonAnnotations.timestamp }}",
+          "firing_count": {{ .Alerts.Firing | len }},
+          "resolved_count": {{ .Alerts.Resolved | len }}
+        }
+
+# =============================================================================
+# Alert Routing Examples
+# =============================================================================
+# Examples of how to route different types of alerts
+
+routing_examples:
+  # Route by severity
+  by_severity: |
+    routes:
+      - match:
+          severity: critical
+        receiver: pagerduty-critical
+      - match:
+          severity: warning
+        receiver: slack-warnings
+
+  # Route by category
+  by_category: |
+    routes:
+      - match:
+          category: api
+        receiver: api-team
+      - match:
+          category: database
+        receiver: dba-team
+      - match:
+          category: agent
+        receiver: ml-team
+
+  # Route by time (business hours vs off-hours)
+  by_time: |
+    routes:
+      - match:
+          severity: critical
+        receiver: pagerduty-24x7
+      - match:
+          severity: warning
+        receiver: slack-business-hours
+        active_time_intervals:
+          - business_hours
+
+    time_intervals:
+      - name: business_hours
+        time_intervals:
+          - weekdays: ['monday:friday']
+            times:
+              - start_time: '09:00'
+                end_time: '17:00'
+            location: 'America/New_York'
+
+# =============================================================================
+# Testing
+# =============================================================================
+# To test your alerting configuration:
+# 1. Start the observability stack: docker-compose -f docker/docker-compose.observability.yml up -d
+# 2. Send a test alert using curl:
+
+test_alert_command: |
+  curl -X POST http://localhost:9093/api/v1/alerts -d '[
+    {
+      "labels": {
+        "alertname": "TestAlert",
+        "severity": "warning",
+        "category": "test"
+      },
+      "annotations": {
+        "summary": "Test alert from Nubabel",
+        "description": "This is a test alert to verify alerting configuration"
+      }
+    }
+  ]'

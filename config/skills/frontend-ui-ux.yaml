@@ -1,0 +1,62 @@
+id: frontend-ui-ux
+name: 프론트엔드 UI/UX
+description: 프론트엔드 개발, UI 컴포넌트 구현, 스타일링, 반응형 디자인을 담당합니다.
+category: development
+triggers:
+  - 디자인
+  - design
+  - UI
+  - UX
+  - 프론트엔드
+  - frontend
+  - 컴포넌트
+  - component
+  - 스타일
+  - style
+  - react
+  - 리액트
+  - vue
+  - 뷰
+  - css
+  - layout
+  - 레이아웃
+  - responsive
+  - 반응형
+  - tailwind
+  - scss
+  - animation
+  - 애니메이션
+parameters:
+  - name: component
+    type: string
+    description: 대상 컴포넌트명
+    required: false
+  - name: action
+    type: string
+    description: 작업 유형 (create, modify, style, refactor)
+    required: true
+  - name: framework
+    type: string
+    description: 프레임워크 (react, vue, svelte)
+    required: false
+    default: react
+  - name: styling
+    type: string
+    description: 스타일링 방식 (css, scss, tailwind, styled-components)
+    required: false
+    default: tailwind
+outputs:
+  - name: component_code
+    type: string
+    description: 생성/수정된 컴포넌트 코드
+  - name: style_code
+    type: string
+    description: 스타일 코드
+  - name: preview_url
+    type: string
+    description: 미리보기 URL
+tools_required:
+  - file__read
+  - file__write
+  - playwright__screenshot
+  - npm__run

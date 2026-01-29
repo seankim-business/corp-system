@@ -1,0 +1,57 @@
+id: mcp-integration
+name: MCP 통합
+description: Notion, Linear, Jira 등 외부 서비스와의 통합 작업을 처리합니다.
+category: automation
+triggers:
+  - task
+  - 태스크
+  - workflow
+  - 워크플로우
+  - project
+  - 프로젝트
+  - document
+  - 문서
+  - database
+  - 데이터
+  - notion
+  - 노션
+  - linear
+  - 리니어
+  - jira
+  - 지라
+  - asana
+  - airtable
+  - 에어테이블
+  - trello
+  - integration
+  - 연동
+parameters:
+  - name: service
+    type: string
+    description: 연동할 서비스 이름
+    required: true
+  - name: action
+    type: string
+    description: 수행할 작업 (create, read, update, delete)
+    required: true
+  - name: payload
+    type: object
+    description: 작업에 필요한 데이터
+    required: false
+outputs:
+  - name: result
+    type: object
+    description: 작업 수행 결과
+  - name: metadata
+    type: object
+    description: 작업 메타데이터 (타임스탬프, ID 등)
+tools_required:
+  - notion__getTasks
+  - notion__createTask
+  - notion__updateTask
+  - notion__deleteTask
+  - linear__getIssues
+  - linear__createIssue
+  - linear__updateIssue
+  - jira__getIssues
+  - jira__createIssue

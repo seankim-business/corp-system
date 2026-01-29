@@ -1,0 +1,15 @@
+{
+  "agents": [
+    {
+      "agent_id": "ace3391",
+      "agent_type": "oh-my-claudecode:explore-medium",
+      "started_at": "2026-01-28T14:59:44.867Z",
+      "parent_mode": "ultrawork",
+      "status": "running"
+    }
+  ],
+  "total_spawned": 1,
+  "total_completed": 0,
+  "total_failed": 0,
+  "last_updated": "2026-01-28T15:00:42.604Z"
+}

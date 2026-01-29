@@ -26,42 +26,60 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
+import {
+  HomeIcon,
+  DocumentDuplicateIcon,
+  ClockIcon,
+  ChatBubbleLeftRightIcon,
+  MagnifyingGlassIcon,
+  Cog6ToothIcon,
+  SignalIcon,
+  ChartBarIcon,
+  FlagIcon,
+  CheckCircleIcon,
+  BuildingOfficeIcon,
+  CpuChipIcon,
+  WrenchScrewdriverIcon,
+  HeartIcon,
+  BoltIcon,
+  BookOpenIcon
+} from '@heroicons/react/24/outline';
 
 interface NavItem {
   name: string;
   path: string;
-  icon: string;
+  icon: React.ElementType;
 }
 
 const mainNavItems: NavItem[] = [
-  { name: "Dashboard", path: "/dashboard", icon: "🏠" },
-  { name: "Workflows", path: "/workflows", icon: "📋" },
-  { name: "Executions", path: "/executions", icon: "⏱️" },
-  { name: "Conversations", path: "/conversations", icon: "💬" },
-  { name: "Search", path: "/search", icon: "🔍" },
-  { name: "Settings", path: "/settings", icon: "⚙️" },
+  { name: "Dashboard", path: "/dashboard", icon: HomeIcon },
+  { name: "Workflows", path: "/workflows", icon: DocumentDuplicateIcon },
+  { name: "Executions", path: "/executions", icon: ClockIcon },
+  { name: "Conversations", path: "/conversations", icon: ChatBubbleLeftRightIcon },
+  { name: "Search", path: "/search", icon: MagnifyingGlassIcon },
+  { name: "Settings", path: "/settings", icon: Cog6ToothIcon },
 ];
 
 const activityNavItems: NavItem[] = [
-  { name: "Activity", path: "/activity", icon: "📡" },
-  { name: "Metrics", path: "/metrics/agents", icon: "📊" },
-  { name: "OKR", path: "/okr", icon: "🎯" },
-  { name: "Approvals", path: "/approvals", icon: "✅" },
-  { name: "Changes", path: "/org-changes", icon: "📝" },
+  { name: "Activity", path: "/activity", icon: SignalIcon },
+  { name: "Metrics", path: "/metrics/agents", icon: ChartBarIcon },
+  { name: "OKR", path: "/okr", icon: FlagIcon },
+  { name: "Approvals", path: "/approvals", icon: CheckCircleIcon },
+  { name: "Changes", path: "/org-changes", icon: DocumentDuplicateIcon },
 ];
 
 const integrationNavItems: NavItem[] = [
-  { name: "Notion Settings", path: "/settings/notion", icon: "📝" },
-  { name: "Slack Settings", path: "/settings/slack", icon: "💬" },
+  { name: "Notion Settings", path: "/settings/notion", icon: DocumentDuplicateIcon },
+  { name: "Slack Settings", path: "/settings/slack", icon: ChatBubbleLeftRightIcon },
 ];
 
 const adminNavItems: NavItem[] = [
-  { name: "Admin Dashboard", path: "/admin", icon: "🔧" },
-  { name: "System Health", path: "/admin/system", icon: "💓" },
-  { name: "Organizations", path: "/admin/organizations", icon: "🏢" },
-  { name: "Agents", path: "/admin/agents", icon: "🤖" },
-  { name: "Skills", path: "/admin/skills", icon: "⚡" },
-  { name: "SOP Library", path: "/admin/sops", icon: "📖" },
+  { name: "Admin Dashboard", path: "/admin", icon: WrenchScrewdriverIcon },
+  { name: "System Health", path: "/admin/system", icon: HeartIcon },
+  { name: "Organizations", path: "/admin/organizations", icon: BuildingOfficeIcon },
+  { name: "Agents", path: "/admin/agents", icon: CpuChipIcon },
+  { name: "Skills", path: "/admin/skills", icon: BoltIcon },
+  { name: "SOP Library", path: "/admin/sops", icon: BookOpenIcon },
 ];
 
 export default function Sidebar() {
@@ -73,6 +91,7 @@ export default function Sidebar() {
   const renderNavItems = (items: NavItem[]) => {
     return items.map((item) => {
       const isActive = location.pathname === item.path;
+      const Icon = item.icon;
       return (
         <li key={item.path}>
           <Link
@@ -81,7 +100,7 @@ export default function Sidebar() {
               isActive ? "bg-indigo-600 text-white" : "text-gray-700 hover:bg-gray-200"
             }`}
           >
-            <span className="text-xl">{item.icon}</span>
+            <Icon className="h-5 w-5" />
             <span className="font-medium">{item.name}</span>
           </Link>
         </li>

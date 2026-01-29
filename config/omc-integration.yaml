@@ -1,0 +1,232 @@
+# OMC Bridge Integration Configuration
+#
+# This file configures the integration between Nubabel and oh-my-claudecode (OMC)
+# runtime for advanced code intelligence tools.
+#
+# Environment variables can override these settings with OMC_ prefix:
+# - OMC_RUNTIME_URL: omcRuntimeUrl
+# - OMC_PROTOCOL: protocol
+# - OMC_API_KEY: apiKey
+# - OMC_CONNECTION_TIMEOUT_MS: connectionTimeoutMs
+# - etc.
+
+omc_bridge:
+  # ============================================
+  # CONNECTION SETTINGS
+  # ============================================
+
+  # OMC runtime server URL
+  # Default: http://localhost:3100
+  omcRuntimeUrl: "http://localhost:3100"
+
+  # Communication protocol
+  # Options: sse, stdio, websocket
+  # Default: sse (Server-Sent Events)
+  protocol: "sse"
+
+  # Optional API key for authentication
+  # Can also be set via OMC_API_KEY environment variable
+  # apiKey: ""
+
+  # ============================================
+  # TIMEOUT SETTINGS
+  # ============================================
+
+  # Timeout for establishing connection (ms)
+  # Default: 5000
+  connectionTimeoutMs: 5000
+
+  # Default timeout for tool requests (ms)
+  # Individual tools may have shorter defaults
+  # Default: 30000
+  requestTimeoutMs: 30000
+
+  # Interval between health checks (ms)
+  # Default: 30000
+  healthCheckIntervalMs: 30000
+
+  # ============================================
+  # RETRY SETTINGS
+  # ============================================
+
+  # Maximum number of retry attempts for failed calls
+  # Default: 3
+  maxRetries: 3
+
+  # Delay between retry attempts (ms)
+  # Default: 1000
+  retryDelayMs: 1000
+
+  # ============================================
+  # RATE LIMITING
+  # ============================================
+
+  # Maximum concurrent tool calls
+  # Default: 10
+  maxConcurrentCalls: 10
+
+  # Maximum tool calls per minute (per organization)
+  # Default: 60
+  rateLimitPerMinute: 60
+
+  # ============================================
+  # TOOL CONFIGURATION
+  # ============================================
+
+  # Explicitly enable only these tools (whitelist)
+  # Leave empty or omit to enable all tools
+  # enabledTools:
+  #   - lsp_hover
+  #   - lsp_goto_definition
+  #   - lsp_diagnostics
+
+  # Explicitly disable these tools (blacklist)
+  # Takes precedence over enabledTools
+  # disabledTools:
+  #   - python_repl
+  #   - ast_grep_replace
+
+  # ============================================
+  # LOGGING
+  # ============================================
+
+  # Log level for OMC bridge operations
+  # Options: debug, info, warn, error
+  # Default: info
+  logLevel: "info"
+
+  # Whether to log individual tool calls
+  # Useful for debugging but can be verbose
+  # Default: true
+  logToolCalls: true
+
+# ============================================
+# TOOL-SPECIFIC SETTINGS
+# ============================================
+
+tool_settings:
+  # LSP Tools
+  lsp_hover:
+    timeoutMs: 5000
+    requiresApproval: false
+
+  lsp_goto_definition:
+    timeoutMs: 5000
+    requiresApproval: false
+
+  lsp_find_references:
+    timeoutMs: 15000
+    requiresApproval: false
+
+  lsp_document_symbols:
+    timeoutMs: 5000
+    requiresApproval: false
+
+  lsp_workspace_symbols:
+    timeoutMs: 10000
+    requiresApproval: false
+
+  lsp_diagnostics:
+    timeoutMs: 5000
+    requiresApproval: false
+
+  lsp_diagnostics_directory:
+    timeoutMs: 60000
+    requiresApproval: false
+
+  lsp_prepare_rename:
+    timeoutMs: 5000
+    requiresApproval: false
+
+  lsp_rename:
+    timeoutMs: 30000
+    # Rename modifies files - may need approval
+    requiresApproval: true
+
+  lsp_code_actions:
+    timeoutMs: 5000
+    requiresApproval: false
+
+  lsp_code_action_resolve:
+    timeoutMs: 5000
+    requiresApproval: false
+
+  lsp_servers:
+    timeoutMs: 2000
+    requiresApproval: false
+
+  # AST Tools
+  ast_grep_search:
+    timeoutMs: 30000
+    requiresApproval: false
+
+  ast_grep_replace:
+    timeoutMs: 60000
+    # Replace modifies files - may need approval
+    requiresApproval: true
+
+  # REPL Tools
+  python_repl:
+    timeoutMs: 30000
+    # Code execution may need approval
+    requiresApproval: true
+
+# ============================================
+# PERMISSIONS
+# ============================================
+
+tool_permissions:
+  # Which agents can use which tools
+  omc__lsp_hover:
+    allowed_agents: [all]
+
+  omc__lsp_goto_definition:
+    allowed_agents: [all]
+
+  omc__lsp_find_references:
+    allowed_agents: [all]
+
+  omc__lsp_document_symbols:
+    allowed_agents: [all]
+
+  omc__lsp_workspace_symbols:
+    allowed_agents: [all]
+
+  omc__lsp_diagnostics:
+    allowed_agents: [all]
+
+  omc__lsp_diagnostics_directory:
+    allowed_agents: [all]
+
+  omc__lsp_prepare_rename:
+    allowed_agents: [dev-agent]
+
+  omc__lsp_rename:
+    allowed_agents: [dev-agent]
+    requires_approval:
+      condition: "always"
+      approver: tech_lead
+
+  omc__lsp_code_actions:
+    allowed_agents: [dev-agent]
+
+  omc__lsp_code_action_resolve:
+    allowed_agents: [dev-agent]
+
+  omc__lsp_servers:
+    allowed_agents: [all]
+
+  omc__ast_grep_search:
+    allowed_agents: [dev-agent, data-agent]
+
+  omc__ast_grep_replace:
+    allowed_agents: [dev-agent]
+    requires_approval:
+      condition: "always"
+      approver: tech_lead
+
+  omc__python_repl:
+    allowed_agents: [dev-agent, data-agent]
+    requires_approval:
+      condition: "code.contains('import os') or code.contains('subprocess')"
+      approver: tech_lead

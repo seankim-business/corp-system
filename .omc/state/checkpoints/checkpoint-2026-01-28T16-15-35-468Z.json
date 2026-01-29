@@ -1,0 +1,15 @@
+{
+  "created_at": "2026-01-28T16:15:35.467Z",
+  "trigger": "auto",
+  "active_modes": {
+    "ultrawork": {
+      "original_prompt": "ralplan ulw https://github.com/moltbot/moltbot 이 프로젝트 연구해보고, 우리 프로젝트와 비교 분석 빡세게 해줘"
+    }
+  },
+  "todo_summary": {
+    "pending": 0,
+    "in_progress": 0,
+    "completed": 0
+  },
+  "wisdom_exported": false
+}

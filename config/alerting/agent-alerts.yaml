@@ -1,0 +1,199 @@
+# Agent Monitoring Alerting Rules
+# For use with Prometheus Alertmanager
+#
+# These rules monitor the health and performance of multi-agent workflows.
+
+groups:
+  - name: agent_alerts
+    interval: 30s
+    rules:
+      # High Error Rate Alert
+      # Triggers when agent error rate exceeds 10% over 5 minutes
+      - alert: AgentHighErrorRate
+        expr: |
+          (
+            sum(rate(agent_errors_total[5m])) by (agent_id)
+            /
+            sum(rate(agent_execution_duration_seconds_count[5m])) by (agent_id)
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High error rate for agent {{ $labels.agent_id }}"
+          description: "Agent {{ $labels.agent_id }} has an error rate of {{ $value | humanizePercentage }} over the last 5 minutes."
+          runbook_url: "https://docs.nubabel.com/runbooks/agent-high-error-rate"
+
+      # Slow Execution Alert
+      # Triggers when P95 latency exceeds 30 seconds for 10 minutes
+      - alert: AgentSlowExecution
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(agent_execution_duration_seconds_bucket[10m])) by (agent_id, le)
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Slow execution for agent {{ $labels.agent_id }}"
+          description: "Agent {{ $labels.agent_id }} P95 latency is {{ $value | humanizeDuration }} (threshold: 30s)."
+          runbook_url: "https://docs.nubabel.com/runbooks/agent-slow-execution"
+
+      # No Active Sessions Alert
+      # Triggers when there are no active agent sessions for extended period
+      - alert: AgentNoActiveSessions
+        expr: |
+          sum(active_agent_sessions) == 0
+        for: 30m
+        labels:
+          severity: info
+          team: platform
+        annotations:
+          summary: "No active agent sessions"
+          description: "No agents have been active for the last 30 minutes. This may indicate a problem with the orchestration system."
+
+      # Agent Session Spike Alert
+      # Triggers when active sessions suddenly increase
+      - alert: AgentSessionSpike
+        expr: |
+          sum(active_agent_sessions) >
+          avg_over_time(sum(active_agent_sessions)[1h:5m]) * 3
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Unusual spike in agent sessions"
+          description: "Active agent sessions ({{ $value }}) is more than 3x the hourly average."
+
+      # Tool Call Failure Rate Alert
+      - alert: ToolCallHighFailureRate
+        expr: |
+          (
+            sum(rate(agent_tool_calls_total{status="failed"}[5m])) by (tool_name)
+            /
+            sum(rate(agent_tool_calls_total[5m])) by (tool_name)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High failure rate for tool {{ $labels.tool_name }}"
+          description: "Tool {{ $labels.tool_name }} has a failure rate of {{ $value | humanizePercentage }}."
+
+      # Delegation Failure Alert
+      - alert: AgentDelegationFailures
+        expr: |
+          (
+            sum(rate(agent_delegations_total{status="failed"}[5m])) by (from_agent, to_agent)
+            /
+            sum(rate(agent_delegations_total[5m])) by (from_agent, to_agent)
+          ) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High delegation failure rate: {{ $labels.from_agent }} -> {{ $labels.to_agent }}"
+          description: "Delegation from {{ $labels.from_agent }} to {{ $labels.to_agent }} has {{ $value | humanizePercentage }} failure rate."
+
+  - name: workflow_alerts
+    interval: 30s
+    rules:
+      # Workflow Step Timeout Alert
+      - alert: WorkflowStepTimeout
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(workflow_step_duration_seconds_bucket[5m])) by (workflow_id, step_type, le)
+          ) > 120
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Workflow step timeout risk for {{ $labels.workflow_id }}"
+          description: "Step type {{ $labels.step_type }} in workflow {{ $labels.workflow_id }} has P99 latency of {{ $value | humanizeDuration }}."
+
+      # Workflow Execution Backlog Alert
+      - alert: WorkflowExecutionBacklog
+        expr: |
+          sum(bullmq_queue_jobs{queue="orchestration", state="waiting"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Workflow execution backlog growing"
+          description: "There are {{ $value }} pending workflow executions in the queue."
+
+  - name: agent_capacity_alerts
+    interval: 60s
+    rules:
+      # Agent Near Capacity Alert
+      - alert: AgentNearCapacity
+        expr: |
+          (
+            sum(active_agent_sessions) by (agent_id)
+            /
+            # Assuming max concurrent tasks per agent type from agent-registry
+            (5 + 0 * sum(active_agent_sessions) by (agent_id))
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Agent {{ $labels.agent_id }} approaching capacity"
+          description: "Agent {{ $labels.agent_id }} is at {{ $value | humanizePercentage }} of its maximum concurrent task limit."
+
+      # Memory Pressure Alert (when many agents active)
+      - alert: HighAgentMemoryPressure
+        expr: |
+          nodejs_heap_used_bytes / nodejs_heap_size_bytes > 0.85
+          and
+          sum(active_agent_sessions) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory pressure with active agents"
+          description: "Node.js heap is at {{ $value | humanizePercentage }} with {{ printf \"%.0f\" (sum(active_agent_sessions)) }} active agent sessions."
+
+  - name: agent_slo_alerts
+    interval: 60s
+    rules:
+      # SLO: Agent Availability (99.9% target)
+      - alert: AgentAvailabilitySLOBreach
+        expr: |
+          1 - (
+            sum(rate(agent_errors_total[1h]))
+            /
+            sum(rate(agent_execution_duration_seconds_count[1h]))
+          ) < 0.999
+        for: 15m
+        labels:
+          severity: critical
+          team: platform
+          slo: availability
+        annotations:
+          summary: "Agent availability SLO breach"
+          description: "Agent availability is {{ $value | humanizePercentage }}, below the 99.9% SLO target."
+
+      # SLO: Agent Latency (P95 < 10s, 95% of time)
+      - alert: AgentLatencySLOBreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(agent_execution_duration_seconds_bucket[1h])) by (le)
+          ) > 10
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+          slo: latency
+        annotations:
+          summary: "Agent latency SLO breach"
+          description: "Agent P95 latency is {{ $value | humanizeDuration }}, exceeding the 10s SLO target."

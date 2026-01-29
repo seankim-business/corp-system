@@ -67,3 +67,5 @@ temp/
 # Embedded git repositories
 corp-system/
 oh-my-opencode/
+.playwright-profile
+.chrome-test-profile

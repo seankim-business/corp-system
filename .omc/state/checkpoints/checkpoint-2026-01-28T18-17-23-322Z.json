@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-01-28T18:17:23.320Z",
+  "trigger": "auto",
+  "active_modes": {
+    "autopilot": {
+      "phase": "execution",
+      "originalIdea": ""
+    },
+    "ultrawork": {
+      "original_prompt": "<task-notification>\n<task-id>a493196</task-id>\n<status>completed</status>\n<summary>Agent \"Executor implements Phase 2 Skill Integration\" completed</summary>\n<result>All files are complete. Let me create a summary of what was implemented.\n\n## Changes Made\n\n- `/Users/sean/Documents/Kyndof/tools/nubabel/src/orchestrator/types/unified-skill.ts`: Created new file with unified skill interface supporting both OMC and Nubabel skill sources. Includes `UnifiedSkill`, `SkillSource`, `SkillCostTier`, `ParsedOmcSkill`, `OmcSkillMetadata`, `SkillMatchResult`, `SkillRoutingDecision`, and registry configuration types.\n\n- `/Users/sean/Documents/Kyndof/tools/nubabel/src/utils/omc-skill-parser.ts`: Created new file with OMC SKILL.md parsing utilities. Includes `parseFrontmatter()`, `extractKeywords()`, `extractAgents()`, `parseSkillMd()`, `convertToUnifiedSkill()`, and `loadOmcSkillsFromDirectory()` functions.\n\n- `/Users/sean/Documents/Kyndof/tools/nubabel/src/orchestrator/unified-skill-registry.ts`: Created singleton registry class managing skills from both sources. Includes `loadSkills()`, `getSkillByName()`, `findSkillByKeywords()`, `registerOmcSkill()`, `registerNubabelSkill()`, caching with TTL, and automatic version detection for OMC skills.\n\n- `/Users/sean/Documents/Kyndof/tools/nubabel/config/skills/omc-skills.json`: Created JSON config with metadata for 10 key OMC skills (autopilot, ralph, ultrawork, plan, analyze, deepsearch, code-review, tdd, security-review, research) including keywords, agents, cost tiers, and conflict definitions.\n\n- `/Users/sean/Documents/Kyndof/tools/nubabel/src/orchestrator/skill-selector.ts:1-4`: Added imports for unified skill registry and types.\n\n- `/Users/sean/Documents/Kyndof/tools/nubabel/src/orchestrator/skill-selector.ts:19-36`: Added `OmcSkillMatch` and `ExtendedSkillSelection` interfaces.\n\n- `/Users/sean/Documents/Kyndof/tools/nubabel/src/orchestrator/skill-selector.ts:248-538`: Added OMC skill routing functions: `findOmcSkill()`, `findAllOmcSkills()`, `resolveSkillConflicts()`, `selectSkillsWithOmc()`, `getOmcSkillByName()`, `detectOmcExecutionMode()`, and `initializeOmcSkillRegistry()`.\n\n## Verification\n\n- Build: TypeScript compilation passes for all new files (verified with `tsc --noEmit`)\n- Imports: All cross-file imports are correct and resolve properly\n- Dependencies: No external dependencies added\n\n## Summary\n\nImplemented Phase 2 - Skill Integration with a Unified Skill Registry that bridges OMC (oh-my-claudecode) skills with Nubabel's existing skill system. The registry supports automatic loading from OMC's filesystem cache, keyword-based skill routing, priority-based conflict resolution between execution modes, and hybrid skill merging when the same skill exists in both systems.</result>\n</task-notification>\nFull transcript available at: /private/tmp/claude/-Users-sean-Documents-Kyndof-tools-nubabel/tasks/a493196.output"
+    }
+  },
+  "todo_summary": {
+    "pending": 0,
+    "in_progress": 0,
+    "completed": 0
+  },
+  "wisdom_exported": true
+}

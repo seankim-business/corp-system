@@ -1,0 +1,27 @@
+id: schedule-management
+name: Schedule Management
+description: "일정 관리 및 조율 스킬"
+category: operations
+triggers:
+  - "일정"
+  - "schedule"
+  - "calendar"
+  - "meeting"
+parameters:
+  - name: default_duration_minutes
+    type: number
+    description: Default meeting duration in minutes
+    required: false
+    default: 60
+  - name: buffer_minutes
+    type: number
+    description: Buffer time between meetings
+    required: false
+    default: 15
+outputs:
+  - name: scheduled_event
+    type: object
+    description: The scheduled calendar event
+tools_required:
+  - calendar_manage
+  - notify_slack

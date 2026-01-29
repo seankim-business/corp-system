@@ -1,0 +1,22 @@
+{
+  "agents": [
+    {
+      "agent_id": "a79a138",
+      "agent_type": "oh-my-claudecode:executor",
+      "started_at": "2026-01-28T14:35:49.053Z",
+      "parent_mode": "ultrawork",
+      "status": "running"
+    },
+    {
+      "agent_id": "a9360e1",
+      "agent_type": "oh-my-claudecode:planner",
+      "started_at": "2026-01-28T14:45:43.731Z",
+      "parent_mode": "ultrawork",
+      "status": "running"
+    }
+  ],
+  "total_spawned": 2,
+  "total_completed": 0,
+  "total_failed": 0,
+  "last_updated": "2026-01-28T14:45:43.732Z"
+}

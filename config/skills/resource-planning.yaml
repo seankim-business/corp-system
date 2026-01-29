@@ -1,0 +1,27 @@
+id: resource-planning
+name: Resource Planning
+description: "리소스 할당 및 용량 계획 스킬"
+category: operations
+triggers:
+  - "리소스"
+  - "resource"
+  - "allocation"
+  - "capacity"
+parameters:
+  - name: max_resources
+    type: number
+    description: Maximum number of resources to allocate
+    required: false
+    default: 100
+  - name: planning_horizon_days
+    type: number
+    description: Number of days to plan ahead
+    required: false
+    default: 30
+outputs:
+  - name: allocation_plan
+    type: object
+    description: The resource allocation plan
+tools_required:
+  - notion_query
+  - calendar_manage

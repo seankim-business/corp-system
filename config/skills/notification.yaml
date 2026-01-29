@@ -1,0 +1,50 @@
+id: notification
+name: 알림
+description: Slack, 이메일, SMS 등 다양한 채널을 통한 알림 발송을 담당합니다.
+category: communication
+triggers:
+  - 알림
+  - notification
+  - notify
+  - 메시지
+  - message
+  - slack
+  - 슬랙
+  - email
+  - 이메일
+  - 발송
+  - send
+  - alert
+  - 경고
+parameters:
+  - name: channel
+    type: string
+    description: 알림 채널 (slack, email, sms, push)
+    required: true
+  - name: recipient
+    type: string
+    description: 수신자 (채널 ID, 이메일 주소 등)
+    required: true
+  - name: message
+    type: string
+    description: 알림 메시지 내용
+    required: true
+  - name: priority
+    type: string
+    description: 우선순위 (low, normal, high, urgent)
+    required: false
+    default: normal
+outputs:
+  - name: message_id
+    type: string
+    description: 발송된 메시지 ID
+  - name: status
+    type: string
+    description: 발송 상태
+  - name: timestamp
+    type: string
+    description: 발송 시간
+tools_required:
+  - slack__postMessage
+  - slack__sendDM
+  - email__send

@@ -1,0 +1,9 @@
+{
+  "active": true,
+  "phase": "execution",
+  "startedAt": "2026-01-29T02:30:00Z",
+  "currentPhase": 2,
+  "totalPhases": 5,
+  "spec": ".omc/autopilot/spec.md",
+  "plan": ".omc/autopilot/plan.md"
+}
