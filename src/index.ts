@@ -73,7 +73,7 @@ import agentMetricsRoutes from "./api/agent-metrics";
 import regionsRoutes from "./api/regions";
 // import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
-import onboardingRoutes from "./api/onboarding";
+// import onboardingRoutes from "./api/onboarding";
 // import errorManagementRoutes from "./api/error-management";
 // import agentAdminRoutes from "./api/agent-admin";
 // import optimizationRoutes from "./api/optimization";
@@ -85,11 +85,12 @@ import onboardingRoutes from "./api/onboarding";
 // import alertsRoutes from "./api/alerts";
 // import analyticsRoutes from "./api/analytics";
 // import metaAgentRoutes from "./api/meta-agent";
-import billingRoutes from "./api/billing";
-import stripeWebhookRoutes from "./api/stripe-webhook";
+// import billingRoutes from "./api/billing";
+// import stripeWebhookRoutes from "./api/stripe-webhook";
 // import v1ApiRouter from "./api/v1";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
+import { shutdownAgentActivityService } from "./services/monitoring";
 // import { conversationsRouter } from "./api/conversations";
 import { startWorkers, gracefulShutdown as gracefulWorkerShutdown } from "./workers";
 import { startSlackBot, stopSlackBot } from "./api/slack";
@@ -515,9 +516,9 @@ app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRout
 // app.use("/api/alerts", apiRateLimiter, authenticate, sentryUserContext, alertsRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
 // app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
-app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
-app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
+// app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
+// app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
 app.use("/api", sseRouter);
 
 // Public API v1 (external developer access with API key auth)
@@ -753,6 +754,10 @@ async function gracefulShutdown(signal: string) {
     logger.info("Closing SSE connections");
     await shutdownSSE();
     logger.info("SSE closed");
+
+    logger.info("Closing agent activity service");
+    await shutdownAgentActivityService();
+    logger.info("Agent activity service closed");
 
     logger.info("Stopping Slack Bot");
     await stopSlackBot();
