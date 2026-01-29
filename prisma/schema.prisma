@@ -51,6 +51,7 @@ model Organization {
   workflows              Workflow[]
   notionConnections      NotionConnection[]
   mcpConnections         MCPConnection[]
+  claudeAccounts         ClaudeAccount[]
   slackIntegrations      SlackIntegration[]
   orchestratorExecutions OrchestratorExecution[]
   featureFlagOverrides   FeatureFlagOverride[]
@@ -471,6 +472,56 @@ model MCPConnection {
   @@map("mcp_connections")
 }
 
+/// Claude Accounts (Per-account circuit breaker state)
+/// Tracks API health and circuit breaker status for individual Claude accounts
+model ClaudeAccount {
+  id                  String    @id @default(uuid()) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  name                String    @db.VarChar(255)
+  status              String    @default("active") @db.VarChar(50)
+  consecutiveFailures Int       @default(0) @map("consecutive_failures")
+  halfOpenSuccesses   Int       @default(0) @map("half_open_successes")
+  circuitOpensAt      DateTime? @map("circuit_opens_at") @db.Timestamptz(6)
+  lastFailureAt       DateTime? @map("last_failure_at") @db.Timestamptz(6)
+  lastFailureReason   String?   @map("last_failure_reason") @db.Text
+  lastSuccessAt       DateTime? @map("last_success_at") @db.Timestamptz(6)
+  metadata            Json      @default("{}") @db.JsonB
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  quotaAlerts  QuotaAlert[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([status])
+  @@index([circuitOpensAt])
+  @@map("claude_accounts")
+}
+
+model QuotaAlert {
+  id           String    @id @default(uuid()) @db.Uuid
+  accountId    String    @map("account_id") @db.Uuid
+  type         String    @db.VarChar(50)
+  severity     String    @db.VarChar(20)
+  message      String    @db.Text
+  currentValue Int       @map("current_value")
+  limit        Int
+  percentage   Float
+  quotaType    String    @map("quota_type") @db.VarChar(50)
+  resolvedAt   DateTime? @map("resolved_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account ClaudeAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([type])
+  @@index([severity])
+  @@index([resolvedAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("quota_alerts")
+}
+
 /// Legacy Notion Connections (Backward compatibility)
 model NotionConnection {
   id                String   @id @default(uuid()) @db.Uuid
@@ -492,19 +543,23 @@ model NotionConnection {
 // ============================================================================
 
 /// Slack Integrations (Per-organization Slack workspaces)
-/// Replaces hardcoded SLACK_BOT_TOKEN environment variable
+/// Supports BYOA (Bring Your Own App) - organizations provide their own Slack App credentials
 model SlackIntegration {
-  id             String @id @default(uuid()) @db.Uuid
-  organizationId String @map("organization_id") @db.Uuid
-  workspaceId    String @unique @map("workspace_id") @db.VarChar(50) // Slack Team ID (T01234ABCD)
-  workspaceName  String @map("workspace_name") @db.VarChar(255) // Friendly name
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @unique @map("organization_id") @db.Uuid
+  workspaceId    String? @unique @map("workspace_id") @db.VarChar(50) // Slack Team ID (T01234ABCD) - filled after OAuth
+  workspaceName  String? @map("workspace_name") @db.VarChar(255) // Friendly name - filled after OAuth
 
-  // OAuth tokens (encrypted in application layer before storage)
-  botToken String  @map("bot_token") @db.Text // xoxb-... (encrypted)
+  // Slack App credentials (BYOA - encrypted)
+  clientId     String? @map("client_id") @db.Text // Slack App Client ID (encrypted)
+  clientSecret String? @map("client_secret") @db.Text // Slack App Client Secret (encrypted)
+
+  // OAuth tokens (encrypted in application layer before storage) - filled after OAuth
+  botToken String? @map("bot_token") @db.Text // xoxb-... (encrypted)
   appToken String? @map("app_token") @db.Text // xapp-... (encrypted, for Socket Mode)
 
   // Security
-  signingSecret String @map("signing_secret") @db.Text // Webhook verification (encrypted)
+  signingSecret String? @map("signing_secret") @db.Text // Webhook verification (encrypted)
 
   // OAuth metadata
   botUserId String?  @map("bot_user_id") @db.VarChar(50) // U01234ABCD
@@ -525,7 +580,6 @@ model SlackIntegration {
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, workspaceId])
   @@index([organizationId])
   @@index([workspaceId])
   @@index([enabled])
@@ -1095,17 +1149,17 @@ model AgentSkillAssignment {
 
 /// Subscription (Organization billing subscription)
 model Subscription {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @unique @map("organization_id") @db.Uuid
-  stripeCustomerId String? @map("stripe_customer_id") @db.VarChar(255)
-  stripeSubscriptionId String? @map("stripe_subscription_id") @db.VarChar(255)
-  plan           String   @default("free") @db.VarChar(50) // free, starter, pro, enterprise
-  status         String   @default("active") @db.VarChar(50) // active, past_due, canceled, trialing
-  currentPeriodStart DateTime? @map("current_period_start") @db.Timestamptz(6)
-  currentPeriodEnd DateTime? @map("current_period_end") @db.Timestamptz(6)
-  cancelAtPeriodEnd Boolean @default(false) @map("cancel_at_period_end")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String    @unique @map("organization_id") @db.Uuid
+  stripeCustomerId     String?   @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId String?   @map("stripe_subscription_id") @db.VarChar(255)
+  plan                 String    @default("free") @db.VarChar(50) // free, starter, pro, enterprise
+  status               String    @default("active") @db.VarChar(50) // active, past_due, canceled, trialing
+  currentPeriodStart   DateTime? @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd     DateTime? @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   invoices Invoice[]
 
@@ -1116,21 +1170,21 @@ model Subscription {
 
 /// Invoice (Billing invoices)
 model Invoice {
-  id             String   @id @default(uuid()) @db.Uuid
-  subscriptionId String   @map("subscription_id") @db.Uuid
-  stripeInvoiceId String? @unique @map("stripe_invoice_id") @db.VarChar(255)
-  amountDue      Int      @map("amount_due") // in cents
-  amountPaid     Int      @default(0) @map("amount_paid")
-  currency       String   @default("usd") @db.VarChar(10)
-  status         String   @default("draft") @db.VarChar(50) // draft, open, paid, void, uncollectible
-  invoiceUrl     String?  @map("invoice_url") @db.Text
-  pdfUrl         String?  @map("pdf_url") @db.Text
-  periodStart    DateTime? @map("period_start") @db.Timestamptz(6)
-  periodEnd      DateTime? @map("period_end") @db.Timestamptz(6)
-  dueDate        DateTime? @map("due_date") @db.Timestamptz(6)
-  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String    @id @default(uuid()) @db.Uuid
+  subscriptionId  String    @map("subscription_id") @db.Uuid
+  stripeInvoiceId String?   @unique @map("stripe_invoice_id") @db.VarChar(255)
+  amountDue       Int       @map("amount_due") // in cents
+  amountPaid      Int       @default(0) @map("amount_paid")
+  currency        String    @default("usd") @db.VarChar(10)
+  status          String    @default("draft") @db.VarChar(50) // draft, open, paid, void, uncollectible
+  invoiceUrl      String?   @map("invoice_url") @db.Text
+  pdfUrl          String?   @map("pdf_url") @db.Text
+  periodStart     DateTime? @map("period_start") @db.Timestamptz(6)
+  periodEnd       DateTime? @map("period_end") @db.Timestamptz(6)
+  dueDate         DateTime? @map("due_date") @db.Timestamptz(6)
+  paidAt          DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
@@ -1165,16 +1219,16 @@ model UsageRecord {
 
 /// OnboardingState (Track user onboarding progress)
 model OnboardingState {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @unique @map("organization_id") @db.Uuid
-  userId         String   @map("user_id") @db.Uuid
-  currentStep    String   @default("welcome") @map("current_step") @db.VarChar(50)
-  completedSteps String[] @default([]) @map("completed_steps") @db.VarChar(50)
-  skippedSteps   String[] @default([]) @map("skipped_steps") @db.VarChar(50)
-  metadata       Json?    @db.JsonB
-  startedAt      DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @unique @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  currentStep    String    @default("welcome") @map("current_step") @db.VarChar(50)
+  completedSteps String[]  @default([]) @map("completed_steps") @db.VarChar(50)
+  skippedSteps   String[]  @default([]) @map("skipped_steps") @db.VarChar(50)
+  metadata       Json?     @db.JsonB
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
   completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   checklistItems OnboardingChecklistItem[]
 
@@ -1184,18 +1238,18 @@ model OnboardingState {
 
 /// OnboardingChecklistItem (Individual onboarding tasks)
 model OnboardingChecklistItem {
-  id               String   @id @default(uuid()) @db.Uuid
-  onboardingStateId String  @map("onboarding_state_id") @db.Uuid
-  key              String   @db.VarChar(100)
-  title            String   @db.VarChar(255)
-  description      String?  @db.Text
-  category         String?  @db.VarChar(50)
-  required         Boolean  @default(false)
-  completed        Boolean  @default(false)
-  completedAt      DateTime? @map("completed_at") @db.Timestamptz(6)
-  metadata         Json?    @db.JsonB
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String    @id @default(uuid()) @db.Uuid
+  onboardingStateId String    @map("onboarding_state_id") @db.Uuid
+  key               String    @db.VarChar(100)
+  title             String    @db.VarChar(255)
+  description       String?   @db.Text
+  category          String?   @db.VarChar(50)
+  required          Boolean   @default(false)
+  completed         Boolean   @default(false)
+  completedAt       DateTime? @map("completed_at") @db.Timestamptz(6)
+  metadata          Json?     @db.JsonB
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   onboardingState OnboardingState @relation(fields: [onboardingStateId], references: [id], onDelete: Cascade)
 
@@ -1210,19 +1264,19 @@ model OnboardingChecklistItem {
 
 /// APIKey (Public API keys for external integrations)
 model APIKey {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  name           String   @db.VarChar(255)
-  keyHash        String   @unique @map("key_hash") @db.VarChar(64) // SHA-256 hash of the key
-  keyPrefix      String   @map("key_prefix") @db.VarChar(10) // First 8 chars for identification
-  scopes         String[] @default([]) @db.VarChar(100)
-  rateLimit      Int      @default(1000) @map("rate_limit") // requests per hour
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String    @db.VarChar(255)
+  keyHash        String    @unique @map("key_hash") @db.VarChar(64) // SHA-256 hash of the key
+  keyPrefix      String    @map("key_prefix") @db.VarChar(10) // First 8 chars for identification
+  scopes         String[]  @default([]) @db.VarChar(100)
+  rateLimit      Int       @default(1000) @map("rate_limit") // requests per hour
   expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
   lastUsedAt     DateTime? @map("last_used_at") @db.Timestamptz(6)
-  enabled        Boolean  @default(true)
-  createdBy      String   @map("created_by") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  enabled        Boolean   @default(true)
+  createdBy      String    @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([organizationId])
   @@index([keyPrefix])
@@ -1254,19 +1308,19 @@ model PublicWebhook {
 
 /// WebhookDelivery (Track webhook delivery attempts)
 model WebhookDelivery {
-  id           String   @id @default(uuid()) @db.Uuid
-  webhookId    String   @map("webhook_id") @db.Uuid
-  eventType    String   @map("event_type") @db.VarChar(100)
-  payload      Json     @db.JsonB
-  status       String   @default("pending") @db.VarChar(50) // pending, success, failed
-  statusCode   Int?     @map("status_code")
-  responseBody String?  @map("response_body") @db.Text
-  attempts     Int      @default(0)
+  id            String    @id @default(uuid()) @db.Uuid
+  webhookId     String    @map("webhook_id") @db.Uuid
+  eventType     String    @map("event_type") @db.VarChar(100)
+  payload       Json      @db.JsonB
+  status        String    @default("pending") @db.VarChar(50) // pending, success, failed
+  statusCode    Int?      @map("status_code")
+  responseBody  String?   @map("response_body") @db.Text
+  attempts      Int       @default(0)
   lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz(6)
-  nextRetryAt  DateTime? @map("next_retry_at") @db.Timestamptz(6)
-  errorMessage String?  @map("error_message") @db.Text
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  nextRetryAt   DateTime? @map("next_retry_at") @db.Timestamptz(6)
+  errorMessage  String?   @map("error_message") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   webhook PublicWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
@@ -1282,14 +1336,44 @@ model WebhookDelivery {
 
 /// OrganizationAIProvider (Organization-level AI provider preferences)
 model OrganizationAIProvider {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @unique @map("organization_id") @db.Uuid
-  defaultProvider String  @default("anthropic") @map("default_provider") @db.VarChar(50)
-  providers      Json     @default("{}") @db.JsonB // provider-specific settings
-  modelPreferences Json   @default("{}") @map("model_preferences") @db.JsonB // category -> model mapping
-  rateLimits     Json?    @map("rate_limits") @db.JsonB
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @unique @map("organization_id") @db.Uuid
+  defaultProvider  String   @default("anthropic") @map("default_provider") @db.VarChar(50)
+  providers        Json     @default("{}") @db.JsonB // provider-specific settings
+  modelPreferences Json     @default("{}") @map("model_preferences") @db.JsonB // category -> model mapping
+  rateLimits       Json?    @map("rate_limits") @db.JsonB
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("organization_ai_providers")
+}
+
+// ============================================================================
+// AGENT ACTIVITY TRACKING (Real-time monitoring)
+// ============================================================================
+
+model AgentActivity {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  sessionId      String    @map("session_id") @db.VarChar(255)
+  agentType      String    @map("agent_type") @db.VarChar(100)
+  agentName      String?   @map("agent_name") @db.VarChar(255)
+  category       String?   @db.VarChar(100)
+  status         String    @default("running") @db.VarChar(50)
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  durationMs     Int?      @map("duration_ms")
+  inputData      Json?     @map("input_data") @db.JsonB
+  outputData     Json?     @map("output_data") @db.JsonB
+  errorMessage   String?   @map("error_message") @db.Text
+  metadata       Json      @default("{}") @db.JsonB
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("agent_activities")
 }
