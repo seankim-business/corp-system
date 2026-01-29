@@ -157,7 +157,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       domain: getCookieDomain(),
     });
 
-    const redirectUrl = `${process.env.BASE_URL}/dashboard`;
+    const redirectUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL}/dashboard`;
     return res.redirect(redirectUrl);
   } catch (error) {
     logger.error("Google OAuth error", { error });
@@ -435,6 +435,17 @@ router.get("/me", authenticate, requireAuth, async (req: Request, res: Response)
     currentOrganization,
     organizations,
     membership: req.membership,
+  });
+});
+
+// Debug endpoint to check cookie domain configuration
+router.get("/debug-cookie-domain", (_req: Request, res: Response) => {
+  const cookieDomain = getCookieDomain();
+  res.json({
+    cookieDomain,
+    envCookieDomain: process.env.COOKIE_DOMAIN || "NOT SET",
+    frontendUrl: process.env.FRONTEND_URL || "NOT SET",
+    baseUrl: process.env.BASE_URL || "NOT SET",
   });
 });
 
