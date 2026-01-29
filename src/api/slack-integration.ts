@@ -21,10 +21,8 @@ interface SlackOAuthResponse {
   scope?: string;
 }
 
-const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
-const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
 const SLACK_REDIRECT_URI =
-  process.env.SLACK_REDIRECT_URI || "https://auth.nubabel.com/api/slack/oauth/callback";
+  process.env.SLACK_REDIRECT_URI || "https://app.nubabel.com/api/slack/oauth/callback";
 const SLACK_SCOPES = [
   "app_mentions:read",
   "chat:write",
@@ -74,23 +72,93 @@ async function decodeState(
   }
 }
 
+// Save Slack App credentials (BYOA)
+slackIntegrationRouter.post(
+  "/slack/credentials",
+  requireAuth,
+  requirePermission(Permission.INTEGRATION_MANAGE),
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId } = req.user!;
+      const userId = req.user!.id;
+      const { clientId, clientSecret, signingSecret } = req.body;
+
+      if (!clientId || !clientSecret || !signingSecret) {
+        return res.status(400).json({
+          error: "clientId, clientSecret, and signingSecret are required",
+        });
+      }
+
+      const encryptedClientId = encrypt(clientId);
+      const encryptedClientSecret = encrypt(clientSecret);
+      const encryptedSigningSecret = encrypt(signingSecret);
+
+      const existing = await prisma.slackIntegration.findUnique({
+        where: { organizationId },
+      });
+
+      let integration;
+      if (existing) {
+        integration = await prisma.slackIntegration.update({
+          where: { organizationId },
+          data: {
+            clientId: encryptedClientId,
+            clientSecret: encryptedClientSecret,
+            signingSecret: encryptedSigningSecret,
+            updatedAt: new Date(),
+          },
+        });
+      } else {
+        integration = await prisma.slackIntegration.create({
+          data: {
+            organizationId,
+            clientId: encryptedClientId,
+            clientSecret: encryptedClientSecret,
+            signingSecret: encryptedSigningSecret,
+            installedBy: userId,
+          },
+        });
+      }
+
+      logger.info(`Slack credentials saved: org=${organizationId}`);
+      return res.json({
+        success: true,
+        hasCredentials: true,
+        hasWorkspace: !!integration.workspaceId,
+      });
+    } catch (error) {
+      logger.error("Save Slack credentials error", {
+        error: error instanceof Error ? error.message : error,
+      });
+      return res.status(500).json({ error: "Failed to save Slack credentials" });
+    }
+  },
+);
+
+// Start OAuth flow using org's stored credentials
 slackIntegrationRouter.get(
   "/slack/oauth/install",
   requireAuth,
   requirePermission(Permission.INTEGRATION_MANAGE),
   async (req: Request, res: Response) => {
-    const frontendUrl = process.env.FRONTEND_URL || "https://auth.nubabel.com";
+    const frontendUrl = process.env.FRONTEND_URL || "https://app.nubabel.com";
+    const { organizationId, id: userId } = req.user!;
 
-    if (!SLACK_CLIENT_ID) {
-      logger.error("Slack OAuth: SLACK_CLIENT_ID not configured");
-      return res.redirect(`${frontendUrl}/settings/slack?error=slack_not_configured`);
+    // Get org's stored Slack credentials
+    const integration = await prisma.slackIntegration.findUnique({
+      where: { organizationId },
+    });
+
+    if (!integration?.clientId) {
+      logger.error("Slack OAuth: No credentials configured for org", { organizationId });
+      return res.redirect(`${frontendUrl}/settings/slack?error=credentials_not_configured`);
     }
 
-    const { organizationId, id: userId } = req.user!;
+    const clientId = decrypt(integration.clientId);
     const state = await encodeState(organizationId, userId);
 
     const authorizeUrl = new URL("https://slack.com/oauth/v2/authorize");
-    authorizeUrl.searchParams.set("client_id", SLACK_CLIENT_ID);
+    authorizeUrl.searchParams.set("client_id", clientId);
     authorizeUrl.searchParams.set("scope", SLACK_SCOPES);
     authorizeUrl.searchParams.set("redirect_uri", SLACK_REDIRECT_URI);
     authorizeUrl.searchParams.set("state", state);
@@ -99,9 +167,10 @@ slackIntegrationRouter.get(
   },
 );
 
+// OAuth callback - uses org's stored credentials
 slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response) => {
   const { code, state, error } = req.query;
-  const frontendUrl = process.env.FRONTEND_URL || "https://auth.nubabel.com";
+  const frontendUrl = process.env.FRONTEND_URL || "https://app.nubabel.com";
 
   if (error) {
     logger.error("Slack OAuth error", { error });
@@ -112,24 +181,34 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
     return res.redirect(`${frontendUrl}/settings/slack?error=missing_params`);
   }
 
-  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
-    logger.error("Slack OAuth: Missing CLIENT_ID or CLIENT_SECRET");
-    return res.redirect(`${frontendUrl}/settings/slack?error=server_config`);
-  }
-
   const stateData = await decodeState(String(state));
   if (!stateData) {
     logger.error("Slack OAuth: Invalid state parameter");
     return res.redirect(`${frontendUrl}/settings/slack?error=invalid_state`);
   }
 
+  // Get org's stored Slack credentials
+  const integration = await prisma.slackIntegration.findUnique({
+    where: { organizationId: stateData.organizationId },
+  });
+
+  if (!integration?.clientId || !integration?.clientSecret) {
+    logger.error("Slack OAuth: Missing credentials for org", {
+      organizationId: stateData.organizationId,
+    });
+    return res.redirect(`${frontendUrl}/settings/slack?error=credentials_not_configured`);
+  }
+
+  const clientId = decrypt(integration.clientId);
+  const clientSecret = decrypt(integration.clientSecret);
+
   try {
     const tokenResponse = await fetch("https://slack.com/api/oauth.v2.access", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: SLACK_CLIENT_ID,
-        client_secret: SLACK_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         code: String(code),
         redirect_uri: SLACK_REDIRECT_URI,
       }),
@@ -150,57 +229,22 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
     const botUserId = tokenData.bot_user_id;
     const scope = tokenData.scope;
 
-    const envAppToken = process.env.SLACK_APP_TOKEN;
-    const envSigningSecret = process.env.SLACK_SIGNING_SECRET;
-
-    if (!envSigningSecret) {
-      logger.error("Slack OAuth: SLACK_SIGNING_SECRET not configured");
-      return res.redirect(`${frontendUrl}/settings/slack?error=server_config`);
-    }
-
     const encryptedBotToken = encrypt(botToken);
-    const encryptedAppToken = envAppToken ? encrypt(envAppToken) : null;
-    const encryptedSigningSecret = encrypt(envSigningSecret);
 
-    const existing = await prisma.slackIntegration.findFirst({
+    await prisma.slackIntegration.update({
       where: { organizationId: stateData.organizationId },
+      data: {
+        workspaceId,
+        workspaceName,
+        botToken: encryptedBotToken,
+        botUserId,
+        scopes: scope ? scope.split(",") : [],
+        installedAt: new Date(),
+        healthStatus: "healthy",
+        enabled: true,
+        updatedAt: new Date(),
+      },
     });
-
-    if (existing) {
-      await prisma.slackIntegration.update({
-        where: { id: existing.id },
-        data: {
-          workspaceId,
-          workspaceName,
-          botToken: encryptedBotToken,
-          botUserId,
-          scopes: scope ? scope.split(",") : [],
-          appToken: encryptedAppToken,
-          signingSecret: encryptedSigningSecret,
-          installedAt: new Date(),
-          healthStatus: "healthy",
-          enabled: true,
-          updatedAt: new Date(),
-        },
-      });
-    } else {
-      await prisma.slackIntegration.create({
-        data: {
-          organizationId: stateData.organizationId,
-          workspaceId,
-          workspaceName,
-          botToken: encryptedBotToken,
-          botUserId,
-          scopes: scope ? scope.split(",") : [],
-          appToken: encryptedAppToken,
-          signingSecret: encryptedSigningSecret,
-          installedBy: stateData.userId,
-          installedAt: new Date(),
-          healthStatus: "healthy",
-          enabled: true,
-        },
-      });
-    }
 
     logger.info(`Slack OAuth success: org=${stateData.organizationId}, workspace=${workspaceName}`);
     return res.redirect(`${frontendUrl}/settings/slack?success=true`);
@@ -220,7 +264,7 @@ slackIntegrationRouter.get(
     try {
       const { organizationId } = req.user!;
 
-      const integration = await prisma.slackIntegration.findFirst({
+      const integration = await prisma.slackIntegration.findUnique({
         where: { organizationId },
       });
 
@@ -242,6 +286,9 @@ slackIntegrationRouter.get(
           installedAt: integration.installedAt,
           createdAt: integration.createdAt,
           updatedAt: integration.updatedAt,
+          // Indicate whether credentials and workspace are configured
+          hasCredentials: !!(integration.clientId && integration.clientSecret),
+          hasWorkspace: !!integration.workspaceId,
         },
       });
     } catch (error) {
@@ -261,7 +308,7 @@ slackIntegrationRouter.put(
     try {
       const { organizationId } = req.user!;
       const userId = req.user!.id;
-      const { workspaceId, workspaceName, botToken } = req.body;
+      const { workspaceId, workspaceName, botToken, signingSecret } = req.body;
 
       if (!workspaceId || !workspaceName) {
         return res.status(400).json({
@@ -269,19 +316,10 @@ slackIntegrationRouter.put(
         });
       }
 
-      const envSigningSecret = process.env.SLACK_SIGNING_SECRET;
-      if (!envSigningSecret) {
-        return res.status(500).json({
-          error: "SLACK_SIGNING_SECRET must be set on the server (Railway env)",
-        });
-      }
-
-      const envAppToken = process.env.SLACK_APP_TOKEN;
       const encryptedBotToken = botToken ? encrypt(botToken) : null;
-      const encryptedAppToken = envAppToken ? encrypt(envAppToken) : null;
-      const encryptedSigningSecret = encrypt(envSigningSecret);
+      const encryptedSigningSecret = signingSecret ? encrypt(signingSecret) : null;
 
-      const existing = await prisma.slackIntegration.findFirst({
+      const existing = await prisma.slackIntegration.findUnique({
         where: { organizationId },
       });
 
@@ -294,13 +332,12 @@ slackIntegrationRouter.put(
       let integration;
       if (existing) {
         integration = await prisma.slackIntegration.update({
-          where: { id: existing.id },
+          where: { organizationId },
           data: {
             workspaceId,
             workspaceName,
             ...(encryptedBotToken !== null && { botToken: encryptedBotToken }),
-            appToken: encryptedAppToken,
-            signingSecret: encryptedSigningSecret,
+            ...(encryptedSigningSecret !== null && { signingSecret: encryptedSigningSecret }),
             updatedAt: new Date(),
           },
         });
@@ -311,7 +348,6 @@ slackIntegrationRouter.put(
             workspaceId,
             workspaceName,
             botToken: encryptedBotToken!,
-            appToken: encryptedAppToken,
             signingSecret: encryptedSigningSecret,
             installedBy: userId,
           },
@@ -391,7 +427,7 @@ slackIntegrationRouter.delete(
     try {
       const { organizationId } = req.user!;
 
-      const existing = await prisma.slackIntegration.findFirst({
+      const existing = await prisma.slackIntegration.findUnique({
         where: { organizationId },
       });
 
@@ -400,7 +436,7 @@ slackIntegrationRouter.delete(
       }
 
       await prisma.slackIntegration.delete({
-        where: { id: existing.id },
+        where: { organizationId },
       });
 
       return res.json({ success: true });
@@ -418,32 +454,36 @@ export async function getSlackIntegrationByWorkspace(workspaceId: string) {
     where: { workspaceId },
   });
 
-  if (!integration) {
+  if (!integration || !integration.botToken) {
     return null;
   }
 
   return {
     ...integration,
-    botToken: decrypt(integration.botToken),
-    appToken: integration.appToken ? decrypt(integration.appToken) : null,
-    signingSecret: decrypt(integration.signingSecret),
+    botToken: integration.botToken ? decrypt(integration.botToken) : "",
+    appToken: integration.appToken !== null ? decrypt(integration.appToken) : null,
+    signingSecret: integration.signingSecret !== null ? decrypt(integration.signingSecret) : null,
+    clientId: integration.clientId !== null ? decrypt(integration.clientId) : null,
+    clientSecret: integration.clientSecret !== null ? decrypt(integration.clientSecret) : null,
   };
 }
 
 export async function getSlackIntegrationByOrg(organizationId: string) {
-  const integration = await prisma.slackIntegration.findFirst({
+  const integration = await prisma.slackIntegration.findUnique({
     where: { organizationId },
   });
 
-  if (!integration) {
+  if (!integration || !integration.botToken) {
     return null;
   }
 
   return {
     ...integration,
-    botToken: decrypt(integration.botToken),
-    appToken: integration.appToken ? decrypt(integration.appToken) : null,
-    signingSecret: decrypt(integration.signingSecret),
+    botToken: integration.botToken ? decrypt(integration.botToken) : "",
+    appToken: integration.appToken !== null ? decrypt(integration.appToken) : null,
+    signingSecret: integration.signingSecret !== null ? decrypt(integration.signingSecret) : null,
+    clientId: integration.clientId !== null ? decrypt(integration.clientId) : null,
+    clientSecret: integration.clientSecret !== null ? decrypt(integration.clientSecret) : null,
   };
 }
 

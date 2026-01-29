@@ -32,14 +32,14 @@ export async function sendApprovalNotification(params: {
     where: { organizationId, enabled: true },
   });
 
-  if (!integration) {
+  if (!integration || !integration.botToken) {
     logger.debug("No Slack integration found for organization", { organizationId });
     return null;
   }
 
   const client = new WebClient(integration.botToken);
 
-  const approverSlackUser = await findSlackUserByEmail(client, approver.email);
+  const approverSlackUser = await findSlackUserByEmail(client, approver.email ?? undefined);
   if (!approverSlackUser) {
     logger.warn("Could not find Slack user for approver", {
       approverEmail: approver.email,
@@ -111,7 +111,7 @@ export async function updateApprovalMessage(params: {
     where: { organizationId, enabled: true },
   });
 
-  if (!integration) {
+  if (!integration || !integration.botToken) {
     return;
   }
 
@@ -154,10 +154,7 @@ export async function updateApprovalMessage(params: {
   }
 }
 
-async function findSlackUserByEmail(
-  client: WebClient,
-  email?: string | null,
-): Promise<string | null> {
+async function findSlackUserByEmail(client: WebClient, email?: string): Promise<string | null> {
   if (!email) return null;
 
   try {
