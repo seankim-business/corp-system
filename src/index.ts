@@ -268,6 +268,10 @@ app.get("/health", (_req, res) => {
 // Mount health dashboard router for /health/full endpoint
 app.use("/health", createHealthDashboardRouter());
 
+// Mount Anthropic monitoring health endpoint
+import healthAnthropicRouter from "./api/health-anthropic";
+app.use("/health", healthAnthropicRouter);
+
 if (process.env.NODE_ENV === "development") {
   app.get("/debug/sentry-test", (_req, _res) => {
     throw new Error("Sentry test error");
