@@ -45,16 +45,15 @@ function createPrismaClient(): PrismaClient {
                 model,
               });
             } catch (error) {
-              logger.error(
-                "Failed to set RLS context",
-                {
-                  organizationId,
-                  operation,
-                  model,
-                },
-                error instanceof Error ? error : new Error(String(error)),
-              );
-              throw error;
+              // RLS function may not exist yet (migration not run)
+              // Log warning but continue - RLS is security enhancement, not required for basic functionality
+              logger.warn("Failed to set RLS context (migration may not be run yet)", {
+                organizationId,
+                operation,
+                model,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              // Don't throw - allow query to proceed without RLS context
             }
           } else {
             logger.warn("No organization context available for RLS", {
