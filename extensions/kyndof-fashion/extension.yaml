@@ -1,0 +1,199 @@
+id: kyndof-fashion
+name: Kyndof Fashion Industry Extension
+version: 1.0.0
+description: |
+  패션 산업을 위한 Nubabel 확장.
+  의류 디자인, 생산 관리, 품질 검사 워크플로우를 포함합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: industry
+tags:
+  - fashion
+  - manufacturing
+  - design
+  - production
+  - clo3d
+  - garment
+
+nubabelVersion: ">=2.0.0"
+
+components:
+  agents:
+    - id: fashion-designer
+      configPath: ./agents/fashion-designer.yaml
+    - id: production-manager
+      configPath: ./agents/production-manager.yaml
+    - id: quality-inspector
+      configPath: ./agents/quality-inspector.yaml
+    - id: collection-manager
+      configPath: ./agents/collection-manager.yaml
+
+  skills:
+    - id: garment-design
+      configPath: ./skills/garment-design.yaml
+    - id: pattern-making
+      configPath: ./skills/pattern-making.yaml
+    - id: quality-check
+      configPath: ./skills/quality-check.yaml
+    - id: production-planning
+      configPath: ./skills/production-planning.yaml
+    - id: material-sourcing
+      configPath: ./skills/material-sourcing.yaml
+
+  mcpTools:
+    - id: clo3d-get-designs
+      name: clo3d__getDesigns
+      handler: ./mcp/clo3d/tools/getDesigns.ts
+      description: CLO3D에서 디자인 목록을 가져옵니다
+      schema:
+        type: object
+        properties:
+          collectionId:
+            type: string
+            description: 컬렉션 ID (선택)
+          season:
+            type: string
+            description: 시즌 (예: 2026SS)
+          status:
+            type: string
+            enum: [draft, review, approved]
+            description: 디자인 상태
+
+    - id: clo3d-export-pattern
+      name: clo3d__exportPattern
+      handler: ./mcp/clo3d/tools/exportPattern.ts
+      description: CLO3D 디자인에서 패턴을 내보냅니다
+      schema:
+        type: object
+        required: [designId, format]
+        properties:
+          designId:
+            type: string
+            description: 디자인 ID
+          format:
+            type: string
+            enum: [dxf, pdf, ai]
+            description: 출력 포맷
+
+    - id: clo3d-render
+      name: clo3d__render3D
+      handler: ./mcp/clo3d/tools/render3D.ts
+      description: CLO3D 디자인의 3D 렌더링을 생성합니다
+      schema:
+        type: object
+        required: [designId]
+        properties:
+          designId:
+            type: string
+            description: 디자인 ID
+          angle:
+            type: number
+            description: 카메라 각도 (0-360)
+          quality:
+            type: string
+            enum: [preview, high, ultra]
+            description: 렌더링 품질
+
+  workflows:
+    - id: collection-production
+      configPath: ./workflows/collection-production.yaml
+    - id: sample-review
+      configPath: ./workflows/sample-review.yaml
+    - id: quality-inspection
+      configPath: ./workflows/quality-inspection.yaml
+
+  uiComponents:
+    - id: collection-dashboard
+      type: page
+      path: /fashion/collections
+      componentPath: ./ui/pages/CollectionDashboard.tsx
+      title: 컬렉션 관리
+      icon: palette
+
+    - id: production-tracker
+      type: page
+      path: /fashion/production
+      componentPath: ./ui/pages/ProductionTracker.tsx
+      title: 생산 현황
+      icon: factory
+
+    - id: quality-reports
+      type: page
+      path: /fashion/quality
+      componentPath: ./ui/pages/QualityReports.tsx
+      title: 품질 리포트
+      icon: clipboard-check
+
+    - id: production-stats-widget
+      type: widget
+      componentPath: ./ui/widgets/ProductionStats.tsx
+      title: 생산 통계
+      size: medium
+
+    - id: collection-calendar-widget
+      type: widget
+      componentPath: ./ui/widgets/CollectionCalendar.tsx
+      title: 컬렉션 캘린더
+      size: large
+
+permissions:
+  - read:notion
+  - write:notion
+  - read:drive
+  - write:drive
+  - send:slack
+  - execute:workflows
+  - manage:agents
+
+configSchema:
+  type: object
+  properties:
+    clo3dApiKey:
+      type: string
+      description: CLO3D API 키
+      secret: true
+    clo3dWorkspace:
+      type: string
+      description: CLO3D 워크스페이스 ID
+    clo3dApiUrl:
+      type: string
+      description: CLO3D API 엔드포인트 URL
+      default: https://api.clo3d.com/v1
+    productionNotionDb:
+      type: string
+      description: 생산 관리 Notion 데이터베이스 ID
+    qualityNotionDb:
+      type: string
+      description: 품질 검사 Notion 데이터베이스 ID
+    collectionNotionDb:
+      type: string
+      description: 컬렉션 관리 Notion 데이터베이스 ID
+    slackChannel:
+      type: string
+      description: 알림을 받을 Slack 채널
+      default: "#fashion-alerts"
+  required:
+    - clo3dApiKey
+    - clo3dWorkspace
+
+icon: ./assets/icon.png
+screenshots:
+  - ./assets/screenshot-1.png
+  - ./assets/screenshot-2.png
+  - ./assets/screenshot-3.png
+
+hooks:
+  onInstall: ./hooks/onInstall.ts
+  onUninstall: ./hooks/onUninstall.ts
+  onUpdate: ./hooks/onUpdate.ts
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en
+  translationsPath: ./i18n

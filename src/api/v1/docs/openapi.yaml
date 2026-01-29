@@ -1,0 +1,1255 @@
+openapi: 3.0.3
+info:
+  title: Nubabel Public API
+  description: |
+    Public API for Nubabel - Multi-Agent Orchestration Platform.
+
+    ## Authentication
+    All endpoints require Bearer token authentication using an API key.
+    Include the header: `Authorization: Bearer <your_api_key>`
+
+    ## Rate Limiting
+    Rate limits depend on your API key tier:
+    - **Free**: 60 requests/minute, 1,000 requests/day
+    - **Pro**: 300 requests/minute, 10,000 requests/day
+    - **Enterprise**: 1,000 requests/minute, 100,000 requests/day
+
+    Rate limit headers are included in all responses:
+    - `X-RateLimit-Limit-Minute`: Your per-minute limit
+    - `X-RateLimit-Remaining-Minute`: Remaining requests this minute
+    - `X-RateLimit-Limit-Day`: Your per-day limit
+    - `X-RateLimit-Remaining-Day`: Remaining requests today
+
+    ## Errors
+    All errors follow a consistent format:
+    ```json
+    {
+      "error": "error_code",
+      "message": "Human-readable description"
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: Nubabel Support
+    email: support@nubabel.io
+  license:
+    name: Proprietary
+servers:
+  - url: /api/v1
+    description: Production API
+
+tags:
+  - name: Agents
+    description: Agent management and execution
+  - name: Workflows
+    description: Workflow CRUD and execution
+  - name: Executions
+    description: Execution history and management
+  - name: Webhooks
+    description: Webhook registration and management
+  - name: Organization
+    description: Organization info and usage
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check API availability (no authentication required)
+      security: []
+      tags: [Health]
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /agents:
+    get:
+      summary: List available agents
+      description: Returns all agents available in the system
+      tags: [Agents]
+      security:
+        - BearerAuth: [agents:read]
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Agent'
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+
+  /agents/{agentId}:
+    get:
+      summary: Get agent details
+      tags: [Agents]
+      security:
+        - BearerAuth: [agents:read]
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AgentDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /agents/{agentId}/execute:
+    post:
+      summary: Execute an agent
+      description: Trigger agent execution with the specified input
+      tags: [Agents]
+      security:
+        - BearerAuth: [agents:execute]
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - input
+              properties:
+                input:
+                  type: string
+                  description: Input prompt for the agent
+                context:
+                  type: object
+                  description: Additional context for execution
+                sessionId:
+                  type: string
+                  description: Session ID for tracking
+      responses:
+        '202':
+          description: Execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      executionId:
+                        type: string
+                      status:
+                        type: string
+                        enum: [pending, running]
+                      startedAt:
+                        type: string
+                        format: date-time
+
+  /workflows:
+    get:
+      summary: List workflows
+      tags: [Workflows]
+      security:
+        - BearerAuth: [workflows:read]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, archived, draft]
+      responses:
+        '200':
+          description: List of workflows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Workflow'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      summary: Create workflow
+      tags: [Workflows]
+      security:
+        - BearerAuth: [workflows:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkflow'
+      responses:
+        '201':
+          description: Workflow created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Workflow'
+
+  /workflows/{workflowId}:
+    get:
+      summary: Get workflow details
+      tags: [Workflows]
+      security:
+        - BearerAuth: [workflows:read]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WorkflowDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      summary: Update workflow
+      tags: [Workflows]
+      security:
+        - BearerAuth: [workflows:write]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkflow'
+      responses:
+        '200':
+          description: Workflow updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Workflow'
+
+    delete:
+      summary: Delete workflow
+      tags: [Workflows]
+      security:
+        - BearerAuth: [workflows:write]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Workflow deleted
+
+  /workflows/{workflowId}/execute:
+    post:
+      summary: Execute workflow
+      tags: [Workflows]
+      security:
+        - BearerAuth: [workflows:execute]
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: object
+                  description: Input variables for the workflow
+                sessionId:
+                  type: string
+      responses:
+        '202':
+          description: Workflow execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      executionId:
+                        type: string
+                      workflowId:
+                        type: string
+                      status:
+                        type: string
+                      startedAt:
+                        type: string
+                        format: date-time
+
+  /executions:
+    get:
+      summary: List executions
+      tags: [Executions]
+      security:
+        - BearerAuth: [executions:read]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
+        - name: workflowId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of executions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Execution'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /executions/{executionId}:
+    get:
+      summary: Get execution details
+      tags: [Executions]
+      security:
+        - BearerAuth: [executions:read]
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Execution details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ExecutionDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /executions/{executionId}/cancel:
+    post:
+      summary: Cancel execution
+      tags: [Executions]
+      security:
+        - BearerAuth: [executions:read]
+      parameters:
+        - name: executionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Execution cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      status:
+                        type: string
+                      cancelledAt:
+                        type: string
+                        format: date-time
+
+  /executions/stats/summary:
+    get:
+      summary: Get execution statistics
+      tags: [Executions]
+      security:
+        - BearerAuth: [executions:read]
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+            maximum: 30
+      responses:
+        '200':
+          description: Execution statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      period:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            format: date-time
+                          end:
+                            type: string
+                            format: date-time
+                          days:
+                            type: integer
+                      totals:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          completed:
+                            type: integer
+                          failed:
+                            type: integer
+                          cancelled:
+                            type: integer
+                          running:
+                            type: integer
+                      rates:
+                        type: object
+                        properties:
+                          successRate:
+                            type: number
+                          failureRate:
+                            type: number
+
+  /webhooks:
+    get:
+      summary: List webhooks
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Webhook'
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      availableEvents:
+                        type: array
+                        items:
+                          type: string
+
+    post:
+      summary: Create webhook
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - events
+              properties:
+                url:
+                  type: string
+                  format: uri
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WebhookEvent'
+      responses:
+        '201':
+          description: Webhook created (secret only shown once)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/Webhook'
+                      - type: object
+                        properties:
+                          secret:
+                            type: string
+                            description: Webhook signing secret (only shown on creation)
+                  message:
+                    type: string
+
+  /webhooks/{webhookId}:
+    get:
+      summary: Get webhook details
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Webhook details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Webhook'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      summary: Update webhook
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WebhookEvent'
+                status:
+                  type: string
+                  enum: [active, disabled]
+      responses:
+        '200':
+          description: Webhook updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Webhook'
+
+    delete:
+      summary: Delete webhook
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Webhook deleted
+
+  /webhooks/{webhookId}/test:
+    post:
+      summary: Test webhook
+      description: Send a test payload to verify webhook configuration
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      status:
+                        type: integer
+                      error:
+                        type: string
+                      latencyMs:
+                        type: number
+
+  /webhooks/{webhookId}/rotate-secret:
+    post:
+      summary: Rotate webhook secret
+      description: Generate a new signing secret (old secret immediately invalidated)
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: New secret generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      secret:
+                        type: string
+                  message:
+                    type: string
+
+  /webhooks/{webhookId}/deliveries:
+    get:
+      summary: Get webhook delivery logs
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Delivery logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookDelivery'
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      limit:
+                        type: integer
+
+  /webhooks/events/list:
+    get:
+      summary: List available webhook events
+      tags: [Webhooks]
+      security:
+        - BearerAuth: [webhooks:manage]
+      responses:
+        '200':
+          description: Available events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        description:
+                          type: string
+
+  /organization:
+    get:
+      summary: Get organization info
+      tags: [Organization]
+      security:
+        - BearerAuth: [organization:read]
+      responses:
+        '200':
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Organization'
+
+  /organization/usage:
+    get:
+      summary: Get API usage info
+      tags: [Organization]
+      security:
+        - BearerAuth: [organization:read]
+      responses:
+        '200':
+          description: Usage information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      apiKey:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          name:
+                            type: string
+                          tier:
+                            type: string
+                          scopes:
+                            type: array
+                            items:
+                              type: string
+                      rateLimits:
+                        type: object
+                        properties:
+                          minute:
+                            $ref: '#/components/schemas/RateLimitInfo'
+                          day:
+                            $ref: '#/components/schemas/RateLimitInfo'
+                      totalRequests:
+                        type: integer
+
+  /organization/api-keys:
+    get:
+      summary: List API keys
+      tags: [Organization]
+      security:
+        - BearerAuth: [organization:read]
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/APIKey'
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      availableScopes:
+                        type: array
+                        items:
+                          type: string
+
+  /organization/stats:
+    get:
+      summary: Get organization statistics
+      tags: [Organization]
+      security:
+        - BearerAuth: [organization:read]
+      responses:
+        '200':
+          description: Organization statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      workflows:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                      executions:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          last24Hours:
+                            type: integer
+                      apiKeys:
+                        type: object
+                        properties:
+                          active:
+                            type: integer
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key obtained from the Developer Portal
+
+  schemas:
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        version:
+          type: string
+
+    AgentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Agent'
+        - type: object
+          properties:
+            tools:
+              type: array
+              items:
+                type: string
+            systemPrompt:
+              type: string
+            capabilities:
+              type: array
+              items:
+                type: string
+
+    Workflow:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, draft]
+        nodeCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WorkflowDetail:
+      allOf:
+        - $ref: '#/components/schemas/Workflow'
+        - type: object
+          properties:
+            nodes:
+              type: array
+              items:
+                type: object
+            edges:
+              type: array
+              items:
+                type: object
+            triggerType:
+              type: string
+            lastExecutedAt:
+              type: string
+              format: date-time
+
+    CreateWorkflow:
+      type: object
+      required:
+        - name
+        - nodes
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        nodes:
+          type: array
+          items:
+            type: object
+        edges:
+          type: array
+          items:
+            type: object
+        triggerType:
+          type: string
+          enum: [manual, webhook, schedule]
+
+    UpdateWorkflow:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, draft]
+        nodes:
+          type: array
+          items:
+            type: object
+        edges:
+          type: array
+          items:
+            type: object
+
+    Execution:
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        workflowName:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        duration:
+          type: integer
+          description: Duration in milliseconds
+
+    ExecutionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Execution'
+        - type: object
+          properties:
+            input:
+              type: object
+            output:
+              type: object
+            error:
+              type: string
+            nodeExecutions:
+              type: array
+              items:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  status:
+                    type: string
+                  startedAt:
+                    type: string
+                    format: date-time
+                  completedAt:
+                    type: string
+                    format: date-time
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookEvent'
+        status:
+          type: string
+          enum: [active, disabled]
+        failureCount:
+          type: integer
+        lastSuccess:
+          type: string
+          format: date-time
+        lastFailure:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    WebhookEvent:
+      type: string
+      enum:
+        - agent.execution.started
+        - agent.execution.completed
+        - agent.execution.failed
+        - workflow.started
+        - workflow.completed
+        - workflow.failed
+        - approval.requested
+        - approval.completed
+        - approval.rejected
+        - api_key.created
+        - api_key.revoked
+
+    WebhookDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+        event:
+          type: string
+        status:
+          type: string
+          enum: [pending, delivered, failed]
+        attempts:
+          type: integer
+        responseStatus:
+          type: integer
+        error:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastAttemptAt:
+          type: string
+          format: date-time
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        logoUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    APIKey:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        keyPrefix:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        rateLimitTier:
+          type: string
+          enum: [free, pro, enterprise]
+        status:
+          type: string
+          enum: [active, revoked, expired]
+        lastUsedAt:
+          type: string
+          format: date-time
+        totalRequests:
+          type: integer
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    RateLimitInfo:
+      type: object
+      properties:
+        limit:
+          type: integer
+        remaining:
+          type: integer
+        resetInSeconds:
+          type: integer
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: not_found
+              message:
+                type: string
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: unauthorized
+              message:
+                type: string
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: forbidden
+              message:
+                type: string
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: rate_limited
+              message:
+                type: string
+              retryAfter:
+                type: integer

@@ -1,0 +1,119 @@
+id: pattern-making
+name: Pattern Making Skill
+nameKo: 패턴 메이킹 스킬
+description: |
+  의류 패턴 제작 전문 스킬.
+  패턴 설계, 그레이딩, 마카 작성을 다룹니다.
+
+category: technical
+difficulty: advanced
+
+inputs:
+  - name: designId
+    type: string
+    description: CLO3D 디자인 ID
+    required: true
+  - name: sizeRange
+    type: array
+    description: 생산할 사이즈 범위
+    required: true
+  - name: fabricWidth
+    type: number
+    description: 원단 폭 (cm)
+    required: true
+
+outputs:
+  - name: patternFiles
+    type: array
+    description: 패턴 파일 목록 (DXF, AI)
+  - name: gradingSpec
+    type: object
+    description: 그레이딩 스펙
+  - name: markerLayout
+    type: object
+    description: 마카 배치도
+
+knowledge:
+  patternPieces:
+    jacket:
+      - Front Body
+      - Back Body
+      - Sleeve
+      - Collar
+      - Facing
+      - Lining Front
+      - Lining Back
+    pants:
+      - Front Panel
+      - Back Panel
+      - Waistband
+      - Pocket Bag
+      - Fly Shield
+    dress:
+      - Front Bodice
+      - Back Bodice
+      - Front Skirt
+      - Back Skirt
+      - Sleeve
+
+  seamAllowances:
+    standard: 1.0  # cm
+    armhole: 1.5
+    hemline: 3.0
+    zipper: 1.5
+    neckline: 0.7
+
+  gradingRules:
+    women:
+      bust:
+        increment: 4  # cm per size
+      waist:
+        increment: 4
+      hip:
+        increment: 4
+      length:
+        increment: 1
+    men:
+      chest:
+        increment: 5
+      waist:
+        increment: 5
+
+  sizeCharts:
+    women:
+      XS: { bust: 80, waist: 62, hip: 88 }
+      S: { bust: 84, waist: 66, hip: 92 }
+      M: { bust: 88, waist: 70, hip: 96 }
+      L: { bust: 92, waist: 74, hip: 100 }
+      XL: { bust: 96, waist: 78, hip: 104 }
+
+steps:
+  - name: extractPattern
+    description: CLO3D에서 패턴 추출
+    tools:
+      - clo3d__exportPattern
+    actions:
+      - 2D 패턴 데이터 추출
+      - 시접 확인 및 조정
+      - 그레인 라인 설정
+
+  - name: grading
+    description: 사이즈 그레이딩
+    actions:
+      - 기준 사이즈 설정 (보통 M)
+      - 그레이딩 룰 적용
+      - 각 사이즈 패턴 생성
+
+  - name: markerMaking
+    description: 마카 작성
+    actions:
+      - 원단 폭에 맞춰 배치
+      - 원단 효율 계산
+      - 무늬 방향 고려
+
+  - name: exportFiles
+    description: 파일 출력
+    formats:
+      - DXF (CAD용)
+      - PDF (참고용)
+      - AI (일러스트용)

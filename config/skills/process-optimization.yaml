@@ -1,0 +1,23 @@
+id: process-optimization
+name: Process Optimization
+description: "프로세스 분석 및 개선 스킬"
+category: operations
+triggers:
+  - "프로세스"
+  - "process"
+  - "optimize"
+  - "improve"
+  - "efficiency"
+parameters:
+  - name: analysis_depth
+    type: string
+    description: Depth of analysis (shallow, medium, deep)
+    required: false
+    default: medium
+outputs:
+  - name: optimization_report
+    type: object
+    description: Process optimization recommendations
+tools_required:
+  - notion_query
+  - notion_update

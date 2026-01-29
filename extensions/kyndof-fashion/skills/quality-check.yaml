@@ -1,0 +1,144 @@
+id: quality-check
+name: Quality Check Skill
+nameKo: 품질 검사 스킬
+description: |
+  의류 품질 검사 전문 스킬.
+  검품 기준, 불량 판정, 품질 리포트를 다룹니다.
+
+category: quality
+difficulty: intermediate
+
+inputs:
+  - name: productId
+    type: string
+    description: 제품/스타일 ID
+    required: true
+  - name: quantity
+    type: number
+    description: 검사 수량
+    required: true
+  - name: inspectionType
+    type: string
+    description: 검사 유형 (inline, final, AQL)
+    required: true
+
+outputs:
+  - name: inspectionReport
+    type: object
+    description: 검사 보고서
+  - name: defectList
+    type: array
+    description: 불량 목록
+  - name: passRate
+    type: number
+    description: 합격률 (%)
+
+knowledge:
+  inspectionTypes:
+    inline:
+      description: 생산 중 공정 검사
+      timing: 생산 진행 중
+      sampleRate: 10%
+    final:
+      description: 최종 출고 전 전수 검사
+      timing: 포장 전
+      sampleRate: 100%
+    AQL:
+      description: 허용 품질 수준 샘플링 검사
+      timing: 출고 전
+      levels:
+        - { level: 1.0, major: 1, minor: 4 }
+        - { level: 2.5, major: 2, minor: 7 }
+        - { level: 4.0, major: 3, minor: 10 }
+
+  defectCategories:
+    critical:
+      description: 사용 불가, 안전 이슈
+      action: 폐기
+      examples:
+        - 바늘 잔류
+        - 유해물질 검출
+        - 심각한 구조적 결함
+    major:
+      description: 명백한 결함
+      action: 수선 또는 반품
+      examples:
+        - 봉제 불량 (터짐, 건너뜀)
+        - 색상 불일치
+        - 치수 오차 (허용치 초과)
+        - 원단 결함 (올 풀림, 얼룩)
+    minor:
+      description: 경미한 결함
+      action: 조건부 출고
+      examples:
+        - 미세 실밥
+        - 경미한 다림질 필요
+        - 라벨 약간 비뚤어짐
+
+  checkPoints:
+    appearance:
+      - 봉제 상태
+      - 원단 상태
+      - 색상 일치
+      - 프린트/자수 품질
+    construction:
+      - 솔기 강도
+      - 단추/지퍼 작동
+      - 안감 부착
+      - 심지 접착
+    measurement:
+      - 가슴둘레
+      - 허리둘레
+      - 총장
+      - 소매길이
+      - 어깨너비
+    labeling:
+      - 케어라벨
+      - 사이즈라벨
+      - 브랜드라벨
+      - 행택
+
+  tolerances:
+    measurements:
+      bust: ±1.5  # cm
+      waist: ±1.5
+      length: ±1.0
+      sleeve: ±0.5
+    color:
+      deltaE: 1.5  # 색차 허용치
+
+steps:
+  - name: sampleSelection
+    description: 검사 샘플 선정
+    actions:
+      - 검사 유형에 따른 샘플 수 결정
+      - 랜덤 샘플링
+      - 로트 정보 기록
+
+  - name: visualInspection
+    description: 외관 검사
+    actions:
+      - 전면/후면 확인
+      - 디테일 부위 집중 검사
+      - 결함 사진 촬영
+
+  - name: measurementCheck
+    description: 치수 검사
+    actions:
+      - 주요 치수 측정
+      - 허용 오차 비교
+      - 측정 기록
+
+  - name: functionalTest
+    description: 기능 검사
+    actions:
+      - 지퍼 개폐 테스트
+      - 단추 내구성 확인
+      - 신축성 확인 (해당 시)
+
+  - name: reporting
+    description: 보고서 작성
+    actions:
+      - 합격/불합격 판정
+      - 불량 유형별 집계
+      - 개선 권고사항 작성

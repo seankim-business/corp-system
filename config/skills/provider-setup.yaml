@@ -1,0 +1,58 @@
+id: provider-setup
+name: AI Provider 설정
+description: Anthropic, OpenAI, Google AI 등 AI 프로바이더 연결 및 설정을 관리합니다.
+category: configuration
+triggers:
+  - connect
+  - 연결
+  - setup
+  - 설정
+  - provider
+  - 프로바이더
+  - api key
+  - apikey
+  - api 키
+  - oauth
+  - authenticate
+  - 인증
+  - anthropic
+  - openai
+  - google ai
+  - gemini
+  - github models
+  - openrouter
+  - claude
+  - gpt
+  - ai provider
+  - ai 프로바이더
+  - configure
+  - 구성
+  - enable
+  - 활성화
+  - disconnect
+  - 연결 해제
+parameters:
+  - name: provider
+    type: string
+    description: AI 프로바이더 이름 (anthropic, openai, google-ai, github-models, openrouter)
+    required: true
+  - name: action
+    type: string
+    description: 수행할 작업 (connect, disconnect, configure, test)
+    required: true
+  - name: credentials
+    type: object
+    description: 인증 정보 (API 키, OAuth 토큰 등)
+    required: false
+outputs:
+  - name: status
+    type: string
+    description: 연결 상태
+  - name: provider_info
+    type: object
+    description: 프로바이더 정보
+tools_required:
+  - provider__connect
+  - provider__disconnect
+  - provider__test
+  - provider__configure

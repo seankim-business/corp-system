@@ -1,0 +1,55 @@
+id: api-integration
+name: API 통합
+description: REST API, GraphQL API 통합 및 외부 서비스 연동을 처리합니다.
+category: integration
+triggers:
+  - API
+  - REST
+  - GraphQL
+  - endpoint
+  - 엔드포인트
+  - webhook
+  - 웹훅
+  - HTTP
+  - request
+  - 요청
+  - response
+  - 응답
+  - authentication
+  - 인증
+  - OAuth
+parameters:
+  - name: url
+    type: string
+    description: API 엔드포인트 URL
+    required: true
+  - name: method
+    type: string
+    description: HTTP 메소드 (GET, POST, PUT, DELETE, PATCH)
+    required: true
+  - name: headers
+    type: object
+    description: 요청 헤더
+    required: false
+  - name: body
+    type: object
+    description: 요청 바디
+    required: false
+  - name: auth
+    type: object
+    description: 인증 정보
+    required: false
+outputs:
+  - name: response
+    type: object
+    description: API 응답 데이터
+  - name: status_code
+    type: number
+    description: HTTP 상태 코드
+  - name: headers
+    type: object
+    description: 응답 헤더
+tools_required:
+  - http__request
+  - http__get
+  - http__post

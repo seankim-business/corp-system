@@ -1,0 +1,74 @@
+{
+  "name": "@kyndof/nubabel-fashion-extension",
+  "version": "1.0.0",
+  "description": "패션 산업을 위한 Nubabel 확장 - CLO3D 연동, 생산 관리, 품질 검사",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": {
+    "name": "Kyndof Corp",
+    "email": "dev@kyndof.com",
+    "url": "https://kyndof.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kyndof/nubabel-fashion-extension"
+  },
+  "keywords": [
+    "nubabel",
+    "extension",
+    "fashion",
+    "clo3d",
+    "manufacturing",
+    "production",
+    "quality"
+  ],
+  "scripts": {
+    "build": "tsc && npm run build:yaml",
+    "build:yaml": "node scripts/validate-yaml.js",
+    "dev": "tsc --watch",
+    "dev:install": "npm run build && nubabel extension install --local .",
+    "package": "npm run build && nubabel extension package",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@nubabel/core": ">=2.0.0",
+    "@nubabel/extensions": ">=2.0.0",
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "date-fns": "^3.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "js-yaml": "^4.1.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist",
+    "agents",
+    "skills",
+    "workflows",
+    "assets",
+    "extension.yaml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "nubabel": {
+    "extensionId": "kyndof-fashion",
+    "minVersion": "2.0.0"
+  }
+}

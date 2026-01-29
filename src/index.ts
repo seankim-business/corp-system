@@ -42,8 +42,9 @@ import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 import { googleAiOAuthRouter } from "./api/google-ai-oauth";
-import { githubModelsOAuthRouter } from "./api/github-models-oauth";
-import { providersRouter } from "./api/providers";
+// TEMPORARILY DISABLED - Missing Prisma models/types
+// import { githubModelsOAuthRouter } from "./api/github-models-oauth";
+// import { providersRouter } from "./api/providers";
 import { organizationSettingsRouter } from "./api/organization-settings";
 import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
 import { webhooksRouter } from "./api/webhooks";
@@ -69,10 +70,11 @@ import delegationRoutes from "./api/delegations";
 import agentMetricsRoutes from "./api/agent-metrics";
 import regionsRoutes from "./api/regions";
 import agentSessionsRoutes from "./api/agent-sessions";
-import costsRoutes from "./api/costs";
-import onboardingRoutes from "./api/onboarding";
+// TEMPORARILY DISABLED - Missing Prisma models/exports
+// import costsRoutes from "./api/costs";
+// import onboardingRoutes from "./api/onboarding";
 import errorManagementRoutes from "./api/error-management";
-import agentAdminRoutes from "./api/agent-admin";
+// import agentAdminRoutes from "./api/agent-admin";
 import optimizationRoutes from "./api/optimization";
 import patternsRoutes from "./api/patterns";
 import feedbackRoutes from "./api/feedback";
@@ -82,11 +84,12 @@ import ragRoutes from "./api/rag";
 import alertsRoutes from "./api/alerts";
 import analyticsRoutes from "./api/analytics";
 import metaAgentRoutes from "./api/meta-agent";
-import billingRoutes from "./api/billing";
-import stripeWebhookRoutes from "./api/stripe-webhook";
+// TEMPORARILY DISABLED - Missing Prisma models
+// import billingRoutes from "./api/billing";
+// import stripeWebhookRoutes from "./api/stripe-webhook";
 import extensionsRoutes from "./api/extensions";
 import { ExtensionRegistry } from "./services/extension-registry";
-import v1ApiRouter from "./api/v1";
+// import v1ApiRouter from "./api/v1";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
 import { conversationsRouter } from "./api/conversations";
@@ -435,9 +438,9 @@ app.use("/api", webhookRateLimiter, syncRoutes);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 app.use("/api", apiRateLimiter, googleAiOAuthRouter);
-app.use("/api", apiRateLimiter, githubModelsOAuthRouter);
-
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, providersRouter);
+// TEMPORARILY DISABLED
+// app.use("/api", apiRateLimiter, githubModelsOAuthRouter);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, providersRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, notionRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, slackIntegrationRouter);
@@ -471,9 +474,10 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoute
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
 app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
 app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
-app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
+// TEMPORARILY DISABLED
+// app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
 app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, feedbackRoutes);
@@ -484,14 +488,16 @@ app.use("/api/rag", apiRateLimiter, authenticate, sentryUserContext, ragRoutes);
 app.use("/api/alerts", apiRateLimiter, authenticate, sentryUserContext, alertsRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
 app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
-app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
-app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
+// TEMPORARILY DISABLED - Missing Prisma models
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
+// app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
+// app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
 app.use("/api/v1/extensions", apiRateLimiter, authenticate, sentryUserContext, extensionsRoutes);
 app.use("/api", sseRouter);
 
 // Public API v1 (external developer access with API key auth)
-app.use("/api/v1", v1ApiRouter);
+// TEMPORARILY DISABLED - Missing Prisma models
+// app.use("/api/v1", v1ApiRouter);
 
 app.use(
   "/admin/queues",

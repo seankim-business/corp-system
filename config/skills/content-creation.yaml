@@ -1,0 +1,29 @@
+id: content-creation
+name: Content Creation
+description: 다양한 형식의 콘텐츠를 생성하고 편집합니다
+category: creative
+triggers:
+  - 작성
+  - write
+  - 생성
+  - create
+  - 콘텐츠
+  - content
+  - 글
+  - 문서
+parameters:
+  - name: format
+    type: string
+    description: 콘텐츠 형식 (blog, social, email, etc.)
+    required: false
+  - name: tone
+    type: string
+    description: 콘텐츠 톤 (formal, casual, etc.)
+    required: false
+outputs:
+  - name: content
+    type: string
+    description: 생성된 콘텐츠
+tools_required:
+  - notion
+  - slack

@@ -1,0 +1,134 @@
+# Test Skill Configurations for E2E Testing
+
+skills:
+  - id: content-creation
+    name: Content Creation
+    description: Create marketing content, blog posts, social media posts
+    category: marketing
+    requires_approval: false
+    estimated_duration: 300
+
+  - id: brand-guidelines
+    name: Brand Guidelines
+    description: Apply and enforce brand guidelines
+    category: marketing
+    requires_approval: false
+    estimated_duration: 120
+
+  - id: campaign-planning
+    name: Campaign Planning
+    description: Plan and structure marketing campaigns
+    category: marketing
+    requires_approval: true
+    approval_type: content
+    estimated_duration: 600
+
+  - id: budget-check
+    name: Budget Check
+    description: Check and verify budget availability
+    category: finance
+    requires_approval: false
+    estimated_duration: 60
+
+  - id: expense-approval
+    name: Expense Approval
+    description: Process expense approval requests
+    category: finance
+    requires_approval: true
+    approval_type: budget
+    approval_threshold: 1000
+    estimated_duration: 120
+
+  - id: financial-reporting
+    name: Financial Reporting
+    description: Generate financial reports and summaries
+    category: finance
+    requires_approval: false
+    estimated_duration: 300
+
+  - id: product-launch
+    name: Product Launch
+    description: Manage product launch workflow
+    category: product
+    requires_approval: true
+    approval_type: product_launch
+    estimated_duration: 1800
+
+  - id: roadmap-planning
+    name: Roadmap Planning
+    description: Plan and update product roadmap
+    category: product
+    requires_approval: true
+    approval_type: content
+    estimated_duration: 900
+
+  - id: feature-prioritization
+    name: Feature Prioritization
+    description: Prioritize features based on impact
+    category: product
+    requires_approval: false
+    estimated_duration: 300
+
+  - id: task-management
+    name: Task Management
+    description: Create, assign, and track tasks
+    category: operations
+    requires_approval: false
+    estimated_duration: 60
+
+  - id: workflow-automation
+    name: Workflow Automation
+    description: Automate repetitive workflows
+    category: operations
+    requires_approval: false
+    estimated_duration: 180
+
+  - id: resource-planning
+    name: Resource Planning
+    description: Plan and allocate resources
+    category: operations
+    requires_approval: true
+    approval_type: resource
+    estimated_duration: 300
+
+  - id: data-analysis
+    name: Data Analysis
+    description: Analyze data and extract insights
+    category: data
+    requires_approval: false
+    estimated_duration: 600
+
+  - id: metrics-tracking
+    name: Metrics Tracking
+    description: Track and report on KPIs
+    category: data
+    requires_approval: false
+    estimated_duration: 120
+
+  - id: report-generation
+    name: Report Generation
+    description: Generate comprehensive reports
+    category: data
+    requires_approval: false
+    estimated_duration: 300
+
+  - id: general-assistance
+    name: General Assistance
+    description: General purpose assistance
+    category: general
+    requires_approval: false
+    estimated_duration: 60
+
+  - id: routing
+    name: Request Routing
+    description: Route requests to appropriate agents
+    category: general
+    requires_approval: false
+    estimated_duration: 10
+
+  - id: clarification
+    name: Request Clarification
+    description: Ask clarifying questions
+    category: general
+    requires_approval: false
+    estimated_duration: 30

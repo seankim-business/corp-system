@@ -1,0 +1,204 @@
+# Test SOP Configurations for E2E Testing
+
+sops:
+  - id: customer-onboarding
+    name: Customer Onboarding
+    description: Standard customer onboarding process
+    version: "1.0.0"
+    category: customer-success
+    estimated_duration: 604800  # 7 days in seconds
+    steps:
+      - id: welcome-email
+        name: Send Welcome Email
+        type: automated
+        action: send_email
+        template: welcome
+        config:
+          email_template: customer-welcome
+          include_attachments:
+            - onboarding-guide.pdf
+            - getting-started.pdf
+        timeout: 60
+
+      - id: kickoff-meeting
+        name: Schedule Kickoff Meeting
+        type: manual
+        description: Schedule and conduct kickoff meeting with customer
+        assignee_role: account_manager
+        required_data:
+          - meeting_time
+          - attendees
+          - agenda
+        timeout: 172800  # 2 days
+
+      - id: account-setup
+        name: Setup Customer Account
+        type: approval
+        description: Setup and verify customer account configuration
+        approver_role: account_manager
+        approval_type: account_setup
+        required_data:
+          - account_config
+          - permissions
+        timeout: 86400  # 1 day
+
+      - id: training
+        name: Schedule Training Session
+        type: automated
+        action: schedule_training
+        config:
+          training_type: basic
+          duration: 60
+          max_attendees: 10
+        timeout: 300
+
+  - id: content-review
+    name: Content Review Process
+    description: Review and approve marketing content
+    version: "1.0.0"
+    category: marketing
+    estimated_duration: 172800  # 2 days
+    steps:
+      - id: draft-review
+        name: Initial Draft Review
+        type: manual
+        description: Review initial content draft
+        assignee_role: content_reviewer
+        required_data:
+          - content_draft
+          - target_audience
+        timeout: 86400
+
+      - id: legal-review
+        name: Legal Compliance Review
+        type: approval
+        description: Ensure content meets legal requirements
+        approver_role: legal_team
+        approval_type: legal_compliance
+        timeout: 86400
+
+      - id: brand-check
+        name: Brand Guidelines Check
+        type: automated
+        action: brand_check
+        config:
+          check_logo: true
+          check_colors: true
+          check_tone: true
+        timeout: 60
+
+      - id: final-approval
+        name: Final Content Approval
+        type: approval
+        description: Final approval before publishing
+        approver_role: content_manager
+        approval_type: content
+        timeout: 86400
+
+  - id: expense-reimbursement
+    name: Expense Reimbursement
+    description: Process expense reimbursement requests
+    version: "1.0.0"
+    category: finance
+    estimated_duration: 259200  # 3 days
+    steps:
+      - id: submit-receipt
+        name: Submit Receipt
+        type: manual
+        description: Submit expense receipt and details
+        assignee_role: employee
+        required_data:
+          - receipt_image
+          - amount
+          - category
+          - description
+        timeout: 86400
+
+      - id: auto-categorize
+        name: Auto-Categorize Expense
+        type: automated
+        action: categorize_expense
+        config:
+          use_ai: true
+        timeout: 30
+
+      - id: manager-approval
+        name: Manager Approval
+        type: approval
+        description: Manager reviews and approves expense
+        approver_role: manager
+        approval_type: budget
+        approval_threshold: 500
+        timeout: 172800
+
+      - id: process-payment
+        name: Process Payment
+        type: automated
+        action: process_payment
+        config:
+          payment_method: direct_deposit
+          notification: true
+        timeout: 86400
+
+  - id: product-launch-sop
+    name: Product Launch SOP
+    description: Standard operating procedure for product launches
+    version: "1.0.0"
+    category: product
+    estimated_duration: 1209600  # 14 days
+    steps:
+      - id: requirements-review
+        name: Requirements Review
+        type: manual
+        description: Review and finalize product requirements
+        assignee_role: product_manager
+        required_data:
+          - requirements_doc
+          - user_stories
+          - acceptance_criteria
+        timeout: 259200
+
+      - id: stakeholder-approval
+        name: Stakeholder Approval
+        type: approval
+        description: Get stakeholder sign-off on requirements
+        approver_role: product_director
+        approval_type: product_launch
+        timeout: 172800
+
+      - id: marketing-prep
+        name: Marketing Preparation
+        type: parallel
+        parallel_steps:
+          - id: create-assets
+            name: Create Marketing Assets
+            type: automated
+            action: create_marketing_assets
+            agent: brand-agent
+            timeout: 259200
+          - id: create-announcement
+            name: Create Announcement
+            type: automated
+            action: create_announcement
+            agent: brand-agent
+            timeout: 86400
+        timeout: 259200
+
+      - id: final-launch-approval
+        name: Final Launch Approval
+        type: approval
+        description: Final approval to proceed with launch
+        approver_role: executive
+        approval_type: product_launch
+        timeout: 86400
+
+      - id: execute-launch
+        name: Execute Launch
+        type: automated
+        action: execute_launch
+        config:
+          notify_channels:
+            - slack
+            - email
+            - in-app
+        timeout: 3600

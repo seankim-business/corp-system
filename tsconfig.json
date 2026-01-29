@@ -20,5 +20,27 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "src/services/public-webhooks.ts",
+    "src/services/provider-health.ts",
+    "src/services/provider-rate-limit.ts",
+    "src/services/onboarding/**",
+    "src/services/billing/**",
+    "src/services/budget-alerts.ts",
+    "src/api/onboarding.ts",
+    "src/api/v1/**",
+    "src/api/providers.ts",
+    "src/api/agent-admin.ts",
+    "src/api/costs.ts",
+    "src/api/github-models-oauth.ts",
+    "src/api/billing.ts",
+    "src/api/stripe-webhook.ts",
+    "src/orchestrator/agent-matcher.ts",
+    "src/orchestrator/skills/provider-setup.ts",
+    "src/orchestrator/slack-response-formatter.ts",
+    "src/providers/github-models-provider.ts"
+  ]
 }

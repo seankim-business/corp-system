@@ -1,0 +1,36 @@
+id: data-analysis
+name: Data Analysis
+description: 데이터 분석 및 인사이트 도출을 담당합니다
+category: analytics
+triggers:
+  - 분석
+  - analyze
+  - 데이터
+  - data
+  - 통계
+  - statistics
+  - 인사이트
+  - insight
+parameters:
+  - name: data_source
+    type: string
+    description: 데이터 소스
+    required: true
+  - name: metrics
+    type: array
+    description: 분석할 메트릭 목록
+    required: false
+  - name: time_range
+    type: string
+    description: 분석 기간
+    required: false
+outputs:
+  - name: analysis
+    type: object
+    description: 분석 결과
+  - name: recommendations
+    type: array
+    description: 권장 사항
+tools_required:
+  - airtable
+  - google-sheets

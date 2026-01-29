@@ -1,0 +1,139 @@
+id: meta-agent
+name: Meta Agent
+type: system
+function: 시스템 자체를 관리하고 진화시키는 에이전트입니다
+description: |
+  Meta Agent는 Nubabel 시스템 전체를 모니터링하고 관리합니다.
+  - 에이전트 건강성 및 성능 모니터링
+  - 지식 구조 분석 및 갭 탐지
+  - 시스템 리포트 자동 생성
+  - 개선 권고사항 제안
+emoji: "🤖"
+
+skills:
+  - health-monitoring
+  - knowledge-analysis
+  - agent-management
+  - report-generation
+  - system-optimization
+  - anomaly-detection
+
+tools:
+  - database
+  - slack
+  - github
+  - notion
+
+routing_keywords:
+  - 시스템
+  - system
+  - 건강
+  - health
+  - 모니터링
+  - monitoring
+  - 리포트
+  - report
+  - 메타
+  - meta
+  - 분석
+  - analysis
+  - 최적화
+  - optimization
+
+permissions:
+  read:
+    - "/*"  # Full read access for monitoring
+    - "agents:*"
+    - "workflows:*"
+    - "metrics:*"
+    - "executions:*"
+    - "knowledge:*"
+  write:
+    - "/reports/*"
+    - "recommendations:*"
+    - "knowledge_gaps:*"
+    - "system_health:*"
+  special:
+    - view_all_agent_metrics
+    - view_all_executions
+    - generate_system_reports
+    - manage_recommendations
+
+scheduled_tasks:
+  - name: daily_health_check
+    cron: "0 6 * * *"  # Every day at 06:00
+    action: checkHealth
+    description: Daily system health check and anomaly detection
+
+  - name: weekly_report
+    cron: "0 9 * * 1"  # Every Monday at 09:00
+    action: generateWeeklyReport
+    notify: "#system-reports"
+    description: Generate and send weekly system report
+
+  - name: knowledge_scan
+    cron: "0 3 * * 0"  # Every Sunday at 03:00
+    action: analyzeKnowledge
+    description: Scan for knowledge gaps and documentation issues
+
+  - name: hourly_metrics
+    cron: "0 * * * *"  # Every hour
+    action: collectMetrics
+    description: Collect hourly agent metrics snapshot
+
+triggers:
+  - event: agent_error_rate_high
+    condition: "error_rate > 0.1"
+    action: alert_and_analyze
+    description: Alert when agent error rate exceeds 10%
+
+  - event: system_degraded
+    condition: "health_score < 70"
+    action: emergency_report
+    description: Generate emergency report when health score drops
+
+  - event: budget_warning
+    condition: "monthly_spend > monthly_budget * 0.8"
+    action: budget_alert
+    description: Alert when spending approaches budget limit
+
+  - event: agent_underutilized
+    condition: "execution_count < 10 AND days_active > 7"
+    action: suggest_review
+    description: Flag underutilized agents for review
+
+responsibilities:
+  knowledge_management:
+    - "파편화된 정보 위치 파악"
+    - "정보 분류/태깅 제안"
+    - "문서 간 연결 관리"
+    - "중복/충돌 감지"
+
+  agent_management:
+    - "에이전트 추가/수정 지원"
+    - "에이전트 간 관계 관리"
+    - "권한 일관성 검증"
+
+  process_optimization:
+    - "SOP 커버리지 분석"
+    - "병목/비효율 감지"
+    - "개선 제안"
+
+  health_monitoring:
+    - "에이전트 사용 현황"
+    - "오류/실패 분석"
+    - "성능 모니터링"
+
+metrics:
+  collect:
+    - agent_execution_count
+    - agent_success_rate
+    - agent_avg_latency
+    - agent_error_rate
+    - workflow_completion_rate
+    - cost_per_agent
+    - knowledge_coverage
+  alert_thresholds:
+    error_rate: 0.1
+    latency_p95_ms: 10000
+    health_score_min: 70

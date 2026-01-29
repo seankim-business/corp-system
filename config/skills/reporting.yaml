@@ -1,0 +1,52 @@
+id: reporting
+name: 리포팅
+description: 데이터 기반 보고서 생성, 대시보드 업데이트, 정기 리포트 작성을 담당합니다.
+category: analytics
+triggers:
+  - 리포트
+  - report
+  - 보고서
+  - 대시보드
+  - dashboard
+  - 현황
+  - status
+  - 요약
+  - summary
+  - 지표
+  - metrics
+  - KPI
+  - 성과
+  - performance
+parameters:
+  - name: type
+    type: string
+    description: 리포트 유형 (daily, weekly, monthly, custom)
+    required: true
+  - name: metrics
+    type: array
+    description: 포함할 지표 목록
+    required: true
+  - name: date_range
+    type: object
+    description: 기간 설정 (start, end)
+    required: false
+  - name: format
+    type: string
+    description: 출력 형식 (pdf, html, markdown, slack)
+    required: false
+    default: markdown
+outputs:
+  - name: report
+    type: object
+    description: 생성된 보고서 데이터
+  - name: charts
+    type: array
+    description: 생성된 차트 목록
+  - name: file_path
+    type: string
+    description: 저장된 파일 경로
+tools_required:
+  - airtable__query
+  - google-sheets__read
+  - notion__createPage
+  - slack__postMessage

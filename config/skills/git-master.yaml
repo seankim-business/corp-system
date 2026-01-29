@@ -1,0 +1,61 @@
+id: git-master
+name: Git 마스터
+description: Git 버전 관리, 커밋, 브랜치 관리, 충돌 해결을 담당합니다.
+category: development
+triggers:
+  - 커밋
+  - commit
+  - git
+  - push
+  - pull
+  - 리베이스
+  - rebase
+  - merge
+  - 머지
+  - branch
+  - 브랜치
+  - conflict
+  - 충돌
+  - history
+  - 이력
+  - checkout
+  - stash
+  - cherry-pick
+  - tag
+  - 태그
+parameters:
+  - name: action
+    type: string
+    description: Git 작업 유형 (commit, push, pull, merge, rebase, branch, etc.)
+    required: true
+  - name: message
+    type: string
+    description: 커밋 메시지
+    required: false
+  - name: branch
+    type: string
+    description: 대상 브랜치명
+    required: false
+  - name: files
+    type: array
+    description: 대상 파일 목록
+    required: false
+outputs:
+  - name: status
+    type: string
+    description: 작업 상태 (success, conflict, error)
+  - name: commit_hash
+    type: string
+    description: 커밋 해시
+  - name: diff
+    type: string
+    description: 변경사항 diff
+tools_required:
+  - git__status
+  - git__commit
+  - git__push
+  - git__pull
+  - git__branch
+  - git__merge
+  - git__log
+  - git__diff

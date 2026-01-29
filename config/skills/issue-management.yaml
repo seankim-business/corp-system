@@ -1,0 +1,40 @@
+id: issue-management
+name: Issue Management
+description: 이슈 및 태스크 관리를 담당합니다
+category: development
+triggers:
+  - 이슈
+  - issue
+  - 태스크
+  - task
+  - 버그
+  - bug
+  - 티켓
+  - ticket
+parameters:
+  - name: title
+    type: string
+    description: 이슈 제목
+    required: true
+  - name: description
+    type: string
+    description: 이슈 설명
+    required: false
+  - name: priority
+    type: string
+    description: 우선순위
+    required: false
+  - name: assignee
+    type: string
+    description: 담당자
+    required: false
+outputs:
+  - name: issue_id
+    type: string
+    description: 생성된 이슈 ID
+  - name: issue_url
+    type: string
+    description: 이슈 URL
+tools_required:
+  - linear
+  - github

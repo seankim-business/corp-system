@@ -1,0 +1,131 @@
+id: production-planning
+name: Production Planning Skill
+nameKo: 생산 계획 스킬
+description: |
+  의류 생산 계획 전문 스킬.
+  생산 일정, 물량 배분, 공정 관리를 다룹니다.
+
+category: production
+difficulty: advanced
+
+inputs:
+  - name: collectionId
+    type: string
+    description: 컬렉션 ID
+    required: true
+  - name: deliveryDate
+    type: date
+    description: 납기일
+    required: true
+  - name: quantities
+    type: object
+    description: 스타일별 수량
+    required: true
+
+outputs:
+  - name: productionSchedule
+    type: object
+    description: 생산 일정표
+  - name: materialRequirements
+    type: array
+    description: 원부자재 소요량
+  - name: capacityPlan
+    type: object
+    description: 생산 능력 계획
+
+knowledge:
+  productionStages:
+    - name: material_preparation
+      nameKo: 원부자재 준비
+      duration: 7-14일
+      tasks:
+        - 원단 발주
+        - 부자재 발주
+        - 입고 검수
+    - name: cutting
+      nameKo: 재단
+      duration: 1-2일
+      tasks:
+        - 연단
+        - 재단
+        - 부속 재단
+    - name: sewing
+      nameKo: 봉제
+      duration: 3-7일
+      tasks:
+        - 미싱
+        - 마무리 봉제
+        - 부속 부착
+    - name: finishing
+      nameKo: 마감
+      duration: 1-2일
+      tasks:
+        - 다림질
+        - 검품
+        - 수선
+    - name: packing
+      nameKo: 포장/출고
+      duration: 1-2일
+      tasks:
+        - 행택 부착
+        - 폴리백 포장
+        - 박스 포장
+        - 출고
+
+  capacityMetrics:
+    sewingLine:
+      dailyOutput: 100-150장  # 품목에 따라 다름
+      workHours: 8시간
+      efficiency: 85%
+    cuttingTable:
+      dailyOutput: 500-1000장
+      layerHeight: 최대 100겹
+    pressingStation:
+      dailyOutput: 200-300장
+
+  leadTimes:
+    domesticFabric: 7일
+    importedFabric: 21-30일
+    trims: 5-7일
+    labels: 7-10일
+
+  bufferRules:
+    standard: 3일
+    critical: 5일
+    overseasShipping: 7일
+
+steps:
+  - name: analyzeOrder
+    description: 주문 분석
+    actions:
+      - 스타일별 수량 확인
+      - 납기일 확인
+      - 복잡도 평가
+
+  - name: calculateTimeline
+    description: 일정 계산
+    actions:
+      - 역산법으로 시작일 산출
+      - 공정별 소요 시간 배분
+      - 버퍼 시간 할당
+
+  - name: allocateCapacity
+    description: 생산 능력 배분
+    actions:
+      - 라인별 물량 배분
+      - 협력업체 물량 배분
+      - 병목 공정 확인
+
+  - name: planMaterials
+    description: 자재 계획
+    actions:
+      - BOM (자재명세서) 작성
+      - 소요량 계산
+      - 발주 일정 수립
+
+  - name: createSchedule
+    description: 일정표 생성
+    actions:
+      - 간트차트 작성
+      - 마일스톤 설정
+      - 담당자 배정

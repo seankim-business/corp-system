@@ -1,0 +1,58 @@
+id: playwright
+name: Playwright 자동화
+description: 브라우저 자동화, 스크린샷 캡처, 웹 테스트를 수행합니다.
+category: automation
+triggers:
+  - 스크린샷
+  - screenshot
+  - 브라우저
+  - browser
+  - 웹페이지
+  - webpage
+  - 캡처
+  - capture
+  - automation
+  - 자동화
+  - test
+  - 테스트
+  - scrape
+  - 크롤링
+  - e2e
+  - end-to-end
+  - headless
+parameters:
+  - name: url
+    type: string
+    description: 대상 URL
+    required: true
+  - name: action
+    type: string
+    description: 수행할 작업 (screenshot, scrape, test, navigate)
+    required: true
+  - name: selector
+    type: string
+    description: CSS 선택자 (선택적)
+    required: false
+  - name: viewport
+    type: object
+    description: 브라우저 뷰포트 설정
+    required: false
+    default:
+      width: 1920
+      height: 1080
+outputs:
+  - name: screenshot
+    type: string
+    description: 스크린샷 파일 경로 또는 base64
+  - name: content
+    type: string
+    description: 스크래핑된 콘텐츠
+  - name: testResult
+    type: object
+    description: 테스트 실행 결과
+tools_required:
+  - playwright__screenshot
+  - playwright__navigate
+  - playwright__click
+  - playwright__fill
+  - playwright__evaluate

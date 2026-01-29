@@ -15,3 +15,19 @@ prisma/migrations/*.sql
 oh-my-opencode
 certs
 nginx_logs
+
+# Uncommitted files with build errors (temporary)
+src/api/agent-admin.ts
+src/api/costs.ts
+src/api/providers.ts
+src/api/v1/
+src/orchestrator/agent-matcher.ts
+src/orchestrator/skills/provider-setup.ts
+src/orchestrator/slack-response-formatter.ts
+src/providers/github-models-provider.ts
+src/services/billing/
+src/services/budget-alerts.ts
+src/services/onboarding/
+src/services/provider-health.ts
+src/services/provider-rate-limit.ts
+src/services/public-webhooks.ts

@@ -1,0 +1,111 @@
+id: garment-design
+name: Garment Design Skill
+nameKo: 의류 디자인 스킬
+description: |
+  의류 디자인 전문 스킬.
+  실루엣, 디테일, 컬러 등 디자인 요소를 다룹니다.
+
+category: design
+difficulty: advanced
+
+inputs:
+  - name: garmentType
+    type: string
+    description: 의류 종류 (jacket, dress, pants 등)
+    required: true
+  - name: season
+    type: string
+    description: 시즌 (SS, FW, Pre-Fall, Resort)
+    required: true
+  - name: targetCustomer
+    type: string
+    description: 타겟 고객층
+    required: false
+  - name: priceRange
+    type: string
+    description: 가격대 (premium, mid, budget)
+    required: false
+
+outputs:
+  - name: designConcept
+    type: object
+    description: 디자인 컨셉 문서
+  - name: technicalSpecs
+    type: object
+    description: 기술 사양
+
+knowledge:
+  silhouettes:
+    - name: A-Line
+      description: 어깨에서 밑단으로 갈수록 넓어지는 실루엣
+      suitableFor: [dress, skirt, coat]
+    - name: H-Line
+      description: 직선적이고 박시한 실루엣
+      suitableFor: [dress, jacket, coat]
+    - name: X-Line
+      description: 허리가 강조되는 곡선 실루엣
+      suitableFor: [dress, jacket]
+    - name: Fitted
+      description: 몸에 밀착되는 실루엣
+      suitableFor: [top, dress, pants]
+    - name: Oversized
+      description: 여유 있고 큰 실루엣
+      suitableFor: [jacket, coat, top]
+
+  necklines:
+    - V-Neck
+    - Round Neck
+    - Square Neck
+    - Boat Neck
+    - Turtle Neck
+    - Off-Shoulder
+
+  sleeves:
+    - Set-in Sleeve
+    - Raglan Sleeve
+    - Dolman Sleeve
+    - Bell Sleeve
+    - Puff Sleeve
+    - Cap Sleeve
+
+  fabricTypes:
+    woven:
+      - Cotton
+      - Linen
+      - Silk
+      - Wool
+      - Polyester
+    knit:
+      - Jersey
+      - Rib
+      - Interlock
+      - Fleece
+
+steps:
+  - name: analyzeRequirements
+    description: 디자인 요구사항 분석
+    actions:
+      - 시즌 트렌드 확인
+      - 타겟 고객 분석
+      - 가격대별 소재 범위 결정
+
+  - name: conceptDevelopment
+    description: 디자인 컨셉 개발
+    actions:
+      - 실루엣 결정
+      - 디테일 요소 선정
+      - 컬러 팔레트 구성
+
+  - name: technicalDesign
+    description: 기술 디자인
+    actions:
+      - 패턴 구조 설계
+      - 봉제 방법 결정
+      - 부자재 선정
+
+  - name: visualization
+    description: 시각화
+    actions:
+      - CLO3D 3D 모델링
+      - 컬러웨이 렌더링
+      - 테크팩 작성

@@ -1,0 +1,166 @@
+# Test Agent Configurations for E2E Testing
+# These agents mirror the production configuration but with test-specific settings
+
+agents:
+  - id: brand-agent
+    name: Brand Agent
+    function: brand
+    description: "Marketing campaigns, content, and brand guidelines"
+    skills:
+      - content-creation
+      - brand-guidelines
+      - campaign-planning
+    tools:
+      - notion_query
+      - drive_read
+      - notify_slack
+    routing_keywords:
+      - 캠페인
+      - 브리프
+      - 콘텐츠
+      - 브랜드
+      - 마케팅
+      - campaign
+      - brief
+      - content
+      - brand
+      - marketing
+    permissions:
+      read:
+        - "/sops/brand/*"
+        - "/docs/marketing/*"
+      write:
+        - "/sops/brand/*"
+
+  - id: finance-agent
+    name: Finance Agent
+    function: finance
+    description: "Budget management, expense approval, financial reports"
+    skills:
+      - budget-check
+      - expense-approval
+      - financial-reporting
+    tools:
+      - sheets_read
+      - sheets_write
+      - notify_slack
+    routing_keywords:
+      - 예산
+      - 확인
+      - 비용
+      - 지출
+      - budget
+      - finance
+      - cost
+      - expense
+      - approval
+    permissions:
+      read:
+        - "/budgets/*"
+        - "/expenses/*"
+      write:
+        - "/expenses/*"
+
+  - id: product-agent
+    name: Product Agent
+    function: product
+    description: "Product launches, feature planning, roadmap management"
+    skills:
+      - product-launch
+      - roadmap-planning
+      - feature-prioritization
+    tools:
+      - linear_read
+      - linear_write
+      - notion_query
+      - notify_slack
+    routing_keywords:
+      - 제품
+      - 출시
+      - 기능
+      - 로드맵
+      - product
+      - launch
+      - feature
+      - roadmap
+    permissions:
+      read:
+        - "/products/*"
+        - "/roadmaps/*"
+      write:
+        - "/products/*"
+
+  - id: ops-agent
+    name: Operations Agent
+    function: operations
+    description: "Operations management, task coordination, resource allocation"
+    skills:
+      - task-management
+      - workflow-automation
+      - resource-planning
+    tools:
+      - linear_read
+      - linear_write
+      - slack_channel_manage
+    routing_keywords:
+      - 운영
+      - 작업
+      - 리소스
+      - 스케줄
+      - operations
+      - ops
+      - task
+      - resource
+      - schedule
+    permissions:
+      read:
+        - "/tasks/*"
+        - "/schedules/*"
+      write:
+        - "/tasks/*"
+
+  - id: data-agent
+    name: Data Agent
+    function: data
+    description: "Data analysis, metrics tracking, dashboard management"
+    skills:
+      - data-analysis
+      - metrics-tracking
+      - report-generation
+    tools:
+      - bigquery_read
+      - sheets_read
+      - sheets_write
+    routing_keywords:
+      - 데이터
+      - 분석
+      - 통계
+      - 메트릭
+      - 대시보드
+      - data
+      - analysis
+      - analytics
+      - metrics
+      - dashboard
+    permissions:
+      read:
+        - "/data/*"
+        - "/metrics/*"
+      write:
+        - "/reports/*"
+
+  - id: general-agent
+    name: General Agent
+    function: general
+    description: "General purpose agent for unclassified requests"
+    skills:
+      - general-assistance
+      - routing
+      - clarification
+    tools:
+      - slack_message
+    routing_keywords: []
+    permissions:
+      read:
+        - "/*"
+      write: []

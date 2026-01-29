@@ -1,0 +1,35 @@
+id: scheduling
+name: Scheduling
+description: 일정 관리 및 미팅 조율을 담당합니다
+category: operations
+triggers:
+  - 일정
+  - schedule
+  - 미팅
+  - meeting
+  - 예약
+  - book
+  - 약속
+parameters:
+  - name: date
+    type: date
+    description: 일정 날짜
+    required: true
+  - name: duration
+    type: number
+    description: 소요 시간 (분)
+    required: false
+    default: 60
+  - name: attendees
+    type: array
+    description: 참석자 목록
+    required: false
+outputs:
+  - name: event_id
+    type: string
+    description: 생성된 이벤트 ID
+  - name: event_link
+    type: string
+    description: 이벤트 링크
+tools_required:
+  - google-calendar
