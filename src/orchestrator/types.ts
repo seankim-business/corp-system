@@ -7,7 +7,38 @@ export type Category =
   | "unspecified-high"
   | "writing";
 
-export type Skill = "playwright" | "git-master" | "frontend-ui-ux" | "mcp-integration";
+// Legacy skill union - deprecated, use SkillId instead
+/** @deprecated Use SkillId from extension-registry instead */
+export type LegacySkill = "playwright" | "git-master" | "frontend-ui-ux" | "mcp-integration";
+
+// Branded type for type-safe skill identifiers
+export type SkillId = string & { readonly __brand: unique symbol };
+
+// Combined type for backward compatibility
+export type Skill = LegacySkill | SkillId;
+
+// Type guard to check if a skill is a legacy built-in skill
+export function isLegacySkill(id: string): id is LegacySkill {
+  return ['playwright', 'git-master', 'frontend-ui-ux', 'mcp-integration'].includes(id);
+}
+
+// Type guard to validate skill ID format
+export function isValidSkillId(id: string): boolean {
+  return /^[a-z][a-z0-9-]*$/.test(id);
+}
+
+// Convert string to SkillId (use after validation)
+export function toSkillId(id: string): SkillId {
+  if (!isValidSkillId(id)) {
+    throw new Error(`Invalid skill ID format: ${id}`);
+  }
+  return id as SkillId;
+}
+
+// Safe conversion without validation
+export function asSkillId(id: string): SkillId {
+  return id as SkillId;
+}
 
 export interface OrchestrationRequest {
   userRequest: string;

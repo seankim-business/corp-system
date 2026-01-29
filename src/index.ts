@@ -84,6 +84,8 @@ import analyticsRoutes from "./api/analytics";
 import metaAgentRoutes from "./api/meta-agent";
 import billingRoutes from "./api/billing";
 import stripeWebhookRoutes from "./api/stripe-webhook";
+import extensionsRoutes from "./api/extensions";
+import { ExtensionRegistry } from "./services/extension-registry";
 import v1ApiRouter from "./api/v1";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
@@ -119,6 +121,9 @@ try {
 
 const app = express();
 const port = parseInt(process.env.PORT || "3000", 10);
+
+// Initialize extension registry
+(app as any).extensionRegistry = new ExtensionRegistry(db);
 
 let activeRequests = 0;
 let isShuttingDown = false;
@@ -482,6 +487,7 @@ app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, meta
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
 app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
 app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
+app.use("/api/v1/extensions", apiRateLimiter, authenticate, sentryUserContext, extensionsRoutes);
 app.use("/api", sseRouter);
 
 // Public API v1 (external developer access with API key auth)

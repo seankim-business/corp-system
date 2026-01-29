@@ -11,22 +11,32 @@ datasource db {
 }
 
 // ============================================================================
+// SKILL & MCP ECOSYSTEM ENUMS
+// ============================================================================
+
+enum ExtensionType {
+  extension
+  skill
+  mcp_server
+}
+
+// ============================================================================
 // CORE MULTI-TENANT TABLES
 // ============================================================================
 
 /// Organizations (Tenants)
 /// Each organization represents a separate company/workspace
 model Organization {
-  id        String   @id @default(uuid()) @db.Uuid
-  slug      String   @unique @db.VarChar(50) // Subdomain: kyndof, clientco
-  name      String   @db.VarChar(255)
-  logoUrl   String?  @map("logo_url") @db.Text
-  settings  Json     @default("{}") @db.JsonB
-  monthlyBudgetCents     Int?     @map("monthly_budget_cents")
-  currentMonthSpendCents Int      @default(0) @map("current_month_spend_cents")
+  id                     String    @id @default(uuid()) @db.Uuid
+  slug                   String    @unique @db.VarChar(50) // Subdomain: kyndof, clientco
+  name                   String    @db.VarChar(255)
+  logoUrl                String?   @map("logo_url") @db.Text
+  settings               Json      @default("{}") @db.JsonB
+  monthlyBudgetCents     Int?      @map("monthly_budget_cents")
+  currentMonthSpendCents Int       @default(0) @map("current_month_spend_cents")
   budgetResetAt          DateTime? @map("budget_reset_at") @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   workspaceDomains       WorkspaceDomain[]
@@ -45,6 +55,12 @@ model Organization {
   orchestratorExecutions OrchestratorExecution[]
   featureFlagOverrides   FeatureFlagOverride[]
   featureFlagAuditLogs   FeatureFlagAuditLog[]
+  marketplaceExtensions  MarketplaceExtension[]
+  extensionInstallations ExtensionInstallation[]
+  extensionPermissions   ExtensionPermission[]
+  skillLearningPatterns  SkillLearningPattern[]
+  agentSkillAssignments  AgentSkillAssignment[]
+  extensionUsageLogs     ExtensionUsageLog[]
 
   @@map("organizations")
 }
@@ -144,13 +160,13 @@ model Session {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-   @@index([userId])
-   @@index([organizationId])
-   @@index([organizationId, expiresAt])
-   @@index([tokenHash])
-   @@index([expiresAt])
-   @@index([source])
-   @@map("sessions")
+  @@index([userId])
+  @@index([organizationId])
+  @@index([organizationId, expiresAt])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([source])
+  @@map("sessions")
 }
 
 // ============================================================================
@@ -181,6 +197,8 @@ model Agent {
   manager      Agent?       @relation("AgentHierarchy", fields: [managerId], references: [id])
   subordinates Agent[]      @relation("AgentHierarchy")
   team         Team?        @relation(fields: [teamId], references: [id])
+
+  skillAssignments AgentSkillAssignment[]
 
   @@index([organizationId])
   @@index([managerId])
@@ -265,11 +283,11 @@ model Task {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project?     @relation(fields: [projectId], references: [id])
 
-   @@index([organizationId, id])
-   @@index([organizationId, status])
-   @@index([organizationId, dueDate])
-   @@index([organizationId, projectId])
-   @@map("tasks")
+  @@index([organizationId, id])
+  @@index([organizationId, status])
+  @@index([organizationId, dueDate])
+  @@index([organizationId, projectId])
+  @@map("tasks")
 }
 
 /// Goals (Hierarchical)
@@ -384,10 +402,10 @@ model WorkflowExecution {
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
-   @@index([workflowId])
-   @@index([status])
-   @@index([createdAt(sort: Desc)])
-   @@map("workflow_executions")
+  @@index([workflowId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("workflow_executions")
 }
 
 /// Orchestrator Executions (Conversation / delegation history)
@@ -417,12 +435,12 @@ model OrchestratorExecution {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-   @@index([organizationId, createdAt(sort: Desc)])
-   @@index([organizationId, status])
-   @@index([userId, createdAt(sort: Desc)])
-   @@index([sessionId])
-   @@index([status])
-   @@map("orchestrator_executions")
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@index([status])
+  @@map("orchestrator_executions")
 }
 
 // ============================================================================
@@ -446,11 +464,11 @@ model MCPConnection {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-   @@index([organizationId])
-   @@index([organizationId, enabled])
-   @@index([provider])
-   @@index([namespace])
-   @@map("mcp_connections")
+  @@index([organizationId])
+  @@index([organizationId, enabled])
+  @@index([provider])
+  @@index([namespace])
+  @@map("mcp_connections")
 }
 
 /// Legacy Notion Connections (Backward compatibility)
@@ -550,10 +568,10 @@ model FeatureFlagRule {
 
   featureFlag FeatureFlag @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
 
-   @@index([featureFlagId, priority])
-   @@index([enabled, priority])
-   @@index([type])
-   @@map("feature_flag_rules")
+  @@index([featureFlagId, priority])
+  @@index([enabled, priority])
+  @@index([type])
+  @@map("feature_flag_rules")
 }
 
 model FeatureFlagOverride {
@@ -651,12 +669,12 @@ model Approval {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-   @@index([organizationId, status])
-   @@index([approverId, status])
-   @@index([fallbackApproverId])
-   @@index([requesterId])
-   @@index([expiresAt])
-   @@map("approvals")
+  @@index([organizationId, status])
+  @@index([approverId, status])
+  @@index([fallbackApproverId])
+  @@index([requesterId])
+  @@index([expiresAt])
+  @@map("approvals")
 }
 
 // ============================================================================
@@ -833,4 +851,240 @@ model SessionHijackingAttempt {
   @@index([userId, createdAt(sort: Desc)])
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("session_hijacking_attempts")
+}
+
+// ============================================================================
+// SKILL & MCP ECOSYSTEM TABLES
+// ============================================================================
+
+/// MarketplaceExtension - Unified marketplace item for extensions/skills/MCP servers
+model MarketplaceExtension {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String? @map("organization_id") @db.Uuid
+
+  slug        String @db.VarChar(100)
+  name        String @db.VarChar(255)
+  description String @db.Text
+  version     String @db.VarChar(20)
+
+  extensionType ExtensionType @default(extension) @map("extension_type")
+  category      String        @db.VarChar(50)
+  tags          String[]      @default([]) @db.VarChar(50)
+
+  source     String? @db.VarChar(50)
+  format     String? @db.VarChar(20)
+  manifest   Json    @default("{}") @db.JsonB
+  definition Json?   @db.JsonB
+
+  runtimeType   String?  @map("runtime_type") @db.VarChar(30)
+  runtimeConfig Json?    @map("runtime_config") @db.JsonB
+  triggers      String[] @default([]) @db.VarChar(100)
+  parameters    Json     @default("[]") @db.JsonB
+  outputs       Json     @default("[]") @db.JsonB
+  dependencies  String[] @default([]) @db.VarChar(100)
+  toolsRequired String[] @default([]) @map("tools_required") @db.VarChar(100)
+  mcpProviders  String[] @default([]) @map("mcp_providers") @db.VarChar(50)
+
+  publisherId String? @map("publisher_id") @db.Uuid
+  isPublic    Boolean @default(false) @map("is_public")
+  verified    Boolean @default(false)
+  downloads   Int     @default(0)
+  rating      Float?  @db.Real
+  ratingCount Int     @default(0) @map("rating_count")
+
+  status  String  @default("active") @db.VarChar(20)
+  enabled Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  organization     Organization?           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publisher        ExtensionPublisher?     @relation(fields: [publisherId], references: [id])
+  versions         ExtensionVersion[]
+  installations    ExtensionInstallation[]
+  usageLogs        ExtensionUsageLog[]
+  permissions      ExtensionPermission[]
+  agentAssignments AgentSkillAssignment[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([extensionType])
+  @@index([category])
+  @@index([isPublic, status])
+  @@map("marketplace_extensions")
+}
+
+/// ExtensionVersion - Version history
+model ExtensionVersion {
+  id          String  @id @default(uuid()) @db.Uuid
+  extensionId String  @map("extension_id") @db.Uuid
+  version     String  @db.VarChar(20)
+  manifest    Json    @db.JsonB
+  definition  Json?   @db.JsonB
+  changelog   String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  extension MarketplaceExtension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+
+  @@unique([extensionId, version])
+  @@index([extensionId])
+  @@map("extension_versions")
+}
+
+/// ExtensionInstallation - Org-level installations
+model ExtensionInstallation {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  extensionId    String @map("extension_id") @db.Uuid
+  version        String @db.VarChar(20)
+
+  configOverrides Json? @map("config_overrides") @db.JsonB
+  credentials     Json? @db.JsonB
+
+  status     String  @default("active") @db.VarChar(20)
+  autoUpdate Boolean @default(true) @map("auto_update")
+
+  installedAt DateTime @default(now()) @map("installed_at") @db.Timestamptz(6)
+  installedBy String   @map("installed_by") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  extension    MarketplaceExtension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, extensionId])
+  @@index([organizationId])
+  @@index([extensionId])
+  @@map("extension_installations")
+}
+
+/// ExtensionPublisher - Publisher accounts
+model ExtensionPublisher {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String? @map("organization_id") @db.Uuid
+
+  name        String  @db.VarChar(255)
+  slug        String  @unique @db.VarChar(100)
+  description String? @db.Text
+  website     String? @db.Text
+  verified    Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  extensions MarketplaceExtension[]
+
+  @@index([organizationId])
+  @@map("extension_publishers")
+}
+
+/// ExtensionPermission - Access control
+model ExtensionPermission {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  extensionId String? @map("extension_id") @db.Uuid
+  category    String? @db.VarChar(50)
+
+  agentId String? @map("agent_id") @db.Uuid
+  roleId  String? @map("role_id") @db.VarChar(50)
+
+  canExecute   Boolean @default(true) @map("can_execute")
+  canConfigure Boolean @default(false) @map("can_configure")
+  canInstall   Boolean @default(false) @map("can_install")
+
+  allowedTools String[] @default([]) @map("allowed_tools") @db.VarChar(100)
+  deniedTools  String[] @default([]) @map("denied_tools") @db.VarChar(100)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  extension    MarketplaceExtension? @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([extensionId])
+  @@index([agentId])
+  @@map("extension_permissions")
+}
+
+/// ExtensionUsageLog - Execution history
+model ExtensionUsageLog {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  extensionId    String  @map("extension_id") @db.Uuid
+  agentId        String? @map("agent_id") @db.Uuid
+  sessionId      String? @map("session_id") @db.VarChar(255)
+
+  executionId String @map("execution_id") @db.Uuid
+  status      String @db.VarChar(20)
+  durationMs  Int    @map("duration_ms")
+
+  errorCode    String? @map("error_code") @db.VarChar(50)
+  errorMessage String? @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  extension    MarketplaceExtension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([extensionId])
+  @@map("extension_usage_logs")
+}
+
+/// SkillLearningPattern - Pattern detection for skill generation
+model SkillLearningPattern {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  patternHash String @map("pattern_hash") @db.VarChar(64)
+  patternType String @map("pattern_type") @db.VarChar(30)
+  steps       Json   @db.JsonB
+  frequency   Int    @default(1)
+
+  triggerPhrases String[] @default([]) @map("trigger_phrases") @db.Text
+  contextTags    String[] @default([]) @map("context_tags") @db.VarChar(50)
+
+  status String @default("detected") @db.VarChar(20)
+
+  firstSeenAt DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, patternHash])
+  @@index([organizationId])
+  @@index([status])
+  @@map("skill_learning_patterns")
+}
+
+/// AgentSkillAssignment - Agent-specific skill configurations
+model AgentSkillAssignment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  agentId        String @map("agent_id") @db.Uuid
+  extensionId    String @map("extension_id") @db.Uuid
+
+  assignmentType  String  @map("assignment_type") @db.VarChar(20)
+  enabled         Boolean @default(true)
+  priority        Int     @default(100)
+  configOverrides Json?   @map("config_overrides") @db.JsonB
+
+  successCount Int @default(0) @map("success_count")
+  failureCount Int @default(0) @map("failure_count")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  agent        Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  extension    MarketplaceExtension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, extensionId])
+  @@index([organizationId])
+  @@index([agentId])
+  @@map("agent_skill_assignments")
 }
