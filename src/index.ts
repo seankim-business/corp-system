@@ -60,7 +60,7 @@ import googleCalendarRoutes from "./api/google-calendar";
 import githubRoutes from "./api/github";
 import githubSsotRoutes from "./api/github-ssot";
 import sopRoutes from "./api/sop";
-import sopsRoutes from "./api/sops";
+// import sopsRoutes from "./api/sops";
 // import sopEditorRoutes from "./api/sop-editor";
 import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
@@ -68,8 +68,8 @@ import dailyBriefingRoutes from "./api/daily-briefing";
 import syncRoutes from "./api/sync";
 import delegationRoutes from "./api/delegations";
 import agentMetricsRoutes from "./api/agent-metrics";
-import agentHierarchyRoutes from "./api/agent-hierarchy";
-import agentActivityRoutes from "./api/agent-activity";
+// import agentHierarchyRoutes from "./api/agent-hierarchy";
+// import agentActivityRoutes from "./api/agent-activity";
 import regionsRoutes from "./api/regions";
 // import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
@@ -102,7 +102,7 @@ import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/
 import { adminRouter } from "./admin";
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
-import { createHealthDashboardRouter } from "./api/health-dashboard";
+// import { createHealthDashboardRouter } from "./api/health-dashboard";
 import healthAnthropicRouter from "./api/health-anthropic";
 
 logger.info("Initializing Nubabel Platform", {
@@ -266,7 +266,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.use("/health", createHealthDashboardRouter());
+// app.use("/health", createHealthDashboardRouter());
 app.use("/health", healthAnthropicRouter);
 
 if (process.env.NODE_ENV === "development") {
@@ -490,7 +490,7 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, googleCalendarR
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubSsotRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
-app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopsRoutes);
+// app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopsRoutes);
 // app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopEditorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
@@ -498,13 +498,13 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRo
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSettingsRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
-app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHierarchyRoutes);
+// app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHierarchyRoutes);
 app.use(
-  "/api/agent-activity",
-  apiRateLimiter,
-  authenticate,
-  sentryUserContext,
-  agentActivityRoutes,
+//   "/api/agent-activity",
+//   apiRateLimiter,
+//   authenticate,
+//   sentryUserContext,
+//   agentActivityRoutes,
 );
 app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
