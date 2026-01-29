@@ -84,8 +84,11 @@ function setupEventHandlers(app: App): void {
     try {
       const { user, text, channel, thread_ts, ts } = event;
 
+      // messageTs is for thread context (reply in same thread)
       const messageTs = thread_ts || ts;
-      dedupeKey = `slack:dedupe:app_mention:${channel}:${messageTs}`;
+      // dedupeKey must use the actual message ts, NOT thread_ts
+      // Otherwise all messages in a thread get the same key and only first is processed
+      dedupeKey = `slack:dedupe:app_mention:${channel}:${ts}`;
       const alreadyProcessed = await redis.exists(dedupeKey);
       if (alreadyProcessed) {
         logger.debug("Duplicate Slack app_mention event skipped", {
