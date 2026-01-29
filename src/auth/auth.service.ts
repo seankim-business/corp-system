@@ -14,8 +14,8 @@ export class AuthService {
   async loginWithGoogle(
     code: string,
     organizationSlug?: string,
-    ipAddress?: string,
-    userAgent?: string,
+    _ipAddress?: string,  // Kept for API compatibility but not included in JWT (proxy issues)
+    _userAgent?: string,  // Kept for API compatibility but not included in JWT (proxy issues)
     codeVerifier?: string,
   ) {
     const { tokens } = await googleClient.getToken({
@@ -141,12 +141,12 @@ export class AuthService {
       });
     }
 
+    // NOTE: Don't include ipAddress/userAgent in JWT token
+    // IP changes behind proxies (Railway, CloudFlare) causing session hijacking false positives
     const sessionToken = this.createSessionToken({
       userId: user.id,
       organizationId: organization.id,
       role: membership.role,
-      ipAddress,
-      userAgent,
     });
 
     const refreshToken = this.createRefreshToken({
