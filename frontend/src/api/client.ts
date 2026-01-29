@@ -20,6 +20,25 @@ export const api = axios.create({
   },
 });
 
+// Helper to get CSRF token from cookie
+function getCsrfToken(): string {
+  const match = document.cookie.match(/csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+// Add CSRF token to all mutating requests (POST, PUT, DELETE, PATCH)
+api.interceptors.request.use((config) => {
+  const csrfToken = getCsrfToken();
+  if (
+    csrfToken &&
+    config.method &&
+    !["get", "head", "options"].includes(config.method.toLowerCase())
+  ) {
+    config.headers["X-CSRF-Token"] = csrfToken;
+  }
+  return config;
+});
+
 function toApiError(error: unknown): ApiError {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<any>;
