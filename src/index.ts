@@ -103,6 +103,7 @@ import { adminRouter } from "./admin";
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
 import { createHealthDashboardRouter } from "./api/health-dashboard";
+import healthAnthropicRouter from "./api/health-anthropic";
 
 logger.info("Initializing Nubabel Platform", {
   nodeVersion: process.version,
@@ -265,11 +266,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// Mount health dashboard router for /health/full endpoint
 app.use("/health", createHealthDashboardRouter());
-
-// Mount Anthropic monitoring health endpoint
-import healthAnthropicRouter from "./api/health-anthropic";
 app.use("/health", healthAnthropicRouter);
 
 if (process.env.NODE_ENV === "development") {
