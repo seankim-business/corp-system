@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { logger } from "../utils/logger";
 import { Category } from "./types";
 import { trackUsage } from "../services/cost-tracker";
@@ -343,6 +343,27 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
 
         span.recordException(error as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage });
+
+        if (error instanceof APIError && error.status === 429) {
+          await anthropicMetricsTracker
+            .recordRateLimit("default")
+            .catch((err: Error) =>
+              logger.warn("Failed to track rate limit", { error: err.message }),
+            );
+
+          const slackAlerts = getSlackAlerts();
+          if (slackAlerts) {
+            slackAlerts
+              .sendRateLimitAlert({
+                accountName: "default",
+                error: error.message,
+                timestamp: new Date(),
+              })
+              .catch((err: Error) =>
+                logger.warn("Failed to send Slack alert", { error: err.message }),
+              );
+          }
+        }
 
         recordAiRequest({
           model,
