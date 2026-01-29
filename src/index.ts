@@ -499,13 +499,7 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSet
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
 // app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHierarchyRoutes);
-app.use(
-//   "/api/agent-activity",
-//   apiRateLimiter,
-//   authenticate,
-//   sentryUserContext,
-//   agentActivityRoutes,
-);
+// app.use("/api/agent-activity", apiRateLimiter, authenticate, sentryUserContext, agentActivityRoutes);
 app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
