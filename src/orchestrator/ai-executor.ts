@@ -6,6 +6,7 @@ import { recordAiRequest } from "../services/metrics";
 import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
 import { getOrganizationApiKey } from "../api/organization-settings";
 import { anthropicMetricsTracker } from "../services/anthropic-metrics";
+import { getSlackAlerts } from "../services/slack-anthropic-alerts";
 
 export interface AIExecutionParams {
   category: Category;
@@ -230,6 +231,20 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
                 .catch((err: Error) =>
                   logger.warn("Failed to track rate limit", { error: err.message }),
                 );
+
+              // Send Slack alert
+              const slackAlerts = getSlackAlerts();
+              if (slackAlerts) {
+                slackAlerts
+                  .sendRateLimitAlert({
+                    accountName: "default",
+                    error: error.message,
+                    timestamp: new Date(),
+                  })
+                  .catch((err: Error) =>
+                    logger.warn("Failed to send Slack alert", { error: err.message }),
+                  );
+              }
             }
 
             throw error;

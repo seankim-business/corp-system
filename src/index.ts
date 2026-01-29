@@ -50,18 +50,17 @@ import { webhooksRouter } from "./api/webhooks";
 import { sidecarCallbacksRouter } from "./api/sidecar-callbacks";
 import gdprRoutes from "./api/gdpr.routes";
 import dashboardRoutes from "./api/dashboard";
-import healthAnthropicRouter from "./api/health-anthropic";
 import membersRoutes from "./api/members";
 import approvalsRoutes from "./api/approvals";
 import okrRoutes from "./api/okr";
-// import orgChangesRoutes from "./api/org-changes";
+import orgChangesRoutes from "./api/org-changes";
 import searchRoutes from "./api/search";
 import driveRoutes from "./api/drive";
 import googleCalendarRoutes from "./api/google-calendar";
 import githubRoutes from "./api/github";
 import githubSsotRoutes from "./api/github-ssot";
 import sopRoutes from "./api/sop";
-// import sopsRoutes from "./api/sops";
+import sopsRoutes from "./api/sops";
 // import sopEditorRoutes from "./api/sop-editor";
 import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
@@ -70,11 +69,11 @@ import syncRoutes from "./api/sync";
 import delegationRoutes from "./api/delegations";
 import agentMetricsRoutes from "./api/agent-metrics";
 import agentHierarchyRoutes from "./api/agent-hierarchy";
-// import agentActivityRoutes from "./api/agent-activity";
-// import regionsRoutes from "./api/regions";
+import agentActivityRoutes from "./api/agent-activity";
+import regionsRoutes from "./api/regions";
 // import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
-// import onboardingRoutes from "./api/onboarding";
+import onboardingRoutes from "./api/onboarding";
 // import errorManagementRoutes from "./api/error-management";
 // import agentAdminRoutes from "./api/agent-admin";
 // import optimizationRoutes from "./api/optimization";
@@ -86,22 +85,24 @@ import agentHierarchyRoutes from "./api/agent-hierarchy";
 // import alertsRoutes from "./api/alerts";
 // import analyticsRoutes from "./api/analytics";
 // import metaAgentRoutes from "./api/meta-agent";
-// import billingRoutes from "./api/billing";
-// import stripeWebhookRoutes from "./api/stripe-webhook";
+import billingRoutes from "./api/billing";
+import stripeWebhookRoutes from "./api/stripe-webhook";
 // import v1ApiRouter from "./api/v1";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
 // import { conversationsRouter } from "./api/conversations";
 import { startWorkers, gracefulShutdown as gracefulWorkerShutdown } from "./workers";
 import { startSlackBot, stopSlackBot } from "./api/slack";
+import { initializeSlackAlerts } from "./services/slack-anthropic-alerts";
 import { disconnectRedis } from "./db/redis";
 import { db } from "./db/client";
 import { shutdownOpenTelemetry } from "./instrumentation";
 import { logger } from "./utils/logger";
 import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
-// import { adminRouter } from "./admin";
+import { adminRouter } from "./admin";
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
+import { createHealthDashboardRouter } from "./api/health-dashboard";
 
 logger.info("Initializing Nubabel Platform", {
   nodeVersion: process.version,
@@ -130,7 +131,21 @@ let isShuttingDown = false;
 app.use(sentryRequestHandler());
 app.use(sentryTracingHandler());
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        connectSrc: ["'self'", "https://*.nubabel.com", "wss://*.nubabel.com"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        frameSrc: ["'self'", "https://accounts.google.com"],
+      },
+    },
+  }),
+);
 
 // CORS: Allow requests from all nubabel.com subdomains
 const allowedOrigins = [
@@ -245,9 +260,13 @@ app.get("/health", (_req, res) => {
       DATABASE_URL: process.env.DATABASE_URL ? "SET" : "MISSING",
       REDIS_URL: process.env.REDIS_URL ? "SET" : "MISSING",
       BASE_URL: process.env.BASE_URL || "NOT_SET",
+      FRONTEND_URL: process.env.FRONTEND_URL || "NOT_SET",
     },
   });
 });
+
+// Mount health dashboard router for /health/full endpoint
+app.use("/health", createHealthDashboardRouter());
 
 if (process.env.NODE_ENV === "development") {
   app.get("/debug/sentry-test", (_req, _res) => {
@@ -460,18 +479,17 @@ app.use(
 );
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, gdprRoutes);
 app.use("/api/dashboard", apiRateLimiter, authenticate, sentryUserContext, dashboardRoutes);
-app.use("/api/health", healthAnthropicRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, membersRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, approvalsRoutes);
 app.use("/api/okr", apiRateLimiter, authenticate, sentryUserContext, okrRoutes);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, orgChangesRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, orgChangesRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, searchRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, driveRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, googleCalendarRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubSsotRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
-// app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopsRoutes);
+app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopsRoutes);
 // app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopEditorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
@@ -480,11 +498,17 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSet
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
 app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHierarchyRoutes);
-// app.use("/api/agent-activity", apiRateLimiter, authenticate, sentryUserContext, agentActivityRoutes);
-// app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
+app.use(
+  "/api/agent-activity",
+  apiRateLimiter,
+  authenticate,
+  sentryUserContext,
+  agentActivityRoutes,
+);
+app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
+app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
 // app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
@@ -496,9 +520,9 @@ app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHie
 // app.use("/api/alerts", apiRateLimiter, authenticate, sentryUserContext, alertsRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
 // app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
-// app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
-// app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
+app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
+app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
 app.use("/api", sseRouter);
 
 // Public API v1 (external developer access with API key auth)
@@ -647,6 +671,15 @@ const server = app.listen(port, "0.0.0.0", async () => {
   try {
     await startSlackBot();
     logger.info("✅ Slack Bot started");
+
+    if (process.env.SLACK_BOT_TOKEN) {
+      const alertChannel = process.env.SLACK_ALERT_CHANNEL || "#eng-alerts";
+      initializeSlackAlerts({
+        slackToken: process.env.SLACK_BOT_TOKEN,
+        alertChannel,
+      });
+      logger.info("✅ Slack Anthropic alerts initialized", { channel: alertChannel });
+    }
   } catch (error) {
     logger.warn("⚠️  Failed to start Slack Bot (continuing without Slack integration)", {
       error: error instanceof Error ? error.message : String(error),
