@@ -875,11 +875,13 @@
       "agent_type": "oh-my-claudecode:build-fixer",
       "started_at": "2026-01-29T13:41:40.252Z",
       "parent_mode": "autopilot",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-01-29T13:45:10.352Z",
+      "duration_ms": 210100
     }
   ],
   "total_spawned": 99,
   "total_completed": 0,
-  "total_failed": 92,
-  "last_updated": "2026-01-29T13:41:40.253Z"
+  "total_failed": 93,
+  "last_updated": "2026-01-29T13:45:10.353Z"
 }
