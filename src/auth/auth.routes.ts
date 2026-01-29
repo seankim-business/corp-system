@@ -11,6 +11,31 @@ import { logger } from "../utils/logger";
 const router = express.Router();
 const authService = new AuthService();
 
+// Get cookie domain for cross-subdomain auth
+// MUST return .nubabel.com for auth.nubabel.com cookies to work on app.nubabel.com
+function getCookieDomain(): string | undefined {
+  if (process.env.COOKIE_DOMAIN) {
+    return process.env.COOKIE_DOMAIN;
+  }
+  // Fallback: extract root domain from FRONTEND_URL or BASE_URL
+  const baseUrl = process.env.FRONTEND_URL || process.env.BASE_URL;
+  if (baseUrl) {
+    try {
+      const url = new URL(baseUrl);
+      const hostParts = url.hostname.split('.');
+      if (hostParts.length >= 2) {
+        const rootDomain = hostParts.slice(-2).join('.');
+        logger.warn("COOKIE_DOMAIN not set, using extracted domain", { extractedDomain: `.${rootDomain}` });
+        return `.${rootDomain}`;
+      }
+    } catch {
+      // Invalid URL
+    }
+  }
+  logger.error("COOKIE_DOMAIN not set - cross-subdomain auth will NOT work!");
+  return undefined;
+}
+
 function extractIpAddress(req: Request): string | undefined {
   const xForwardedFor = req.get("x-forwarded-for");
   if (xForwardedFor) {
@@ -121,7 +146,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     res.cookie("refresh", result.refreshToken, {
@@ -129,7 +154,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     const redirectUrl = `${process.env.BASE_URL}/dashboard`;
@@ -172,7 +197,7 @@ router.post("/register", loginLimiter, async (req: Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     res.cookie("refresh", result.refreshToken, {
@@ -180,7 +205,7 @@ router.post("/register", loginLimiter, async (req: Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     return res.status(201).json({
@@ -220,7 +245,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     res.cookie("refresh", result.refreshToken, {
@@ -228,7 +253,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     return res.json({
@@ -255,8 +280,8 @@ router.post("/logout", async (req: Request, res: Response) => {
     }
   }
 
-  res.clearCookie("session", { domain: process.env.COOKIE_DOMAIN });
-  res.clearCookie("refresh", { domain: process.env.COOKIE_DOMAIN });
+  res.clearCookie("session", { domain: getCookieDomain() });
+  res.clearCookie("refresh", { domain: getCookieDomain() });
   return res.json({ success: true });
 });
 
@@ -278,8 +303,8 @@ router.post("/logout-all", authenticate, requireAuth, async (req: Request, res: 
       where: { userId },
     });
 
-    res.clearCookie("session", { domain: process.env.COOKIE_DOMAIN });
-    res.clearCookie("refresh", { domain: process.env.COOKIE_DOMAIN });
+    res.clearCookie("session", { domain: getCookieDomain() });
+    res.clearCookie("refresh", { domain: getCookieDomain() });
 
     return res.json({
       success: true,
@@ -332,7 +357,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     return res.json({ success: true });
@@ -356,7 +381,7 @@ router.post("/switch-org", authenticate, async (req: Request, res: Response) => 
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     res.cookie("refresh", result.refreshToken, {
@@ -364,7 +389,7 @@ router.post("/switch-org", authenticate, async (req: Request, res: Response) => 
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      domain: process.env.COOKIE_DOMAIN,
+      domain: getCookieDomain(),
     });
 
     const redirectUrl = `https://${result.organization.slug}.${process.env.BASE_DOMAIN}/dashboard`;
