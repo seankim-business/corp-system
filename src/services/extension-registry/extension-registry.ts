@@ -1,6 +1,11 @@
-import { PrismaClient } from '@prisma/client';
-import { Redis } from 'ioredis';
-import { logger } from '../../utils/logger';
+/**
+ * Extension Registry Service (Stub)
+ *
+ * TODO: Implement when MarketplaceExtension and AgentSkillAssignment tables are added to Prisma schema
+ */
+import { PrismaClient } from "@prisma/client";
+import { Redis } from "ioredis";
+import { logger } from "../../utils/logger";
 import {
   Extension,
   ExtensionDefinition,
@@ -9,16 +14,16 @@ import {
   ListOptions,
   ResolvedSkill,
   SearchOptions,
-} from './types';
+} from "./types";
 
 export class ExtensionRegistry {
-  private prisma: PrismaClient;
+  // @ts-expect-error Prisma client reserved for future use when MarketplaceExtension table is added
+  private _prisma: PrismaClient;
   private redis: Redis | null;
-  private cachePrefix = 'ext:registry:';
-  private cacheTTL = 300; // 5 minutes
+  private cachePrefix = "ext:registry:";
 
   constructor(prisma: PrismaClient, redis?: Redis) {
-    this.prisma = prisma;
+    this._prisma = prisma;
     this.redis = redis || null;
   }
 
@@ -26,247 +31,158 @@ export class ExtensionRegistry {
     return `${this.cachePrefix}${orgId}:${suffix}`;
   }
 
-  async listExtensions(orgId: string, options: ListOptions = {}): Promise<Extension[]> {
-    const cacheKey = this.getCacheKey(orgId, `list:${JSON.stringify(options)}`);
-
-    if (this.redis) {
-      const cached = await this.redis.get(cacheKey);
-      if (cached) return JSON.parse(cached);
-    }
-
-    const where: any = {
-      OR: [
-        { organizationId: orgId },
-        { organizationId: null, isPublic: true },
-      ],
-      status: 'active',
-    };
-
-    if (options.type) where.extensionType = options.type;
-    if (options.category) where.category = options.category;
-    if (options.enabled !== undefined) where.enabled = options.enabled;
-
-    const extensions = await this.prisma.marketplaceExtension.findMany({
-      where,
-      take: options.limit || 100,
-      skip: options.offset || 0,
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    const result = extensions.map(this.toExtension);
-
-    if (this.redis) {
-      await this.redis.setex(cacheKey, this.cacheTTL, JSON.stringify(result));
-    }
-
-    return result;
+  async listExtensions(_orgId: string, _options: ListOptions = {}): Promise<Extension[]> {
+    // Stub: Return empty array until MarketplaceExtension table is added
+    logger.debug("ExtensionRegistry.listExtensions called (stub)");
+    return [];
   }
 
   async listSkills(orgId: string, options: ListOptions = {}): Promise<Extension[]> {
-    return this.listExtensions(orgId, { ...options, type: 'skill' });
+    return this.listExtensions(orgId, { ...options, type: "skill" });
   }
 
-  async getExtension(orgId: string, slug: string): Promise<Extension | null> {
-    const extension = await this.prisma.marketplaceExtension.findFirst({
-      where: {
-        slug,
-        OR: [
-          { organizationId: orgId },
-          { organizationId: null, isPublic: true },
-        ],
-      },
-    });
-
-    return extension ? this.toExtension(extension) : null;
+  async getExtension(_orgId: string, _slug: string): Promise<Extension | null> {
+    // Stub: Return null until MarketplaceExtension table is added
+    logger.debug("ExtensionRegistry.getExtension called (stub)");
+    return null;
   }
 
-  async getExtensionById(id: ExtensionId): Promise<Extension | null> {
-    const extension = await this.prisma.marketplaceExtension.findUnique({
-      where: { id },
-    });
-
-    return extension ? this.toExtension(extension) : null;
+  async getExtensionById(_id: ExtensionId): Promise<Extension | null> {
+    // Stub: Return null until MarketplaceExtension table is added
+    logger.debug("ExtensionRegistry.getExtensionById called (stub)");
+    return null;
   }
 
-  async searchExtensions(query: string, orgId: string, options: SearchOptions = {}): Promise<Extension[]> {
-    const where: any = {
-      OR: [
-        { name: { contains: query, mode: 'insensitive' } },
-        { description: { contains: query, mode: 'insensitive' } },
-        { tags: { has: query.toLowerCase() } },
-      ],
-      AND: {
-        OR: [
-          { organizationId: orgId },
-          ...(options.includeGlobal !== false ? [{ organizationId: null, isPublic: true }] : []),
-        ],
-      },
-      status: 'active',
-    };
-
-    if (options.type) where.extensionType = options.type;
-
-    const extensions = await this.prisma.marketplaceExtension.findMany({
-      where,
-      take: options.limit || 50,
-      orderBy: [{ downloads: 'desc' }, { rating: 'desc' }],
-    });
-
-    return extensions.map(this.toExtension);
+  async searchExtensions(
+    _query: string,
+    _orgId: string,
+    _options: SearchOptions = {},
+  ): Promise<Extension[]> {
+    // Stub: Return empty array until MarketplaceExtension table is added
+    logger.debug("ExtensionRegistry.searchExtensions called (stub)");
+    return [];
   }
 
   async resolveSkillsForRequest(
-    orgId: string,
-    request: string,
-    _agentId?: string
+    _orgId: string,
+    _request: string,
+    _agentId?: string,
   ): Promise<ResolvedSkill[]> {
-    const skills = await this.listSkills(orgId, { enabled: true });
-    const requestLower = request.toLowerCase();
-    const words = requestLower.split(/\s+/);
-
-    const matches: ResolvedSkill[] = [];
-
-    for (const skill of skills) {
-      const matchedTriggers: string[] = [];
-      let score = 0;
-
-      for (const trigger of skill.triggers) {
-        const triggerLower = trigger.toLowerCase();
-        if (requestLower.includes(triggerLower)) {
-          matchedTriggers.push(trigger);
-          score += triggerLower.length;
-        } else if (words.some(w => triggerLower.includes(w))) {
-          matchedTriggers.push(trigger);
-          score += 1;
-        }
-      }
-
-      if (matchedTriggers.length > 0) {
-        matches.push({ skill, score, matchedTriggers });
-      }
-    }
-
-    return matches.sort((a, b) => b.score - a.score);
+    // Stub: Return empty array until extension system is implemented
+    return [];
   }
 
   async registerExtension(
-    orgId: string,
+    _orgId: string,
     definition: ExtensionDefinition,
-    createdBy?: string
+    _createdBy?: string,
   ): Promise<Extension> {
     const validated = ExtensionDefinitionSchema.parse(definition);
 
-    const extension = await this.prisma.marketplaceExtension.create({
-      data: {
-        organizationId: orgId,
-        slug: validated.slug,
-        name: validated.name,
-        description: validated.description,
-        version: validated.version,
-        extensionType: validated.extensionType,
-        category: validated.category,
-        tags: validated.tags,
-        source: validated.source,
-        format: validated.format,
-        runtimeType: validated.runtimeType,
-        runtimeConfig: validated.runtimeConfig as any,
-        triggers: validated.triggers,
-        parameters: validated.parameters as any,
-        outputs: validated.outputs as any,
-        dependencies: validated.dependencies,
-        toolsRequired: validated.toolsRequired,
-        mcpProviders: validated.mcpProviders,
-        isPublic: validated.isPublic,
-        enabled: validated.enabled,
-        manifest: {},
-        createdBy,
-      },
-    });
+    // Stub: Return a mock extension until MarketplaceExtension table is added
+    logger.warn("ExtensionRegistry.registerExtension called (stub) - extension not persisted");
 
-    await this.invalidateCache(orgId);
-    logger.info('Extension registered', { slug: validated.slug, orgId });
-
-    return this.toExtension(extension);
+    return {
+      id: `stub-${Date.now()}` as ExtensionId,
+      organizationId: _orgId,
+      publisherId: null,
+      verified: false,
+      slug: validated.slug,
+      name: validated.name,
+      description: validated.description,
+      version: validated.version,
+      extensionType: validated.extensionType,
+      category: validated.category,
+      tags: validated.tags,
+      source: validated.source,
+      format: validated.format,
+      runtimeType: validated.runtimeType,
+      runtimeConfig: validated.runtimeConfig,
+      triggers: validated.triggers,
+      parameters: validated.parameters,
+      outputs: validated.outputs,
+      dependencies: validated.dependencies,
+      toolsRequired: validated.toolsRequired,
+      mcpProviders: validated.mcpProviders,
+      isPublic: validated.isPublic ?? false,
+      enabled: validated.enabled ?? true,
+      status: "active",
+      downloads: 0,
+      rating: null,
+      ratingCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 
   async updateExtension(
     id: ExtensionId,
-    updates: Partial<ExtensionDefinition>
+    _updates: Partial<ExtensionDefinition>,
   ): Promise<Extension> {
-    const extension = await this.prisma.marketplaceExtension.update({
-      where: { id },
-      data: updates as any,
-    });
+    // Stub: Return mock until MarketplaceExtension table is added
+    logger.warn("ExtensionRegistry.updateExtension called (stub) - update not persisted");
 
-    if (extension.organizationId) {
-      await this.invalidateCache(extension.organizationId);
-    }
-
-    return this.toExtension(extension);
+    return {
+      id,
+      organizationId: null,
+      publisherId: null,
+      verified: false,
+      slug: "stub",
+      name: "Stub Extension",
+      description: "",
+      version: "1.0.0",
+      extensionType: "skill" as const,
+      category: "general",
+      tags: [],
+      source: "yaml" as const,
+      format: "native" as const,
+      runtimeType: "prompt" as const,
+      runtimeConfig: {},
+      triggers: [],
+      parameters: [],
+      outputs: [],
+      dependencies: [],
+      toolsRequired: [],
+      mcpProviders: [],
+      isPublic: false,
+      enabled: true,
+      status: "active",
+      downloads: 0,
+      rating: null,
+      ratingCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 
-  async deleteExtension(id: ExtensionId): Promise<void> {
-    const extension = await this.prisma.marketplaceExtension.delete({
-      where: { id },
-    });
-
-    if (extension.organizationId) {
-      await this.invalidateCache(extension.organizationId);
-    }
+  async deleteExtension(_id: ExtensionId): Promise<void> {
+    // Stub: No-op until MarketplaceExtension table is added
+    logger.warn("ExtensionRegistry.deleteExtension called (stub) - deletion not persisted");
   }
 
-  async getSkillsForAgent(agentId: string, _orgId: string): Promise<Extension[]> {
-    const assignments = await this.prisma.agentSkillAssignment.findMany({
-      where: { agentId, enabled: true },
-      include: { extension: true },
-      orderBy: { priority: 'desc' },
-    });
-
-    return assignments
-      .filter((a: { extension: { status: string } }) => a.extension.status === 'active')
-      .map((a: { extension: any }) => this.toExtension(a.extension));
+  async getSkillsForAgent(_agentId: string, _orgId: string): Promise<Extension[]> {
+    // Stub: Return empty array until AgentSkillAssignment table is added
+    logger.debug("ExtensionRegistry.getSkillsForAgent called (stub)");
+    return [];
   }
 
-  private async invalidateCache(orgId: string): Promise<void> {
+  async invalidateCache(orgId: string): Promise<void> {
     if (!this.redis) return;
 
-    const keys = await this.redis.keys(`${this.cachePrefix}${orgId}:*`);
+    const pattern = this.getCacheKey(orgId, "*");
+    const keys = await this.redis.keys(pattern);
     if (keys.length > 0) {
       await this.redis.del(...keys);
     }
   }
+}
 
-  private toExtension(row: any): Extension {
-    return {
-      id: row.id as ExtensionId,
-      organizationId: row.organizationId,
-      publisherId: row.publisherId,
-      slug: row.slug,
-      name: row.name,
-      description: row.description,
-      version: row.version,
-      extensionType: row.extensionType,
-      category: row.category,
-      tags: row.tags || [],
-      source: row.source,
-      format: row.format,
-      runtimeType: row.runtimeType,
-      runtimeConfig: row.runtimeConfig,
-      triggers: row.triggers || [],
-      parameters: row.parameters || [],
-      outputs: row.outputs || [],
-      dependencies: row.dependencies || [],
-      toolsRequired: row.toolsRequired || [],
-      mcpProviders: row.mcpProviders || [],
-      isPublic: row.isPublic,
-      verified: row.verified,
-      downloads: row.downloads,
-      rating: row.rating,
-      ratingCount: row.ratingCount,
-      status: row.status,
-      enabled: row.enabled,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    };
+// Singleton instance
+let registryInstance: ExtensionRegistry | null = null;
+
+export function getExtensionRegistry(prisma: PrismaClient, redis?: Redis): ExtensionRegistry {
+  if (!registryInstance) {
+    registryInstance = new ExtensionRegistry(prisma, redis);
   }
+  return registryInstance;
 }
