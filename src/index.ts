@@ -42,7 +42,6 @@ import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 import { googleAiOAuthRouter } from "./api/google-ai-oauth";
-// TEMPORARILY DISABLED - Missing Prisma models/types
 // import { githubModelsOAuthRouter } from "./api/github-models-oauth";
 // import { providersRouter } from "./api/providers";
 import { organizationSettingsRouter } from "./api/organization-settings";
@@ -61,40 +60,40 @@ import googleCalendarRoutes from "./api/google-calendar";
 import githubRoutes from "./api/github";
 import githubSsotRoutes from "./api/github-ssot";
 import sopRoutes from "./api/sop";
-import sopEditorRoutes from "./api/sop-editor";
+import sopsRoutes from "./api/sops";
+// import sopEditorRoutes from "./api/sop-editor";
 import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
-import taskPrioritizationRoutes from "./api/task-prioritization";
+// import taskPrioritizationRoutes from "./api/task-prioritization";
 import syncRoutes from "./api/sync";
 import delegationRoutes from "./api/delegations";
 import agentMetricsRoutes from "./api/agent-metrics";
+import agentHierarchyRoutes from "./api/agent-hierarchy";
+import agentActivityRoutes from "./api/agent-activity";
 import regionsRoutes from "./api/regions";
-import agentSessionsRoutes from "./api/agent-sessions";
-// TEMPORARILY DISABLED - Missing Prisma models/exports
+// import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
-// import onboardingRoutes from "./api/onboarding";
-import errorManagementRoutes from "./api/error-management";
+import onboardingRoutes from "./api/onboarding";
+// import errorManagementRoutes from "./api/error-management";
 // import agentAdminRoutes from "./api/agent-admin";
-import optimizationRoutes from "./api/optimization";
-import patternsRoutes from "./api/patterns";
-import feedbackRoutes from "./api/feedback";
-import memoryRoutes from "./api/memory";
-import knowledgeGraphRoutes from "./api/knowledge-graph";
-import ragRoutes from "./api/rag";
-import alertsRoutes from "./api/alerts";
-import analyticsRoutes from "./api/analytics";
-import metaAgentRoutes from "./api/meta-agent";
-// TEMPORARILY DISABLED - Missing Prisma models
-// import billingRoutes from "./api/billing";
-// import stripeWebhookRoutes from "./api/stripe-webhook";
-import extensionsRoutes from "./api/extensions";
-import { ExtensionRegistry } from "./services/extension-registry";
+// import optimizationRoutes from "./api/optimization";
+// import patternsRoutes from "./api/patterns";
+// import feedbackRoutes from "./api/feedback";
+// import memoryRoutes from "./api/memory";
+// import knowledgeGraphRoutes from "./api/knowledge-graph";
+// import ragRoutes from "./api/rag";
+// import alertsRoutes from "./api/alerts";
+// import analyticsRoutes from "./api/analytics";
+// import metaAgentRoutes from "./api/meta-agent";
+import billingRoutes from "./api/billing";
+import stripeWebhookRoutes from "./api/stripe-webhook";
 // import v1ApiRouter from "./api/v1";
 import { serverAdapter as bullBoardAdapter } from "./queue/bull-board";
 import { sseRouter, shutdownSSE } from "./api/sse";
-import { conversationsRouter } from "./api/conversations";
+// import { conversationsRouter } from "./api/conversations";
 import { startWorkers, gracefulShutdown as gracefulWorkerShutdown } from "./workers";
 import { startSlackBot, stopSlackBot } from "./api/slack";
+import { initializeSlackAlerts } from "./services/slack-anthropic-alerts";
 import { disconnectRedis } from "./db/redis";
 import { db } from "./db/client";
 import { shutdownOpenTelemetry } from "./instrumentation";
@@ -103,6 +102,7 @@ import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/
 import { adminRouter } from "./admin";
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
+import { createHealthDashboardRouter } from "./api/health-dashboard";
 
 logger.info("Initializing Nubabel Platform", {
   nodeVersion: process.version,
@@ -125,39 +125,59 @@ try {
 const app = express();
 const port = parseInt(process.env.PORT || "3000", 10);
 
-// Initialize extension registry
-(app as any).extensionRegistry = new ExtensionRegistry(db);
-
 let activeRequests = 0;
 let isShuttingDown = false;
 
 app.use(sentryRequestHandler());
 app.use(sentryTracingHandler());
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        connectSrc: ["'self'", "https://*.nubabel.com", "wss://*.nubabel.com"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        frameSrc: ["'self'", "https://accounts.google.com"],
+      },
+    },
+  }),
+);
 
-// CORS configuration for multiple subdomains
+// CORS: Allow requests from all nubabel.com subdomains
 const allowedOrigins = [
-  process.env.BASE_URL,
-  process.env.FRONTEND_URL,
-  "http://localhost:3000",
-  "http://localhost:3001",
-].filter(Boolean) as string[];
+  process.env.BASE_URL || "http://localhost:3000",
+  process.env.FRONTEND_URL || "https://app.nubabel.com",
+  "https://nubabel.com",
+  "https://www.nubabel.com",
+  "https://app.nubabel.com",
+  "https://auth.nubabel.com",
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, curl, etc.)
-      if (!origin) {
+      if (!origin) return callback(null, true);
+
+      // Allow all *.nubabel.com subdomains
+      if (origin.endsWith(".nubabel.com") || origin === "https://nubabel.com") {
         return callback(null, true);
       }
-      // Check if origin is allowed or matches *.nubabel.com
-      if (
-        allowedOrigins.includes(origin) ||
-        /^https:\/\/([a-z0-9-]+\.)?nubabel\.com$/.test(origin)
-      ) {
+
+      // Allow explicitly listed origins
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
+
+      // Development: allow localhost
+      if (origin.includes("localhost")) {
+        return callback(null, true);
+      }
+
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
@@ -240,9 +260,13 @@ app.get("/health", (_req, res) => {
       DATABASE_URL: process.env.DATABASE_URL ? "SET" : "MISSING",
       REDIS_URL: process.env.REDIS_URL ? "SET" : "MISSING",
       BASE_URL: process.env.BASE_URL || "NOT_SET",
+      FRONTEND_URL: process.env.FRONTEND_URL || "NOT_SET",
     },
   });
 });
+
+// Mount health dashboard router for /health/full endpoint
+app.use("/health", createHealthDashboardRouter());
 
 if (process.env.NODE_ENV === "development") {
   app.get("/debug/sentry-test", (_req, _res) => {
@@ -438,8 +462,8 @@ app.use("/api", webhookRateLimiter, syncRoutes);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 app.use("/api", apiRateLimiter, googleAiOAuthRouter);
-// TEMPORARILY DISABLED
 // app.use("/api", apiRateLimiter, githubModelsOAuthRouter);
+
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, providersRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, notionRoutes);
@@ -465,38 +489,43 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, googleCalendarR
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, githubSsotRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
-app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopEditorRoutes);
+app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopsRoutes);
+// app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopEditorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, taskPrioritizationRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, taskPrioritizationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSettingsRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRoutes);
+app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHierarchyRoutes);
+app.use(
+  "/api/agent-activity",
+  apiRateLimiter,
+  authenticate,
+  sentryUserContext,
+  agentActivityRoutes,
+);
 app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
-app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
-// TEMPORARILY DISABLED
+// app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
+app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
-app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, feedbackRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, patternsRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memoryRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, knowledgeGraphRoutes);
-app.use("/api/rag", apiRateLimiter, authenticate, sentryUserContext, ragRoutes);
-app.use("/api/alerts", apiRateLimiter, authenticate, sentryUserContext, alertsRoutes);
-app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
-app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
-// TEMPORARILY DISABLED - Missing Prisma models
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
-// app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
-// app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
-app.use("/api/v1/extensions", apiRateLimiter, authenticate, sentryUserContext, extensionsRoutes);
+// app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, feedbackRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, patternsRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memoryRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, knowledgeGraphRoutes);
+// app.use("/api/rag", apiRateLimiter, authenticate, sentryUserContext, ragRoutes);
+// app.use("/api/alerts", apiRateLimiter, authenticate, sentryUserContext, alertsRoutes);
+// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
+// app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
+app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
+app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
 app.use("/api", sseRouter);
 
 // Public API v1 (external developer access with API key auth)
-// TEMPORARILY DISABLED - Missing Prisma models
 // app.use("/api/v1", v1ApiRouter);
 
 app.use(
@@ -507,14 +536,14 @@ app.use(
   bullBoardAdapter.getRouter(),
 );
 
-app.use(
-  "/admin/errors",
-  apiRateLimiter,
-  authenticate,
-  sentryUserContext,
-  strictRateLimiter,
-  errorManagementRoutes,
-);
+// app.use(
+//   "/admin/errors",
+//   apiRateLimiter,
+//   authenticate,
+//   sentryUserContext,
+//   strictRateLimiter,
+//   errorManagementRoutes,
+// );
 
 app.get("/api/user", authenticate, sentryUserContext, (req, res) => {
   res.json({
@@ -576,7 +605,6 @@ if (process.env.NODE_ENV === "production") {
   const frontendPath = path.join(__dirname, "../frontend/dist");
   const landingPath = path.join(__dirname, "../landing");
 
-  // Serve landing page for root domain (nubabel.com)
   app.use((req, res, next) => {
     const host = req.get("host") || "";
 
@@ -585,28 +613,32 @@ if (process.env.NODE_ENV === "production") {
       if (req.path === "/" || req.path === "/index.html") {
         return res.sendFile(path.join(landingPath, "index.html"));
       }
-      // Serve landing static assets (images, etc.)
       return express.static(landingPath)(req, res, next);
     }
 
-    // Subdomains (app.nubabel.com, auth.nubabel.com) → frontend app
-    next();
-  });
-
-  // Serve frontend app static files
-  app.use(express.static(frontendPath));
-
-  // SPA fallback for frontend app (excluding API routes)
-  app.use((req, res, next) => {
-    if (
-      !req.path.startsWith("/api") &&
-      !req.path.startsWith("/health") &&
-      !req.path.startsWith("/auth")
-    ) {
-      res.sendFile(path.join(frontendPath, "index.html"));
-    } else {
-      next();
+    // Auth server (auth.nubabel.com) → NO frontend, only API/auth routes
+    if (host.startsWith("auth.")) {
+      // Don't serve frontend on auth subdomain
+      return next();
     }
+
+    // App subdomain (app.nubabel.com) → frontend app
+    if (host.startsWith("app.")) {
+      // Serve static files
+      return express.static(frontendPath)(req, res, () => {
+        // SPA fallback (excluding API routes)
+        if (
+          !req.path.startsWith("/api") &&
+          !req.path.startsWith("/health") &&
+          !req.path.startsWith("/auth")
+        ) {
+          return res.sendFile(path.join(frontendPath, "index.html"));
+        }
+        next();
+      });
+    }
+
+    next();
   });
 }
 
@@ -639,6 +671,15 @@ const server = app.listen(port, "0.0.0.0", async () => {
   try {
     await startSlackBot();
     logger.info("✅ Slack Bot started");
+
+    if (process.env.SLACK_BOT_TOKEN) {
+      const alertChannel = process.env.SLACK_ALERT_CHANNEL || "#eng-alerts";
+      initializeSlackAlerts({
+        slackToken: process.env.SLACK_BOT_TOKEN,
+        alertChannel,
+      });
+      logger.info("✅ Slack Anthropic alerts initialized", { channel: alertChannel });
+    }
   } catch (error) {
     logger.warn("⚠️  Failed to start Slack Bot (continuing without Slack integration)", {
       error: error instanceof Error ? error.message : String(error),

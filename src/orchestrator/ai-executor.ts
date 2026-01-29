@@ -5,6 +5,8 @@ import { trackUsage } from "../services/cost-tracker";
 import { recordAiRequest } from "../services/metrics";
 import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
 import { getOrganizationApiKey } from "../api/organization-settings";
+import { anthropicMetricsTracker } from "../services/anthropic-metrics";
+import { getSlackAlerts } from "../services/slack-anthropic-alerts";
 
 export interface AIExecutionParams {
   category: Category;
@@ -218,6 +220,33 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
             const message = error instanceof Error ? error.message : "Unknown error";
             apiSpan.recordException(error as Error);
             apiSpan.setStatus({ code: SpanStatusCode.ERROR, message });
+
+            // Track rate limit errors (429)
+            if (
+              error instanceof Error &&
+              (error.message.includes("429") || error.message.includes("rate limit"))
+            ) {
+              await anthropicMetricsTracker
+                .recordRateLimit("default")
+                .catch((err: Error) =>
+                  logger.warn("Failed to track rate limit", { error: err.message }),
+                );
+
+              // Send Slack alert
+              const slackAlerts = getSlackAlerts();
+              if (slackAlerts) {
+                slackAlerts
+                  .sendRateLimitAlert({
+                    accountName: "default",
+                    error: error.message,
+                    timestamp: new Date(),
+                  })
+                  .catch((err: Error) =>
+                    logger.warn("Failed to send Slack alert", { error: err.message }),
+                  );
+              }
+            }
+
             throw error;
           } finally {
             apiSpan.end();
@@ -273,6 +302,21 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
           outputTokens,
         });
 
+        // Track Anthropic-specific metrics
+        await anthropicMetricsTracker
+          .recordRequest({
+            model,
+            category: params.category,
+            inputTokens,
+            outputTokens,
+            cost,
+            duration,
+            success: true,
+          })
+          .catch((err: Error) =>
+            logger.warn("Failed to track Anthropic metrics", { error: err.message }),
+          );
+
         logger.info("AI execution completed", {
           model,
           inputTokens,
@@ -308,6 +352,22 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
           inputTokens: 0,
           outputTokens: 0,
         });
+
+        // Track Anthropic-specific metrics for failures
+        await anthropicMetricsTracker
+          .recordRequest({
+            model,
+            category: params.category,
+            inputTokens: 0,
+            outputTokens: 0,
+            cost: 0,
+            duration,
+            success: false,
+            error: errorMessage,
+          })
+          .catch((err: Error) =>
+            logger.warn("Failed to track Anthropic error metrics", { error: err.message }),
+          );
 
         logger.error("AI execution failed", {
           model,
