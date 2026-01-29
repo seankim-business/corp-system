@@ -100,7 +100,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     res.cookie(CSRF_COOKIE_NAME, csrfToken, {
       httpOnly: false, // Must be readable by JavaScript
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Changed from strict to lax for cross-subdomain compatibility
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // "none" for cross-site (auth.nubabel.com → app.nubabel.com)
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: "/",
       ...(cookieDomain && { domain: cookieDomain }),
@@ -183,7 +183,7 @@ export function csrfTokenEndpoint(req: Request, res: Response): void {
     res.cookie(CSRF_COOKIE_NAME, csrfToken, {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000,
       path: "/",
       ...(cookieDomain && { domain: cookieDomain }),
