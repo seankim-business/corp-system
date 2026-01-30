@@ -50,7 +50,7 @@ function requireSidecarAuth(req: Request, res: Response, next: NextFunction): vo
 sidecarCallbacksRouter.use(requireSidecarAuth);
 
 // Session state updates
-sidecarCallbacksRouter.post("/sidecar/sessions/:sessionId/update", async (req, res) => {
+sidecarCallbacksRouter.post("/sessions/:sessionId/update", async (req, res) => {
   const { sessionId } = req.params;
   const { state, metadata } = req.body;
 
@@ -91,7 +91,7 @@ sidecarCallbacksRouter.post("/sidecar/sessions/:sessionId/update", async (req, r
 });
 
 // MCP tool execution callback
-sidecarCallbacksRouter.post("/sidecar/mcp/invoke", async (req, res) => {
+sidecarCallbacksRouter.post("/mcp/invoke", async (req, res) => {
   const { organizationId, provider, toolName, args } = req.body;
 
   try {
@@ -182,7 +182,7 @@ sidecarCallbacksRouter.post("/sidecar/mcp/invoke", async (req, res) => {
 });
 
 // Progress updates (for real-time streaming)
-sidecarCallbacksRouter.post("/sidecar/sessions/:sessionId/progress", async (req, res) => {
+sidecarCallbacksRouter.post("/sessions/:sessionId/progress", async (req, res) => {
   const { sessionId } = req.params;
   const { progress } = req.body;
 
@@ -202,7 +202,7 @@ sidecarCallbacksRouter.post("/sidecar/sessions/:sessionId/progress", async (req,
 });
 
 // SSE endpoint for real-time progress streaming
-sidecarCallbacksRouter.get("/sidecar/sessions/:sessionId/stream", (req, res) => {
+sidecarCallbacksRouter.get("/sessions/:sessionId/stream", (req, res) => {
   const { sessionId } = req.params;
 
   res.setHeader("Content-Type", "text/event-stream");

@@ -477,7 +477,7 @@ app.post("/health/circuits/reset", (req, res) => {
 app.use("/auth", authRateLimiter, authRoutes);
 
 app.use("/api", webhookRateLimiter, webhooksRouter);
-app.use("/api", sidecarRateLimiter, sidecarCallbacksRouter);
+app.use("/api/sidecar", sidecarRateLimiter, sidecarCallbacksRouter);
 app.use("/api", webhookRateLimiter, syncRoutes);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);

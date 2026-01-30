@@ -28,7 +28,7 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 // Paths that are exempt from CSRF (webhooks, callbacks, etc.)
 const EXEMPT_PATHS = [
   "/api/webhooks",
-  "/api/sidecar-callbacks",
+  "/api/sidecar",
   "/health",
   "/metrics",
   "/api/slack/events", // Slack uses its own signing verification
