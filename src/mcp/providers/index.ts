@@ -256,6 +256,39 @@ export async function loadAvailableProviders(): Promise<string[]> {
     });
   }
 
+  // Always load execution provider (core internal provider)
+  try {
+    const { createExecutionProvider } = await import("./execution");
+    registerProvider(createExecutionProvider() as unknown as MCPProvider);
+    loaded.push("execution");
+  } catch (err) {
+    logger.warn("Failed to load execution provider", {
+      error: String(err),
+    });
+  }
+
+  // Always load approval provider (core internal provider)
+  try {
+    const { createApprovalProvider } = await import("./approval");
+    registerProvider(createApprovalProvider() as unknown as MCPProvider);
+    loaded.push("approval");
+  } catch (err) {
+    logger.warn("Failed to load approval provider", {
+      error: String(err),
+    });
+  }
+
+  // Always load knowledge-graph provider (core internal provider)
+  try {
+    const { createKnowledgeGraphProvider } = await import("./knowledge-graph");
+    registerProvider(createKnowledgeGraphProvider() as unknown as MCPProvider);
+    loaded.push("knowledge-graph");
+  } catch (err) {
+    logger.warn("Failed to load knowledge-graph provider", {
+      error: String(err),
+    });
+  }
+
   logger.info("MCP providers loaded", { count: loaded.length, providers: loaded });
   return loaded;
 }
