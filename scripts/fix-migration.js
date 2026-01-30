@@ -1,5 +1,15 @@
 #!/usr/bin/env node
 const { PrismaClient } = require("@prisma/client");
+const { execSync } = require("child_process");
+
+// Essential tables that must exist for the app to function
+const ESSENTIAL_TABLES = [
+  "organizations",
+  "users",
+  "memberships",
+  "sessions",
+  "approvals",
+];
 
 async function main() {
   const prisma = new PrismaClient();
@@ -7,31 +17,36 @@ async function main() {
   try {
     console.log("=== Database Migration Fix ===");
 
-    // Check if core tables exist
-    console.log("1. Checking if core tables exist...");
-    let coreTablesExist = false;
-    try {
-      await prisma.$queryRaw`SELECT 1 FROM organizations LIMIT 1`;
-      coreTablesExist = true;
-      console.log("   ✓ Core tables exist - database is healthy");
-    } catch (e) {
-      console.log("   ⚠ Core tables missing - will reset migration history");
+    // Check if ALL essential tables exist
+    console.log("1. Checking essential tables...");
+    const missingTables = [];
+    for (const table of ESSENTIAL_TABLES) {
+      try {
+        await prisma.$queryRawUnsafe(`SELECT 1 FROM ${table} LIMIT 1`);
+        console.log(`   ✓ ${table} exists`);
+      } catch (e) {
+        missingTables.push(table);
+        console.log(`   ✗ ${table} MISSING`);
+      }
     }
 
-    if (!coreTablesExist) {
-      console.log("2. Clearing migration history for fresh start...");
+    if (missingTables.length > 0) {
+      console.log(`\n2. Found ${missingTables.length} missing tables - forcing schema sync...`);
+      console.log("   Running: npx prisma db push --accept-data-loss");
       try {
-        // Clear the _prisma_migrations table so migrate deploy runs everything fresh
-        await prisma.$executeRawUnsafe(`DELETE FROM _prisma_migrations`);
-        console.log("   ✓ Migration history cleared");
+        execSync("npx prisma db push --accept-data-loss", {
+          stdio: "inherit",
+          env: process.env
+        });
+        console.log("   ✅ Schema synchronized successfully!");
       } catch (e) {
-        // Table might not exist yet, that's ok
-        console.log("   ⚠ Migration table not found (first run)");
+        console.log("   ⚠ db push failed:", e.message);
       }
-      console.log("   → Prisma will now run all migrations from scratch");
     } else {
-      // Tables exist, create helper function
-      console.log("2. Creating RLS helper function...");
+      console.log("   ✅ All essential tables exist!");
+
+      // Create RLS helper function
+      console.log("\n2. Creating RLS helper function...");
       await prisma.$executeRawUnsafe(`
         CREATE OR REPLACE FUNCTION set_current_organization(org_id TEXT)
         RETURNS VOID AS $$
@@ -41,30 +56,9 @@ async function main() {
         $$ LANGUAGE plpgsql;
       `);
       console.log("   ✓ set_current_organization function created");
-
-      // Fix any failed migrations
-      console.log("3. Fixing failed migrations...");
-      const failedMigrations = await prisma.$queryRaw`
-        SELECT migration_name
-        FROM _prisma_migrations
-        WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL
-      `;
-
-      if (failedMigrations.length > 0) {
-        console.log(`   Found ${failedMigrations.length} failed migration(s)`);
-        for (const { migration_name } of failedMigrations) {
-          await prisma.$executeRawUnsafe(
-            `DELETE FROM _prisma_migrations WHERE migration_name = $1`,
-            migration_name,
-          );
-          console.log(`   ✓ ${migration_name} removed (will be re-applied)`);
-        }
-      } else {
-        console.log("   ✓ No failed migrations found");
-      }
     }
 
-    console.log("=== Done ===");
+    console.log("\n=== Done ===");
   } catch (error) {
     console.error("Error:", error.message);
   } finally {
