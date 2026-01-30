@@ -12,15 +12,19 @@ class RedisConnectionPool {
   private pool: Redis[] = [];
   private available: Redis[] = [];
   private inUse: Set<Redis> = new Set();
+  private inUseTimestamps: Map<Redis, number> = new Map();
   private config: RedisPoolConfig;
   private poolType: string;
   private healthInterval: NodeJS.Timeout | null = null;
+  private leakCheckInterval: NodeJS.Timeout | null = null;
+  private readonly MAX_CONNECTION_HOLD_TIME_MS = 30000;
 
   constructor(config: RedisPoolConfig, poolType: string) {
     this.config = config;
     this.poolType = poolType;
     this.initialize();
     this.startHealthMonitor();
+    this.startLeakDetection();
   }
 
   private initialize(): void {
@@ -58,6 +62,48 @@ class RedisConnectionPool {
     }, 30000);
 
     this.healthInterval.unref?.();
+  }
+
+  private startLeakDetection(): void {
+    this.leakCheckInterval = setInterval(() => {
+      const now = Date.now();
+      const leaked: Redis[] = [];
+
+      this.inUseTimestamps.forEach((timestamp, connection) => {
+        if (now - timestamp > this.MAX_CONNECTION_HOLD_TIME_MS) {
+          leaked.push(connection);
+        }
+      });
+
+      if (leaked.length > 0) {
+        logger.warn(
+          `Redis ${this.poolType} pool: force-releasing ${leaked.length} leaked connections`,
+          {
+            leakedCount: leaked.length,
+            maxHoldTimeMs: this.MAX_CONNECTION_HOLD_TIME_MS,
+          },
+        );
+
+        leaked.forEach((connection) => {
+          this.forceRelease(connection);
+        });
+      }
+    }, 10000);
+
+    this.leakCheckInterval.unref?.();
+  }
+
+  private forceRelease(connection: Redis): void {
+    this.inUse.delete(connection);
+    this.inUseTimestamps.delete(connection);
+
+    if (connection.status === "end" || connection.status === "close") {
+      this.removeConnection(connection);
+      this.ensureMinimumConnections();
+      return;
+    }
+
+    this.available.push(connection);
   }
 
   private createConnection(): Redis {
@@ -129,6 +175,7 @@ class RedisConnectionPool {
     if (this.available.length > 0) {
       const connection = this.available.pop()!;
       this.inUse.add(connection);
+      this.inUseTimestamps.set(connection, Date.now());
       return connection;
     }
 
@@ -136,6 +183,7 @@ class RedisConnectionPool {
       const connection = this.createConnection();
       this.pool.push(connection);
       this.inUse.add(connection);
+      this.inUseTimestamps.set(connection, Date.now());
       return connection;
     }
 
@@ -151,6 +199,7 @@ class RedisConnectionPool {
           clearTimeout(timeout);
           const connection = this.available.pop()!;
           this.inUse.add(connection);
+          this.inUseTimestamps.set(connection, Date.now());
           resolve(connection);
         }
       }, 10);
@@ -163,6 +212,7 @@ class RedisConnectionPool {
     if (this.available.length > 0) {
       const connection = this.available.pop()!;
       this.inUse.add(connection);
+      this.inUseTimestamps.set(connection, Date.now());
       return connection;
     }
 
@@ -170,6 +220,7 @@ class RedisConnectionPool {
       const connection = this.createConnection();
       this.pool.push(connection);
       this.inUse.add(connection);
+      this.inUseTimestamps.set(connection, Date.now());
       return connection;
     }
 
@@ -180,6 +231,7 @@ class RedisConnectionPool {
     if (!this.inUse.has(connection)) return;
 
     this.inUse.delete(connection);
+    this.inUseTimestamps.delete(connection);
 
     if (connection.status === "end" || connection.status === "close") {
       this.removeConnection(connection);
@@ -198,6 +250,11 @@ class RedisConnectionPool {
       this.healthInterval = null;
     }
 
+    if (this.leakCheckInterval) {
+      clearInterval(this.leakCheckInterval);
+      this.leakCheckInterval = null;
+    }
+
     while (this.inUse.size > 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
@@ -205,6 +262,7 @@ class RedisConnectionPool {
     await Promise.all(this.pool.map((conn) => conn.quit()));
     this.pool = [];
     this.available = [];
+    this.inUseTimestamps.clear();
   }
 
   getStats() {
@@ -217,10 +275,16 @@ class RedisConnectionPool {
   }
 }
 
-const queuePool = new RedisConnectionPool({ min: 5, max: 10, acquireTimeoutMillis: 5000 }, "queue");
+// Increased pool sizes to prevent exhaustion under load
+// Queue pool: handles auth (PKCE), caching, general operations
+// Worker pool: handles BullMQ workers which need dedicated connections
+const queuePool = new RedisConnectionPool(
+  { min: 10, max: 30, acquireTimeoutMillis: 10000 },
+  "queue",
+);
 
 const workerPool = new RedisConnectionPool(
-  { min: 5, max: 15, acquireTimeoutMillis: 10000 },
+  { min: 10, max: 40, acquireTimeoutMillis: 15000 },
   "worker",
 );
 
