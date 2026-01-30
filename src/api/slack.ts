@@ -3,6 +3,7 @@ import { WebClient } from "@slack/web-api";
 import { slackEventQueue } from "../queue/slack-event.queue";
 import { createSession, getSessionBySlackThread } from "../orchestrator/session-manager";
 import { getUserBySlackId, getOrganizationBySlackWorkspace } from "../services/slack-service";
+import { provisionSlackUser } from "../services/slack-user-provisioner";
 import { logger } from "../utils/logger";
 import { metrics } from "../utils/metrics";
 import { randomUUID } from "crypto";
@@ -393,21 +394,7 @@ function setupEventHandlers(app: App): void {
         return;
       }
 
-      const nubabelUser = await getUserBySlackId(user, client as WebClient);
-      if (!nubabelUser) {
-        logger.warn("Nubabel user not found for Slack user", {
-          slackUserId: user,
-        });
-        metrics.increment("slack.error.user_not_found");
-
-        await say({
-          text: "❌ Nubabel user not found. Please login first at https://nubabel.com",
-          thread_ts: thread_ts || ts,
-        });
-        await sequence.error();
-        return;
-      }
-
+      // Get organization first (needed for user lookup)
       const slackWorkspace = await client.team.info();
       const workspaceId = slackWorkspace.team?.id;
 
@@ -425,6 +412,48 @@ function setupEventHandlers(app: App): void {
       if (!organization) {
         await say({
           text: "❌ Organization not found. Please connect your Slack workspace in Settings.",
+          thread_ts: thread_ts || ts,
+        });
+        await sequence.error();
+        return;
+      }
+
+      // Auto-provision the Slack user before lookup
+      // This creates User and SlackUser records if they don't exist
+      try {
+        const slackUserInfo = await client.users.info({ user });
+        const profile = slackUserInfo.user?.profile;
+
+        if (profile) {
+          await provisionSlackUser(user, workspaceId, organization.id, {
+            email: profile?.email,
+            displayName: profile?.display_name || profile?.real_name,
+            realName: profile?.real_name,
+            avatarUrl: profile?.image_192 || profile?.image_72,
+            isBot: slackUserInfo.user?.is_bot,
+            isAdmin: slackUserInfo.user?.is_admin,
+          });
+          logger.debug("Slack user provisioned", { slackUserId: user, organizationId: organization.id });
+        }
+      } catch (provisionError) {
+        logger.warn("Failed to provision Slack user (non-fatal)", {
+          slackUserId: user,
+          error: provisionError instanceof Error ? provisionError.message : String(provisionError),
+        });
+        // Continue anyway - getUserBySlackId may still find the user
+      }
+
+      // Now lookup user with organization context for ExternalIdentity matching
+      const nubabelUser = await getUserBySlackId(user, client as WebClient, organization.id);
+      if (!nubabelUser) {
+        logger.warn("Nubabel user not found for Slack user", {
+          slackUserId: user,
+          organizationId: organization.id,
+        });
+        metrics.increment("slack.error.user_not_found");
+
+        await say({
+          text: "❌ Nubabel user not found. Please login first at https://nubabel.com",
           thread_ts: thread_ts || ts,
         });
         await sequence.error();

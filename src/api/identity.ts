@@ -580,4 +580,113 @@ router.post(
   },
 );
 
+/**
+ * POST /api/admin/identities/sync-slack
+ * Sync all Slack users to ExternalIdentity system with auto-linking
+ * This is useful for migrating existing Slack users
+ */
+router.post(
+  "/admin/identities/sync-slack",
+  requirePermission(Permission.INTEGRATION_MANAGE),
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId, id: adminId } = req.user!;
+
+      logger.info("Starting Slack to ExternalIdentity sync", { organizationId, adminId });
+
+      // Get all Slack users for this organization
+      const slackUsers = await db.slackUser.findMany({
+        where: { organizationId },
+        include: { user: true },
+      });
+
+      if (slackUsers.length === 0) {
+        return res.json({
+          success: true,
+          message: "No Slack users found to sync",
+          stats: { total: 0, synced: 0, alreadyExists: 0, autoLinked: 0, suggested: 0, errors: 0 },
+        });
+      }
+
+      const stats = {
+        total: slackUsers.length,
+        synced: 0,
+        alreadyExists: 0,
+        autoLinked: 0,
+        suggested: 0,
+        errors: 0,
+      };
+
+      for (const slackUser of slackUsers) {
+        // Skip bots
+        if (slackUser.isBot) {
+          continue;
+        }
+
+        try {
+          // Check if ExternalIdentity already exists
+          const existing = await db.externalIdentity.findFirst({
+            where: {
+              organizationId,
+              provider: "slack",
+              providerUserId: slackUser.slackUserId,
+            },
+          });
+
+          if (existing) {
+            stats.alreadyExists++;
+            continue;
+          }
+
+          // Create ExternalIdentity and attempt auto-linking
+          const result = await identityResolver.resolveIdentity(
+            {
+              provider: "slack",
+              providerUserId: slackUser.slackUserId,
+              providerTeamId: slackUser.slackTeamId,
+              email: slackUser.email ?? undefined,
+              displayName: slackUser.displayName ?? undefined,
+              realName: slackUser.realName ?? undefined,
+              avatarUrl: slackUser.avatarUrl ?? undefined,
+              metadata: {
+                isBot: slackUser.isBot,
+                isAdmin: slackUser.isAdmin,
+              },
+            },
+            {
+              organizationId,
+              performedBy: adminId,
+            },
+          );
+
+          stats.synced++;
+
+          if (result.action === "auto_linked") {
+            stats.autoLinked++;
+          } else if (result.action === "suggested") {
+            stats.suggested++;
+          }
+        } catch (error) {
+          stats.errors++;
+          logger.error("Failed to sync Slack user to ExternalIdentity", {
+            slackUserId: slackUser.slackUserId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      logger.info("Slack to ExternalIdentity sync completed", { organizationId, stats });
+
+      return res.json({
+        success: true,
+        message: `Synced ${stats.synced} Slack users (${stats.autoLinked} auto-linked, ${stats.suggested} suggested)`,
+        stats,
+      });
+    } catch (error) {
+      logger.error("Failed to sync Slack users to ExternalIdentity", { error });
+      return res.status(500).json({ error: "Failed to sync Slack users" });
+    }
+  },
+);
+
 export default router;

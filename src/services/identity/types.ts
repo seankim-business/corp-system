@@ -82,7 +82,7 @@ export interface IdentityResolutionOptions {
   autoLinkThreshold?: number; // Default: 0.95
   suggestionThreshold?: number; // Default: 0.85
   skipAutoLink?: boolean;
-  performedBy: string; // User ID performing the operation
+  performedBy?: string; // User ID performing the operation (optional for system actions)
 }
 
 // =============================================================================
@@ -96,7 +96,7 @@ export interface LinkOperationInput {
   externalIdentityId: string;
   userId: string;
   method: LinkMethod;
-  performedBy: string;
+  performedBy?: string; // Optional for system-initiated auto-linking
   reason?: string;
   ipAddress?: string;
   userAgent?: string;
@@ -107,7 +107,7 @@ export interface LinkOperationInput {
  */
 export interface UnlinkOperationInput {
   externalIdentityId: string;
-  performedBy: string;
+  performedBy?: string; // Optional for system-initiated actions
   reason?: string;
   ipAddress?: string;
   userAgent?: string;

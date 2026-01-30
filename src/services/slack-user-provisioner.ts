@@ -1,5 +1,7 @@
 import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
+import { identityResolver } from "./identity";
+import type { ExternalIdentityProfile } from "./identity/types";
 
 interface SlackUserProfile {
   email?: string;
@@ -46,6 +48,17 @@ export async function provisionSlackUser(
         isAdmin: profile.isAdmin ?? existing.isAdmin,
       },
       include: { user: true },
+    });
+
+    // Sync to ExternalIdentity for the unified identity system
+    // This ensures ExternalIdentity records exist and enables auto-linking
+    await syncToExternalIdentity(slackUserId, slackTeamId, organizationId, {
+      email: updated.email ?? undefined,
+      displayName: updated.displayName ?? undefined,
+      realName: updated.realName ?? undefined,
+      avatarUrl: updated.avatarUrl ?? undefined,
+      isBot: updated.isBot,
+      isAdmin: updated.isAdmin,
     });
 
     return updated;
@@ -122,7 +135,62 @@ export async function provisionSlackUser(
     include: { user: true },
   });
 
+  // Also create/update ExternalIdentity for the unified identity system
+  // This enables auto-linking and the admin dashboard
+  await syncToExternalIdentity(slackUserId, slackTeamId, organizationId, profile);
+
   return slackUser;
+}
+
+/**
+ * Sync Slack user to ExternalIdentity system.
+ * This creates the ExternalIdentity record and attempts auto-linking.
+ */
+async function syncToExternalIdentity(
+  slackUserId: string,
+  slackTeamId: string,
+  organizationId: string,
+  profile: SlackUserProfile
+): Promise<void> {
+  // Skip bots for identity linking
+  if (profile.isBot) {
+    logger.debug("Skipping ExternalIdentity sync for bot user", { slackUserId });
+    return;
+  }
+
+  try {
+    const identityProfile: ExternalIdentityProfile = {
+      provider: "slack",
+      providerUserId: slackUserId,
+      providerTeamId: slackTeamId,
+      email: profile.email,
+      displayName: profile.displayName,
+      realName: profile.realName,
+      avatarUrl: profile.avatarUrl,
+      metadata: {
+        isBot: profile.isBot ?? false,
+        isAdmin: profile.isAdmin ?? false,
+      },
+    };
+
+    const result = await identityResolver.resolveIdentity(identityProfile, {
+      organizationId,
+      performedBy: undefined, // System action
+    });
+
+    logger.info("ExternalIdentity sync completed", {
+      slackUserId,
+      action: result.action,
+      linkedUserId: result.linkedUserId,
+      externalIdentityId: result.externalIdentityId,
+    });
+  } catch (error) {
+    // Log but don't fail the main provisioning operation
+    logger.error("Failed to sync to ExternalIdentity (non-fatal)", {
+      slackUserId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /**

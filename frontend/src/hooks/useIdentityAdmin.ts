@@ -363,3 +363,43 @@ export function useUpdateIdentitySettings() {
     },
   });
 }
+
+/**
+ * Sync all Slack users to ExternalIdentity system with auto-linking
+ */
+export function useSyncSlackIdentities() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/identities/sync-slack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to sync Slack identities");
+      }
+
+      return response.json() as Promise<{
+        success: boolean;
+        message: string;
+        stats: {
+          total: number;
+          synced: number;
+          alreadyExists: number;
+          autoLinked: number;
+          suggested: number;
+          errors: number;
+        };
+      }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "identities"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "identities", "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "identities", "suggestions"] });
+    },
+  });
+}

@@ -14,10 +14,11 @@ import {
   useUnlinkIdentity,
   useAcceptSuggestion,
   useRejectSuggestion,
+  useSyncSlackIdentities,
   type ExternalIdentity,
   type IdentitySuggestion,
 } from "../../hooks/useIdentityAdmin";
-import { MessageSquare, Mail, FileText, Link as LinkIcon, Unlink, Check, X } from "lucide-react";
+import { MessageSquare, Mail, FileText, Link as LinkIcon, Unlink, Check, X, RefreshCw } from "lucide-react";
 
 type FilterStatus = "all" | "linked" | "unlinked" | "suggested";
 type FilterProvider = "all" | "slack" | "google" | "notion";
@@ -43,6 +44,7 @@ export default function IdentityManagement() {
   const unlinkMutation = useUnlinkIdentity();
   const acceptMutation = useAcceptSuggestion();
   const rejectMutation = useRejectSuggestion();
+  const syncMutation = useSyncSlackIdentities();
 
   const stats = statsData || {
     total: 0,
@@ -127,15 +129,40 @@ export default function IdentityManagement() {
     );
   };
 
+  const handleSyncSlack = () => {
+    if (!confirm("Sync all Slack users to the identity system? This will create identity records and attempt auto-linking.")) {
+      return;
+    }
+
+    syncMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        alert(`Sync complete: ${data.message}\n\nAuto-linked: ${data.stats.autoLinked}\nSuggestions created: ${data.stats.suggested}`);
+      },
+      onError: (error) => {
+        alert(error.message);
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Brutalist Header */}
       <div className="border-b-4 border-white bg-black">
-        <div className="p-8">
-          <h1 className="text-6xl font-black uppercase tracking-tighter mb-2">
-            Identity
-          </h1>
-          <p className="text-xl font-mono text-gray-400">CONTROL PANEL</p>
+        <div className="p-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-6xl font-black uppercase tracking-tighter mb-2">
+              Identity
+            </h1>
+            <p className="text-xl font-mono text-gray-400">CONTROL PANEL</p>
+          </div>
+          <button
+            onClick={handleSyncSlack}
+            disabled={syncMutation.isPending}
+            className="px-6 py-3 border-2 border-white text-white font-mono font-bold uppercase hover:bg-white hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <RefreshCw className={`w-5 h-5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+            {syncMutation.isPending ? "SYNCING..." : "SYNC SLACK USERS"}
+          </button>
         </div>
       </div>
 
