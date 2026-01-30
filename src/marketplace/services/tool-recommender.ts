@@ -1,0 +1,487 @@
+/**
+ * Tool Recommender Service
+ *
+ * AI-powered recommendation engine for the Marketplace Hub.
+ * Analyzes user requests and recommends relevant tools from external sources.
+ *
+ * @module marketplace/services/tool-recommender
+ */
+
+import { logger } from "../../utils/logger";
+import type { BaseExternalSource, ExternalSourceItem } from "./sources/external/types";
+import type { AIProvider, Message } from "../../providers/ai-provider";
+
+/**
+ * Context for generating recommendations
+ *
+ * @interface RecommendationContext
+ * @property {string} orgId - Organization ID for filtering installed tools
+ * @property {string[]} [installedTools] - List of already installed tool IDs
+ * @property {string} [agentId] - Agent ID for personalized recommendations
+ */
+export interface RecommendationContext {
+  orgId: string;
+  installedTools?: string[];
+  agentId?: string;
+}
+
+/**
+ * Tool recommendation with reasoning
+ *
+ * @interface ToolRecommendation
+ * @property {ExternalSourceItem} item - The recommended tool
+ * @property {string} reason - Why this tool is recommended
+ * @property {number} confidence - Confidence score (0-1)
+ * @property {number} priority - Priority ranking (1 = highest)
+ */
+export interface ToolRecommendation {
+  item: ExternalSourceItem;
+  reason: string;
+  confidence: number;
+  priority: number;
+}
+
+/**
+ * Analysis of user request
+ *
+ * @interface RequestAnalysis
+ * @property {string} searchQuery - Optimized search query for external sources
+ * @property {string} preferredType - Preferred extension type (mcp_server, skill, etc.)
+ * @property {string[]} capabilities - Required capabilities/features
+ * @property {string} urgency - Urgency level (low, medium, high)
+ */
+export interface RequestAnalysis {
+  searchQuery: string;
+  preferredType: string;
+  capabilities: string[];
+  urgency: string;
+}
+
+/**
+ * Tool Recommender Service
+ *
+ * Analyzes user requests and recommends relevant tools from external sources.
+ * Uses AI to understand intent and rank results by relevance.
+ *
+ * @class ToolRecommender
+ *
+ * @example
+ * const recommender = new ToolRecommender([smitherySource, mcpRegistrySource], aiProvider);
+ * const recommendations = await recommender.recommendTools(
+ *   "I need to integrate with Slack",
+ *   { orgId: "org-123", installedTools: ["smithery:@anthropic/slack-mcp"] }
+ * );
+ */
+export class ToolRecommender {
+  private readonly sources: BaseExternalSource[];
+  private readonly aiProvider?: AIProvider;
+
+  /**
+   * Create a new ToolRecommender
+   *
+   * @param {BaseExternalSource[]} sources - External sources to search
+   * @param {AIProvider} [aiProvider] - Optional AI provider for request analysis
+   */
+  constructor(sources: BaseExternalSource[], aiProvider?: AIProvider) {
+    this.sources = sources;
+    this.aiProvider = aiProvider;
+
+    logger.info("ToolRecommender initialized", {
+      sourceCount: sources.length,
+      sources: sources.map((s) => s.sourceId),
+      hasAI: !!aiProvider,
+    });
+  }
+
+  /**
+   * Recommend tools based on user request
+   *
+   * Flow:
+   * 1. Analyze request with AI to extract search terms and preferred types
+   * 2. Search across all sources in parallel
+   * 3. Filter out already installed tools
+   * 4. Rank results by relevance
+   * 5. Return top 5 recommendations with reasons
+   *
+   * @param {string} request - User's natural language request
+   * @param {RecommendationContext} context - Context for filtering and personalization
+   * @returns {Promise<ToolRecommendation[]>} Top 5 recommendations
+   *
+   * @example
+   * const recommendations = await recommender.recommendTools(
+   *   "I need to integrate with Slack and send messages",
+   *   { orgId: "org-123", installedTools: [] }
+   * );
+   */
+  async recommendTools(
+    request: string,
+    context: RecommendationContext,
+  ): Promise<ToolRecommendation[]> {
+    logger.info("Starting tool recommendation", {
+      request,
+      orgId: context.orgId,
+      installedCount: context.installedTools?.length || 0,
+    });
+
+    try {
+      const analysis = await this.analyzeRequest(request);
+      logger.debug("Request analysis completed", analysis);
+      const searchPromises = this.sources.map(async (source) => {
+        try {
+          const result = await source.search({
+            query: analysis.searchQuery,
+            limit: 20,
+          });
+          logger.debug("Source search completed", {
+            source: source.sourceId,
+            found: result.items.length,
+          });
+          return result.items;
+        } catch (error) {
+          logger.error("Source search failed", {
+            source: source.sourceId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return [];
+        }
+      });
+
+      const searchResults = await Promise.all(searchPromises);
+      const allItems = searchResults.flat();
+
+      logger.info("All sources searched", {
+        totalItems: allItems.length,
+        sourceResults: searchResults.map((items, i) => ({
+          source: this.sources[i].sourceId,
+          count: items.length,
+        })),
+      });
+
+      const installedSet = new Set(context.installedTools || []);
+      const uninstalledItems = allItems.filter((item) => !installedSet.has(item.id));
+
+      logger.debug("Filtered installed tools", {
+        before: allItems.length,
+        after: uninstalledItems.length,
+        filtered: allItems.length - uninstalledItems.length,
+      });
+
+      const rankedItems = this.rankItems(uninstalledItems, analysis, request);
+      const topRecommendations = rankedItems.slice(0, 5).map((item, index) => ({
+        item,
+        reason: this.generateReason(item, analysis, request),
+        confidence: this.calculateConfidence(item, analysis, request),
+        priority: index + 1,
+      }));
+
+      logger.info("Recommendations generated", {
+        total: topRecommendations.length,
+        topItem: topRecommendations[0]?.item.name,
+      });
+
+      return topRecommendations;
+    } catch (error) {
+      logger.error("Tool recommendation failed", {
+        request,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze user request to extract search parameters
+   *
+   * Uses AI if available, otherwise falls back to simple keyword extraction.
+   *
+   * @param {string} request - User's natural language request
+   * @returns {Promise<RequestAnalysis>} Analysis results
+   *
+   * @example
+   * const analysis = await recommender.analyzeRequest("I need to integrate with Slack");
+   * // Returns: { searchQuery: "slack integration", preferredType: "mcp_server", ... }
+   */
+  async analyzeRequest(request: string): Promise<RequestAnalysis> {
+    if (this.aiProvider) {
+      return this.analyzeWithAI(request);
+    } else {
+      return this.analyzeWithKeywords(request);
+    }
+  }
+
+  /**
+   * Analyze request using AI
+   *
+   * @private
+   * @param {string} request - User's request
+   * @returns {Promise<RequestAnalysis>} Analysis results
+   */
+  private async analyzeWithAI(request: string): Promise<RequestAnalysis> {
+    const systemPrompt = `You are a tool recommendation assistant. Analyze user requests and extract:
+1. Search query: Optimized keywords for finding relevant tools
+2. Preferred type: What kind of tool they need (mcp_server, skill, extension, workflow)
+3. Capabilities: List of required features/capabilities
+4. Urgency: How urgent is this need (low, medium, high)
+
+Respond in JSON format:
+{
+  "searchQuery": "optimized search terms",
+  "preferredType": "mcp_server|skill|extension|workflow",
+  "capabilities": ["capability1", "capability2"],
+  "urgency": "low|medium|high"
+}`;
+
+    const messages: Message[] = [
+      {
+        role: "user",
+        content: `Analyze this request: "${request}"`,
+      },
+    ];
+
+    try {
+      const response = await this.aiProvider!.chat(messages, {
+        systemPrompt,
+        temperature: 0.3,
+        maxTokens: 500,
+      });
+
+      logger.debug("AI analysis completed", {
+        usage: response.usage,
+        model: response.model,
+      });
+
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("AI response did not contain valid JSON");
+      }
+
+      const analysis = JSON.parse(jsonMatch[0]) as RequestAnalysis;
+      return analysis;
+    } catch (error) {
+      logger.warn("AI analysis failed, falling back to keyword extraction", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.analyzeWithKeywords(request);
+    }
+  }
+
+  /**
+   * Analyze request using simple keyword matching (fallback)
+   *
+   * @private
+   * @param {string} request - User's request
+   * @returns {RequestAnalysis} Analysis results
+   */
+  private analyzeWithKeywords(request: string): RequestAnalysis {
+    const lowerRequest = request.toLowerCase();
+
+    const stopWords = new Set([
+      "i",
+      "need",
+      "to",
+      "want",
+      "a",
+      "an",
+      "the",
+      "for",
+      "with",
+      "how",
+      "can",
+    ]);
+    const searchQuery = request
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((word) => !stopWords.has(word))
+      .join(" ");
+
+    let preferredType = "mcp_server";
+    if (lowerRequest.includes("workflow") || lowerRequest.includes("automation")) {
+      preferredType = "workflow";
+    } else if (lowerRequest.includes("skill") || lowerRequest.includes("capability")) {
+      preferredType = "skill";
+    } else if (lowerRequest.includes("extension") || lowerRequest.includes("plugin")) {
+      preferredType = "extension";
+    }
+
+    const capabilities: string[] = [];
+    const capabilityKeywords = [
+      "integration",
+      "communication",
+      "data",
+      "analytics",
+      "automation",
+      "ai",
+      "search",
+      "storage",
+    ];
+    for (const keyword of capabilityKeywords) {
+      if (lowerRequest.includes(keyword)) {
+        capabilities.push(keyword);
+      }
+    }
+
+    let urgency = "medium";
+    if (
+      lowerRequest.includes("urgent") ||
+      lowerRequest.includes("asap") ||
+      lowerRequest.includes("immediately")
+    ) {
+      urgency = "high";
+    } else if (lowerRequest.includes("eventually") || lowerRequest.includes("someday")) {
+      urgency = "low";
+    }
+
+    return {
+      searchQuery,
+      preferredType,
+      capabilities,
+      urgency,
+    };
+  }
+
+  /**
+   * Rank items by relevance to the request
+   *
+   * Ranking factors:
+   * - Match with request keywords
+   * - Popularity (downloads, stars)
+   * - Verified sources
+   * - Type match
+   *
+   * @private
+   * @param {ExternalSourceItem[]} items - Items to rank
+   * @param {RequestAnalysis} analysis - Request analysis
+   * @param {string} request - Original request
+   * @returns {ExternalSourceItem[]} Ranked items
+   */
+  private rankItems(
+    items: ExternalSourceItem[],
+    analysis: RequestAnalysis,
+    request: string,
+  ): ExternalSourceItem[] {
+    const requestKeywords = new Set(
+      request
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2),
+    );
+
+    return items
+      .map((item) => {
+        let score = 0;
+
+        const itemText = `${item.name} ${item.description} ${item.tags?.join(" ")}`.toLowerCase();
+        const matchedKeywords = Array.from(requestKeywords).filter((keyword) =>
+          itemText.includes(keyword),
+        );
+        score += (matchedKeywords.length / requestKeywords.size) * 100;
+
+        if (item.type === analysis.preferredType) {
+          score += 50;
+        }
+
+        const downloads = item.downloads || 0;
+        const stars = item.stars || 0;
+        const popularityScore = Math.min(50, Math.log10(downloads + stars + 1) * 10);
+        score += popularityScore;
+
+        const verifiedSources = new Set(["smithery", "mcp-registry"]);
+        if (verifiedSources.has(item.source)) {
+          score += 20;
+        }
+
+        if (item.rating) {
+          score += (item.rating / 5) * 25;
+        }
+
+        return { item, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map(({ item }) => item);
+  }
+
+  /**
+   * Generate human-readable reason for recommendation
+   *
+   * @private
+   * @param {ExternalSourceItem} item - Recommended item
+   * @param {RequestAnalysis} analysis - Request analysis
+   * @param {string} request - Original request
+   * @returns {string} Reason text
+   */
+  private generateReason(
+    item: ExternalSourceItem,
+    analysis: RequestAnalysis,
+    _request: string,
+  ): string {
+    const reasons: string[] = [];
+
+    if (item.type === analysis.preferredType) {
+      reasons.push(`Matches your need for a ${analysis.preferredType}`);
+    }
+
+    if (item.downloads && item.downloads > 1000) {
+      reasons.push(`Popular tool with ${item.downloads.toLocaleString()} downloads`);
+    }
+
+    if (item.rating && item.rating >= 4.0) {
+      reasons.push(`Highly rated (${item.rating.toFixed(1)}/5.0)`);
+    }
+
+    const matchedCapabilities = analysis.capabilities.filter((cap) =>
+      item.description.toLowerCase().includes(cap),
+    );
+    if (matchedCapabilities.length > 0) {
+      reasons.push(`Provides ${matchedCapabilities.join(", ")} capabilities`);
+    }
+
+    if (reasons.length === 0) {
+      reasons.push("Relevant to your request");
+    }
+
+    return reasons.join(". ");
+  }
+
+  /**
+   * Calculate confidence score for recommendation
+   *
+   * @private
+   * @param {ExternalSourceItem} item - Recommended item
+   * @param {RequestAnalysis} analysis - Request analysis
+   * @param {string} request - Original request
+   * @returns {number} Confidence score (0-1)
+   */
+  private calculateConfidence(
+    item: ExternalSourceItem,
+    analysis: RequestAnalysis,
+    request: string,
+  ): number {
+    let confidence = 0.5;
+
+    if (item.type === analysis.preferredType) {
+      confidence += 0.2;
+    }
+
+    if (item.rating && item.rating >= 4.5) {
+      confidence += 0.15;
+    }
+
+    if (item.downloads && item.downloads > 5000) {
+      confidence += 0.1;
+    }
+
+    const requestKeywords = new Set(
+      request
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((w) => w.length > 2),
+    );
+    const itemText = `${item.name} ${item.description}`.toLowerCase();
+    const matchedKeywords = Array.from(requestKeywords).filter((keyword) =>
+      itemText.includes(keyword),
+    );
+    confidence += (matchedKeywords.length / requestKeywords.size) * 0.15;
+
+    return Math.min(1.0, confidence);
+  }
+}

@@ -7,6 +7,13 @@ jest.mock("@anthropic-ai/sdk", () => {
         create: createMessageMock,
       },
     })),
+    APIError: class APIError extends Error {
+      status: number;
+      constructor(message: string, status: number) {
+        super(message);
+        this.status = status;
+      }
+    },
     __createMessageMock: createMessageMock,
   };
 });
@@ -25,6 +32,57 @@ jest.mock("../../utils/logger", () => ({
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
+jest.mock("../../services/anthropic-metrics", () => ({
+  anthropicMetricsTracker: {
+    recordRequest: jest.fn().mockResolvedValue(undefined),
+    recordRateLimit: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
+jest.mock("../../services/slack-anthropic-alerts", () => ({
+  getSlackAlerts: jest.fn().mockReturnValue(null),
+}));
+
+jest.mock("../../mcp/registry", () => ({
+  mcpRegistry: {
+    getToolsForAgent: jest.fn().mockReturnValue([]),
+    getTool: jest.fn().mockReturnValue(undefined),
+    callTool: jest.fn(),
+  },
+}));
+
+jest.mock("../../mcp/providers", () => ({
+  getAllProviderTools: jest.fn().mockReturnValue([]),
+  executeProviderTool: jest.fn().mockResolvedValue({ success: false, error: { message: "Not found" } }),
+}));
+
+jest.mock("../../services/mcp-registry", () => ({
+  getActiveMCPConnections: jest.fn().mockResolvedValue([]),
+  getAccessTokenFromConfig: jest.fn().mockReturnValue(null),
+}));
+
+jest.mock("../../api/organization-settings", () => ({
+  getOrganizationApiKey: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock("@opentelemetry/api", () => ({
+  trace: {
+    getTracer: jest.fn().mockReturnValue({
+      startActiveSpan: jest.fn((_name, fn) => fn({
+        setAttribute: jest.fn(),
+        recordException: jest.fn(),
+        setStatus: jest.fn(),
+        end: jest.fn(),
+      })),
+    }),
+  },
+  SpanStatusCode: {
+    OK: 0,
+    ERROR: 1,
   },
 }));
 
