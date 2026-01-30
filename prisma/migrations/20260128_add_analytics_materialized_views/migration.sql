@@ -196,66 +196,20 @@ COMMENT ON MATERIALIZED VIEW mv_skill_usage IS
 
 
 -- ============================================================================
--- 4. HOURLY QUEUE STATISTICS
+-- 4. HOURLY QUEUE STATISTICS (DEFERRED)
 -- ============================================================================
--- Aggregates work queue and job execution performance by hour, queue name, and organization.
--- Sources: work_queue (enqueued/completed/failed counts), job_executions (wait and process times)
-
-DROP MATERIALIZED VIEW IF EXISTS mv_hourly_queue_stats;
-
-CREATE MATERIALIZED VIEW mv_hourly_queue_stats AS
-SELECT
-    date_trunc('hour', wq.created_at)                               AS hour_bucket,
-    wq.queue_name,
-    wq.organization_id,
-
-    -- Job counts from work_queue
-    COUNT(*)                                                        AS jobs_enqueued,
-    COUNT(*) FILTER (WHERE wq.status = 'completed')                 AS jobs_completed,
-    COUNT(*) FILTER (WHERE wq.status IN ('failed', 'dead_letter'))  AS jobs_failed,
-
-    -- Average wait time: time from enqueue (created_at) to first execution start
-    ROUND(AVG(
-        EXTRACT(EPOCH FROM (je_first.first_started_at - wq.created_at)) * 1000
-    ))::int                                                         AS avg_wait_time_ms,
-
-    -- Average processing time from job_executions
-    ROUND(AVG(je_agg.avg_exec_duration))::int                      AS avg_process_time_ms
-
-FROM work_queue wq
-
--- Subquery: earliest execution start per work queue item (for wait time)
-LEFT JOIN LATERAL (
-    SELECT MIN(je.started_at) AS first_started_at
-    FROM job_executions je
-    WHERE je.work_queue_id = wq.id
-) je_first ON true
-
--- Subquery: average execution duration per work queue item (for process time)
-LEFT JOIN LATERAL (
-    SELECT AVG(je.duration_ms) AS avg_exec_duration
-    FROM job_executions je
-    WHERE je.work_queue_id = wq.id
-      AND je.duration_ms IS NOT NULL
-) je_agg ON true
-
-GROUP BY date_trunc('hour', wq.created_at), wq.queue_name, wq.organization_id
-WITH NO DATA;
-
--- Unique index required for REFRESH CONCURRENTLY
-CREATE UNIQUE INDEX idx_mv_hourly_queue_stats_pk
-    ON mv_hourly_queue_stats (hour_bucket, queue_name, organization_id);
-
--- Supporting indexes for time-range and queue-specific queries
-CREATE INDEX idx_mv_hourly_queue_stats_org_time
-    ON mv_hourly_queue_stats (organization_id, hour_bucket DESC);
-
-CREATE INDEX idx_mv_hourly_queue_stats_queue
-    ON mv_hourly_queue_stats (queue_name, hour_bucket DESC);
-
-COMMENT ON MATERIALIZED VIEW mv_hourly_queue_stats IS
-    'Hourly queue performance metrics by queue name and organization. Refresh: every 15 minutes. '
-    'Use REFRESH MATERIALIZED VIEW CONCURRENTLY mv_hourly_queue_stats;';
+-- NOTE: This view is deferred until work_queue and job_executions tables are created.
+-- The BullMQ queue system uses Redis, not PostgreSQL tables for job tracking.
+-- When queue analytics are needed, implement a separate ETL process to populate
+-- a PostgreSQL analytics table from Redis data.
+--
+-- Original sources (not yet created):
+-- - work_queue (enqueued/completed/failed counts)
+-- - job_executions (wait and process times)
+--
+-- TODO: Create work_queue and job_executions tables if PostgreSQL-based
+-- queue analytics are required. For now, use BullMQ's built-in metrics
+-- via Bull Board (/admin/queues) or Redis directly.
 
 
 -- ============================================================================
@@ -297,9 +251,6 @@ BEGIN
 
         RAISE NOTICE '  -> mv_skill_usage';
         REFRESH MATERIALIZED VIEW CONCURRENTLY mv_skill_usage;
-
-        RAISE NOTICE '  -> mv_hourly_queue_stats';
-        REFRESH MATERIALIZED VIEW CONCURRENTLY mv_hourly_queue_stats;
     ELSE
         RAISE NOTICE 'Refreshing materialized views (non-concurrent, full refresh)...';
 
@@ -311,9 +262,6 @@ BEGIN
 
         RAISE NOTICE '  -> mv_skill_usage';
         REFRESH MATERIALIZED VIEW mv_skill_usage;
-
-        RAISE NOTICE '  -> mv_hourly_queue_stats';
-        REFRESH MATERIALIZED VIEW mv_hourly_queue_stats;
     END IF;
 
     RAISE NOTICE 'All materialized views refreshed successfully.';
@@ -321,7 +269,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION refresh_all_materialized_views(BOOLEAN) IS
-    'Refreshes all analytics materialized views. Pass concurrent := false for initial population after migration. '
+    'Refreshes orchestration analytics materialized views (3 views). Pass concurrent := false for initial population after migration. '
     'Recommended schedule: every 15 minutes via pg_cron or application scheduler.';
 
 
@@ -342,10 +290,6 @@ COMMENT ON FUNCTION refresh_all_materialized_views(BOOLEAN) IS
 -- -- Refresh skill usage every 30 minutes
 -- SELECT cron.schedule('refresh-skill-usage', '*/30 * * * *',
 --     $$REFRESH MATERIALIZED VIEW CONCURRENTLY mv_skill_usage$$);
---
--- -- Refresh hourly queue stats every 15 minutes
--- SELECT cron.schedule('refresh-hourly-queue', '*/15 * * * *',
---     $$REFRESH MATERIALIZED VIEW CONCURRENTLY mv_hourly_queue_stats$$);
 --
 -- -- Or use the unified function every 15 minutes
 -- SELECT cron.schedule('refresh-all-analytics', '*/15 * * * *',

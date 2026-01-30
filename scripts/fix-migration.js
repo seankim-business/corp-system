@@ -26,6 +26,7 @@ async function main() {
       "20260126_add_organization_budgets",
       "20260126_add_performance_indexes",
       "20260126_enable_row_level_security",
+      "20260128_add_analytics_materialized_views",
     ];
 
     for (const migration of failedMigrations) {
