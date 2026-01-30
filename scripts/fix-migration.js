@@ -50,13 +50,13 @@ async function main() {
 
     console.log("3. Finding all failed migrations...");
     const failedMigrations = await prisma.$queryRaw`
-      SELECT migration_name 
-      FROM _prisma_migrations 
-      WHERE finished_at IS NULL
+      SELECT migration_name
+      FROM _prisma_migrations
+      WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL
     `;
 
     if (failedMigrations.length > 0) {
-      console.log(`   Found ${failedMigrations.length} failed migration(s)`);
+      console.log(`   Found ${failedMigrations.length} failed/rolled-back migration(s)`);
       for (const { migration_name } of failedMigrations) {
         await prisma.$executeRawUnsafe(
           `
