@@ -335,6 +335,402 @@ export class SlackClient {
       },
     );
   }
+
+  // === New OpenClaw-style methods ===
+
+  async updateMessage(
+    channel: string,
+    ts: string,
+    text?: string,
+    blocks?: any[],
+  ): Promise<{ ok: boolean; channel: string; ts: string }> {
+    return this.executeWithMetrics(
+      "updateMessage",
+      { "slack.channel": channel, "slack.ts": ts },
+      async () => {
+        const response = await this.client.chat.update({
+          channel,
+          ts,
+          text,
+          blocks: blocks as any,
+        });
+        if (!response.ok) {
+          throw new Error(`Slack API error: ${response.error}`);
+        }
+        return {
+          ok: response.ok,
+          channel: response.channel as string,
+          ts: response.ts as string,
+        };
+      },
+    );
+  }
+
+  async deleteMessage(
+    channel: string,
+    ts: string,
+  ): Promise<{ ok: boolean; channel: string; ts: string }> {
+    return this.executeWithMetrics(
+      "deleteMessage",
+      { "slack.channel": channel, "slack.ts": ts },
+      async () => {
+        const response = await this.client.chat.delete({
+          channel,
+          ts,
+        });
+        if (!response.ok) {
+          throw new Error(`Slack API error: ${response.error}`);
+        }
+        return { ok: response.ok, channel, ts };
+      },
+    );
+  }
+
+  async uploadFile(options: {
+    channel_id: string;
+    content?: string;
+    filename?: string;
+    filetype?: string;
+    initial_comment?: string;
+    title?: string;
+    thread_ts?: string;
+  }): Promise<{ ok: boolean; fileId?: string; permalink?: string }> {
+    return this.executeWithMetrics(
+      "uploadFile",
+      { "slack.channel": options.channel_id },
+      async () => {
+        const uploadArgs: any = {
+          channel_id: options.channel_id,
+          content: options.content || "",
+          filename: options.filename || "file.txt",
+        };
+        if (options.filetype) uploadArgs.filetype = options.filetype;
+        if (options.initial_comment) uploadArgs.initial_comment = options.initial_comment;
+        if (options.title) uploadArgs.title = options.title;
+        if (options.thread_ts) uploadArgs.thread_ts = options.thread_ts;
+        const response = await this.client.files.uploadV2(uploadArgs);
+        const file = (response as any).file;
+        return {
+          ok: true,
+          fileId: file?.id,
+          permalink: file?.permalink,
+        };
+      },
+    );
+  }
+
+  async addReaction(
+    channel: string,
+    timestamp: string,
+    name: string,
+  ): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "addReaction",
+      { "slack.channel": channel, "slack.emoji": name },
+      async () => {
+        try {
+          await this.client.reactions.add({ channel, timestamp, name });
+          return { ok: true };
+        } catch (error: any) {
+          if (error.data?.error === "already_reacted") {
+            return { ok: true };
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  async removeReaction(
+    channel: string,
+    timestamp: string,
+    name: string,
+  ): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "removeReaction",
+      { "slack.channel": channel, "slack.emoji": name },
+      async () => {
+        try {
+          await this.client.reactions.remove({ channel, timestamp, name });
+          return { ok: true };
+        } catch (error: any) {
+          if (error.data?.error === "no_reaction") {
+            return { ok: true };
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  async pinMessage(channel: string, timestamp: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "pinMessage",
+      { "slack.channel": channel },
+      async () => {
+        try {
+          await this.client.pins.add({ channel, timestamp });
+          return { ok: true };
+        } catch (error: any) {
+          if (error.data?.error === "already_pinned") {
+            return { ok: true };
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  async unpinMessage(channel: string, timestamp: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "unpinMessage",
+      { "slack.channel": channel },
+      async () => {
+        try {
+          await this.client.pins.remove({ channel, timestamp });
+          return { ok: true };
+        } catch (error: any) {
+          if (error.data?.error === "no_pin") {
+            return { ok: true };
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  async getPermalink(
+    channel: string,
+    message_ts: string,
+  ): Promise<{ ok: boolean; permalink?: string }> {
+    return this.executeWithMetrics(
+      "getPermalink",
+      { "slack.channel": channel },
+      async () => {
+        const response = await this.client.chat.getPermalink({
+          channel,
+          message_ts,
+        });
+        return { ok: true, permalink: response.permalink };
+      },
+    );
+  }
+
+  async listUsers(options?: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<{ users: SlackUser[]; nextCursor?: string }> {
+    return this.executeWithMetrics(
+      "listUsers",
+      { "slack.limit": options?.limit ?? 100 },
+      async () => {
+        const response = await this.client.users.list({
+          limit: options?.limit || 100,
+          cursor: options?.cursor,
+        });
+        if (!response.ok) {
+          throw new Error(`Slack API error: ${response.error}`);
+        }
+        const users: SlackUser[] = (response.members || [])
+          .filter((m: any) => !m.deleted)
+          .map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            realName: m.real_name || m.profile?.real_name,
+            displayName: m.profile?.display_name,
+            email: m.profile?.email,
+            isBot: m.is_bot || false,
+            isAdmin: m.is_admin,
+            isOwner: m.is_owner,
+            teamId: m.team_id,
+            timezone: m.tz,
+            profileImage: m.profile?.image_192,
+          }));
+        return { users, nextCursor: response.response_metadata?.next_cursor };
+      },
+      (result, span) => {
+        span.setAttribute("result.count", result.users.length);
+      },
+    );
+  }
+
+  async getUserPresence(userId: string): Promise<{
+    presence: "active" | "away";
+    online?: boolean;
+  }> {
+    return this.executeWithMetrics(
+      "getUserPresence",
+      { "slack.user_id": userId },
+      async () => {
+        const response = await this.client.users.getPresence({ user: userId });
+        return {
+          presence: response.presence as "active" | "away",
+          online: response.online,
+        };
+      },
+    );
+  }
+
+  async scheduleMessage(
+    channel: string,
+    text: string,
+    post_at: number,
+    options?: { thread_ts?: string; blocks?: any[] },
+  ): Promise<{ scheduled_message_id?: string; post_at?: number; channel?: string }> {
+    return this.executeWithMetrics(
+      "scheduleMessage",
+      { "slack.channel": channel, "slack.post_at": post_at },
+      async () => {
+        const response = await this.client.chat.scheduleMessage({
+          channel,
+          text,
+          post_at,
+          thread_ts: options?.thread_ts,
+          blocks: options?.blocks,
+        });
+        return {
+          scheduled_message_id: response.scheduled_message_id,
+          post_at: response.post_at,
+          channel: response.channel,
+        };
+      },
+    );
+  }
+
+  async createChannel(
+    name: string,
+    isPrivate?: boolean,
+  ): Promise<{ ok: boolean; channel?: { id: string; name: string } }> {
+    return this.executeWithMetrics(
+      "createChannel",
+      { "slack.channel_name": name },
+      async () => {
+        const response = await this.client.conversations.create({
+          name,
+          is_private: isPrivate,
+        });
+        return {
+          ok: response.ok,
+          channel: {
+            id: (response.channel as any)?.id,
+            name: (response.channel as any)?.name,
+          },
+        };
+      },
+    );
+  }
+
+  async inviteToChannel(channel: string, users: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "inviteToChannel",
+      { "slack.channel": channel },
+      async () => {
+        try {
+          await this.client.conversations.invite({ channel, users });
+          return { ok: true };
+        } catch (error: any) {
+          if (error.data?.error === "already_in_channel") {
+            return { ok: true };
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  async kickFromChannel(channel: string, user: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "kickFromChannel",
+      { "slack.channel": channel },
+      async () => {
+        await this.client.conversations.kick({ channel, user });
+        return { ok: true };
+      },
+    );
+  }
+
+  async setChannelTopic(channel: string, topic: string): Promise<{ ok: boolean; topic?: string }> {
+    return this.executeWithMetrics(
+      "setChannelTopic",
+      { "slack.channel": channel },
+      async () => {
+        const response = await this.client.conversations.setTopic({ channel, topic });
+        return { ok: true, topic: (response.channel as any)?.topic?.value };
+      },
+    );
+  }
+
+  async archiveChannel(channel: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "archiveChannel",
+      { "slack.channel": channel },
+      async () => {
+        try {
+          await this.client.conversations.archive({ channel });
+          return { ok: true };
+        } catch (error: any) {
+          if (error.data?.error === "already_archived") {
+            return { ok: true };
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
+  async getThreadReplies(
+    channel: string,
+    ts: string,
+    options?: { limit?: number; cursor?: string },
+  ): Promise<{ messages: any[]; hasMore: boolean; nextCursor?: string }> {
+    return this.executeWithMetrics(
+      "getThreadReplies",
+      { "slack.channel": channel, "slack.thread_ts": ts },
+      async () => {
+        const response = await this.client.conversations.replies({
+          channel,
+          ts,
+          limit: options?.limit ?? 100,
+          cursor: options?.cursor,
+        });
+        return {
+          messages: response.messages || [],
+          hasMore: response.has_more || false,
+          nextCursor: response.response_metadata?.next_cursor,
+        };
+      },
+      (result, span) => {
+        span.setAttribute("result.count", result.messages.length);
+      },
+    );
+  }
+
+  async getChannelHistory(
+    channel: string,
+    options?: { limit?: number; cursor?: string; oldest?: string; latest?: string },
+  ): Promise<{ messages: any[]; hasMore: boolean; nextCursor?: string }> {
+    return this.executeWithMetrics(
+      "getChannelHistory",
+      { "slack.channel": channel },
+      async () => {
+        const response = await this.client.conversations.history({
+          channel,
+          limit: options?.limit ?? 100,
+          cursor: options?.cursor,
+          oldest: options?.oldest,
+          latest: options?.latest,
+        });
+        return {
+          messages: response.messages || [],
+          hasMore: response.has_more || false,
+          nextCursor: response.response_metadata?.next_cursor,
+        };
+      },
+      (result, span) => {
+        span.setAttribute("result.count", result.messages.length);
+      },
+    );
+  }
 }
 
 type SlackClientFactoryOptions = {

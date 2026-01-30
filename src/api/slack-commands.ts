@@ -262,12 +262,119 @@ router.post("/commands", async (req: Request, res: Response) => {
     if (!commandText || commandText.trim().length === 0) {
       return res.status(200).json({
         response_type: "ephemeral",
-        text: "Usage: `/nubabel <your request>` — tell me what you need help with.\n\nSettings commands:\n• `/nubabel marketplace apikey list` - List configured API keys\n• `/nubabel marketplace apikey set <source> <key>` - Set an API key\n• `/nubabel marketplace apikey delete <source>` - Remove an API key\n\nSources: smithery, civitai, langchain",
+        text: `*Nubabel Commands*
+
+*General:*
+• \`/nubabel <your request>\` — AI assistant
+• \`/nubabel help\` — Show this help
+• \`/nubabel status\` — Bot status & usage
+• \`/nubabel whoami\` — Your user info
+
+*Settings:*
+• \`/nubabel marketplace apikey list\` — List API keys
+• \`/nubabel marketplace apikey set <source> <key>\` — Set API key
+• \`/nubabel marketplace apikey delete <source>\` — Remove API key
+
+Sources: smithery, civitai, langchain`,
       });
     }
 
-    // Check for marketplace settings commands
+    // Check for OpenClaw-style commands
     const trimmedCommand = commandText.trim().toLowerCase();
+
+    // /nubabel help
+    if (trimmedCommand === "help" || trimmedCommand === "commands") {
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: `*Nubabel Commands*
+
+*General:*
+• \`/nubabel <your request>\` — AI assistant
+• \`/nubabel help\` — Show this help
+• \`/nubabel status\` — Bot status & usage
+• \`/nubabel whoami\` — Your user info
+
+*Settings:*
+• \`/nubabel marketplace apikey list\` — List API keys
+• \`/nubabel marketplace apikey set <source> <key>\` — Set API key
+• \`/nubabel marketplace apikey delete <source>\` — Remove API key
+
+*Slack Tools Available:*
+sendMessage, updateMessage, deleteMessage, uploadFile, addReaction, removeReaction,
+pinMessage, unpinMessage, getPermalink, listChannels, getChannelInfo, getChannelHistory,
+listUsers, getUser, getUserPresence, searchMessages, getThreadMessages,
+scheduleMessage, createChannel, inviteToChannel, kickFromChannel, setChannelTopic, archiveChannel`,
+      });
+    }
+
+    // /nubabel status
+    if (trimmedCommand === "status") {
+      try {
+        const [sessionCount, workflowCount] = await Promise.all([
+          prisma.session.count({ where: { organizationId } }),
+          prisma.workflow.count({ where: { organizationId, enabled: true } }),
+        ]);
+
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: `*Nubabel Status*
+
+:white_check_mark: Bot is online
+:office: Organization: ${organization.name}
+:page_facing_up: Active Sessions: ${sessionCount}
+:gear: Enabled Workflows: ${workflowCount}
+:clock1: Server Time: ${new Date().toISOString()}`,
+        });
+      } catch (error) {
+        logger.error("Failed to get status", {}, error as Error);
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: ":white_check_mark: Bot is online",
+        });
+      }
+    }
+
+    // /nubabel whoami
+    if (trimmedCommand === "whoami" || trimmedCommand === "id") {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            memberships: {
+              where: { organizationId },
+              select: { role: true, permissions: true },
+            },
+          },
+        });
+
+        if (!user) {
+          return res.status(200).json({
+            response_type: "ephemeral",
+            text: "User not found in Nubabel.",
+          });
+        }
+
+        const membership = user.memberships[0];
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: `*Your Nubabel Identity*
+
+:bust_in_silhouette: Name: ${user.displayName || "Not set"}
+:email: Email: ${user.email}
+:office: Organization: ${organization.name}
+:key: Role: ${membership?.role || "member"}
+:id: User ID: \`${user.id}\`
+:slack: Slack ID: \`${slackUserId}\``,
+        });
+      } catch (error) {
+        logger.error("Failed to get user info", {}, error as Error);
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: `Slack User ID: \`${slackUserId}\``,
+        });
+      }
+    }
+
     if (trimmedCommand.startsWith("marketplace apikey")) {
       return handleMarketplaceApiKeyCommand(res, commandText.trim(), organizationId);
     }
