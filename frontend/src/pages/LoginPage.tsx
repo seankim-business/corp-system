@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import GoogleButton from '../components/common/GoogleButton';
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import GoogleButton from "../components/common/GoogleButton";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  session_expired: 'Your login session has expired. Please try again.',
-  auth_failed: 'Authentication failed. Please try again.',
-  access_denied: 'Access was denied. Please try again and grant the required permissions.',
-  invalid_request: 'Invalid authentication request. Please try again.',
-  server_error: 'Server error occurred. Please try again later.',
+  session_expired: "Your login session has expired. Please try again.",
+  auth_failed: "Authentication failed. Please try again.",
+  access_denied: "Access was denied. Please try again and grant the required permissions.",
+  invalid_request: "Invalid authentication request. Please try again.",
+  server_error: "Server error occurred. Please try again later.",
 };
 
 export default function LoginPage() {
@@ -15,19 +15,19 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const errorParam = searchParams.get('error');
+    const errorParam = searchParams.get("error");
     if (errorParam && ERROR_MESSAGES[errorParam]) {
       setError(ERROR_MESSAGES[errorParam]);
       // Clean up URL so refresh doesn't re-show stale error
       const cleaned = new URLSearchParams(searchParams);
-      cleaned.delete('error');
+      cleaned.delete("error");
       const newSearch = cleaned.toString();
-      window.history.replaceState({}, '', newSearch ? `/login?${newSearch}` : '/login');
+      window.history.replaceState({}, "", newSearch ? `/login?${newSearch}` : "/login");
     }
   }, [searchParams]);
 
   const handleGoogleLogin = () => {
-    const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || "https://auth.nubabel.com";
     window.location.href = `${apiBase}/auth/google`;
   };
 

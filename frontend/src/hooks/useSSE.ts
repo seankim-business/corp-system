@@ -68,7 +68,7 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
   const connect = useCallback(() => {
     cleanupEventSource();
 
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://auth.nubabel.com";
     const fullUrl = `${baseUrl}${url}`;
 
     try {
