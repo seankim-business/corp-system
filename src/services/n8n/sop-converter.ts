@@ -22,6 +22,10 @@ export class SOPConverter {
   private nodeIdCounter = 0;
 
   sopToN8n(sopSteps: SOPStep[], workflowName: string): N8nWorkflowInput {
+    logger.info("Converting SOP steps to n8n workflow", {
+      workflowName,
+      stepCount: sopSteps.length,
+    });
     this.nodeIdCounter = 0;
     const nodes: N8nNode[] = [];
     const connections: N8nConnections = {};
@@ -70,6 +74,10 @@ export class SOPConverter {
   }
 
   n8nToSop(workflowJson: N8nWorkflowInput): SOPStep[] {
+    logger.info("Converting n8n workflow to SOP steps", {
+      workflowName: workflowJson.name,
+      nodeCount: workflowJson.nodes.length,
+    });
     const steps: SOPStep[] = [];
     const { nodes, connections } = workflowJson;
 
