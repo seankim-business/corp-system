@@ -79,11 +79,20 @@ export class AccountPoolService {
       }
 
       // Round-robin selection using Redis counter
-      const counterKey = `account:round_robin:${criteria.organizationId}`;
-      const counter = await redis.incr(counterKey);
-      await redis.expire(counterKey, 3600);
+      let selectedIndex = 0;
+      try {
+        const counterKey = `account:round_robin:${criteria.organizationId}`;
+        const counter = await redis.incr(counterKey);
+        await redis.expire(counterKey, 3600);
+        selectedIndex = (counter - 1) % available.length;
+      } catch (redisError) {
+        // If Redis fails, fall back to random selection
+        logger.warn("Redis counter failed, using random selection", {
+          error: redisError instanceof Error ? redisError.message : String(redisError),
+        });
+        selectedIndex = Math.floor(Math.random() * available.length);
+      }
 
-      const selectedIndex = (counter - 1) % available.length;
       const selected = available[selectedIndex];
 
       logger.debug("Account selected", {
@@ -100,6 +109,20 @@ export class AccountPoolService {
         error: error instanceof Error ? error.message : String(error),
         organizationId: criteria.organizationId,
       });
+
+      // Last resort: try to return fallback accounts
+      try {
+        const fallbackAccounts = this.getFallbackAccounts();
+        if (fallbackAccounts.length > 0) {
+          logger.info("Using fallback environment account after selection failure");
+          return fallbackAccounts[0];
+        }
+      } catch (fallbackError) {
+        logger.error("Failed to get fallback accounts", {
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        });
+      }
+
       return null;
     }
   }

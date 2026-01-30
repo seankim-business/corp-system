@@ -16,6 +16,8 @@ import {
 import { sendApprovalNotification, updateApprovalMessage } from "../services/approval-slack";
 import { logger } from "../utils/logger";
 import { createAuditLog } from "../services/audit-logger";
+import { processApprovalRequest, undoAutoApproval } from "../services/auto-approval.service";
+import type { ApprovalRequest as RiskApprovalRequest } from "../services/approval-risk-scorer";
 
 const router = Router();
 
@@ -100,6 +102,50 @@ router.post(
         resourceId: approval.id,
         details: { type, title, approverId, expiresAt: expiresAt.toISOString() },
       });
+
+      // Check if eligible for auto-approval
+      const riskApprovalRequest: RiskApprovalRequest = {
+        id: approval.id,
+        organizationId,
+        userId: requesterId,
+        requestType: type as any,
+        description,
+        amount: context?.amount ? Number(context.amount) : undefined,
+        impactScope: context?.impactScope as any,
+        metadata: context as Record<string, unknown> | undefined,
+        createdAt: approval.createdAt,
+      };
+
+      const autoApprovalResult = await processApprovalRequest(riskApprovalRequest);
+
+      if (autoApprovalResult.autoApproved) {
+        // Update approval status to approved
+        await prisma.approval.update({
+          where: { id: approval.id },
+          data: {
+            status: "approved",
+            responseNote: "Auto-approved: Low risk routine request",
+            respondedAt: new Date(),
+          },
+        });
+
+        logger.info("Approval auto-approved", {
+          approvalId: approval.id,
+          riskScore: autoApprovalResult.riskScore.totalScore,
+        });
+
+        return res.status(201).json({
+          approval: {
+            ...approval,
+            status: "approved",
+            responseNote: "Auto-approved: Low risk routine request",
+            respondedAt: new Date(),
+          },
+          autoApproved: true,
+          riskScore: autoApprovalResult.riskScore,
+          undoExpiresAt: autoApprovalResult.undoExpiresAt,
+        });
+      }
 
       if (notifyViaSlack) {
         try {
@@ -318,6 +364,38 @@ router.put(
         error instanceof Error ? error : new Error(String(error)),
       );
       return res.status(500).json({ error: "Failed to respond to approval" });
+    }
+  },
+);
+
+router.post(
+  "/approvals/auto-approval/:approvalId/undo",
+  requireAuth,
+  requirePermission(Permission.APPROVAL_READ),
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId } = req.user!;
+      const approvalId = String(req.params.approvalId);
+
+      const result = await undoAutoApproval(approvalId);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.reason });
+      }
+
+      logger.info("Auto-approval undone", { approvalId, organizationId });
+
+      return res.json({
+        success: true,
+        message: "Auto-approval successfully undone",
+      });
+    } catch (error) {
+      logger.error(
+        "Undo auto-approval error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      return res.status(500).json({ error: "Failed to undo auto-approval" });
     }
   },
 );

@@ -100,8 +100,22 @@ export class AnthropicProvider implements AIProvider {
     }
 
     const metadata = this.account.metadata as any;
-    const encryptedApiKey = metadata?.encryptedApiKey;
 
+    // For environment-sourced accounts, use the API key directly from env
+    if (metadata?.source === "environment") {
+      const envApiKey = process.env.ANTHROPIC_API_KEY;
+      if (!envApiKey) {
+        throw new AIProviderError(
+          `Environment account ${this.account.name} requires ANTHROPIC_API_KEY env var`,
+          "anthropic",
+          AIProviderErrorCode.INVALID_CREDENTIALS,
+        );
+      }
+      return envApiKey;
+    }
+
+    // For database-stored accounts, decrypt the encrypted API key
+    const encryptedApiKey = metadata?.encryptedApiKey;
     if (!encryptedApiKey) {
       throw new AIProviderError(
         `Account ${this.account.name} (${this.account.id}) has no encrypted API key`,

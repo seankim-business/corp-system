@@ -42,43 +42,70 @@ model Organization {
   // installationMode String @default("recommend") @map("installation_mode") @db.VarChar(20) // recommend, auto, manual
 
   // Relations
-  workspaceDomains       WorkspaceDomain[]
-  memberships            Membership[]
-  agents                 Agent[]
-  teams                  Team[]
-  projects               Project[]
-  tasks                  Task[]
-  goals                  Goal[]
-  valueStreams           ValueStream[]
-  kpis                   KPI[]
-  workflows              Workflow[]
-  notionConnections      NotionConnection[]
-  mcpConnections         MCPConnection[]
-  claudeAccounts         ClaudeAccount[]
-  claudeMaxAccounts      ClaudeMaxAccount[]
-  slackIntegrations      SlackIntegration[]
-  orchestratorExecutions OrchestratorExecution[]
-  agentActivities        AgentActivity[]
-  featureFlagOverrides   FeatureFlagOverride[]
-  featureFlagAuditLogs   FeatureFlagAuditLog[]
-  marketplaceExtensions  MarketplaceExtension[]
-  extensionInstallations ExtensionInstallation[]
-  extensionPermissions   ExtensionPermission[]
-  skillLearningPatterns  SkillLearningPattern[]
-  agentSkillAssignments  AgentSkillAssignment[]
-  extensionUsageLogs     ExtensionUsageLog[]
-  slackWorkspaces        SlackWorkspace[]
-  externalCredentials    ExternalMarketplaceCredential[]
-  installationQueue      InstallationQueue[]
-  n8nInstances           N8nInstance[]
-  n8nWorkflows           N8nWorkflow[]
-  n8nCredentials         N8nCredential[]
-  knowledgeNodes         KnowledgeNode[]
-  knowledgeEdges         KnowledgeEdge[]
-  knowledgeClusters      KnowledgeCluster[]
-  entityMemories         EntityMemory[]
-  memories               Memory[]
-  feedbackCaptures       FeedbackCapture[]
+  workspaceDomains             WorkspaceDomain[]
+  memberships                  Membership[]
+  agents                       Agent[]
+  teams                        Team[]
+  projects                     Project[]
+  tasks                        Task[]
+  goals                        Goal[]
+  valueStreams                 ValueStream[]
+  kpis                         KPI[]
+  workflows                    Workflow[]
+  notionConnections            NotionConnection[]
+  mcpConnections               MCPConnection[]
+  claudeAccounts               ClaudeAccount[]
+  claudeMaxAccounts            ClaudeMaxAccount[]
+  slackIntegrations            SlackIntegration[]
+  orchestratorExecutions       OrchestratorExecution[]
+  agentActivities              AgentActivity[]
+  featureFlagOverrides         FeatureFlagOverride[]
+  featureFlagAuditLogs         FeatureFlagAuditLog[]
+  marketplaceExtensions        MarketplaceExtension[]
+  extensionInstallations       ExtensionInstallation[]
+  extensionPermissions         ExtensionPermission[]
+  skillLearningPatterns        SkillLearningPattern[]
+  agentSkillAssignments        AgentSkillAssignment[]
+  extensionUsageLogs           ExtensionUsageLog[]
+  slackWorkspaces              SlackWorkspace[]
+  externalCredentials          ExternalMarketplaceCredential[]
+  installationQueue            InstallationQueue[]
+  n8nInstances                 N8nInstance[]
+  n8nWorkflows                 N8nWorkflow[]
+  n8nCredentials               N8nCredential[]
+  knowledgeNodes               KnowledgeNode[]
+  knowledgeEdges               KnowledgeEdge[]
+  knowledgeClusters            KnowledgeCluster[]
+  entityMemories               EntityMemory[]
+  memories                     Memory[]
+  feedbackCaptures             FeedbackCapture[]
+  // Identity linking relations (ADD THESE)
+  externalIdentities           ExternalIdentity[]
+  identityLinkSuggestions      IdentityLinkSuggestion[]
+  identityLinkAudits           IdentityLinkAudit[]
+  identitySettings             IdentitySettings?
+  // AR (Agent Resource) Management relations
+  agentDepartments             AgentDepartment[]
+  agentPositions               AgentPosition[]
+  agentAssignments             AgentAssignment[]
+  arCostEntries                ARCostEntry[]
+  arApprovalRequests           ARApprovalRequest[]
+  arApprovalRules              ARApprovalRule[]
+  agentDailyReports            AgentDailyReport[]
+  goalAlignmentRecords         GoalAlignmentRecord[]
+  workloadRebalancing          WorkloadRebalancing[]
+  humanAvailability            HumanAvailability[]
+  agentCapacity                AgentCapacity[]
+  arMeetings                   ARMeeting[]
+  arLeaveRequests              ARLeaveRequest[]
+  arTeamConfigurations         ARTeamConfiguration[]
+  arTeamRecommendations        ARTeamRecommendation[]
+  arMetaAgents                 ARMetaAgent[]
+  arDepartmentLogs             ARDepartmentLog[]
+  humanPositions               HumanPosition[]
+  humanAssignments             HumanAssignment[]
+  templateEffectivenessRecords TemplateEffectivenessRecord[]
+  templateABTests              TemplateABTest[]
 
   @@map("organizations")
 }
@@ -97,12 +124,20 @@ model User {
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  memberships            Membership[]
-  sessions               Session[]
-  orchestratorExecutions OrchestratorExecution[]
-  featureFlagAuditLogs   FeatureFlagAuditLog[]
-  slackUsers             SlackUser[]
-  feedbackCaptures       FeedbackCapture[]
+  memberships                 Membership[]
+  sessions                    Session[]
+  orchestratorExecutions      OrchestratorExecution[]
+  featureFlagAuditLogs        FeatureFlagAuditLog[]
+  slackUsers                  SlackUser[]
+  feedbackCaptures            FeedbackCapture[]
+  // Identity linking relations (ADD THESE)
+  externalIdentities          ExternalIdentity[]       @relation("ExternalIdentities")
+  linkedIdentities            ExternalIdentity[]       @relation("IdentityLinkedBy")
+  suggestedIdentityLinks      IdentityLinkSuggestion[] @relation("SuggestedIdentityLinks")
+  reviewedIdentitySuggestions IdentityLinkSuggestion[] @relation("IdentitySuggestionReviewer")
+  identityAuditActions        IdentityLinkAudit[]      @relation("IdentityAuditPerformer")
+  // AR (Agent Resource) Management relations
+  humanAssignments            HumanAssignment[]
 
   @@index([email])
   @@index([googleId])
@@ -212,6 +247,21 @@ model Agent {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  // NEW: Orchestration configuration fields
+  displayName     String?   @map("display_name") @db.VarChar(255)
+  avatar          String?   @db.Text
+  position        String?   @db.VarChar(100)
+  department      String?   @db.VarChar(100)
+  permissionLevel String    @default("member") @map("permission_level") @db.VarChar(50)
+  claudeMdContent String?   @map("claude_md_content") @db.Text
+  mcpConfigJson   Json?     @map("mcp_config_json") @db.JsonB
+  toolAllowlist   String[]  @default([]) @map("tool_allowlist") @db.VarChar(100)
+  toolDenylist    String[]  @default([]) @map("tool_denylist") @db.VarChar(100)
+  preferredModel  String?   @map("preferred_model") @db.VarChar(50)
+  maxTokenBudget  Int?      @map("max_token_budget")
+  maxConcurrency  Int       @default(1) @map("max_concurrency")
+  lastActiveAt    DateTime? @map("last_active_at") @db.Timestamptz(6)
+
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   manager      Agent?       @relation("AgentHierarchy", fields: [managerId], references: [id])
@@ -219,13 +269,112 @@ model Agent {
   team         Team?        @relation(fields: [teamId], references: [id])
 
   skillAssignments AgentSkillAssignment[]
+  credentials      AgentCredential[]
+  mcpAssignments   AgentMCPAssignment[]
+  executions       AgentExecution[]
+  // AR (Agent Resource) Management relations
+  arAssignments    AgentAssignment[]
 
   @@index([organizationId])
   @@index([managerId])
   @@index([teamId])
   @@index([type])
   @@index([status])
+  @@index([department])
   @@map("agents")
+}
+
+/// Agent Credentials (OAuth tokens, API keys, etc.)
+model AgentCredential {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  agentId        String @map("agent_id") @db.Uuid
+
+  provider       String    @db.VarChar(100)
+  name           String    @db.VarChar(255)
+  credentialType String    @map("credential_type") @db.VarChar(50)
+  encryptedData  String    @map("encrypted_data") @db.Text
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
+  refreshTokenId String?   @map("refresh_token_id") @db.Uuid
+  scopes         String[]  @default([]) @db.VarChar(100)
+  enabled        Boolean   @default(true)
+  lastUsedAt     DateTime? @map("last_used_at") @db.Timestamptz(6)
+  lastError      String?   @map("last_error") @db.Text
+  metadata       Json      @default("{}") @db.JsonB
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, provider, name])
+  @@index([agentId])
+  @@index([provider])
+  @@map("agent_credentials")
+}
+
+/// Agent MCP Assignments (Which MCP tools each agent can use)
+model AgentMCPAssignment {
+  id                 String   @id @default(uuid()) @db.Uuid
+  agentId            String   @map("agent_id") @db.Uuid
+  mcpConnectionId    String   @map("mcp_connection_id") @db.Uuid
+  allowedTools       String[] @default([]) @map("allowed_tools") @db.VarChar(100)
+  deniedTools        String[] @default([]) @map("denied_tools") @db.VarChar(100)
+  useAgentCredential Boolean  @default(false) @map("use_agent_credential")
+  agentCredentialId  String?  @map("agent_credential_id") @db.Uuid
+  enabled            Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  agent         Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  mcpConnection MCPConnection @relation(fields: [mcpConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, mcpConnectionId])
+  @@index([agentId])
+  @@index([mcpConnectionId])
+  @@map("agent_mcp_assignments")
+}
+
+/// Agent Executions (Tracks individual agent task executions)
+model AgentExecution {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  agentId            String    @map("agent_id") @db.Uuid
+  linkedActivityId   String?   @map("linked_activity_id") @db.Uuid
+  sessionId          String    @map("session_id") @db.VarChar(255)
+  parentExecutionId  String?   @map("parent_execution_id") @db.Uuid
+  taskDescription    String    @map("task_description") @db.Text
+  status             String    @default("pending") @db.VarChar(50)
+  progressPercent    Int       @default(0) @map("progress_percent")
+  currentAction      String?   @map("current_action") @db.Text
+  configSnapshot     Json      @map("config_snapshot") @db.JsonB
+  claudeMaxAccountId String?   @map("claude_max_account_id") @db.Uuid
+  startedAt          DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz(6)
+  durationMs         Int?      @map("duration_ms")
+  inputData          Json?     @map("input_data") @db.JsonB
+  outputData         Json?     @map("output_data") @db.JsonB
+  streamChunks       Json[]    @default([]) @map("stream_chunks") @db.JsonB
+  toolCalls          Json[]    @default([]) @map("tool_calls") @db.JsonB
+  errorMessage       String?   @map("error_message") @db.Text
+  errorType          String?   @map("error_type") @db.VarChar(50)
+  slackChannelId     String?   @map("slack_channel_id") @db.VarChar(50)
+  slackThreadTs      String?   @map("slack_thread_ts") @db.VarChar(50)
+  slackMessageTs     String?   @map("slack_message_ts") @db.VarChar(50)
+  metadata           Json      @default("{}") @db.JsonB
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  agent           Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  parentExecution AgentExecution?  @relation("ExecutionHierarchy", fields: [parentExecutionId], references: [id])
+  childExecutions AgentExecution[] @relation("ExecutionHierarchy")
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@index([status])
+  @@index([parentExecutionId])
+  @@index([slackChannelId, slackThreadTs])
+  @@map("agent_executions")
 }
 
 /// Teams (Groups of agents)
@@ -543,7 +692,8 @@ model MCPConnection {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentAssignments AgentMCPAssignment[]
 
   @@index([organizationId])
   @@index([organizationId, enabled])
@@ -2040,6 +2190,184 @@ model Memory {
 }
 
 // ============================================================================
+// EXTERNAL IDENTITY LINKING SYSTEM
+// ============================================================================
+
+/// System user for automated operations (used as performedBy for system actions)
+/// This avoids FK constraint issues when system performs audit-logged actions
+model SystemUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  type      String   @db.VarChar(50) // 'system', 'migration', 'cron'
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("system_users")
+}
+
+/// Unified external identity storage for all providers (Slack, Google, Notion, etc.)
+model ExternalIdentity {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  userId         String? @map("user_id") @db.Uuid // Nullable until linked
+
+  // Provider identification
+  provider       String  @db.VarChar(50) // 'slack', 'google', 'notion'
+  providerUserId String  @map("provider_user_id") @db.VarChar(255)
+  providerTeamId String? @map("provider_team_id") @db.VarChar(255)
+
+  // Profile data (synced from provider)
+  email       String? @db.VarChar(255)
+  displayName String? @map("display_name") @db.VarChar(255)
+  realName    String? @map("real_name") @db.VarChar(255)
+  avatarUrl   String? @map("avatar_url") @db.Text
+
+  // Provider-specific metadata
+  metadata Json @default("{}") @db.JsonB
+
+  // Linking information
+  linkStatus     String    @default("unlinked") @map("link_status") @db.VarChar(20) // 'unlinked', 'linked', 'suggested'
+  linkMethod     String?   @map("link_method") @db.VarChar(50) // 'auto_email', 'auto_fuzzy', 'manual', 'admin', 'migration'
+  linkConfidence Float?    @map("link_confidence") @db.Real // 0.00 to 1.00 (using Float for simplicity)
+  linkedAt       DateTime? @map("linked_at") @db.Timestamptz(6)
+  linkedBy       String?   @map("linked_by") @db.Uuid
+
+  // Sync tracking
+  lastSyncedAt DateTime? @map("last_synced_at") @db.Timestamptz(6)
+  syncError    String?   @map("sync_error") @db.Text
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation("ExternalIdentities", fields: [userId], references: [id], onDelete: SetNull)
+  linkedByUser User?        @relation("IdentityLinkedBy", fields: [linkedBy], references: [id])
+
+  suggestions IdentityLinkSuggestion[] @relation("SourceIdentity")
+  auditLogs   IdentityLinkAudit[]
+
+  // Constraints
+  @@unique([organizationId, provider, providerUserId])
+  @@index([organizationId])
+  @@index([organizationId, userId])
+  @@index([organizationId, provider])
+  @@index([organizationId, linkStatus])
+  @@index([organizationId, email])
+  @@index([providerUserId])
+  @@map("external_identities")
+}
+
+/// Suggested identity links awaiting user/admin confirmation
+model IdentityLinkSuggestion {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  // Source (external identity to be linked)
+  externalIdentityId String @map("external_identity_id") @db.Uuid
+
+  // Suggested target user
+  suggestedUserId String @map("suggested_user_id") @db.Uuid
+
+  // Match details
+  matchMethod     String @map("match_method") @db.VarChar(50) // 'email', 'fuzzy_name', 'domain'
+  confidenceScore Float  @map("confidence_score") @db.Real
+  matchDetails    Json   @default("{}") @map("match_details") @db.JsonB
+
+  // Workflow state
+  status          String    @default("pending") @db.VarChar(20) // 'pending', 'accepted', 'rejected', 'expired', 'superseded'
+  reviewedBy      String?   @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  rejectionReason String?   @map("rejection_reason") @db.Text
+
+  // Expiry
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  externalIdentity ExternalIdentity @relation("SourceIdentity", fields: [externalIdentityId], references: [id], onDelete: Cascade)
+  suggestedUser    User             @relation("SuggestedIdentityLinks", fields: [suggestedUserId], references: [id], onDelete: Cascade)
+  reviewer         User?            @relation("IdentitySuggestionReviewer", fields: [reviewedBy], references: [id])
+
+  // Constraints
+  @@unique([externalIdentityId, suggestedUserId])
+  @@index([organizationId, status])
+  @@index([organizationId, suggestedUserId])
+  @@index([expiresAt])
+  @@map("identity_link_suggestions")
+}
+
+/// Audit trail for all identity linking decisions
+model IdentityLinkAudit {
+  id                 String @id @default(uuid()) @db.Uuid
+  organizationId     String @map("organization_id") @db.Uuid
+  externalIdentityId String @map("external_identity_id") @db.Uuid
+
+  // Action details
+  action         String  @db.VarChar(30) // 'linked', 'unlinked', 'rejected', 'suggestion_created', 'superseded'
+  userId         String? @map("user_id") @db.Uuid // Target user (if applicable)
+  previousUserId String? @map("previous_user_id") @db.Uuid // For unlink/re-link
+
+  // Context
+  linkMethod      String? @map("link_method") @db.VarChar(50)
+  confidenceScore Float?  @map("confidence_score") @db.Real
+  performedBy     String? @map("performed_by") @db.Uuid // Nullable for system actions
+  reason          String? @db.Text
+  metadata        Json    @default("{}") @db.JsonB
+
+  // Request context
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
+  // Timestamp
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  externalIdentity ExternalIdentity @relation(fields: [externalIdentityId], references: [id], onDelete: Cascade)
+  performer        User?            @relation("IdentityAuditPerformer", fields: [performedBy], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([externalIdentityId, createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("identity_link_audit")
+}
+
+/// Organization-level identity linking settings
+model IdentitySettings {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @unique @map("organization_id") @db.Uuid
+
+  // Auto-linking configuration
+  autoLinkOnEmail     Boolean @default(true) @map("auto_link_on_email")
+  autoLinkThreshold   Float   @default(0.95) @map("auto_link_threshold") @db.Real
+  suggestionThreshold Float   @default(0.85) @map("suggestion_threshold") @db.Real
+
+  // Provider priorities (JSON array of provider names)
+  providerPriority Json @default("[\"google\", \"slack\", \"notion\"]") @map("provider_priority") @db.JsonB
+
+  // Self-service settings
+  allowUserSelfLink    Boolean @default(true) @map("allow_user_self_link")
+  allowUserSelfUnlink  Boolean @default(true) @map("allow_user_self_unlink")
+  requireAdminApproval Boolean @default(false) @map("require_admin_approval")
+
+  // Retention
+  suggestionExpiryDays Int @default(30) @map("suggestion_expiry_days")
+  auditRetentionDays   Int @default(2555) @map("audit_retention_days") // ~7 years for compliance
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("identity_settings")
+}
+
+// ============================================================================
 // FEEDBACK & LEARNING SYSTEM (Phase 3 Intelligence Layer)
 // ============================================================================
 
@@ -2085,4 +2413,807 @@ model FeedbackCapture {
   @@index([feedbackType])
   @@index([userId])
   @@map("feedback_captures")
+}
+
+/// Prompt Suggestions - AI-generated prompt improvements from feedback analysis
+model PromptSuggestion {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  agentType       String?  @map("agent_type") @db.VarChar(100) // sisyphus, oracle, executor, etc.
+  patternId       String   @map("pattern_id") @db.VarChar(100) // Reference to detected pattern
+  currentPrompt   String?  @map("current_prompt") @db.Text
+  suggestedPrompt String   @map("suggested_prompt") @db.Text
+  reason          String   @db.Text // Why this change is suggested
+  confidence      Float    @default(0.0) // 0-1 confidence score
+  status          String   @default("pending") @db.VarChar(20) // pending, approved, rejected
+  approvedBy      String?  @map("approved_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId, status])
+  @@index([agentType])
+  @@index([createdAt(sort: Desc)])
+  @@map("prompt_suggestions")
+}
+
+// ============================================================================
+// AR (AGENT RESOURCE) MANAGEMENT SYSTEM
+// Enterprise-grade Agent Resource management - mirrors HR practices for AI agents
+// ============================================================================
+
+// --- Module 1: Agent Organization Schema ---
+
+/// Agent Department (Organizational Unit)
+/// Hierarchical department structure for organizing agents
+model AgentDepartment {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(255) // "Product Design", "Operations"
+  code           String   @db.VarChar(50) // "PROD-DESIGN", "OPS"
+  description    String?  @db.Text
+  parentId       String?  @map("parent_id") @db.Uuid // Hierarchical
+  headAgentId    String?  @map("head_agent_id") @db.Uuid // Department head agent
+  headHumanId    String?  @map("head_human_id") @db.Uuid // Human owner
+  budgetCents    Int?     @map("budget_cents")
+  costCenter     String?  @map("cost_center") @db.VarChar(50)
+  status         String   @default("active") @db.VarChar(50)
+  metadata       Json     @default("{}") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent         AgentDepartment?         @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children       AgentDepartment[]        @relation("DepartmentHierarchy")
+  positions      AgentPosition[]
+  humanPositions HumanPosition[]
+  dailySummaries DepartmentDailySummary[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([parentId])
+  @@index([status])
+  @@map("agent_departments")
+}
+
+/// Agent Position (Role Definition)
+/// Defines roles/positions that agents can hold within departments
+model AgentPosition {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  departmentId   String   @map("department_id") @db.Uuid
+  title          String   @db.VarChar(255) // "Senior Designer", "Lead Analyst"
+  level          Int      @default(1) // 1=Entry, 2=Mid, 3=Senior, 4=Lead, 5=Head
+  reportsToId    String?  @map("reports_to_id") @db.Uuid
+  requiredSkills String[] @default([]) @db.VarChar(100)
+  preferredModel String?  @map("preferred_model") @db.VarChar(50) // "opus", "sonnet"
+  maxConcurrent  Int      @default(1) @map("max_concurrent") // How many agents can hold this position
+  budgetPerTask  Int?     @map("budget_per_task") // Token budget
+  approvalLevel  Int      @default(0) @map("approval_level") // 0=none, 1=team, 2=dept, 3=org
+  metadata       Json     @default("{}") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department    AgentDepartment   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  reportsTo     AgentPosition?    @relation("PositionHierarchy", fields: [reportsToId], references: [id])
+  directReports AgentPosition[]   @relation("PositionHierarchy")
+  assignments   AgentAssignment[]
+
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([reportsToId])
+  @@index([level])
+  @@map("agent_positions")
+}
+
+/// Agent Assignment (Agent to Position mapping)
+/// Maps agents to positions with assignment details
+model AgentAssignment {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  agentId          String    @map("agent_id") @db.Uuid
+  positionId       String    @map("position_id") @db.Uuid
+  humanSupervisor  String?   @map("human_supervisor") @db.Uuid // User who oversees
+  assignmentType   String    @default("permanent") @db.VarChar(50) // permanent, temporary, acting
+  startDate        DateTime  @default(now()) @map("start_date") @db.Timestamptz(6)
+  endDate          DateTime? @map("end_date") @db.Timestamptz(6)
+  status           String    @default("active") @db.VarChar(50) // active, on_leave, suspended
+  performanceScore Float?    @map("performance_score") @db.Real // 0-100
+  workload         Float     @default(1.0) @db.Real // 0-1 capacity utilization
+  metadata         Json      @default("{}") @db.JsonB
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  position     AgentPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([agentId])
+  @@index([positionId])
+  @@index([status])
+  @@index([assignmentType])
+  @@map("agent_assignments")
+}
+
+/// AR Cost Entry - Cost tracking per agent/department
+/// Tracks all costs associated with agent operations
+model ARCostEntry {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  agentId        String?      @map("agent_id") @db.Uuid
+  departmentId   String?      @map("department_id") @db.Uuid
+  costType       String       @db.VarChar(50) // "token", "api_call", "compute"
+  amountCents    Int          @map("amount_cents")
+  tokenCount     Int?         @map("token_count")
+  modelUsed      String?      @map("model_used") @db.VarChar(50)
+  taskReference  String?      @map("task_reference") @db.VarChar(255)
+  description    String?      @db.Text
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([agentId])
+  @@index([departmentId])
+  @@index([costType])
+  @@map("ar_cost_entries")
+}
+
+// --- Module 2: Human-Agent Approval Workflow ---
+
+/// AR Approval Request - Multi-level approval requests
+/// Handles approval workflows across organizational levels
+model ARApprovalRequest {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  // Request details
+  requestType    String  @map("request_type") @db.VarChar(50) // "task", "budget", "assignment", "schedule"
+  level          Int // 1-5 (Task to Objective)
+  title          String  @db.VarChar(500)
+  description    String  @db.Text
+  context        Json    @default("{}") @db.JsonB
+  impactScope    String? @map("impact_scope") @db.VarChar(50) // "individual", "team", "department", "org"
+  estimatedValue Int?    @map("estimated_value") // In cents
+
+  // Requester
+  requesterType String @map("requester_type") @db.VarChar(20) // "agent", "human"
+  requesterId   String @map("requester_id") @db.Uuid
+
+  // Approver chain (computed at creation time)
+  approverChain Json @map("approver_chain") @db.JsonB // [{level, approverId, type}]
+  currentLevel  Int  @default(1) @map("current_level")
+
+  // Status
+  status    String @default("pending") @db.VarChar(50)
+  responses Json   @default("[]") @db.JsonB // [{level, approverId, decision, note, timestamp}]
+
+  // Timing
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  escalationAt DateTime? @map("escalation_at") @db.Timestamptz(6) // When to auto-escalate
+
+  // Slack integration
+  slackChannelId String? @map("slack_channel_id") @db.VarChar(50)
+  slackMessageTs String? @map("slack_message_ts") @db.VarChar(50)
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([requesterId, requesterType])
+  @@index([status, expiresAt])
+  @@index([status, escalationAt])
+  @@map("ar_approval_requests")
+}
+
+/// AR Approval Rule - Escalation and routing rules
+/// Defines rules for approval routing and escalation
+model ARApprovalRule {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name        String @db.VarChar(255)
+  requestType String @map("request_type") @db.VarChar(50)
+
+  // Conditions
+  conditions Json @db.JsonB // {minValue, maxValue, impactScope, keywords}
+
+  // Approval chain template
+  requiredLevel Int  @map("required_level") // Minimum level required
+  chainTemplate Json @map("chain_template") @db.JsonB // How to build approver chain
+
+  // Timing
+  timeoutMinutes Int     @default(60) @map("timeout_minutes")
+  autoEscalate   Boolean @default(true) @map("auto_escalate")
+
+  enabled  Boolean @default(true)
+  priority Int     @default(0) // Higher = checked first
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, enabled])
+  @@index([organizationId, requestType])
+  @@index([priority])
+  @@map("ar_approval_rules")
+}
+
+// --- Module 3: Autonomous Coordination Engine ---
+
+/// Agent Daily Report - Daily agent activity summaries
+/// Generated reports for each agent's daily activities
+model AgentDailyReport {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  agentId        String   @map("agent_id") @db.Uuid
+  reportDate     DateTime @map("report_date") @db.Date
+
+  // Activity summary
+  tasksCompleted  Int    @default(0) @map("tasks_completed")
+  tasksInProgress Int    @default(0) @map("tasks_in_progress")
+  tasksBlocked    Int    @default(0) @map("tasks_blocked")
+  tokensConsumed  Int    @default(0) @map("tokens_consumed")
+  avgResponseTime Float? @map("avg_response_time") @db.Real // ms
+
+  // Goal alignment
+  goalAlignmentScore Float?   @map("goal_alignment_score") @db.Real // 0-100
+  contributedGoals   String[] @default([]) @map("contributed_goals") @db.Uuid
+
+  // Issues & blockers
+  blockers   Json @default("[]") @db.JsonB // [{description, severity, suggestedAction}]
+  challenges Json @default("[]") @db.JsonB // [{description, category}]
+
+  // Recommendations
+  recommendations Json @default("[]") @db.JsonB // [{type, description, priority}]
+
+  // AI-generated summary
+  summaryText String? @map("summary_text") @db.Text
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, agentId, reportDate])
+  @@index([organizationId, reportDate])
+  @@index([agentId, reportDate])
+  @@map("agent_daily_reports")
+}
+
+/// Department Daily Summary - Aggregated department reports
+/// Daily summary reports for departments
+model DepartmentDailySummary {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  departmentId   String   @map("department_id") @db.Uuid
+  reportDate     DateTime @map("report_date") @db.Date
+
+  // Aggregated metrics
+  totalAgents      Int    @default(0) @map("total_agents")
+  activeAgents     Int    @default(0) @map("active_agents")
+  totalTasks       Int    @default(0) @map("total_tasks")
+  completedTasks   Int    @default(0) @map("completed_tasks")
+  avgGoalAlignment Float? @map("avg_goal_alignment") @db.Real
+  totalCostCents   Int    @default(0) @map("total_cost_cents")
+
+  // Department-level issues
+  criticalBlockers  Json @default("[]") @map("critical_blockers") @db.JsonB
+  resourceShortages Json @default("[]") @map("resource_shortages") @db.JsonB
+
+  // AI analysis
+  analysisText    String? @map("analysis_text") @db.Text
+  priorityActions Json    @default("[]") @map("priority_actions") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  department AgentDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, departmentId, reportDate])
+  @@index([organizationId, reportDate])
+  @@index([departmentId])
+  @@map("department_daily_summaries")
+}
+
+/// Goal Alignment Record - Tracks agent contributions to goals
+/// Records how agents align with organizational goals
+model GoalAlignmentRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  agentId        String @map("agent_id") @db.Uuid
+  goalId         String @map("goal_id") @db.Uuid
+
+  alignmentScore Float    @map("alignment_score") @db.Real // 0-100
+  contribution   String   @db.Text // Description of contribution
+  evidenceLinks  String[] @default([]) @map("evidence_links") // Task IDs, etc.
+
+  analysisDate DateTime     @map("analysis_date") @db.Timestamptz(6)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, goalId])
+  @@index([agentId, analysisDate])
+  @@index([alignmentScore])
+  @@map("goal_alignment_records")
+}
+
+/// Workload Rebalancing - Tracks workload rebalancing events
+/// Records decisions to rebalance work across agents
+model WorkloadRebalancing {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  triggerType    String @map("trigger_type") @db.VarChar(50) // "overload", "underutilized", "deadline_risk", "manual"
+  triggerDetails Json   @map("trigger_details") @db.JsonB
+
+  // Changes made
+  changes Json @db.JsonB // [{agentId, action, from, to}]
+
+  // Approval if needed
+  approvalId String? @map("approval_id") @db.Uuid
+  status     String  @default("pending") @db.VarChar(50) // pending, approved, rejected, applied
+
+  appliedAt    DateTime?    @map("applied_at") @db.Timestamptz(6)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([triggerType])
+  @@index([appliedAt])
+  @@map("workload_rebalancing")
+}
+
+// --- Module 4: Schedule & Availability System ---
+
+/// Human Availability - Synced from calendar
+/// Tracks human team members' availability
+model HumanAvailability {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId         String @map("user_id") @db.Uuid
+
+  date           DateTime @db.Date
+  availableFrom  String   @map("available_from") @db.VarChar(5) // "09:00"
+  availableUntil String   @map("available_until") @db.VarChar(5) // "18:00"
+  timezone       String   @db.VarChar(50)
+
+  // Status
+  status       String @db.VarChar(50) // "available", "busy", "vacation", "sick"
+  blockedSlots Json   @default("[]") @map("blocked_slots") @db.JsonB // [{from, to, reason}]
+
+  // Sync info
+  calendarSyncId String?   @map("calendar_sync_id") @db.VarChar(255)
+  lastSyncAt     DateTime? @map("last_sync_at") @db.Timestamptz(6)
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, userId, date])
+  @@index([organizationId, date])
+  @@index([userId])
+  @@index([status])
+  @@map("human_availability")
+}
+
+/// Agent Capacity - Computed agent capacity
+/// Tracks agent capacity for scheduling purposes
+model AgentCapacity {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  agentId        String @map("agent_id") @db.Uuid
+
+  date         DateTime @db.Date
+  maxTasks     Int      @default(10) @map("max_tasks")
+  currentTasks Int      @default(0) @map("current_tasks")
+  maxTokens    Int      @default(100000) @map("max_tokens")
+  usedTokens   Int      @default(0) @map("used_tokens")
+
+  // Capacity score 0-100
+  capacityScore Float @map("capacity_score") @db.Real
+
+  // Constraints
+  blockedReasons Json @default("[]") @map("blocked_reasons") @db.JsonB // [{reason, severity}]
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, agentId, date])
+  @@index([organizationId, date])
+  @@index([agentId])
+  @@index([capacityScore])
+  @@map("agent_capacity")
+}
+
+/// AR Meeting - AR-aware meetings
+/// Meetings that include both human and agent participants
+model ARMeeting {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  title       String  @db.VarChar(500)
+  description String? @db.Text
+  meetingType String  @map("meeting_type") @db.VarChar(50) // "standup", "review", "planning", "adhoc"
+
+  // Participants
+  humanParticipants String[] @default([]) @map("human_participants") @db.Uuid
+  agentParticipants String[] @default([]) @map("agent_participants") @db.Uuid
+
+  // Scheduling
+  scheduledAt     DateTime @map("scheduled_at") @db.Timestamptz(6)
+  durationMinutes Int      @map("duration_minutes")
+  timezone        String   @db.VarChar(50)
+
+  // Recurrence
+  isRecurring    Boolean @default(false) @map("is_recurring")
+  recurrenceRule String? @map("recurrence_rule") @db.VarChar(255) // RRULE format
+
+  // Calendar sync
+  googleEventId String? @map("google_event_id") @db.VarChar(255)
+
+  status String @default("scheduled") @db.VarChar(50)
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, scheduledAt])
+  @@index([status])
+  @@index([meetingType])
+  @@map("ar_meetings")
+}
+
+/// AR Leave Request - Vacation/leave requests
+/// Handles leave requests for both humans and agents
+model ARLeaveRequest {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  // Who is taking leave
+  entityType String @map("entity_type") @db.VarChar(20) // "human", "agent"
+  entityId   String @map("entity_id") @db.Uuid
+
+  leaveType String @map("leave_type") @db.VarChar(50) // "vacation", "sick", "maintenance", "upgrade"
+
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
+  reason String? @db.Text
+
+  // Coverage planning
+  coveringEntity String? @map("covering_entity") @db.Uuid
+  coveringType   String? @map("covering_type") @db.VarChar(20) // "human", "agent"
+  handoverNotes  String? @map("handover_notes") @db.Text
+
+  // Approval
+  approvalId String? @map("approval_id") @db.Uuid
+  status     String  @default("pending") @db.VarChar(50)
+
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, entityId])
+  @@index([organizationId, startDate, endDate])
+  @@index([status])
+  @@index([entityType])
+  @@map("ar_leave_requests")
+}
+
+// --- Module 5: Dynamic Team Templates ---
+
+/// AR Industry Template - Best practices templates
+/// Pre-defined organizational templates for different industries
+model ARIndustryTemplate {
+  id String @id @default(uuid()) @db.Uuid
+
+  name        String @db.VarChar(255) // "Tech Startup - Early Stage"
+  industry    String @db.VarChar(100) // "technology", "fashion", "ecommerce"
+  companySize String @map("company_size") @db.VarChar(50) // "startup", "smb", "enterprise"
+  growthStage String @map("growth_stage") @db.VarChar(50) // "seed", "growth", "mature"
+
+  // Template structure
+  departments Json @db.JsonB // [{name, description, positions: [...]}]
+  keyRoles    Json @map("key_roles") @db.JsonB // Priority roles for this template
+
+  // Recommended practices
+  bestPractices Json @map("best_practices") @db.JsonB
+  antiPatterns  Json @map("anti_patterns") @db.JsonB
+
+  // Metrics
+  usageCount Int    @default(0) @map("usage_count")
+  avgRating  Float? @map("avg_rating") @db.Real
+
+  isBuiltIn Boolean  @default(false) @map("is_built_in")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teamConfigs          ARTeamConfiguration[]
+  recommendations      ARTeamRecommendation[]
+  effectivenessRecords TemplateEffectivenessRecord[]
+  abTestsA             TemplateABTest[]              @relation("TemplateA")
+  abTestsB             TemplateABTest[]              @relation("TemplateB")
+  winningTests         TemplateABTest[]              @relation("WinningTemplate")
+
+  @@index([industry])
+  @@index([companySize])
+  @@index([growthStage])
+  @@index([isBuiltIn])
+  @@map("ar_industry_templates")
+}
+
+/// AR Team Configuration - Organization team configs
+/// Organization-specific team configurations based on templates
+model ARTeamConfiguration {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name       String  @db.VarChar(255) // "Project Alpha Team"
+  templateId String? @map("template_id") @db.Uuid // Base template
+
+  // Custom configuration
+  structure   Json @db.JsonB // Final team structure
+  constraints Json @default("{}") @db.JsonB // {maxBudget, maxAgents, requiredSkills}
+
+  // Team members
+  assignments Json @default("[]") @db.JsonB // [{positionId, agentId, startDate}]
+
+  // Project association
+  projectId String? @map("project_id") @db.Uuid
+
+  status String @default("active") @db.VarChar(50)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  template     ARIndustryTemplate? @relation(fields: [templateId], references: [id])
+  organization Organization        @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([templateId])
+  @@index([status])
+  @@map("ar_team_configurations")
+}
+
+/// AR Team Recommendation - Team composition recommendations
+/// AI-generated recommendations for team composition
+model ARTeamRecommendation {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  // Trigger
+  triggerType String @map("trigger_type") @db.VarChar(50) // "new_project", "scaling", "optimization"
+  context     Json   @db.JsonB
+
+  // Recommendations
+  recommendations Json @db.JsonB // [{action, rationale, impact, effort}]
+
+  // Matched templates
+  matchedTemplates  Json    @map("matched_templates") @db.JsonB // [{templateId, matchScore}]
+  primaryTemplateId String? @map("primary_template_id") @db.Uuid
+
+  status    String    @default("pending") @db.VarChar(50)
+  appliedAt DateTime? @map("applied_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  primaryTemplate ARIndustryTemplate? @relation(fields: [primaryTemplateId], references: [id])
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([triggerType])
+  @@map("ar_team_recommendations")
+}
+
+// --- Module 6: AR Department Self-Management ---
+
+/// AR Meta-Agent - Meta-agent definitions
+/// Defines agents that manage the AR system itself
+model ARMetaAgent {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  agentId  String @map("agent_id") @db.Uuid // Link to Agent table
+  metaRole String @map("meta_role") @db.VarChar(50) // "director", "ops_manager", "analyst", "coach"
+
+  // Configuration
+  config   Json @default("{}") @db.JsonB
+  schedule Json @default("{}") @db.JsonB // When this meta-agent runs
+
+  // Status
+  status       String    @default("active") @db.VarChar(50)
+  lastActiveAt DateTime? @map("last_active_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  departmentLogs ARDepartmentLog[]
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, metaRole])
+  @@index([organizationId])
+  @@index([status])
+  @@map("ar_meta_agents")
+}
+
+/// AR Department Log - AR department activity log
+/// Audit trail for AR department meta-agent actions
+model ARDepartmentLog {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  metaAgentId String? @map("meta_agent_id") @db.Uuid
+  action      String  @db.VarChar(100)
+  category    String  @db.VarChar(50) // "monitoring", "analysis", "coaching", "coordination"
+
+  details Json    @db.JsonB
+  impact  String? @db.VarChar(50) // "low", "medium", "high"
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  metaAgent    ARMetaAgent? @relation(fields: [metaAgentId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([category])
+  @@index([metaAgentId])
+  @@index([impact])
+  @@map("ar_department_logs")
+}
+
+// --- Addendum C: Human Position Schema ---
+
+/// Human Position - Role definitions for humans
+/// Defines positions that humans can hold within AR departments
+model HumanPosition {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  departmentId   String? @map("department_id") @db.Uuid // Can belong to agent department
+
+  title String @db.VarChar(255) // "VP Engineering", "Product Manager"
+  level Int    @default(1) // 1-10 (higher = more senior)
+
+  // AR Authority
+  arApprovalLevel   Int     @default(0) @map("ar_approval_level") // 0-5, what AR decisions can approve
+  maxBudgetApproval Int?    @map("max_budget_approval") // Max budget (cents) can approve
+  canOverrideAgents Boolean @default(false) @map("can_override_agents")
+  canAssignAgents   Boolean @default(false) @map("can_assign_agents")
+
+  // Supervision scope
+  supervisedDepartments String[] @default([]) @map("supervised_departments") @db.Uuid
+  supervisedPositions   String[] @default([]) @map("supervised_positions") @db.Uuid
+
+  metadata  Json     @default("{}") @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department   AgentDepartment?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignments  HumanAssignment[]
+
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([level])
+  @@index([arApprovalLevel])
+  @@map("human_positions")
+}
+
+/// Human Assignment - User to Position mapping
+/// Maps users to human positions within the organization
+model HumanAssignment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId         String @map("user_id") @db.Uuid
+  positionId     String @map("position_id") @db.Uuid
+
+  assignmentType String    @default("primary") @db.VarChar(50) // primary, secondary, acting
+  startDate      DateTime  @default(now()) @map("start_date") @db.Timestamptz(6)
+  endDate        DateTime? @map("end_date") @db.Timestamptz(6)
+  status         String    @default("active") @db.VarChar(50)
+
+  // Delegation when absent
+  delegateToId     String? @map("delegate_to_id") @db.Uuid
+  delegationReason String? @map("delegation_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position     HumanPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, positionId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([positionId])
+  @@index([status])
+  @@map("human_assignments")
+}
+
+// --- Addendum D: Template Learning Loop ---
+
+/// Template Effectiveness Record - Tracks template effectiveness
+/// Metrics for measuring how well templates perform
+model TemplateEffectivenessRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  templateId     String @map("template_id") @db.Uuid
+
+  // Usage tracking
+  usageStartDate DateTime  @map("usage_start_date") @db.Timestamptz(6)
+  usageEndDate   DateTime? @map("usage_end_date") @db.Timestamptz(6)
+
+  // Outcome metrics
+  taskCompletionRate    Float? @map("task_completion_rate") @db.Real // 0-1
+  avgGoalAlignmentScore Float? @map("avg_goal_alignment_score") @db.Real // 0-100
+  avgAgentUtilization   Float? @map("avg_agent_utilization") @db.Real // 0-1
+  totalCostCents        Int?   @map("total_cost_cents")
+  teamSatisfactionScore Float? @map("team_satisfaction_score") @db.Real // 0-10 (from surveys)
+
+  // Comparative metrics
+  comparedToBaseline     Float? @map("compared_to_baseline") @db.Real // Performance vs no template
+  comparedToAlternatives Json?  @map("compared_to_alternatives") @db.JsonB
+
+  // Learning signals
+  customizations      Json @default("[]") @db.JsonB // Changes made from template
+  problemsEncountered Json @default("[]") @map("problems_encountered") @db.JsonB // Issues during usage
+  successPatterns     Json @default("[]") @map("success_patterns") @db.JsonB // What worked well
+
+  // Feedback
+  userFeedback Json @default("[]") @map("user_feedback") @db.JsonB // Direct user feedback
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  template     ARIndustryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  organization Organization       @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([templateId])
+  @@index([usageStartDate])
+  @@map("template_effectiveness_records")
+}
+
+/// Template A/B Test - A/B testing for templates
+/// Tracks experiments comparing different templates
+model TemplateABTest {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+
+  // Test configuration
+  templateAId String @map("template_a_id") @db.Uuid
+  templateBId String @map("template_b_id") @db.Uuid
+
+  // Split configuration
+  splitRatio       Float    @default(0.5) @map("split_ratio") @db.Real // % going to template A
+  targetMetric     String   @map("target_metric") @db.VarChar(100) // Primary success metric
+  secondaryMetrics String[] @default([]) @map("secondary_metrics") @db.VarChar(100)
+
+  // Duration
+  startDate     DateTime  @map("start_date") @db.Timestamptz(6)
+  endDate       DateTime? @map("end_date") @db.Timestamptz(6)
+  minSampleSize Int       @default(10) @map("min_sample_size")
+
+  // Results
+  status                  String  @default("running") @db.VarChar(50) // running, completed, cancelled
+  results                 Json?   @db.JsonB
+  winningTemplateId       String? @map("winning_template_id") @db.Uuid
+  statisticalSignificance Float?  @map("statistical_significance") @db.Real // p-value
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  templateA       ARIndustryTemplate  @relation("TemplateA", fields: [templateAId], references: [id], onDelete: Cascade)
+  templateB       ARIndustryTemplate  @relation("TemplateB", fields: [templateBId], references: [id], onDelete: Cascade)
+  winningTemplate ARIndustryTemplate? @relation("WinningTemplate", fields: [winningTemplateId], references: [id], onDelete: SetNull)
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([startDate])
+  @@map("template_ab_tests")
 }
