@@ -36,16 +36,8 @@ SELECT
     -- Unique users who triggered orchestrations that day
     COUNT(DISTINCT oe.user_id)                                     AS unique_users,
 
-    -- Most frequently used category per day/org
-    (
-        SELECT sub.category
-        FROM orchestrator_executions sub
-        WHERE sub.organization_id = oe.organization_id
-          AND date_trunc('day', sub.created_at) = date_trunc('day', oe.created_at)
-        GROUP BY sub.category
-        ORDER BY COUNT(*) DESC
-        LIMIT 1
-    )                                                              AS most_used_category
+    -- Most frequently used category (mode) per day/org
+    MODE() WITHIN GROUP (ORDER BY oe.category)                     AS most_used_category
 
 FROM orchestrator_executions oe
 GROUP BY date_trunc('day', oe.created_at)::date, oe.organization_id
