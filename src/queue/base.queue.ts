@@ -1,4 +1,5 @@
 import { Queue, QueueOptions, Worker, WorkerOptions, Job } from "bullmq";
+import type { Cluster } from "ioredis";
 import type Redis from "ioredis";
 import { logger } from "../utils/logger";
 import {
@@ -38,14 +39,15 @@ const DEFAULT_MAX_QUEUE_DEPTH = parseInt(process.env.MAX_QUEUE_DEPTH || "10000",
 export class BaseQueue<T = any> {
   protected queue: Queue<T>;
   protected queueName: string;
-  protected connection: Redis;
+  protected connection: Redis | Cluster;
   protected maxQueueDepth: number;
 
   constructor(options: BaseQueueOptions) {
     this.queueName = options.name;
     this.maxQueueDepth = options.maxQueueDepth ?? DEFAULT_MAX_QUEUE_DEPTH;
 
-    this.connection = getQueueConnectionSync();
+    // Mark as long-lived: BullMQ queues hold connections for their entire lifecycle
+    this.connection = getQueueConnectionSync(true);
 
     const queueOptions: QueueOptions = {
       connection: this.connection,
@@ -130,12 +132,13 @@ export interface BaseWorkerOptions {
 export abstract class BaseWorker<T = any> {
   protected worker: Worker<T>;
   protected workerName: string;
-  protected connection: Redis;
+  protected connection: Redis | Cluster;
 
   constructor(queueName: string, options: BaseWorkerOptions = {}) {
     this.workerName = queueName;
 
-    this.connection = getWorkerConnectionSync();
+    // Mark as long-lived: BullMQ workers hold connections for their entire lifecycle
+    this.connection = getWorkerConnectionSync(true);
 
     const workerOptions: WorkerOptions = {
       connection: this.connection,

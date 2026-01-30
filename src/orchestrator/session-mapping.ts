@@ -1,7 +1,6 @@
 import { withQueueConnection } from "../db/redis";
 import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
-import type Redis from "ioredis";
 
 export async function createSessionMapping(
   nubabelSessionId: string,
@@ -9,7 +8,7 @@ export async function createSessionMapping(
 ): Promise<void> {
   logger.info("Creating session mapping", { nubabelSessionId, opencodeSessionId });
 
-  await withQueueConnection(async (redis: Redis) => {
+  await withQueueConnection(async (redis) => {
     await redis.hset(`session:mapping:${nubabelSessionId}`, "opencodeSessionId", opencodeSessionId);
     await redis.hset(`session:mapping:${opencodeSessionId}`, "nubabelSessionId", nubabelSessionId);
     await redis.expire(`session:mapping:${nubabelSessionId}`, 86400);
@@ -37,7 +36,7 @@ export async function createSessionMapping(
 export async function getOpencodeSessionId(nubabelSessionId: string): Promise<string | null> {
   let cached: string | null = null;
 
-  await withQueueConnection(async (redis: Redis) => {
+  await withQueueConnection(async (redis) => {
     cached = await redis.hget(`session:mapping:${nubabelSessionId}`, "opencodeSessionId");
   });
 
@@ -59,7 +58,7 @@ export async function getOpencodeSessionId(nubabelSessionId: string): Promise<st
   sessionId = state?.opencodeSessionId || null;
 
   if (sessionId) {
-    await withQueueConnection(async (redis: Redis) => {
+    await withQueueConnection(async (redis) => {
       await redis.hset(`session:mapping:${nubabelSessionId}`, "opencodeSessionId", sessionId!);
       await redis.expire(`session:mapping:${nubabelSessionId}`, 86400);
     });
@@ -71,7 +70,7 @@ export async function getOpencodeSessionId(nubabelSessionId: string): Promise<st
 export async function getNubabelSessionId(opencodeSessionId: string): Promise<string | null> {
   let cached: string | null = null;
 
-  await withQueueConnection(async (redis: Redis) => {
+  await withQueueConnection(async (redis) => {
     cached = await redis.hget(`session:mapping:${opencodeSessionId}`, "nubabelSessionId");
   });
 
@@ -94,7 +93,7 @@ export async function getNubabelSessionId(opencodeSessionId: string): Promise<st
   sessionId = sessions[0]?.id || null;
 
   if (sessionId) {
-    await withQueueConnection(async (redis: Redis) => {
+    await withQueueConnection(async (redis) => {
       await redis.hset(`session:mapping:${opencodeSessionId}`, "nubabelSessionId", sessionId!);
       await redis.expire(`session:mapping:${opencodeSessionId}`, 86400);
     });

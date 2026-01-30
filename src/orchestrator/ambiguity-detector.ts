@@ -1,10 +1,17 @@
 import { logger } from "../utils/logger";
+import type { ExtractedEntities } from "./intent-detector";
 
 export interface AmbiguityResult {
   isAmbiguous: boolean;
   ambiguityScore: number; // 0.0 (clear) to 1.0 (very ambiguous)
   reasons: string[];
   suggestedClarifications: string[];
+}
+
+export interface ClarificationQuestion {
+  question: string;
+  context: string;
+  suggestedAnswers?: string[];
 }
 
 // --- Pattern definitions ---
@@ -426,4 +433,142 @@ function checkConflicts(
 
   // Cap contribution from conflicts
   return Math.min(addedScore, 0.4);
+}
+
+// ---------------------------------------------------------------------------
+// Clarification Question Generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a specific clarification question based on the ambiguity result
+ * and detected entities. Uses detected entities to make the question more specific.
+ *
+ * @param userRequest - The original user request
+ * @param ambiguityResult - The result from detectAmbiguity
+ * @param entities - Extracted entities from the request
+ * @returns A clarification question object
+ */
+export function generateClarificationQuestion(
+  userRequest: string,
+  ambiguityResult: AmbiguityResult,
+  entities?: ExtractedEntities,
+): ClarificationQuestion {
+  // If not ambiguous, no clarification needed
+  if (!ambiguityResult.isAmbiguous) {
+    return {
+      question: "The request seems clear. Do you want to proceed?",
+      context: "No ambiguity detected",
+    };
+  }
+
+  // Use the first suggested clarification as the base
+  const primaryClarification =
+    ambiguityResult.suggestedClarifications[0] ||
+    "Could you provide more details about what you need?";
+
+  // Build context from detected entities
+  const contextParts: string[] = [];
+
+  if (entities) {
+    if (entities.providers.length > 0) {
+      contextParts.push(`Detected providers: ${entities.providers.join(", ")}`);
+    }
+    if (entities.fileNames.length > 0) {
+      contextParts.push(`Detected files: ${entities.fileNames.join(", ")}`);
+    }
+    if (entities.dates.length > 0) {
+      contextParts.push(`Detected dates: ${entities.dates.join(", ")}`);
+    }
+    if (entities.projectNames.length > 0) {
+      contextParts.push(`Detected projects: ${entities.projectNames.join(", ")}`);
+    }
+  }
+
+  const context = contextParts.length > 0
+    ? contextParts.join(" | ")
+    : `Ambiguity score: ${ambiguityResult.ambiguityScore}`;
+
+  // Generate suggested answers based on the type of ambiguity
+  const suggestedAnswers = generateSuggestedAnswers(
+    userRequest,
+    ambiguityResult.reasons,
+    entities,
+  );
+
+  logger.debug("Generated clarification question", {
+    requestPreview: userRequest.slice(0, 50),
+    ambiguityScore: ambiguityResult.ambiguityScore,
+    reasonCount: ambiguityResult.reasons.length,
+  });
+
+  return {
+    question: primaryClarification,
+    context,
+    suggestedAnswers: suggestedAnswers.length > 0 ? suggestedAnswers : undefined,
+  };
+}
+
+/**
+ * Generate suggested answers based on the type of ambiguity and entities
+ */
+function generateSuggestedAnswers(
+  userRequest: string,
+  reasons: string[],
+  entities?: ExtractedEntities,
+): string[] {
+  const suggestions: string[] = [];
+  const requestLower = userRequest.toLowerCase();
+
+  // Scope-based suggestions
+  if (reasons.some((r) => r.includes("scope"))) {
+    if (entities?.fileNames && entities.fileNames.length > 0) {
+      suggestions.push(`All files in ${entities.fileNames[0]}`);
+      suggestions.push(`Only ${entities.fileNames[0]}`);
+    } else {
+      suggestions.push("Entire codebase");
+      suggestions.push("Specific file or module");
+      suggestions.push("Current directory only");
+    }
+  }
+
+  // Error handling suggestions
+  if (requestLower.includes("error") || requestLower.includes("에러")) {
+    suggestions.push("Add try-catch blocks");
+    suggestions.push("Add error logging");
+    suggestions.push("Add user-facing error messages");
+    suggestions.push("Add error recovery logic");
+  }
+
+  // Testing suggestions
+  if (requestLower.includes("test") || requestLower.includes("테스트")) {
+    suggestions.push("Unit tests");
+    suggestions.push("Integration tests");
+    suggestions.push("End-to-end tests");
+  }
+
+  // Refactoring suggestions
+  if (requestLower.includes("refactor") || requestLower.includes("리팩토링")) {
+    suggestions.push("Extract functions");
+    suggestions.push("Improve naming");
+    suggestions.push("Remove duplication");
+    suggestions.push("Simplify logic");
+  }
+
+  // Provider-specific suggestions
+  if (entities?.providers && entities.providers.length > 0) {
+    const provider = entities.providers[0];
+    suggestions.push(`Create in ${provider}`);
+    suggestions.push(`Update existing ${provider} item`);
+    suggestions.push(`Search ${provider}`);
+  }
+
+  return suggestions.slice(0, 5); // Limit to 5 suggestions
+}
+
+/**
+ * Helper function to check if a request needs clarification
+ * without running full ambiguity detection.
+ */
+export function needsClarification(ambiguityScore: number): boolean {
+  return ambiguityScore >= AMBIGUITY_THRESHOLD;
 }

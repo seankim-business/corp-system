@@ -20,6 +20,7 @@ import { getMCPConnectionsByProvider, getAccessTokenFromConfig } from "./mcp-reg
 import { executeNotionTool } from "../mcp-servers/notion";
 import { executeLinearTool } from "../mcp-servers/linear";
 import { executeGitHubTool } from "../mcp-servers/github";
+import { executeSlackTool } from "../mcp-servers/slack";
 import { delegateTask } from "../orchestrator/delegate-task";
 
 export interface SopStep {
@@ -745,6 +746,15 @@ class SopExecutor {
         break;
       case "linear":
         result = await executeLinearTool(
+          accessToken,
+          toolName,
+          interpolatedInput,
+          organizationId,
+          connection,
+        );
+        break;
+      case "slack":
+        result = await executeSlackTool(
           accessToken,
           toolName,
           interpolatedInput,

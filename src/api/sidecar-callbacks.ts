@@ -5,6 +5,7 @@ import { withQueueConnection } from "../db/redis";
 import { executeNotionTool } from "../mcp-servers/notion";
 import { executeLinearTool } from "../mcp-servers/linear";
 import { executeGitHubTool } from "../mcp-servers/github";
+import { executeSlackTool } from "../mcp-servers/slack";
 import { getMCPConnectionsByProvider, getAccessTokenFromConfig } from "../services/mcp-registry";
 import { logger } from "../utils/logger";
 import { EventEmitter } from "events";
@@ -136,6 +137,20 @@ sidecarCallbacksRouter.post("/mcp/invoke", async (req, res) => {
         }
         result = await executeLinearTool(
           linearToken,
+          toolName,
+          args || {},
+          organizationId,
+          connection,
+        );
+        break;
+      }
+      case "slack": {
+        const slackToken = getAccessTokenFromConfig(connection.config as any);
+        if (!slackToken) {
+          throw new Error("No access token found for Slack connection");
+        }
+        result = await executeSlackTool(
+          slackToken,
           toolName,
           args || {},
           organizationId,

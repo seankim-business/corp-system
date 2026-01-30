@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { getOrganizationContext } from "../utils/async-context";
+import { getOrganizationContext, isRLSBypassed } from "../utils/async-context";
 import { logger } from "../utils/logger";
 import { getCircuitBreaker, CircuitBreakerError } from "../utils/circuit-breaker";
 
@@ -33,6 +33,15 @@ function createPrismaClient(): PrismaClient {
             return query(args);
           }
 
+          // Skip RLS if bypass flag is set (used for system queries during authentication)
+          if (isRLSBypassed()) {
+            logger.debug("RLS bypass active - skipping context check", {
+              operation,
+              model,
+            });
+            return dbCircuitBreaker.execute(() => query(args));
+          }
+
           const context = getOrganizationContext();
           const organizationId = context?.organizationId ?? null;
 
@@ -56,6 +65,7 @@ function createPrismaClient(): PrismaClient {
               // Don't throw - allow query to proceed without RLS context
             }
           } else {
+            // Warn if there's no organization context (bypass was already checked above)
             logger.warn("No organization context available for RLS", {
               operation,
               model,

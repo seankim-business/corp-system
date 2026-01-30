@@ -1,6 +1,7 @@
 import { logger } from "../utils/logger";
 import { getQueueConnectionSync, releaseQueueConnection } from "../db/redis";
 import type Redis from "ioredis";
+import type { Cluster } from "ioredis";
 
 export type KeyspaceEvent = "expired" | "del" | "set" | "hset" | "lpush" | "evicted";
 
@@ -51,8 +52,8 @@ interface HandlerRegistration {
 }
 
 class KeyspaceNotificationManager {
-  private subscriber: Redis | null = null;
-  private configConnection: Redis | null = null;
+  private subscriber: Redis | Cluster | null = null;
+  private configConnection: Redis | Cluster | null = null;
   private handlers: Map<string, HandlerRegistration[]> = new Map();
   private started = false;
 
@@ -70,8 +71,9 @@ class KeyspaceNotificationManager {
     }
 
     try {
-      this.configConnection = getQueueConnectionSync();
-      this.subscriber = getQueueConnectionSync();
+      // Mark as long-lived: these connections are held for the service lifetime
+      this.configConnection = getQueueConnectionSync(true);
+      this.subscriber = getQueueConnectionSync(true);
     } catch (err) {
       logger.error("Failed to acquire Redis connections for keyspace notifications", {
         error: err instanceof Error ? err.message : String(err),
@@ -81,10 +83,12 @@ class KeyspaceNotificationManager {
 
     // Enable keyspace notifications: K=keyspace, g=generic, x=expired, e=evicted
     try {
-      await this.configConnection.config("SET", "notify-keyspace-events", "Kgxe");
-      logger.info("Redis keyspace notifications enabled", {
-        config: "Kgxe",
-      });
+      if (this.configConnection) {
+        await this.configConnection.config("SET", "notify-keyspace-events", "Kgxe");
+        logger.info("Redis keyspace notifications enabled", {
+          config: "Kgxe",
+        });
+      }
     } catch (err) {
       logger.error("Failed to enable Redis keyspace notifications via CONFIG SET", {
         error: err instanceof Error ? err.message : String(err),
@@ -94,7 +98,8 @@ class KeyspaceNotificationManager {
     }
 
     // Set up the message handler before subscribing
-    this.subscriber.on("message", (channel: string, key: string) => {
+    if (this.subscriber) {
+      this.subscriber.on("message", (channel: string, key: string) => {
       const event = channelToEvent(channel);
       if (event) {
         logger.debug("Keyspace event received", { channel, key, event });
@@ -102,7 +107,8 @@ class KeyspaceNotificationManager {
       } else {
         logger.warn("Received message on unknown keyevent channel", { channel, key });
       }
-    });
+      });
+    }
 
     // Subscribe to all keyevent channels
     try {

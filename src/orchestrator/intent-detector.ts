@@ -1,4 +1,5 @@
 import { logger } from "../utils/logger";
+import Anthropic from "@anthropic-ai/sdk";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,6 +36,18 @@ export interface RequestAnalysisResult {
   intent: Intent;
   entities: ExtractedEntities;
 }
+
+// ---------------------------------------------------------------------------
+// LLM-based Classification Cache
+// ---------------------------------------------------------------------------
+
+interface CachedClassification {
+  intent: Intent;
+  timestamp: number;
+}
+
+const classificationCache = new Map<string, CachedClassification>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // ---------------------------------------------------------------------------
 // Action keyword maps (English + Korean)
@@ -75,6 +88,7 @@ const ACTION_PATTERNS: ActionPattern[] = [
       "등록",
       "초기화",
       "세팅",
+      "작업 생성",
     ],
     confidence: 0.85,
   },
@@ -104,6 +118,7 @@ const ACTION_PATTERNS: ActionPattern[] = [
       "가져",
       "리스트",
       "목록",
+      "일정 확인",
     ],
     confidence: 0.80,
   },
@@ -123,6 +138,7 @@ const ACTION_PATTERNS: ActionPattern[] = [
       "탐색",
       "찾기",
       "필터",
+      "검색해",
     ],
     confidence: 0.85,
   },
@@ -267,10 +283,40 @@ const ACTION_PATTERNS: ActionPattern[] = [
       "메시지",
       "공지",
       "통보",
+      "메시지 보내",
     ],
     confidence: 0.80,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// LLM Classification System Prompt
+// ---------------------------------------------------------------------------
+
+const INTENT_CLASSIFICATION_PROMPT = `You are an intent classifier. Analyze the user request and classify it into ONE of these actions:
+- create: Creating/making/adding new items
+- read: Viewing/checking/getting existing items
+- update: Modifying/editing/changing existing items
+- delete: Removing/deleting items
+- search: Searching/filtering/querying for items
+- analyze: Analyzing/investigating/examining data
+- summarize: Summarizing/briefing content
+- schedule: Scheduling/planning/booking events
+- notify: Sending messages/notifications/alerts
+- unknown: Cannot determine intent
+
+Also identify the TARGET (what entity is being acted upon).
+
+Respond ONLY with JSON in this exact format (no markdown, no code fences):
+{"action": "<action_name>", "target": "<target_entity>", "confidence": <0.0_to_1.0>, "reasoning": "<brief_explanation>"}
+
+Rules:
+- action must be one of: create, read, update, delete, search, analyze, summarize, schedule, notify, unknown
+- confidence must be 0.0 to 1.0
+- target should be specific (e.g., "task", "document", "user") or "unknown"
+- reasoning should briefly explain why you chose this classification`;
+
+const LLM_MODEL = "claude-3-5-haiku-20241022";
 
 // ---------------------------------------------------------------------------
 // Target keyword map (the entity being acted upon)
@@ -488,10 +534,111 @@ const PROJECT_NAME_PATTERNS: RegExp[] = [
 // ---------------------------------------------------------------------------
 
 /**
+ * Classify intent using LLM when pattern matching confidence is low.
+ * Uses caching to avoid redundant API calls.
+ */
+async function classifyWithLLM(request: string): Promise<Intent> {
+  // Check cache first
+  const cacheKey = request.toLowerCase().trim();
+  const cached = classificationCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    logger.debug("Intent classification cache hit", { request: request.slice(0, 50) });
+    return cached.intent;
+  }
+
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      logger.warn("No Anthropic API key for LLM classification, using pattern result");
+      return { action: "unknown", target: "unknown", confidence: 0.1 };
+    }
+
+    const client = new Anthropic({ apiKey });
+
+    logger.debug("Classifying intent with LLM", {
+      requestLength: request.length,
+      model: LLM_MODEL,
+    });
+
+    const response = await client.messages.create({
+      model: LLM_MODEL,
+      max_tokens: 256,
+      system: INTENT_CLASSIFICATION_PROMPT,
+      messages: [{ role: "user", content: request }],
+    });
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      logger.warn("LLM intent classification: no text in response");
+      return { action: "unknown", target: "unknown", confidence: 0.1 };
+    }
+
+    // Parse JSON response
+    const cleaned = textBlock.text
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim();
+
+    const parsed = JSON.parse(cleaned) as {
+      action: string;
+      target: string;
+      confidence: number;
+      reasoning?: string;
+    };
+
+    // Validate action is valid IntentAction
+    const validActions: IntentAction[] = [
+      "create",
+      "read",
+      "update",
+      "delete",
+      "search",
+      "analyze",
+      "summarize",
+      "schedule",
+      "notify",
+      "unknown",
+    ];
+
+    const action: IntentAction = validActions.includes(parsed.action as IntentAction)
+      ? (parsed.action as IntentAction)
+      : "unknown";
+
+    const intent: Intent = {
+      action,
+      target: parsed.target || "unknown",
+      confidence: Math.min(Math.max(parsed.confidence, 0), 1),
+    };
+
+    logger.info("LLM intent classification complete", {
+      action: intent.action,
+      target: intent.target,
+      confidence: intent.confidence,
+      reasoning: parsed.reasoning,
+    });
+
+    // Cache the result
+    classificationCache.set(cacheKey, {
+      intent,
+      timestamp: Date.now(),
+    });
+
+    return intent;
+  } catch (error) {
+    logger.error("LLM intent classification failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { action: "unknown", target: "unknown", confidence: 0.1 };
+  }
+}
+
+/**
  * Detect the primary intent (action + target) from a user request string.
  * Uses keyword matching with support for both Korean and English.
+ * Falls back to LLM classification when confidence < 0.7.
  */
-export function detectIntent(request: string): Intent {
+export async function detectIntent(request: string): Promise<Intent> {
   const text = request.toLowerCase();
 
   // --- Detect action ---
@@ -558,18 +705,28 @@ export function detectIntent(request: string): Intent {
   // Round to 2 decimal places for readability
   finalConfidence = Math.round(finalConfidence * 100) / 100;
 
-  logger.debug("Intent detected", {
+  logger.debug("Intent detected by pattern matching", {
     action: bestAction,
     target: bestTarget || "unknown",
     confidence: finalConfidence,
     matchedKeyword: matchedActionKeyword || "none",
   });
 
-  return {
+  const patternResult: Intent = {
     action: bestAction,
     target: bestTarget || "unknown",
     confidence: finalConfidence,
   };
+
+  // LLM fallback when confidence is low
+  if (finalConfidence < 0.7) {
+    logger.info("Pattern confidence below threshold, using LLM fallback", {
+      patternConfidence: finalConfidence,
+    });
+    return await classifyWithLLM(request);
+  }
+
+  return patternResult;
 }
 
 /**
@@ -695,8 +852,8 @@ export function extractEntities(request: string): ExtractedEntities {
 /**
  * Combined analysis: detect intent and extract entities from a user request.
  */
-export function analyzeRequest(request: string): RequestAnalysisResult {
-  const intent = detectIntent(request);
+export async function analyzeRequest(request: string): Promise<RequestAnalysisResult> {
+  const intent = await detectIntent(request);
   const entities = extractEntities(request);
 
   logger.debug("Request analysis complete", {

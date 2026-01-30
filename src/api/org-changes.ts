@@ -6,6 +6,7 @@ import { requirePermission } from "../middleware/require-permission";
 import { Permission } from "../auth/rbac";
 import { validate } from "../middleware/validation.middleware";
 import { logger } from "../utils/logger";
+import { OrgChangeTracker } from "../services/org-change-tracker";
 
 const router = Router();
 
@@ -21,6 +22,12 @@ const listChangesSchema = z.object({
   impactLevel: z.enum(["low", "medium", "high"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+const linkPRSchema = z.object({
+  prUrl: z.string().url().regex(/github\.com.*\/pull\/\d+/, {
+    message: "Must be a valid GitHub PR URL",
+  }),
 });
 
 router.post(
@@ -100,6 +107,79 @@ router.get(
     } catch (error) {
       logger.error("Failed to list organization changes", { error });
       res.status(500).json({ error: "Failed to list organization changes" });
+    }
+  },
+);
+
+router.post(
+  "/org-changes/:id/link-pr",
+  requireAuth,
+  requirePermission(Permission.AUDIT_READ),
+  validate({ body: linkPRSchema }),
+  async (req: Request, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { prUrl } = req.body;
+      const { organizationId } = req.user!;
+
+      const orgChange = await prisma.organizationChange.findFirst({
+        where: { id, organizationId },
+      });
+
+      if (!orgChange) {
+        return res.status(404).json({ error: "Organization change not found" });
+      }
+
+      const tracker = new OrgChangeTracker();
+      await tracker.linkPR(id, prUrl);
+
+      const updatedChange = await prisma.organizationChange.findUnique({
+        where: { id },
+      });
+
+      logger.info("PR linked to organization change", {
+        changeId: id,
+        prUrl,
+        organizationId,
+      });
+
+      return res.json(updatedChange);
+    } catch (error) {
+      logger.error("Failed to link PR to organization change", { error });
+      return res.status(500).json({ error: "Failed to link PR" });
+    }
+  },
+);
+
+router.get(
+  "/org-changes/:id/pr-status",
+  requireAuth,
+  requirePermission(Permission.AUDIT_READ),
+  async (req: Request, res: Response) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { organizationId } = req.user!;
+
+      const orgChange = await prisma.organizationChange.findFirst({
+        where: { id, organizationId },
+        select: { prUrl: true, metadata: true },
+      });
+
+      if (!orgChange) {
+        return res.status(404).json({ error: "Organization change not found" });
+      }
+
+      if (!orgChange.prUrl) {
+        return res.status(404).json({ error: "No PR linked to this change" });
+      }
+
+      const tracker = new OrgChangeTracker();
+      const status = await tracker.syncPRStatus(id);
+
+      return res.json(status);
+    } catch (error) {
+      logger.error("Failed to get PR status", { error });
+      return res.status(500).json({ error: "Failed to get PR status" });
     }
   },
 );

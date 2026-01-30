@@ -9,7 +9,7 @@ module.exports = {
     "!src/**/__tests__/**",
     "!src/**/types.ts",
   ],
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       branches: 60,
       functions: 70,

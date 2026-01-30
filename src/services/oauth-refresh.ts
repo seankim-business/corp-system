@@ -133,3 +133,10 @@ export async function refreshGitHubToken(
 ): Promise<OAuthRefreshResult> {
   return requestRefreshToken(refreshToken, config, "github");
 }
+
+export async function refreshSlackToken(
+  refreshToken: string,
+  config: OAuthRefreshConfig,
+): Promise<OAuthRefreshResult> {
+  return requestRefreshToken(refreshToken, config, "slack");
+}

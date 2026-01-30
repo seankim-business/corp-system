@@ -26,6 +26,7 @@ import { Permission } from "../auth/rbac";
 import { executeNotionTool } from "../mcp-servers/notion";
 import { executeLinearTool } from "../mcp-servers/linear";
 import { executeGitHubTool } from "../mcp-servers/github";
+import { executeSlackTool } from "../mcp-servers/slack";
 import { MCPConnection } from "../orchestrator/types";
 import { logger } from "../utils/logger";
 import {
@@ -251,7 +252,7 @@ router.post(
           let finalOutputData: any = { message: "Workflow executed successfully" };
 
           if (steps.length > 0) {
-            const [notionConnection, linearConnection, githubConnection] = await Promise.all([
+            const [notionConnection, linearConnection, githubConnection, slackConnection] = await Promise.all([
               prisma.notionConnection.findUnique({
                 where: { organizationId },
               }),
@@ -260,6 +261,9 @@ router.post(
               }),
               prisma.mCPConnection.findFirst({
                 where: { organizationId, provider: "github", enabled: true },
+              }),
+              prisma.mCPConnection.findFirst({
+                where: { organizationId, provider: "slack", enabled: true },
               }),
             ]);
 
@@ -382,6 +386,45 @@ router.post(
                     toolInput,
                     organizationId,
                     githubAccessConnection,
+                    req.user?.id,
+                  );
+                  finalOutputData = { ...finalOutputData, ...toolResult };
+                } else if (step.mcp === "slack") {
+                  if (!slackConnection) {
+                    throw new Error("Slack connection not configured");
+                  }
+                  const config = slackConnection.config as { accessToken: string };
+                  if (!config.accessToken) {
+                    throw new Error("Slack access token not configured");
+                  }
+                  const slackRefreshToken = (slackConnection as Record<string, unknown>)
+                    .refreshToken as string | null | undefined;
+                  const slackExpiresAt = (slackConnection as Record<string, unknown>)
+                    .expiresAt as Date | string | null | undefined;
+                  const slackAccessConnection: MCPConnection = {
+                    id: slackConnection.id,
+                    organizationId: slackConnection.organizationId,
+                    provider: slackConnection.provider,
+                    namespace: slackConnection.provider.toLowerCase(),
+                    name: slackConnection.name,
+                    config: slackConnection.config as Record<string, unknown>,
+                    refreshToken: slackRefreshToken ?? null,
+                    expiresAt:
+                      slackExpiresAt instanceof Date
+                        ? slackExpiresAt
+                        : slackExpiresAt
+                          ? new Date(slackExpiresAt)
+                          : null,
+                    enabled: slackConnection.enabled,
+                    createdAt: slackConnection.createdAt,
+                    updatedAt: slackConnection.updatedAt,
+                  };
+                  const toolResult = await executeSlackTool(
+                    config.accessToken,
+                    step.tool,
+                    toolInput,
+                    organizationId,
+                    slackAccessConnection,
                     req.user?.id,
                   );
                   finalOutputData = { ...finalOutputData, ...toolResult };

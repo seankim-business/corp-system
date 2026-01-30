@@ -1,16 +1,16 @@
 import { PrismaClient } from '@prisma/client';
-import { Redis } from 'ioredis';
+import type { Redis, Cluster } from 'ioredis';
 import { createHash } from 'crypto';
 import { ExecutionStep } from './types';
 import { logger } from '../../utils/logger';
 
 export class ExperienceTracker {
   private prisma: PrismaClient;
-  private redis: Redis | null;
+  private redis: Redis | Cluster | null;
   private bufferKey = 'skill:exp:buffer:';
   private bufferSize = 100;
 
-  constructor(prisma: PrismaClient, redis?: Redis) {
+  constructor(prisma: PrismaClient, redis?: Redis | Cluster) {
     this.prisma = prisma;
     this.redis = redis || null;
   }

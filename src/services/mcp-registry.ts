@@ -10,6 +10,7 @@ import {
   refreshGitHubToken,
   refreshLinearToken,
   refreshNotionToken,
+  refreshSlackToken,
   OAuthRefreshConfig,
   OAuthRefreshError,
 } from "./oauth-refresh";
@@ -380,6 +381,8 @@ const refreshTokenForProvider = async (
       return refreshLinearToken(refreshToken, config);
     case "github":
       return refreshGitHubToken(refreshToken, config);
+    case "slack":
+      return refreshSlackToken(refreshToken, config);
     default:
       throw new Error(`Unsupported OAuth refresh provider: ${provider}`);
   }

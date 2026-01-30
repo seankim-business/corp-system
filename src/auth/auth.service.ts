@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { db } from "../db/client";
 import { logger } from "../utils/logger";
+import { runWithoutRLS } from "../utils/data-isolation";
 
 const googleClient = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
@@ -117,14 +118,17 @@ export class AuthService {
       throw new Error("Unable to determine organization. Please contact admin.");
     }
 
-    let membership = await db.membership.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: organization.id,
-          userId: user.id,
+    // Query membership without RLS since this is part of authentication flow
+    let membership = await runWithoutRLS(() =>
+      db.membership.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: organization.id,
+            userId: user.id,
+          },
         },
-      },
-    });
+      }),
+    );
 
     if (!membership) {
       // First user in a newly created organization becomes owner
@@ -246,17 +250,20 @@ export class AuthService {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new Error("Invalid credentials");
 
-    const membership = await db.membership.findFirst({
-      where: {
-        userId: user.id,
-      },
-      include: {
-        organization: true,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
+    // Query membership without RLS since this is part of authentication flow
+    const membership = await runWithoutRLS(() =>
+      db.membership.findFirst({
+        where: {
+          userId: user.id,
+        },
+        include: {
+          organization: true,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      }),
+    );
 
     if (!membership) throw new Error("User is not a member of any organization");
 
@@ -352,17 +359,20 @@ export class AuthService {
   }
 
   async switchOrganization(userId: string, targetOrgId: string) {
-    const membership = await db.membership.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: targetOrgId,
-          userId,
+    // Query membership without RLS since this is part of authentication flow
+    const membership = await runWithoutRLS(() =>
+      db.membership.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: targetOrgId,
+            userId,
+          },
         },
-      },
-      include: {
-        organization: true,
-      },
-    });
+        include: {
+          organization: true,
+        },
+      }),
+    );
 
     if (!membership) {
       throw new Error("User is not a member of this organization");

@@ -30,6 +30,16 @@ async function authorize(query: AuthorizeQuery): Promise<AuthorizeResult> {
   const integration = await getSlackIntegrationByWorkspace(teamId);
 
   if (!integration) {
+    // Fallback to environment variables for dev/test
+    const envBotToken = process.env.SLACK_BOT_TOKEN;
+    if (envBotToken) {
+      logger.info("Using environment variable fallback for Slack auth", { teamId });
+      return {
+        botToken: envBotToken,
+        botUserId: undefined,
+        botId: undefined,
+      };
+    }
     throw new Error(`No Slack integration found for workspace ${teamId}`);
   }
 

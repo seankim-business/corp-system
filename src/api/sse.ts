@@ -20,8 +20,9 @@ interface SSEClient {
 
 class SSEManager extends EventEmitter {
   private clients: Map<string, SSEClient> = new Map();
-  private redis = getQueueConnectionSync();
-  private subscriber = getQueueConnectionSync();
+  // Mark as long-lived: these connections are held for the service lifetime
+  private redis = getQueueConnectionSync(true);
+  private subscriber = getQueueConnectionSync(true);
 
   constructor() {
     super();

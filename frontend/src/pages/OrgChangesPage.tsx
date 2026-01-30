@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { request } from "../api/client";
 
+interface PRMetadata {
+  number: number;
+  title: string;
+  state: "open" | "closed" | "merged";
+  author?: string;
+  lastSynced?: string;
+}
+
 interface OrganizationChange {
   id: string;
   type: string;
@@ -8,6 +16,10 @@ interface OrganizationChange {
   impactLevel: "low" | "medium" | "high";
   createdBy: string;
   createdAt: string;
+  prUrl?: string;
+  metadata?: {
+    pr?: PRMetadata;
+  };
 }
 
 interface ListResponse {
@@ -26,6 +38,8 @@ export default function OrgChangesPage() {
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [impactFilter, setImpactFilter] = useState<"" | "low" | "medium" | "high">("");
   const [offset, setOffset] = useState(0);
+  const [linkingPRFor, setLinkingPRFor] = useState<string | null>(null);
+  const [prUrlInput, setPrUrlInput] = useState("");
   const limit = 20;
 
   useEffect(() => {
@@ -83,6 +97,71 @@ export default function OrgChangesPage() {
         return "⚙️";
       default:
         return "📝";
+    }
+  };
+
+  const getPRStatusColor = (state: string) => {
+    switch (state) {
+      case "merged":
+        return "bg-purple-100 text-purple-800";
+      case "open":
+        return "bg-green-100 text-green-800";
+      case "closed":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const handleLinkPR = async (changeId: string) => {
+    try {
+      await request({
+        url: `/api/org-changes/${changeId}/link-pr`,
+        method: "POST",
+        data: { prUrl: prUrlInput },
+      });
+
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString(),
+      });
+      if (typeFilter) params.append("type", typeFilter);
+      if (impactFilter) params.append("impactLevel", impactFilter);
+
+      const data = await request<ListResponse>({
+        url: `/api/org-changes?${params.toString()}`,
+        method: "GET",
+      });
+      setChanges(data.data || []);
+      setLinkingPRFor(null);
+      setPrUrlInput("");
+    } catch (error) {
+      console.error("Failed to link PR:", error);
+      alert("Failed to link PR. Please check the URL format.");
+    }
+  };
+
+  const handleSyncPRStatus = async (changeId: string) => {
+    try {
+      await request({
+        url: `/api/org-changes/${changeId}/pr-status`,
+        method: "GET",
+      });
+
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString(),
+      });
+      if (typeFilter) params.append("type", typeFilter);
+      if (impactFilter) params.append("impactLevel", impactFilter);
+
+      const data = await request<ListResponse>({
+        url: `/api/org-changes?${params.toString()}`,
+        method: "GET",
+      });
+      setChanges(data.data || []);
+    } catch (error) {
+      console.error("Failed to sync PR status:", error);
     }
   };
 
@@ -166,6 +245,9 @@ export default function OrgChangesPage() {
                   Impact
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  PR Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
               </tr>
@@ -188,6 +270,61 @@ export default function OrgChangesPage() {
                     >
                       {change.impactLevel}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {change.prUrl && change.metadata?.pr ? (
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={change.prUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getPRStatusColor(
+                            change.metadata.pr.state,
+                          )}`}
+                        >
+                          {change.metadata.pr.state} #{change.metadata.pr.number}
+                        </a>
+                        <button
+                          onClick={() => handleSyncPRStatus(change.id)}
+                          className="text-gray-400 hover:text-gray-600"
+                          title="Refresh PR status"
+                        >
+                          🔄
+                        </button>
+                      </div>
+                    ) : linkingPRFor === change.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={prUrlInput}
+                          onChange={(e) => setPrUrlInput(e.target.value)}
+                          placeholder="https://github.com/..."
+                          className="px-2 py-1 text-xs border border-gray-300 rounded"
+                        />
+                        <button
+                          onClick={() => handleLinkPR(change.id)}
+                          className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                        >
+                          Link
+                        </button>
+                        <button
+                          onClick={() => {
+                            setLinkingPRFor(null);
+                            setPrUrlInput("");
+                          }}
+                          className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setLinkingPRFor(change.id)}
+                        className="text-xs text-indigo-600 hover:text-indigo-800"
+                      >
+                        + Link PR
+                      </button>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(change.createdAt).toLocaleString()}

@@ -7,6 +7,7 @@ import { db } from "../db/client";
 import { generateCodeVerifier, generateCodeChallenge } from "./pkce";
 import { redis } from "../db/redis";
 import { logger } from "../utils/logger";
+import { runWithoutRLS } from "../utils/async-context";
 
 const router = express.Router();
 const authService = new AuthService();
@@ -333,14 +334,17 @@ router.post("/refresh", async (req: Request, res: Response) => {
     const payload = authService.verifyRefreshToken(refreshToken);
 
     const user = await db.user.findUnique({ where: { id: payload.userId } });
-    const membership = await db.membership.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: payload.organizationId,
-          userId: payload.userId,
+    // Query membership without RLS since this is part of token refresh flow
+    const membership = await runWithoutRLS(() =>
+      db.membership.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: payload.organizationId,
+            userId: payload.userId,
+          },
         },
-      },
-    });
+      }),
+    );
 
     if (!user || !membership) {
       return res.status(401).json({ error: "User not found" });
@@ -408,11 +412,14 @@ router.get("/me", authenticate, requireAuth, async (req: Request, res: Response)
     ReturnType<typeof db.membership.findMany<{ include: { organization: true } }>>
   >[number];
 
-  const memberships: MembershipWithOrg[] = await db.membership.findMany({
-    where: { userId },
-    include: { organization: true },
-    orderBy: { createdAt: "asc" },
-  });
+  // Query all memberships without RLS context since user can be member of multiple orgs
+  const memberships: MembershipWithOrg[] = await runWithoutRLS(() =>
+    db.membership.findMany({
+      where: { userId },
+      include: { organization: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  );
 
   const organizations = memberships.map((m: MembershipWithOrg) => ({
     id: m.organization.id,

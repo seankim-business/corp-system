@@ -10,7 +10,7 @@ export interface AgentResult {
   confidence: number;
 }
 
-export type AggregationStrategy = "merge" | "priority" | "voting" | "best_confidence";
+export type AggregationStrategy = "merge" | "priority" | "voting" | "best_confidence" | "weighted_merge";
 
 export interface AggregatedResult {
   success: boolean;
@@ -100,6 +100,8 @@ export function aggregateResults(
       return aggregateVoting(results, conflicts);
     case "best_confidence":
       return aggregateBestConfidence(results, conflicts);
+    case "weighted_merge":
+      return aggregateWeightedMerge(results, conflicts);
   }
 }
 
@@ -261,6 +263,100 @@ function aggregateBestConfidence(
 }
 
 /**
+ * Weighted-merge strategy: merge results with higher confidence having
+ * proportionally more influence. Numeric fields are weighted-averaged,
+ * text fields use the highest confidence result.
+ */
+function aggregateWeightedMerge(
+  results: AgentResult[],
+  conflicts: ConflictInfo[],
+): AggregatedResult {
+  const successful = results.filter((r) => r.success);
+
+  if (successful.length === 0) {
+    return {
+      success: false,
+      data: null,
+      strategy: "weighted_merge",
+      sourceCount: results.length,
+      confidence: 0,
+      conflicts,
+    };
+  }
+
+  // Normalize confidence scores to sum to 1
+  const totalConfidence = successful.reduce((sum, r) => sum + r.confidence, 0);
+  const weights = successful.map((r) => r.confidence / totalConfidence);
+
+  // Collect all top-level keys
+  const allKeys = new Set<string>();
+  for (const result of successful) {
+    if (isRecord(result.data)) {
+      for (const key of Object.keys(result.data)) {
+        allKeys.add(key);
+      }
+    }
+  }
+
+  const merged: Record<string, unknown> = {};
+
+  // Process each key
+  for (const key of allKeys) {
+    const values: Array<{ value: unknown; weight: number }> = [];
+
+    for (let i = 0; i < successful.length; i++) {
+      const result = successful[i];
+      if (isRecord(result.data) && key in result.data) {
+        values.push({ value: result.data[key], weight: weights[i] });
+      }
+    }
+
+    if (values.length === 0) continue;
+
+    // Check if all values are numeric
+    const allNumeric = values.every(
+      (v) => typeof v.value === "number" && !isNaN(v.value),
+    );
+
+    if (allNumeric) {
+      // Weighted average for numeric fields
+      const weightedSum = values.reduce(
+        (sum, v) => sum + (v.value as number) * v.weight,
+        0,
+      );
+      merged[key] = weightedSum;
+    } else {
+      // For non-numeric fields, use the value from the highest confidence result
+      const maxWeightValue = values.reduce((max, v) =>
+        v.weight > max.weight ? v : max,
+      );
+      merged[key] = maxWeightValue.value;
+    }
+  }
+
+  // Weighted average confidence
+  const weightedConfidence = successful.reduce(
+    (sum, r, i) => sum + r.confidence * weights[i],
+    0,
+  );
+
+  logger.debug("Weighted-merge aggregation complete", {
+    successCount: successful.length,
+    totalCount: results.length,
+    confidence: weightedConfidence,
+  });
+
+  return {
+    success: true,
+    data: merged,
+    strategy: "weighted_merge",
+    sourceCount: results.length,
+    confidence: weightedConfidence,
+    conflicts,
+  };
+}
+
+/**
  * Detect conflicting results across agents by comparing top-level
  * fields of data objects. Fields with differing values are reported.
  */
@@ -342,4 +438,40 @@ export function resolveConflicts(
   });
 
   return aggregateResults(results, strategy);
+}
+
+/**
+ * Generate a human-readable summary of aggregated results.
+ * Provides an overview of agent count, key findings, and confidence level.
+ */
+export function generateSummary(results: AgentResult[]): string {
+  if (results.length === 0) {
+    return "No agent results to summarize.";
+  }
+
+  const successful = results.filter((r) => r.success);
+  const avgConfidence =
+    results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
+
+  const confidenceLevel =
+    avgConfidence >= 0.8 ? "high" : avgConfidence >= 0.5 ? "moderate" : "low";
+
+  let summary = `Aggregated results from ${results.length} agent${results.length > 1 ? "s" : ""}. `;
+
+  if (successful.length === results.length) {
+    summary += `All agents completed successfully with ${confidenceLevel} confidence (${(avgConfidence * 100).toFixed(0)}%). `;
+  } else if (successful.length > 0) {
+    summary += `${successful.length} succeeded, ${results.length - successful.length} failed, with ${confidenceLevel} overall confidence (${(avgConfidence * 100).toFixed(0)}%). `;
+  } else {
+    summary += `All agents failed with ${confidenceLevel} confidence (${(avgConfidence * 100).toFixed(0)}%). `;
+  }
+
+  // Add key findings if data is available
+  const firstSuccessful = successful[0];
+  if (firstSuccessful && isRecord(firstSuccessful.data)) {
+    const keyCount = Object.keys(firstSuccessful.data).length;
+    summary += `Results contain ${keyCount} key finding${keyCount > 1 ? "s" : ""}.`;
+  }
+
+  return summary;
 }

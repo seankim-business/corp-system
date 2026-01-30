@@ -5,6 +5,7 @@ import { redis } from "../db/redis";
 import { logger } from "../utils/logger";
 import { setSentryUser } from "../services/sentry";
 import { asyncLocalStorage } from "../utils/async-context";
+import { runWithoutRLS } from "../utils/data-isolation";
 
 const authService = new AuthService();
 
@@ -52,17 +53,21 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return res.status(401).json({ error: "User not found" });
     }
 
-    const membership = await db.membership.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: payload.organizationId,
-          userId: payload.userId,
+    // Query membership without RLS context since we need it to SET the context
+    // The membership lookup is already secured by the unique compound key (organizationId + userId)
+    const membership = await runWithoutRLS(() =>
+      db.membership.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: payload.organizationId,
+            userId: payload.userId,
+          },
         },
-      },
-      include: {
-        organization: true,
-      },
-    });
+        include: {
+          organization: true,
+        },
+      }),
+    );
 
     if (!membership) {
       return res.status(403).json({ error: "Membership not found" });

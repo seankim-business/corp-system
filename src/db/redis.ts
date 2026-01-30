@@ -1,6 +1,14 @@
-import Redis from "ioredis";
+import Redis, { Cluster } from "ioredis";
 import { logger } from "../utils/logger";
 import { getEnv } from "../utils/env";
+import {
+  getRedisMode,
+  createSentinelConnection,
+  createClusterConnection,
+  parseSentinelConfig,
+  parseClusterConfig,
+  type RedisMode,
+} from "../services/redis-ha";
 
 interface RedisPoolConfig {
   min: number;
@@ -8,20 +16,25 @@ interface RedisPoolConfig {
   acquireTimeoutMillis: number;
 }
 
+type RedisConnection = Redis | Cluster;
+
 class RedisConnectionPool {
-  private pool: Redis[] = [];
-  private available: Redis[] = [];
-  private inUse: Set<Redis> = new Set();
-  private inUseTimestamps: Map<Redis, number> = new Map();
+  private pool: RedisConnection[] = [];
+  private available: RedisConnection[] = [];
+  private inUse: Set<RedisConnection> = new Set();
+  private inUseTimestamps: Map<RedisConnection, number> = new Map();
+  private longLivedConnections: Set<RedisConnection> = new Set(); // BullMQ connections
   private config: RedisPoolConfig;
   private poolType: string;
   private healthInterval: NodeJS.Timeout | null = null;
   private leakCheckInterval: NodeJS.Timeout | null = null;
   private readonly MAX_CONNECTION_HOLD_TIME_MS = 30000;
+  private redisMode: RedisMode;
 
   constructor(config: RedisPoolConfig, poolType: string) {
     this.config = config;
     this.poolType = poolType;
+    this.redisMode = getRedisMode();
     this.initialize();
     this.startHealthMonitor();
     this.startLeakDetection();
@@ -37,6 +50,7 @@ class RedisConnectionPool {
     logger.info(`Redis ${this.poolType} pool initialized`, {
       min: this.config.min,
       max: this.config.max,
+      mode: this.redisMode,
     });
   }
 
@@ -67,9 +81,14 @@ class RedisConnectionPool {
   private startLeakDetection(): void {
     this.leakCheckInterval = setInterval(() => {
       const now = Date.now();
-      const leaked: Redis[] = [];
+      const leaked: RedisConnection[] = [];
 
       this.inUseTimestamps.forEach((timestamp, connection) => {
+        // Skip leak detection for long-lived BullMQ connections
+        if (this.longLivedConnections.has(connection)) {
+          return;
+        }
+
         if (now - timestamp > this.MAX_CONNECTION_HOLD_TIME_MS) {
           leaked.push(connection);
         }
@@ -93,11 +112,13 @@ class RedisConnectionPool {
     this.leakCheckInterval.unref?.();
   }
 
-  private forceRelease(connection: Redis): void {
+  private forceRelease(connection: RedisConnection): void {
     this.inUse.delete(connection);
     this.inUseTimestamps.delete(connection);
+    this.longLivedConnections.delete(connection); // Clear long-lived flag
 
-    if (connection.status === "end" || connection.status === "close") {
+    const status = (connection as any).status;
+    if (status === "end" || status === "close") {
       this.removeConnection(connection);
       this.ensureMinimumConnections();
       return;
@@ -106,26 +127,39 @@ class RedisConnectionPool {
     this.available.push(connection);
   }
 
-  private createConnection(): Redis {
-    const env = getEnv();
-    const redisUrl = env.REDIS_URL || "redis://localhost:6379";
-    const redisPassword = env.REDIS_PASSWORD;
-    const isTlsEnabled = redisUrl.startsWith("rediss://");
+  private createConnection(): RedisConnection {
+    let connection: RedisConnection;
 
-    const connection = new Redis(redisUrl, {
-      lazyConnect: false,
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-      password: redisPassword || undefined,
-      ...(isTlsEnabled ? { tls: { rejectUnauthorized: false } } : {}),
-      retryStrategy: (times: number) => {
-        if (times > 10) {
-          logger.error(`Redis ${this.poolType} connection failed after 10 retries`);
-          return null;
+    // Determine connection type based on Redis mode
+    switch (this.redisMode) {
+      case "sentinel": {
+        const sentinelConfig = parseSentinelConfig();
+        if (!sentinelConfig) {
+          logger.error("Failed to parse Sentinel config, falling back to standalone");
+          connection = this.createStandaloneConnection();
+        } else {
+          connection = createSentinelConnection(sentinelConfig);
         }
-        return Math.min(times * 100, 3000);
-      },
-    });
+        break;
+      }
+
+      case "cluster": {
+        const clusterConfig = parseClusterConfig();
+        if (!clusterConfig) {
+          logger.error("Failed to parse Cluster config, falling back to standalone");
+          connection = this.createStandaloneConnection();
+        } else {
+          connection = createClusterConnection(clusterConfig);
+        }
+        break;
+      }
+
+      case "standalone":
+      default: {
+        connection = this.createStandaloneConnection();
+        break;
+      }
+    }
 
     connection.on("error", (err) => {
       logger.error(`Redis ${this.poolType} connection error:`, err);
@@ -142,15 +176,38 @@ class RedisConnectionPool {
     return connection;
   }
 
-  private handleConnectionEnd(connection: Redis): void {
+  private createStandaloneConnection(): Redis {
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+    const redisPassword = process.env.REDIS_PASSWORD;
+    const isTlsEnabled = redisUrl.startsWith("rediss://");
+
+    return new Redis(redisUrl, {
+      lazyConnect: false,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      password: redisPassword || undefined,
+      ...(isTlsEnabled ? { tls: { rejectUnauthorized: false } } : {}),
+      retryStrategy: (times: number) => {
+        if (times > 10) {
+          logger.error(`Redis ${this.poolType} connection failed after 10 retries`);
+          return null;
+        }
+        return Math.min(times * 100, 3000);
+      },
+    });
+  }
+
+  private handleConnectionEnd(connection: RedisConnection): void {
     this.removeConnection(connection);
     this.ensureMinimumConnections();
   }
 
-  private removeConnection(connection: Redis): void {
+  private removeConnection(connection: RedisConnection): void {
     this.pool = this.pool.filter((conn) => conn !== connection);
     this.available = this.available.filter((conn) => conn !== connection);
     this.inUse.delete(connection);
+    this.inUseTimestamps.delete(connection);
+    this.longLivedConnections.delete(connection);
   }
 
   private ensureMinimumConnections(): void {
@@ -163,13 +220,16 @@ class RedisConnectionPool {
   }
 
   private pruneStaleConnections(): void {
-    const stale = this.pool.filter((conn) => conn.status === "end" || conn.status === "close");
+    const stale = this.pool.filter((conn) => {
+      const status = (conn as any).status;
+      return status === "end" || status === "close";
+    });
     if (stale.length === 0) return;
     stale.forEach((conn) => this.removeConnection(conn));
     this.ensureMinimumConnections();
   }
 
-  async acquire(): Promise<Redis> {
+  async acquire(): Promise<RedisConnection> {
     this.pruneStaleConnections();
 
     if (this.available.length > 0) {
@@ -206,13 +266,16 @@ class RedisConnectionPool {
     });
   }
 
-  acquireImmediate(): Redis {
+  acquireImmediate(isLongLived = false): RedisConnection {
     this.pruneStaleConnections();
 
     if (this.available.length > 0) {
       const connection = this.available.pop()!;
       this.inUse.add(connection);
       this.inUseTimestamps.set(connection, Date.now());
+      if (isLongLived) {
+        this.longLivedConnections.add(connection);
+      }
       return connection;
     }
 
@@ -221,19 +284,24 @@ class RedisConnectionPool {
       this.pool.push(connection);
       this.inUse.add(connection);
       this.inUseTimestamps.set(connection, Date.now());
+      if (isLongLived) {
+        this.longLivedConnections.add(connection);
+      }
       return connection;
     }
 
     throw new Error(`Redis ${this.poolType} pool exhausted`);
   }
 
-  release(connection: Redis): void {
+  release(connection: RedisConnection): void {
     if (!this.inUse.has(connection)) return;
 
     this.inUse.delete(connection);
     this.inUseTimestamps.delete(connection);
+    this.longLivedConnections.delete(connection); // Clear long-lived flag on release
 
-    if (connection.status === "end" || connection.status === "close") {
+    const status = (connection as any).status;
+    if (status === "end" || status === "close") {
       this.removeConnection(connection);
       this.ensureMinimumConnections();
       return;
@@ -270,7 +338,9 @@ class RedisConnectionPool {
       total: this.pool.length,
       available: this.available.length,
       inUse: this.inUse.size,
-      ready: this.pool.filter((conn) => conn.status === "ready").length,
+      longLived: this.longLivedConnections.size,
+      ready: this.pool.filter((conn) => (conn as any).status === "ready").length,
+      mode: this.redisMode,
     };
   }
 }
@@ -288,36 +358,36 @@ const workerPool = new RedisConnectionPool(
   "worker",
 );
 
-export async function getQueueConnection(): Promise<Redis> {
+export async function getQueueConnection(): Promise<RedisConnection> {
   return queuePool.acquire();
 }
 
-export function getQueueConnectionSync(): Redis {
-  return queuePool.acquireImmediate();
+export function getQueueConnectionSync(isLongLived = false): RedisConnection {
+  return queuePool.acquireImmediate(isLongLived);
 }
 
-export function releaseQueueConnection(connection: Redis): void {
+export function releaseQueueConnection(connection: RedisConnection): void {
   queuePool.release(connection);
 }
 
-export async function getWorkerConnection(): Promise<Redis> {
+export async function getWorkerConnection(): Promise<RedisConnection> {
   return workerPool.acquire();
 }
 
-export function getWorkerConnectionSync(): Redis {
-  return workerPool.acquireImmediate();
+export function getWorkerConnectionSync(isLongLived = false): RedisConnection {
+  return workerPool.acquireImmediate(isLongLived);
 }
 
-export function releaseWorkerConnection(connection: Redis): void {
+export function releaseWorkerConnection(connection: RedisConnection): void {
   workerPool.release(connection);
 }
 
 // Backwards compatibility (queue pool)
-export function getRedisConnection(): Redis {
+export function getRedisConnection(): RedisConnection {
   return getQueueConnectionSync();
 }
 
-export function releaseRedisConnection(connection: Redis): void {
+export function releaseRedisConnection(connection: RedisConnection): void {
   releaseQueueConnection(connection);
 }
 
@@ -332,7 +402,9 @@ export function getPoolStats() {
   };
 }
 
-export async function withQueueConnection<T>(fn: (connection: Redis) => Promise<T>): Promise<T> {
+export async function withQueueConnection<T>(
+  fn: (connection: RedisConnection) => Promise<T>,
+): Promise<T> {
   const connection = await queuePool.acquire();
   try {
     return await fn(connection);
@@ -341,7 +413,9 @@ export async function withQueueConnection<T>(fn: (connection: Redis) => Promise<
   }
 }
 
-export async function withWorkerConnection<T>(fn: (connection: Redis) => Promise<T>): Promise<T> {
+export async function withWorkerConnection<T>(
+  fn: (connection: RedisConnection) => Promise<T>,
+): Promise<T> {
   const connection = await workerPool.acquire();
   try {
     return await fn(connection);
@@ -434,6 +508,18 @@ export const redis = {
     }
   },
 
+  async ltrim(key: string, start: number, stop: number): Promise<boolean> {
+    try {
+      await withQueueConnection((client) => client.ltrim(getPrefixedKey(key), start, stop));
+      return true;
+    } catch (error: unknown) {
+      logger.error(`Redis LTRIM error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  },
+
   async expire(key: string, seconds: number): Promise<boolean> {
     try {
       const result = await withQueueConnection((client) =>
@@ -521,5 +607,43 @@ export const redis = {
 
   async setex(key: string, ttl: number, value: string): Promise<boolean> {
     return this.set(key, value, ttl);
+  },
+
+  async zremrangebyscore(key: string, min: string | number, max: string | number): Promise<number> {
+    try {
+      return await withQueueConnection((client) =>
+        client.zremrangebyscore(getPrefixedKey(key), min, max)
+      );
+    } catch (error: unknown) {
+      logger.error(`Redis ZREMRANGEBYSCORE error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  },
+
+  async zcard(key: string): Promise<number> {
+    try {
+      return await withQueueConnection((client) => client.zcard(getPrefixedKey(key)));
+    } catch (error: unknown) {
+      logger.error(`Redis ZCARD error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  },
+
+  async pexpire(key: string, milliseconds: number): Promise<boolean> {
+    try {
+      const result = await withQueueConnection((client) =>
+        client.pexpire(getPrefixedKey(key), milliseconds),
+      );
+      return result === 1;
+    } catch (error: unknown) {
+      logger.error(`Redis PEXPIRE error for key ${key}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
   },
 };
