@@ -45,6 +45,8 @@ export interface OrchestrationRequest {
   sessionId: string;
   organizationId: string;
   userId: string;
+  /** Thread context prompt for Slack - includes conversation history */
+  threadContext?: string;
 }
 
 export interface OrchestrationResult {
@@ -112,4 +114,34 @@ export interface MCPConnection {
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Sub-agent spawning types (Phase 3 Intelligence Layer - E2-T1, E2-T4)
+export interface SubAgentConfig {
+  agentType: string;
+  task: string;
+  contextToPass?: {
+    conversationHistory?: boolean; // Last 5 messages
+    relevantEntities?: boolean; // Extracted entities
+    parentSummary?: boolean; // Summary of parent's task
+    customContext?: Record<string, unknown>;
+  };
+  maxDepth?: number;
+  tokenBudget?: number;
+}
+
+export interface SubAgentResult {
+  success: boolean;
+  result: string;
+  tokensUsed: number;
+  executionTime: number;
+  childExecutions: Array<{
+    executionId: string;
+    agentType: string;
+    success: boolean;
+    duration: number;
+    tokensUsed: number;
+    depth: number;
+  }>;
+  error?: string;
 }

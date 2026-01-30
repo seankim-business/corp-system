@@ -8,6 +8,8 @@ export interface OrchestrationData {
   eventId: string;
   slackChannel: string;
   slackThreadTs: string;
+  /** Thread context prompt for AI - includes conversation history */
+  threadContext?: string;
 }
 
 export class OrchestrationQueue extends BaseQueue<OrchestrationData> {

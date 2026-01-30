@@ -27,6 +27,8 @@ export type AuditAction =
   | "approval.approved"
   | "approval.rejected"
   | "approval.expired"
+  | "approval.auto_approved"
+  | "approval.auto_approval_undone"
   | "delegation.created"
   | "delegation.revoked"
   | "delegation.expired"
@@ -35,7 +37,13 @@ export type AuditAction =
   | "workflow.exception"
   | "schedule.created"
   | "schedule.updated"
-  | "schedule.deleted";
+  | "schedule.deleted"
+  | "ar.cost.recorded"
+  | "ar.department.created"
+  | "ar.department.updated"
+  | "ar.department.deleted"
+  | "ar.department.moved"
+  | "ar.department.budget_updated";
 
 export interface AuditLogEntry {
   id?: string;

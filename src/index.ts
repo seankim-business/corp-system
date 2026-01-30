@@ -10,7 +10,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import { authenticate } from "./middleware/auth.middleware";
+import { authenticate, authenticateOptional } from "./middleware/auth.middleware";
 import { correlationIdMiddleware } from "./middleware/correlation-id.middleware";
 import { metricsMiddleware } from "./middleware/metrics.middleware";
 import {
@@ -75,6 +75,15 @@ import agentMetricsRoutes from "./api/agent-metrics";
 // import agentHierarchyRoutes from "./api/agent-hierarchy";
 // import agentActivityRoutes from "./api/agent-activity";
 import regionsRoutes from "./api/regions";
+// AR (Agent Resource) Management routes
+import arDepartmentsRoutes from "./ar/api/ar-departments";
+import arPositionsRoutes from "./ar/api/ar-positions";
+import arAssignmentsRoutes from "./ar/api/ar-assignments";
+import arCoordinationRoutes from "./ar/api/ar-coordination";
+import arAnalyticsRoutes from "./ar/api/ar-analytics";
+import identityRoutes from "./api/identity";
+import memberInviteRoutes from "./api/member-invite";
+import resourceRegistryRoutes from "./api/resource-registry";
 // import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
 // import onboardingRoutes from "./api/onboarding";
@@ -487,7 +496,7 @@ app.use("/api", webhookRateLimiter, syncRoutes);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 app.use("/api", apiRateLimiter, googleAiOAuthRouter);
-app.use("/api", apiRateLimiter, notionOAuthRoutes);
+app.use("/api", apiRateLimiter, authenticateOptional, notionOAuthRoutes);
 // app.use("/api", apiRateLimiter, githubModelsOAuthRouter);
 
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, providersRouter);
@@ -528,6 +537,16 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, agentMetricsRou
 // app.use("/api/agents", apiRateLimiter, authenticate, sentryUserContext, agentHierarchyRoutes);
 // app.use("/api/agent-activity", apiRateLimiter, authenticate, sentryUserContext, agentActivityRoutes);
 app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regionsRoutes);
+// AR (Agent Resource) Management routes
+app.use("/api/ar/departments", apiRateLimiter, authenticate, sentryUserContext, arDepartmentsRoutes);
+app.use("/api/ar/positions", apiRateLimiter, authenticate, sentryUserContext, arPositionsRoutes);
+app.use("/api/ar/assignments", apiRateLimiter, authenticate, sentryUserContext, arAssignmentsRoutes);
+app.use("/api/ar/coordination", apiRateLimiter, authenticate, sentryUserContext, arCoordinationRoutes);
+app.use("/api/ar/analytics", apiRateLimiter, authenticate, sentryUserContext, arAnalyticsRoutes);
+// Identity linking routes
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, identityRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memberInviteRoutes);
+app.use("/api/resource-registry", apiRateLimiter, authenticate, sentryUserContext, resourceRegistryRoutes);
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
 app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);

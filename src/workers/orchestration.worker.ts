@@ -42,7 +42,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
     job: Job<OrchestrationData>,
     data: OrchestrationData,
   ): Promise<void> {
-    const { userRequest, sessionId, organizationId, userId, eventId, slackChannel, slackThreadTs } =
+    const { userRequest, sessionId, organizationId, userId, eventId, slackChannel, slackThreadTs, threadContext } =
       data;
 
     await job.updateProgress(PROGRESS_PERCENTAGES.STARTED);
@@ -100,6 +100,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         sessionId,
         organizationId,
         userId,
+        threadContext,
       });
 
       await job.updateProgress(PROGRESS_PERCENTAGES.PROCESSING);

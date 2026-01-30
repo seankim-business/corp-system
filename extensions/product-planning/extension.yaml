@@ -1,0 +1,193 @@
+id: product-planning
+name: Product Planning AI
+version: 1.0.0
+description: |
+  상품 구성 기획 AI 모듈.
+  트렌드 리포트를 기반으로 시즌별 SKU 계획,
+  카테고리 믹스, 가격대별 구성을 자동화합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - planning
+  - md
+  - sku
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: product-planning
+  inputSchema:
+    type: object
+    properties:
+      trendReportArtifactId:
+        type: string
+        description: Reference to Fashion Research artifact
+      seasonCode:
+        type: string
+        description: Target season (e.g., 2026SS)
+      budget:
+        type: object
+        properties:
+          totalSKUs:
+            type: number
+            description: Target total SKU count
+          budgetKRW:
+            type: number
+            description: Total budget in KRW
+      targets:
+        type: object
+        properties:
+          targetMargin:
+            type: number
+            description: Target margin percentage
+          salesTarget:
+            type: number
+            description: Sales target in KRW
+      constraints:
+        type: object
+        properties:
+          categoryMix:
+            type: object
+            description: Category ratio constraints
+          priceRanges:
+            type: array
+            items:
+              type: object
+              properties:
+                range:
+                  type: string
+                percentage:
+                  type: number
+    required:
+      - seasonCode
+
+  outputSchema:
+    type: object
+    properties:
+      skuPlan:
+        type: object
+        properties:
+          seasonCode:
+            type: string
+          totalSKUs:
+            type: number
+          categories:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                skuCount:
+                  type: number
+                percentage:
+                  type: number
+                priceRange:
+                  type: object
+                  properties:
+                    min:
+                      type: number
+                    max:
+                      type: number
+                    avg:
+                      type: number
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      quantity:
+                        type: number
+                      targetPrice:
+                        type: number
+      priceMix:
+        type: array
+        items:
+          type: object
+          properties:
+            range:
+              type: string
+            skuCount:
+              type: number
+            percentage:
+              type: number
+            expectedRevenue:
+              type: number
+      trendAlignment:
+        type: array
+        items:
+          type: object
+          properties:
+            trendName:
+              type: string
+            alignedSKUs:
+              type: number
+            coverage:
+              type: number
+      projections:
+        type: object
+        properties:
+          expectedRevenue:
+            type: number
+          expectedMargin:
+            type: number
+          riskAssessment:
+            type: string
+
+  requiredInputs:
+    - fashion-research  # Requires trend report from Fashion Research
+  optionalInputs: []
+
+  executorConfig:
+    type: ai-agent
+    agentId: md-planner
+    skillIds:
+      - sku-optimization
+
+components:
+  agents:
+    - id: md-planner
+      configPath: ./agents/md-planner.yaml
+
+  skills:
+    - id: sku-optimization
+      configPath: ./skills/sku-optimization.yaml
+
+permissions:
+  - read:artifacts
+  - write:artifacts
+  - execute:workflows
+
+configSchema:
+  type: object
+  properties:
+    defaultMarginTarget:
+      type: number
+      description: Default target margin percentage
+      default: 55
+    maxSKUsPerSeason:
+      type: number
+      description: Maximum SKUs allowed per season
+      default: 500
+    categoryTemplates:
+      type: object
+      description: Pre-defined category mix templates
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

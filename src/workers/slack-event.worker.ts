@@ -20,7 +20,7 @@ export class SlackEventWorker extends BaseWorker<SlackEventData> {
   }
 
   private async processWithContext(job: Job<SlackEventData>): Promise<void> {
-    const { eventId, text, channel, user, ts, organizationId, userId, sessionId } = job.data;
+    const { eventId, text, channel, user, ts, organizationId, userId, sessionId, threadContext } = job.data;
 
     await job.updateProgress(PROGRESS_PERCENTAGES.VALIDATED);
     await emitJobProgress(job.id || "", PROGRESS_STAGES.VALIDATED, PROGRESS_PERCENTAGES.VALIDATED, {
@@ -32,6 +32,7 @@ export class SlackEventWorker extends BaseWorker<SlackEventData> {
       channel,
       user,
       textPreview: text.substring(0, 50),
+      hasThreadContext: !!threadContext,
     });
 
     try {
@@ -54,6 +55,7 @@ export class SlackEventWorker extends BaseWorker<SlackEventData> {
         eventId,
         slackChannel: channel,
         slackThreadTs: ts,
+        threadContext,
       });
 
       await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);

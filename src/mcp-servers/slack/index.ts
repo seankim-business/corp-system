@@ -13,6 +13,10 @@ import { sendMessageTool } from "./tools/sendMessage";
 import { getUserTool } from "./tools/getUser";
 import { listChannelsTool } from "./tools/listChannels";
 import { searchMessagesTool } from "./tools/searchMessages";
+import { addReactionTool } from "./tools/addReaction";
+import { removeReactionTool } from "./tools/removeReaction";
+import { getThreadMessagesTool } from "./tools/getThreadMessages";
+import { getChannelInfoTool } from "./tools/getChannelInfo";
 import {
   MCPExecuteToolOptions,
   executeTool,
@@ -26,6 +30,10 @@ const legacyToolMap: Record<string, string> = {
   get_user: "getUser",
   list_channels: "listChannels",
   search_messages: "searchMessages",
+  add_reaction: "addReaction",
+  remove_reaction: "removeReaction",
+  get_thread_messages: "getThreadMessages",
+  get_channel_info: "getChannelInfo",
 };
 
 export function registerTools(): string[] {
@@ -34,6 +42,10 @@ export function registerTools(): string[] {
     "slack__getUser",
     "slack__listChannels",
     "slack__searchMessages",
+    "slack__addReaction",
+    "slack__removeReaction",
+    "slack__getThreadMessages",
+    "slack__getChannelInfo",
   ];
 }
 
@@ -77,6 +89,18 @@ export async function executeSlackTool(
 
           case "searchMessages":
             return await searchMessagesTool(token, input, connection, userId);
+
+          case "addReaction":
+            return await addReactionTool(token, input, connection, userId);
+
+          case "removeReaction":
+            return await removeReactionTool(token, input, connection, userId);
+
+          case "getThreadMessages":
+            return await getThreadMessagesTool(token, input, connection, userId);
+
+          case "getChannelInfo":
+            return await getChannelInfoTool(token, input, connection, userId);
 
           default:
             throw new Error(`Unknown Slack tool: ${toolName}`);

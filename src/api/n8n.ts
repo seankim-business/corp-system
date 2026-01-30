@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db as prismaDb } from "../db/client";
 import { logger } from "../utils/logger";
 import { n8nPermissionService } from "../services/n8n/permission-service";
-import { workflowGenerator, workflowGeneratorService } from "../services/n8n/workflow-generator";
+import { workflowGeneratorService as workflowGenerator } from "../services/n8n/workflow-generator";
 import type { GenerateOptions } from "../services/n8n/workflow-generator";
 import { n8nSkillAdapter } from "../services/n8n/skill-adapter";
 import { sopConverter } from "../services/n8n/sop-converter";
@@ -217,22 +217,14 @@ router.post("/workflows", requireAuth, async (req: Request, res: Response) => {
 router.post("/generate", requireAuth, async (req: Request, res: Response) => {
   try {
     const data = GenerateAiWorkflowSchema.parse(req.body);
-    const organizationId = req.currentOrganizationId!;
-    const userId = req.user!.id;
-
-    const result = await workflowGenerator.generate({
-      prompt: data.prompt,
-      organizationId,
-      userId,
+    const workflow = await workflowGenerator.generateWorkflow(data.prompt, {
       category: data.category,
-      availableCredentials: data.availableCredentials,
     });
 
-    if (!result.success) {
-      return res.status(400).json({ error: result.error || "Failed to generate workflow" });
-    }
-
-    return res.json(result);
+    return res.json({
+      success: true,
+      workflow,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
@@ -635,7 +627,7 @@ router.post("/workflows/generate", requireAuth, async (req: Request, res: Respon
     const data = GenerateWorkflowSchema.parse(req.body);
     const options: GenerateOptions | undefined = data.options;
 
-    const workflow = await workflowGeneratorService.generateWorkflow(data.prompt, options);
+    const workflow = await workflowGenerator.generateWorkflow(data.prompt, options);
 
     logger.info("Workflow generated via API", {
       name: workflow.name,
@@ -658,10 +650,7 @@ router.post("/workflows/refine", requireAuth, async (req: Request, res: Response
   try {
     const data = RefineWorkflowSchema.parse(req.body);
 
-    const workflow = await workflowGeneratorService.refineWorkflow(
-      data.workflowJson,
-      data.feedback,
-    );
+    const workflow = await workflowGenerator.refineWorkflow(data.workflowJson, data.feedback);
 
     logger.info("Workflow refined via API", {
       name: workflow.name,
@@ -684,7 +673,7 @@ router.post("/workflows/suggest-nodes", requireAuth, async (req: Request, res: R
   try {
     const data = SuggestNodesSchema.parse(req.body);
 
-    const suggestions = await workflowGeneratorService.suggestNodes(data.description);
+    const suggestions = await workflowGenerator.suggestNodes(data.description);
 
     return res.json(suggestions);
   } catch (error) {
@@ -701,7 +690,7 @@ router.post("/workflows/validate", requireAuth, async (req: Request, res: Respon
   try {
     const workflowJson = req.body;
 
-    const result = workflowGeneratorService.validateGeneratedWorkflow(workflowJson);
+    const result = workflowGenerator.validateGeneratedWorkflow(workflowJson);
 
     return res.json(result);
   } catch (error) {

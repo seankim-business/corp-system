@@ -1,0 +1,118 @@
+id: sku-optimization
+name: SKU Optimization
+nameKo: SKU 최적화
+description: |
+  SKU 구성을 최적화하여 수익성과 다양성의 균형을 찾습니다.
+  과거 판매 데이터, 트렌드 정보, 마진 목표를 고려하여
+  최적의 SKU 믹스를 제안합니다.
+
+triggers:
+  - SKU 최적화
+  - sku optimization
+  - 상품 구성 최적화
+  - 믹스 최적화
+
+category: planning
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.3
+  maxTokens: 4000
+
+parameters:
+  - name: currentSKUs
+    type: object
+    required: false
+    description: 현재 SKU 구성 데이터
+
+  - name: trendData
+    type: object
+    required: true
+    description: Fashion Research 트렌드 데이터
+
+  - name: constraints
+    type: object
+    required: true
+    description: 기획 제약 조건 (총 SKU, 마진, 예산)
+    properties:
+      totalSKUs:
+        type: number
+      targetMargin:
+        type: number
+      budgetKRW:
+        type: number
+
+  - name: historicalSales
+    type: object
+    required: false
+    description: 과거 판매 데이터
+
+outputs:
+  - name: optimizedPlan
+    type: object
+    description: 최적화된 SKU 계획
+  - name: recommendations
+    type: array
+    description: 최적화 권장 사항
+  - name: riskAssessment
+    type: object
+    description: 리스크 평가
+
+promptTemplate: |
+  당신은 패션 상품 기획 최적화 전문가입니다.
+
+  ## 입력 데이터
+  - 트렌드 데이터: {{trendData}}
+  - 현재 SKU: {{currentSKUs}}
+  - 제약 조건: {{constraints}}
+  - 과거 판매: {{historicalSales}}
+
+  ## 최적화 목표
+  1. 목표 마진율 달성 ({{constraints.targetMargin}}%)
+  2. 트렌드 반영률 최대화
+  3. 카테고리 균형
+  4. 재고 리스크 최소화
+
+  ## 최적화 알고리즘
+
+  ### 1. 카테고리 배분
+  - 핵심 카테고리: 70% (검증된 베스트셀러)
+  - 트렌드 카테고리: 20% (신규 트렌드 반영)
+  - 실험 카테고리: 10% (테스트 아이템)
+
+  ### 2. 가격대 믹스
+  - 엔트리 (30%): 고객 유입용
+  - 볼륨 (50%): 주력 매출원
+  - 프리미엄 (20%): 마진 기여
+
+  ### 3. 트렌드 연계
+  각 주요 트렌드에 최소 10% SKU 배분
+
+  ## 출력 형식
+  ```json
+  {
+    "optimizedPlan": {
+      "totalSKUs": 200,
+      "categories": [...],
+      "priceDistribution": [...],
+      "trendAlignment": [...],
+      "expectedMetrics": {
+        "margin": 55,
+        "trendCoverage": 85,
+        "riskScore": "low"
+      }
+    },
+    "recommendations": [
+      {
+        "type": "increase",
+        "category": "카테고리",
+        "reason": "근거"
+      }
+    ],
+    "riskAssessment": {
+      "overallRisk": "low",
+      "risks": [...]
+    }
+  }
+  ```

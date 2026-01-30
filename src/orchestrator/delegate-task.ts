@@ -164,6 +164,8 @@ export async function delegateTask(params: DelegateTaskParams): Promise<Delegate
             userId,
             context: params.context,
             selectedAccount: currentAccount || undefined,
+            agentType: (params.context?.agentType as string) || "ai_executor",
+            enablePatternOptimization: true,
           });
 
           if (currentAccount && result.status !== "rate_limited") {

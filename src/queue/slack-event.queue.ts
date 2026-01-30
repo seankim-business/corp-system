@@ -10,6 +10,8 @@ export interface SlackEventData {
   userId: string;
   sessionId: string;
   eventId: string;
+  /** Thread context prompt for AI - includes conversation history */
+  threadContext?: string;
 }
 
 export class SlackEventQueue extends BaseQueue<SlackEventData> {

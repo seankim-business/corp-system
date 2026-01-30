@@ -12,8 +12,129 @@ import { db as prisma } from "../db/client";
 import { updateApprovalMessage } from "../services/approval-slack";
 import { createAuditLog } from "../services/audit-logger";
 import { undoAutoApproval } from "../services/auto-approval.service";
+import { registerIdentityCommands } from "./slack-identity-commands";
+import { resolveSlackThreadContext, buildSlackContextPrompt } from "../services/slack-thread-context";
 
 let slackApp: App | null = null;
+
+// ============================================================================
+// Ack Reactions - OpenClaw-style instant feedback
+// ============================================================================
+
+const ACK_EMOJI = "eyes"; // 👀 - processing
+const DONE_EMOJI = "white_check_mark"; // ✅ - completed
+
+/**
+ * Add an acknowledgment reaction to show we're processing
+ */
+async function addAckReaction(
+  client: WebClient,
+  channel: string,
+  timestamp: string,
+): Promise<void> {
+  try {
+    await client.reactions.add({
+      channel,
+      timestamp,
+      name: ACK_EMOJI,
+    });
+    logger.debug("Added ack reaction", { channel, timestamp, emoji: ACK_EMOJI });
+  } catch (error: any) {
+    // Ignore "already_reacted" errors
+    if (error.data?.error !== "already_reacted") {
+      logger.warn("Failed to add ack reaction", {
+        channel,
+        timestamp,
+        error: error.message,
+      });
+    }
+  }
+}
+
+/**
+ * Remove the ack reaction and add completion reaction
+ * Exported for use by notification worker when response is sent
+ */
+export async function markMessageComplete(
+  client: WebClient,
+  channel: string,
+  timestamp: string,
+): Promise<void> {
+  try {
+    // Remove the ack reaction
+    await client.reactions.remove({
+      channel,
+      timestamp,
+      name: ACK_EMOJI,
+    }).catch(() => {
+      // Ignore if reaction wasn't there
+    });
+
+    // Add completion reaction
+    await client.reactions.add({
+      channel,
+      timestamp,
+      name: DONE_EMOJI,
+    });
+    logger.debug("Marked message complete", { channel, timestamp });
+  } catch (error: any) {
+    if (error.data?.error !== "already_reacted") {
+      logger.warn("Failed to mark message complete", {
+        channel,
+        timestamp,
+        error: error.message,
+      });
+    }
+  }
+}
+
+/**
+ * Add a custom reaction to a message
+ */
+export async function addReaction(
+  client: WebClient,
+  channel: string,
+  timestamp: string,
+  emoji: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await client.reactions.add({
+      channel,
+      timestamp,
+      name: emoji.replace(/:/g, ""), // Remove colons if present
+    });
+    return { ok: true };
+  } catch (error: any) {
+    if (error.data?.error === "already_reacted") {
+      return { ok: true }; // Already reacted is success
+    }
+    return { ok: false, error: error.message };
+  }
+}
+
+/**
+ * Remove a reaction from a message
+ */
+export async function removeReaction(
+  client: WebClient,
+  channel: string,
+  timestamp: string,
+  emoji: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await client.reactions.remove({
+      channel,
+      timestamp,
+      name: emoji.replace(/:/g, ""),
+    });
+    return { ok: true };
+  } catch (error: any) {
+    if (error.data?.error === "no_reaction") {
+      return { ok: true }; // No reaction to remove is success
+    }
+    return { ok: false, error: error.message };
+  }
+}
 
 interface AuthorizeQuery {
   teamId?: string;
@@ -94,6 +215,9 @@ function setupEventHandlers(app: App): void {
 
     try {
       const { user, text, channel, thread_ts, ts } = event;
+
+      // Add ack reaction immediately for instant feedback
+      await addAckReaction(client as WebClient, channel, ts);
 
       // messageTs is for thread context (reply in same thread)
       const messageTs = thread_ts || ts;
@@ -177,6 +301,32 @@ function setupEventHandlers(app: App): void {
 
       const eventId = randomUUID();
 
+      // Collect thread context for AI (OpenClaw-style context awareness)
+      let threadContextPrompt: string | undefined;
+      try {
+        const slackContext = await resolveSlackThreadContext(
+          client as WebClient,
+          channel,
+          thread_ts,
+          ts,
+          user,
+        );
+        threadContextPrompt = buildSlackContextPrompt(slackContext);
+
+        logger.debug("Collected Slack thread context", {
+          channel,
+          hasThread: !!thread_ts,
+          messageCount: slackContext.threadContext?.messageCount || 0,
+        });
+      } catch (error) {
+        logger.warn("Failed to collect thread context, continuing without", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      // Store original message ts for ack reaction completion
+      await redis.set(`slack:original_ts:${eventId}`, ts, 600);
+
       await slackEventQueue.enqueueEvent({
         type: "app_mention",
         channel,
@@ -187,6 +337,7 @@ function setupEventHandlers(app: App): void {
         userId: nubabelUser.id,
         sessionId: session.id,
         eventId,
+        threadContext: threadContextPrompt,
       });
 
       const progressMessage = await say({
@@ -228,9 +379,12 @@ function setupEventHandlers(app: App): void {
 
   app.message(async ({ message, say, client }) => {
     if ("channel_type" in message && message.channel_type === "im") {
-      const msg = message as { user?: string; text?: string; channel: string; ts: string };
+      const msg = message as { user?: string; text?: string; channel: string; ts: string; thread_ts?: string };
 
       if (!msg.user || !msg.text) return;
+
+      // Add ack reaction immediately for instant feedback
+      await addAckReaction(client as WebClient, msg.channel, msg.ts);
 
       const dedupeKey = `slack:dedupe:direct_message:${msg.channel}:${msg.ts}`;
       const alreadyProcessed = await redis.exists(dedupeKey);
@@ -280,6 +434,26 @@ function setupEventHandlers(app: App): void {
 
         const eventId = randomUUID();
 
+        // Collect context for DMs (recent messages in conversation)
+        let threadContextPrompt: string | undefined;
+        try {
+          const slackContext = await resolveSlackThreadContext(
+            client as WebClient,
+            msg.channel,
+            msg.thread_ts,
+            msg.ts,
+            msg.user,
+          );
+          threadContextPrompt = buildSlackContextPrompt(slackContext);
+        } catch (error) {
+          logger.warn("Failed to collect DM context", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        // Store original message ts for ack reaction completion
+        await redis.set(`slack:original_ts:${eventId}`, msg.ts, 600);
+
         await slackEventQueue.enqueueEvent({
           type: "direct_message",
           channel: msg.channel,
@@ -290,6 +464,7 @@ function setupEventHandlers(app: App): void {
           userId: nubabelUser.id,
           sessionId: session.id,
           eventId,
+          threadContext: threadContextPrompt,
         });
 
         const progressMessage = await say(`🤔 Processing your message...`);
@@ -1148,6 +1323,7 @@ export async function startSlackBot(): Promise<void> {
 
   slackApp = createSlackApp();
   setupEventHandlers(slackApp);
+  registerIdentityCommands(slackApp);
 
   await slackApp.start();
   logger.info("Slack Bot started (multi-tenant mode)");

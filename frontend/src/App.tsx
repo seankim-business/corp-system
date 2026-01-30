@@ -13,6 +13,7 @@ import SettingsPage from "./pages/SettingsPage";
 import NotionSettingsPage from "./pages/NotionSettingsPage";
 import SlackSettingsPage from "./pages/SlackSettingsPage";
 import GoogleCalendarSettingsPage from "./pages/GoogleCalendarSettingsPage";
+import LinkedIdentitiesPage from "./pages/settings/LinkedIdentities";
 import MembersPage from "./pages/MembersPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
 import AgentActivityPage from "./pages/AgentActivityPage";
@@ -25,6 +26,7 @@ import ConversationsPage from "./pages/ConversationsPage";
 import SearchPage from "./pages/SearchPage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminOrganizationsPage from "./pages/admin/AdminOrganizationsPage";
+import IdentityManagementPage from "./pages/admin/IdentityManagement";
 import AnalyticsDashboardPage from "./pages/AnalyticsDashboardPage";
 import BillingPage from "./pages/BillingPage";
 import CostDashboardPage from "./pages/CostDashboardPage";
@@ -153,6 +155,16 @@ function App() {
           }
         />
         <Route
+          path="/settings/identities"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <LinkedIdentitiesPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/settings/members"
           element={
             <ProtectedRoute>
@@ -238,6 +250,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <AdminOrganizationsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/identities"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <IdentityManagementPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

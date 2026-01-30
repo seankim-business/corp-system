@@ -46,6 +46,10 @@ const ORG_SCOPED_MODELS = new Set([
   "UsageRecord",
   "OnboardingState",
   "Objective",
+  "ExternalIdentity",
+  "IdentityLinkSuggestion",
+  "IdentityLinkAudit",
+  "IdentitySettings",
 ]);
 
 // Prisma actions that read or mutate scoped rows

@@ -108,6 +108,78 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   return next();
 }
 
+/**
+ * Optional authentication middleware - tries to authenticate but doesn't fail
+ * if there's no token. Useful for routes where some endpoints need auth and
+ * others don't (like OAuth callback routes).
+ */
+export async function authenticateOptional(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const token = req.cookies.session || req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      // No token - proceed without user
+      return next();
+    }
+
+    const isBlacklisted = await redis.get(`token_blacklist:${token}`);
+    if (isBlacklisted) {
+      // Token revoked - proceed without user
+      return next();
+    }
+
+    const payload = authService.verifySessionToken(token);
+
+    const user = await db.user.findUnique({
+      where: { id: payload.userId },
+    });
+
+    if (!user) {
+      return next();
+    }
+
+    const membership = await runWithoutRLS(() =>
+      db.membership.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: payload.organizationId,
+            userId: payload.userId,
+          },
+        },
+        include: {
+          organization: true,
+        },
+      }),
+    );
+
+    if (!membership) {
+      return next();
+    }
+
+    req.user = { ...user, organizationId: payload.organizationId };
+    req.organization = membership.organization;
+    req.membership = membership;
+    req.currentOrganizationId = payload.organizationId;
+
+    if (user && payload.organizationId) {
+      setSentryUser(user.id, payload.organizationId, user.email ?? undefined);
+    }
+
+    // Store organization context in AsyncLocalStorage for RLS middleware
+    return asyncLocalStorage.run(
+      {
+        organizationId: payload.organizationId,
+        userId: payload.userId,
+        role: membership.role,
+      },
+      () => next(),
+    );
+  } catch {
+    // Any error - proceed without user
+    return next();
+  }
+}
+
 export function requireOrganization(req: Request, res: Response, next: NextFunction) {
   if (!req.organization) {
     return res.status(400).json({ error: "Organization required" });

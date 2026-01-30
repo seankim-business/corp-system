@@ -1,19 +1,19 @@
 # Agent Coordination Board
 
-> **Last Updated**: 2026-01-30 17:16 KST
+> **Last Updated**: 2026-01-30 16:41 KST
 > **Purpose**: 멀티 에이전트 작업 현황 추적 및 충돌 방지
 
 ---
 
 ## Active Agents
 
-| Agent ID          | Task                                  | Files Being Modified                                                                                          | Status      | Started |
-| ----------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- | ------- |
-| `sisyphus-n8n-01` | Add n8n instance provisioning service | `src/services/n8n/instance-provisioner.ts`, `src/services/n8n/index.ts`, `src/services/encryption.service.ts` | **WORKING** | 14:20   |
-| `sisyphus-n8n-02` | Add n8n credential sync service       | `src/services/n8n/credential-sync.ts`                                                                         | **WORKING** | 14:50   |
-| `sisyphus-n8n-03` | Add n8n workflow generator service    | `src/services/n8n/workflow-generator.ts`, `src/api/n8n.ts`                                                    | **WORKING** | 17:12   |
-| `sisyphus-sop-01` | Add SOP ↔ n8n converter               | `src/services/n8n/sop-converter.ts`, `src/services/n8n/index.ts`                                              | **WORKING** | 17:13   |
-| `sisyphus-n8n-04` | Add n8n skill adapter + API endpoints | `src/services/n8n/skill-adapter.ts`, `src/services/n8n/index.ts`, `src/api/n8n.ts`                            | **WORKING** | 17:14   |
+| Agent ID               | Task                                  | Files Being Modified                                                                                          | Status      | Started |
+| ---------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------- | ------- |
+| `sisyphus-n8n-01`      | Add n8n instance provisioning service | `src/services/n8n/instance-provisioner.ts`, `src/services/n8n/index.ts`, `src/services/encryption.service.ts` | **WORKING** | 14:20   |
+| `sisyphus-n8n-02`      | Add n8n credential sync service       | `src/services/n8n/credential-sync.ts`                                                                         | **WORKING** | 14:50   |
+| `sisyphus-n8n-03`      | Add n8n workflow generator service    | `src/services/n8n/workflow-generator.ts`, `src/api/n8n.ts`                                                    | **WORKING** | 17:12   |
+| `sisyphus-n8n-04`      | Add n8n skill adapter + API endpoints | `src/services/n8n/skill-adapter.ts`, `src/services/n8n/index.ts`, `src/api/n8n.ts`                            | **WORKING** | 17:14   |
+| `sisyphus-identity-01` | Multi-Ecosystem User Identity Linking | `prisma/schema.prisma`, `src/services/identity/*`, `src/api/identity.ts`                                      | **WORKING** | 16:41   |
 
 ---
 
@@ -21,18 +21,20 @@
 
 > 파일 수정 전 여기서 lock 여부 확인. 충돌 시 기존 에이전트와 조율 필요.
 
-| File/Directory                             | Locked By         | Reason                    | Until |
-| ------------------------------------------ | ----------------- | ------------------------- | ----- |
-| `.env`                                     | -                 | -                         | -     |
-| `src/api/slack*.ts`                        | -                 | -                         | -     |
-| `src/services/n8n/instance-provisioner.ts` | `sisyphus-n8n-01` | n8n instance provisioning | 15:20 |
-| `src/services/n8n/index.ts`                | `sisyphus-n8n-04` | n8n skill adapter export  | 18:30 |
-| `src/services/encryption.service.ts`       | `sisyphus-n8n-01` | n8n instance provisioning | 15:20 |
-| `src/services/n8n/credential-sync.ts`      | `sisyphus-n8n-02` | n8n credential sync       | 15:50 |
-| `src/services/n8n/workflow-generator.ts`   | `sisyphus-n8n-03` | workflow generator        | 18:12 |
-| `src/api/n8n.ts`                           | `sisyphus-n8n-04` | n8n skill endpoints       | 18:30 |
-| `src/services/n8n/sop-converter.ts`        | `sisyphus-sop-01` | SOP converter             | 18:13 |
-| `src/services/n8n/skill-adapter.ts`        | `sisyphus-n8n-04` | n8n skill adapter         | 18:30 |
+| File/Directory                             | Locked By              | Reason                    | Until |
+| ------------------------------------------ | ---------------------- | ------------------------- | ----- |
+| `.env`                                     | -                      | -                         | -     |
+| `src/api/slack*.ts`                        | -                      | -                         | -     |
+| `src/services/n8n/instance-provisioner.ts` | `sisyphus-n8n-01`      | n8n instance provisioning | 15:20 |
+| `src/services/n8n/index.ts`                | `sisyphus-n8n-04`      | n8n skill adapter export  | 18:30 |
+| `src/services/encryption.service.ts`       | `sisyphus-n8n-01`      | n8n instance provisioning | 15:20 |
+| `src/services/n8n/credential-sync.ts`      | `sisyphus-n8n-02`      | n8n credential sync       | 15:50 |
+| `src/services/n8n/workflow-generator.ts`   | `sisyphus-n8n-03`      | workflow generator        | 18:12 |
+| `src/api/n8n.ts`                           | `sisyphus-n8n-04`      | n8n skill endpoints       | 18:30 |
+| `src/services/n8n/skill-adapter.ts`        | `sisyphus-n8n-04`      | n8n skill adapter         | 18:30 |
+| `prisma/schema.prisma`                     | `sisyphus-identity-01` | Identity linking models   | 18:00 |
+| `src/services/identity/*`                  | `sisyphus-identity-01` | Identity services         | 20:00 |
+| `src/api/identity.ts`                      | `sisyphus-identity-01` | Identity API              | 20:00 |
 
 ---
 
@@ -40,6 +42,7 @@
 
 | Agent ID           | Task                                       | Files Modified                                                                                          | Completed |
 | ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- | --------- |
+| `sisyphus-sop-01`  | Add SOP ↔ n8n converter                    | `src/services/n8n/sop-converter.ts`                                                                     | 17:44     |
 | `sisyphus-main`    | **Next Phase Complete** - 9 tasks (T3-T12) | ai-executor.ts, slack-progress.service.ts, docs/, tests/                                                | 14:45     |
 | `sisyphus-main`    | **Phase 3 Complete** - All P0/P1 tasks     | Multiple files - see git diff                                                                           | 13:57     |
 | `executor-aed59b5` | P0-3: LLM Fallback Intent Detection        | `src/orchestrator/intent-detector.ts`, `src/orchestrator/ambiguity-detector.ts`, tests & examples       | 11:20     |

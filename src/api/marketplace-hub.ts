@@ -11,8 +11,7 @@ import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.middleware";
 import { logger } from "../utils/logger";
-import { ComfyUISource } from "../marketplace/services/sources/external/comfyui-source";
-import { CivitAISource } from "../marketplace/services/sources/external/civitai-source";
+import { createAllSources } from "../marketplace/services/sources/external";
 import type {
   BaseExternalSource,
   ExternalSourceItem,
@@ -27,23 +26,33 @@ let sources: Map<string, BaseExternalSource> | null = null;
 
 /**
  * Initialize external sources (lazy singleton pattern)
+ * Uses createAllSources() factory to register all available sources:
+ * - Smithery (MCP servers)
+ * - MCP Registry (official registry)
+ * - Glama (17,400+ servers)
+ * - ComfyUI (workflows/extensions)
+ * - CivitAI (AI models/workflows)
+ * - LangChain Hub (prompts/chains)
  */
 function getSources(): Map<string, BaseExternalSource> {
   if (!sources) {
     sources = new Map();
 
-    // Initialize ComfyUI source
-    const comfyui = new ComfyUISource();
-    sources.set(comfyui.sourceId, comfyui);
-
-    // Initialize CivitAI source
-    const civitai = new CivitAISource({
-      apiKey: process.env.CIVITAI_API_KEY,
+    // Initialize all sources with API keys from environment
+    const allSources = createAllSources({
+      smitheryApiKey: process.env.SMITHERY_API_KEY,
+      civitaiApiKey: process.env.CIVITAI_API_KEY,
+      langchainApiKey: process.env.LANGCHAIN_API_KEY,
     });
-    sources.set(civitai.sourceId, civitai);
+
+    // Register each source by its ID
+    for (const source of allSources) {
+      sources.set(source.sourceId, source);
+    }
 
     logger.info("External sources initialized", {
       sources: Array.from(sources.keys()),
+      count: sources.size,
     });
   }
 

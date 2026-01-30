@@ -35,7 +35,7 @@ const tracer = trace.getTracer("orchestrator");
 
 export async function orchestrate(request: OrchestrationRequest): Promise<OrchestrationResult> {
   return await tracer.startActiveSpan("orchestrator.orchestrate", async (span) => {
-    const { userRequest, sessionId, organizationId, userId } = request;
+    const { userRequest, sessionId, organizationId, userId, threadContext } = request;
     const environment = process.env.NODE_ENV || "development";
 
     try {
@@ -247,6 +247,8 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         userId,
         registrySkillPrompts: registrySkillResult?.skillPrompts || [],
         executableSkills: registrySkillResult?.executableSkills || [],
+        // Slack thread context for conversation awareness (OpenClaw-style)
+        threadContext,
       };
 
       // Execute registry-based executable skills (code/mcp runtime)
@@ -729,3 +731,28 @@ async function saveExecution(data: any) {
     },
   });
 }
+
+// Export sub-agent spawning functionality (Phase 3 Intelligence Layer - E2-T1)
+export {
+  spawnSubAgent,
+  createAgentContext,
+  getSpawnTree,
+  getSpawnStatistics,
+  logExecutionTree,
+  getExecutionTreeSummary,
+  type AgentContext,
+  type SubAgentConfig,
+  type SubAgentResult,
+  type ChildExecution,
+} from "./sub-agent-spawner";
+
+// Export spawn tree visualization (Phase 3 Intelligence Layer - E2-T3)
+export {
+  visualizeSpawnTree,
+  formatSpawnTreeForLogs,
+  getSpawnTreeMetrics,
+  logSpawnTree,
+  getSpawnTreeSummary,
+  type SpawnTreeNode,
+  type TreeMetrics,
+} from "./spawn-tree-visualizer";

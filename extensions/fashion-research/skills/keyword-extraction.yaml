@@ -1,0 +1,115 @@
+id: keyword-extraction
+name: Keyword Extraction
+nameKo: 키워드 추출
+description: |
+  트렌드 데이터에서 핵심 키워드를 추출하고 분석합니다.
+  키워드의 검색량, 추세, 관련어를 파악하여
+  마케팅 및 상품 기획에 활용할 수 있는 인사이트를 제공합니다.
+
+triggers:
+  - 키워드 추출
+  - keyword extraction
+  - 키워드 분석
+  - 검색어 분석
+
+category: research
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.2
+  maxTokens: 3000
+
+parameters:
+  - name: trendData
+    type: object
+    required: true
+    description: 트렌드 스크래핑에서 수집된 데이터
+
+  - name: targetLanguages
+    type: array
+    items:
+      type: string
+      enum:
+        - ko
+        - en
+        - ja
+        - zh
+    required: false
+    default: ["ko", "en"]
+    description: 추출할 키워드 언어
+
+  - name: maxKeywords
+    type: number
+    required: false
+    default: 50
+    description: 추출할 최대 키워드 수
+
+outputs:
+  - name: keywords
+    type: array
+    description: 추출된 키워드 목록 (볼륨, 추세 포함)
+  - name: relatedTerms
+    type: object
+    description: 키워드별 관련어 맵
+  - name: keywordClusters
+    type: array
+    description: 키워드 클러스터 (유사 키워드 그룹)
+
+promptTemplate: |
+  당신은 패션 키워드 분석 전문가입니다.
+
+  ## 입력 데이터
+  {{trendData}}
+
+  ## 추출 지침
+
+  ### 1. 핵심 키워드 식별
+  - 패션 아이템명 (예: 오버사이즈 블레이저, 와이드 팬츠)
+  - 스타일 키워드 (예: 미니멀, 레트로, Y2K)
+  - 소재 키워드 (예: 린넨, 캐시미어, 테크 소재)
+  - 컬러 키워드 (예: 밀크티, 버터옐로우)
+  - 트렌드 키워드 (예: 퀴닛 럭셔리, 고프코어)
+
+  ### 2. 키워드 속성 분석
+  각 키워드에 대해:
+  - 추정 검색량 (high/medium/low)
+  - 추세 (rising/stable/declining)
+  - 관련 키워드
+  - 주 사용 플랫폼
+
+  ### 3. 클러스터링
+  유사한 키워드를 그룹화:
+  - 스타일 클러스터
+  - 아이템 클러스터
+  - 소재 클러스터
+  - 컬러 클러스터
+
+  ## 출력 형식
+  ```json
+  {
+    "keywords": [
+      {
+        "term": "키워드",
+        "termEn": "keyword",
+        "volume": "high",
+        "trend": "rising",
+        "category": "style",
+        "platforms": ["instagram", "pinterest"]
+      }
+    ],
+    "relatedTerms": {
+      "키워드": ["관련어1", "관련어2"]
+    },
+    "keywordClusters": [
+      {
+        "name": "클러스터명",
+        "keywords": ["키워드1", "키워드2"],
+        "theme": "테마 설명"
+      }
+    ]
+  }
+  ```
+
+  ## 타겟 언어: {{targetLanguages}}
+  ## 최대 키워드 수: {{maxKeywords}}

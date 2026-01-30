@@ -7,6 +7,7 @@ import { logger } from "../utils/logger";
 import { getSlackIntegrationByOrg } from "../api/slack-integration";
 import { emitJobProgress, PROGRESS_STAGES, PROGRESS_PERCENTAGES } from "../events/job-progress";
 import { runWithContext } from "../utils/async-context";
+import { markMessageComplete } from "../api/slack";
 
 export class NotificationWorker extends BaseWorker<NotificationData> {
   constructor() {
@@ -89,6 +90,13 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
         await redis.set(`slack:bot_message:${eventId}`, result.ts, 86400); // 24 hour expiry
         // Also store reverse mapping: message timestamp -> eventId
         await redis.set(`slack:bot_message_reverse:${channel}:${result.ts}`, eventId, 86400);
+
+        // Mark the original message as complete with check mark (OpenClaw-style ack)
+        const originalTs = await redis.get(`slack:original_ts:${eventId}`);
+        if (originalTs) {
+          await markMessageComplete(slackClient, channel, originalTs);
+          await redis.del(`slack:original_ts:${eventId}`);
+        }
       }
 
       await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);

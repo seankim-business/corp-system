@@ -1,0 +1,185 @@
+id: fashion-research
+name: Fashion Research AI
+version: 1.0.0
+description: |
+  패션 트렌드 리서치 및 분석 자동화 모듈.
+  시장 트렌드, 소셜 미디어 분석, 키워드 추출을 통해
+  데이터 기반의 트렌드 리포트를 생성합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - research
+  - trends
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: fashion-research
+  inputSchema:
+    type: object
+    properties:
+      seasonCode:
+        type: string
+        description: Target season (e.g., 2026SS, 2026FW)
+      targetMarket:
+        type: array
+        items:
+          type: string
+          enum: [korea, japan, china, usa, europe, global]
+        description: Target markets for trend analysis
+      categories:
+        type: array
+        items:
+          type: string
+        description: Fashion categories to analyze (e.g., women-casual, athleisure)
+      sources:
+        type: array
+        items:
+          type: string
+          enum: [google-trends, instagram, pinterest, runway-shows, street-style, competitor]
+        description: Data sources to analyze
+    required:
+      - seasonCode
+
+  outputSchema:
+    type: object
+    properties:
+      trends:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            category:
+              type: string
+            confidence:
+              type: number
+            growthRate:
+              type: number
+            keywords:
+              type: array
+              items:
+                type: string
+            images:
+              type: array
+              items:
+                type: string
+            sources:
+              type: array
+              items:
+                type: string
+      keywords:
+        type: array
+        items:
+          type: object
+          properties:
+            term:
+              type: string
+            volume:
+              type: number
+            trend:
+              type: string
+              enum: [rising, stable, declining]
+            relatedTerms:
+              type: array
+              items:
+                type: string
+      colorPalette:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            hex:
+              type: string
+            pantone:
+              type: string
+            usage:
+              type: string
+      marketInsights:
+        type: array
+        items:
+          type: object
+          properties:
+            market:
+              type: string
+            insight:
+              type: string
+            dataSource:
+              type: string
+      targetDemographic:
+        type: object
+        properties:
+          ageRange:
+            type: string
+          gender:
+            type: string
+          lifestyle:
+            type: array
+            items:
+              type: string
+          valuePropositions:
+            type: array
+            items:
+              type: string
+
+  requiredInputs: []  # Entry point module - no dependencies
+  optionalInputs: []
+
+  executorConfig:
+    type: ai-agent
+    agentId: trend-analyst
+    skillIds:
+      - trend-scraping
+      - keyword-extraction
+
+components:
+  agents:
+    - id: trend-analyst
+      configPath: ./agents/trend-analyst.yaml
+
+  skills:
+    - id: trend-scraping
+      configPath: ./skills/trend-scraping.yaml
+    - id: keyword-extraction
+      configPath: ./skills/keyword-extraction.yaml
+
+permissions:
+  - read:web
+  - execute:workflows
+  - write:artifacts
+
+configSchema:
+  type: object
+  properties:
+    googleTrendsApiKey:
+      type: string
+      description: Google Trends API key (optional)
+      secret: true
+    socialMediaTokens:
+      type: object
+      description: Social media API tokens
+      secret: true
+    dataRetentionDays:
+      type: number
+      description: Days to retain research data
+      default: 90
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

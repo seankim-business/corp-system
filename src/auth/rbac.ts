@@ -74,6 +74,10 @@ export enum Permission {
   // Audit permissions
   AUDIT_READ = "audit:read",
 
+  // AR (Agent Resource) Management permissions
+  AR_READ = "ar:read",
+  AR_WRITE = "ar:write",
+
   // Billing permissions (owner only)
   BILLING_READ = "billing:read",
   BILLING_MANAGE = "billing:manage",
@@ -159,6 +163,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.APPROVAL_RESPOND,
     // Dashboard access
     Permission.DASHBOARD_READ,
+    // AR permissions
+    Permission.AR_READ,
+    Permission.AR_WRITE,
   ],
 
   [Role.ADMIN]: [
@@ -188,6 +195,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.APPROVAL_READ,
     Permission.APPROVAL_RESPOND,
     Permission.DASHBOARD_READ,
+    // AR permissions
+    Permission.AR_READ,
+    Permission.AR_WRITE,
     // NO billing access
     // NO org deletion
   ],
@@ -211,6 +221,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.APPROVAL_READ,
     Permission.APPROVAL_RESPOND,
     Permission.DASHBOARD_READ,
+    // AR permissions (read only for members)
+    Permission.AR_READ,
     // NO workflow delete
     // NO member management
     // NO settings update
@@ -228,6 +240,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.INTEGRATION_READ,
     Permission.APPROVAL_READ,
     Permission.DASHBOARD_READ,
+    // AR read-only
+    Permission.AR_READ,
     // NO create/update/delete
     // NO execute
     // NO audit

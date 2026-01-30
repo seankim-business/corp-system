@@ -16,6 +16,7 @@ import {
   getActiveMCPConnections,
   getAccessTokenFromConfig,
 } from "../services/mcp-registry";
+import { applyPatternContext } from "../services/pattern-optimizer";
 
 export interface AIExecutionParams {
   category: Category;
@@ -26,6 +27,8 @@ export interface AIExecutionParams {
   userId: string;
   context?: Record<string, unknown>;
   selectedAccount?: ClaudeAccount;
+  agentType?: string; // Agent type for pattern retrieval
+  enablePatternOptimization?: boolean; // Enable/disable pattern application
 }
 
 export interface AIExecutionResult {
@@ -42,6 +45,12 @@ export interface AIExecutionResult {
     accountName?: string;
     cacheReadTokens?: number;
     retryable?: boolean;
+    appliedPatterns?: Array<{
+      id: string;
+      type: string;
+      confidence: number;
+    }>;
+    patternCount?: number;
   };
 }
 
@@ -104,7 +113,11 @@ Provide production-ready code with modern best practices.`,
 
 const tracer = trace.getTracer("ai-executor");
 
-function buildSystemPrompt(skills: string[], registrySkillPrompts?: string[]): string {
+function buildSystemPrompt(
+  skills: string[],
+  registrySkillPrompts?: string[],
+  threadContext?: string,
+): string {
   const basePrompt = `You are a helpful AI assistant. Respond concisely and accurately.`;
 
   // Legacy hardcoded skill prompts
@@ -117,11 +130,19 @@ function buildSystemPrompt(skills: string[], registrySkillPrompts?: string[]): s
 
   const allPrompts = [...legacyPrompts, ...registryPrompts].filter(Boolean);
 
+  let systemPrompt: string;
   if (allPrompts.length === 0) {
-    return basePrompt;
+    systemPrompt = basePrompt;
+  } else {
+    systemPrompt = `${allPrompts.join("\n\n---\n\n")}\n\n---\n\nRemember to be helpful, accurate, and concise.`;
   }
 
-  return `${allPrompts.join("\n\n---\n\n")}\n\n---\n\nRemember to be helpful, accurate, and concise.`;
+  // Add Slack thread context for conversation awareness (OpenClaw-style)
+  if (threadContext) {
+    systemPrompt = `${systemPrompt}\n\n---\n\n${threadContext}`;
+  }
+
+  return systemPrompt;
 }
 
 // ============================================================================
@@ -352,6 +373,90 @@ function buildOrganizationConnectionTools(connections: MCPConnection[]): Anthrop
                 },
               },
               required: ["query"],
+            },
+          },
+          {
+            name: `${conn.namespace}__addReaction`,
+            description: `Add an emoji reaction to a Slack message via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                channel: {
+                  type: "string",
+                  description: "Channel ID where the message is",
+                },
+                timestamp: {
+                  type: "string",
+                  description: "Message timestamp to react to",
+                },
+                emoji: {
+                  type: "string",
+                  description: "Emoji name (e.g., 'thumbsup', 'heart', 'eyes')",
+                },
+              },
+              required: ["channel", "timestamp", "emoji"],
+            },
+          },
+          {
+            name: `${conn.namespace}__removeReaction`,
+            description: `Remove an emoji reaction from a Slack message via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                channel: {
+                  type: "string",
+                  description: "Channel ID where the message is",
+                },
+                timestamp: {
+                  type: "string",
+                  description: "Message timestamp to remove reaction from",
+                },
+                emoji: {
+                  type: "string",
+                  description: "Emoji name to remove",
+                },
+              },
+              required: ["channel", "timestamp", "emoji"],
+            },
+          },
+          {
+            name: `${conn.namespace}__getThreadMessages`,
+            description: `Get all messages in a Slack thread via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                channel: {
+                  type: "string",
+                  description: "Channel ID containing the thread",
+                },
+                thread_ts: {
+                  type: "string",
+                  description: "Thread timestamp (parent message ts)",
+                },
+                limit: {
+                  type: "number",
+                  description: "Max messages to return (default: 50)",
+                },
+                include_parent: {
+                  type: "boolean",
+                  description: "Include the parent message (default: true)",
+                },
+              },
+              required: ["channel", "thread_ts"],
+            },
+          },
+          {
+            name: `${conn.namespace}__getChannelInfo`,
+            description: `Get information about a Slack channel via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                channel: {
+                  type: "string",
+                  description: "Channel ID to get info for",
+                },
+              },
+              required: ["channel"],
             },
           },
         );
@@ -802,7 +907,8 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
       const startTime = Date.now();
       const model = CATEGORY_MODEL_MAP[params.category] || "claude-3-5-sonnet-20241022";
       const registrySkillPrompts = (params.context?.registrySkillPrompts as string[] | undefined);
-      const systemPrompt = buildSystemPrompt(params.skills, registrySkillPrompts);
+      const threadContext = (params.context?.threadContext as string | undefined);
+      let systemPrompt = buildSystemPrompt(params.skills, registrySkillPrompts, threadContext);
       const environment = process.env.NODE_ENV || "development";
 
       span.setAttribute("ai.model", model);
@@ -814,6 +920,42 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
       if (params.selectedAccount) {
         span.setAttribute("account.id", params.selectedAccount.id);
         span.setAttribute("account.name", params.selectedAccount.name);
+      }
+
+      // Apply learned patterns to improve response quality (E3-T3)
+      const enablePatternOpt = params.enablePatternOptimization !== false; // Default to true
+      const appliedPatternRecords: Array<{ id: string; type: string; confidence: number }> = [];
+
+      if (enablePatternOpt && params.agentType) {
+        try {
+          const { getRelevantPatterns } = await import("../services/pattern-optimizer");
+          const patterns = await getRelevantPatterns(
+            params.organizationId,
+            params.agentType,
+            params.prompt,
+          );
+
+          if (patterns.length > 0) {
+            const patternResult = applyPatternContext(systemPrompt, patterns);
+            systemPrompt = patternResult.enhancedPrompt;
+            appliedPatternRecords.push(...patternResult.appliedPatterns.map((p) => ({
+              id: p.id,
+              type: p.patternType,
+              confidence: p.confidence,
+            })));
+
+            span.setAttribute("ai.patterns_applied", patternResult.patternCount);
+            logger.info("Applied learned patterns to AI execution", {
+              organizationId: params.organizationId,
+              agentType: params.agentType,
+              patternCount: patternResult.patternCount,
+            });
+          }
+        } catch (error) {
+          logger.warn("Failed to apply patterns, continuing without them", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       let accountId: string | undefined;
@@ -1115,7 +1257,8 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
         });
 
         span.setStatus({ code: SpanStatusCode.OK });
-        return {
+
+        const executionResult: AIExecutionResult = {
           output,
           status: "success",
           metadata: {
@@ -1127,8 +1270,12 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
             accountId,
             accountName,
             cacheReadTokens,
+            appliedPatterns: appliedPatternRecords.length > 0 ? appliedPatternRecords : undefined,
+            patternCount: appliedPatternRecords.length > 0 ? appliedPatternRecords.length : undefined,
           },
         };
+
+        return executionResult;
       } catch (error: unknown) {
         const duration = Date.now() - startTime;
         const errorMessage = error instanceof Error ? error.message : String(error);

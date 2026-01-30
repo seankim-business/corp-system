@@ -106,6 +106,20 @@ model Organization {
   humanAssignments             HumanAssignment[]
   templateEffectivenessRecords TemplateEffectivenessRecord[]
   templateABTests              TemplateABTest[]
+  // Mega App relations
+  valueStreamArtifacts         ValueStreamArtifact[]
+  megaAppModules               MegaAppModule[]
+  megaAppRoles                 MegaAppRole[]
+  modulePermissions            ModulePermission[]
+  featureRequests              FeatureRequest[]
+  megaAppTeams                 MegaAppTeam[]
+  agentScalingRules            AgentScalingRule[]
+  // Resource Registry relations
+  resourceProviderConnections  ResourceProviderConnection[]
+  resourceMappings             ResourceMapping[]
+  resourceLinkedRecords        ResourceLinkedRecord[]
+  resourceSyncLogs             ResourceSyncLog[]
+  resourceTypeSchemas          ResourceTypeSchema[]
 
   @@map("organizations")
 }
@@ -138,6 +152,8 @@ model User {
   identityAuditActions        IdentityLinkAudit[]      @relation("IdentityAuditPerformer")
   // AR (Agent Resource) Management relations
   humanAssignments            HumanAssignment[]
+  // Mega App relations
+  modulePermissions           ModulePermission[]
 
   @@index([email])
   @@index([googleId])
@@ -162,9 +178,13 @@ model Membership {
   dailyBriefingTime     String  @default("09:00") @map("daily_briefing_time") @db.VarChar(5)
   dailyBriefingTimezone String  @default("UTC") @map("daily_briefing_timezone") @db.VarChar(50)
 
+  // Mega App role assignment
+  megaAppRoleId String? @map("mega_app_role_id") @db.Uuid
+
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  megaAppRole  MegaAppRole? @relation(fields: [megaAppRoleId], references: [id])
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -3216,4 +3236,533 @@ model TemplateABTest {
   @@index([status])
   @@index([startDate])
   @@map("template_ab_tests")
+}
+
+// ============================================================================
+// MEGA APP - VALUE STREAM TABLES (Fashion Value Stream Integration)
+// ============================================================================
+
+/// Value Stream Artifacts (Core data flowing between modules)
+model ValueStreamArtifact {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  moduleId       String @map("module_id") @db.VarChar(100)
+
+  // Versioning
+  version           Int     @default(1)
+  previousVersionId String? @map("previous_version_id") @db.Uuid
+
+  // Status
+  status String @default("draft") @db.VarChar(50) // draft, review, approved, archived
+
+  // Data
+  data Json @db.JsonB
+
+  // Metadata
+  seasonCode   String?  @map("season_code") @db.VarChar(20) // e.g., "2026SS"
+  collectionId String?  @map("collection_id") @db.Uuid
+  tags         String[] @default([]) @db.VarChar(100)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+
+  // Relations
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  upstreamLinks   ArtifactLink[] @relation("DownstreamArtifact")
+  downstreamLinks ArtifactLink[] @relation("UpstreamArtifact")
+
+  @@index([organizationId, moduleId])
+  @@index([organizationId, seasonCode])
+  @@index([organizationId, status])
+  @@index([collectionId])
+  @@map("value_stream_artifacts")
+}
+
+/// Artifact Links (Lineage tracking between artifacts)
+model ArtifactLink {
+  id               String @id @default(uuid()) @db.Uuid
+  upstreamId       String @map("upstream_id") @db.Uuid
+  downstreamId     String @map("downstream_id") @db.Uuid
+  relationshipType String @map("relationship_type") @db.VarChar(50) // source, derived, reference
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  upstream   ValueStreamArtifact @relation("UpstreamArtifact", fields: [upstreamId], references: [id], onDelete: Cascade)
+  downstream ValueStreamArtifact @relation("DownstreamArtifact", fields: [downstreamId], references: [id], onDelete: Cascade)
+
+  @@unique([upstreamId, downstreamId])
+  @@index([upstreamId])
+  @@index([downstreamId])
+  @@map("artifact_links")
+}
+
+/// Mega App Module Definitions (Stored module metadata)
+model MegaAppModule {
+  id             String @id @db.VarChar(100) // e.g., "fashion-research"
+  organizationId String @map("organization_id") @db.Uuid
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+  version     String  @db.VarChar(50)
+
+  // Schemas
+  inputSchema  Json @map("input_schema") @db.JsonB
+  outputSchema Json @map("output_schema") @db.JsonB
+
+  // Dependencies
+  requiredInputs String[] @default([]) @map("required_inputs") @db.VarChar(100)
+  optionalInputs String[] @default([]) @map("optional_inputs") @db.VarChar(100)
+
+  // Executor
+  executorType   String @map("executor_type") @db.VarChar(50) // ai-agent, workflow, mcp-tool, hybrid
+  executorConfig Json   @map("executor_config") @db.JsonB
+
+  // Status
+  enabled Boolean @default(true)
+  status  String  @default("draft") @db.VarChar(50) // draft, active, deprecated
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, enabled])
+  @@map("mega_app_modules")
+}
+
+/// Mega App Roles (Pre-configured permission templates)
+model MegaAppRole {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name        String  @db.VarChar(100) // e.g., "MD", "Designer", "Production Manager"
+  description String? @db.Text
+
+  // Default module permissions for this role
+  defaultPermissions Json @map("default_permissions") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships       Membership[]
+  modulePermissions ModulePermission[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("mega_app_roles")
+}
+
+/// Module Permissions (Per-module access control)
+model ModulePermission {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  moduleId       String @map("module_id") @db.VarChar(100)
+
+  // Who (one of these must be set)
+  userId        String? @map("user_id") @db.Uuid // Specific user override
+  megaAppRoleId String? @map("mega_app_role_id") @db.Uuid // Role-based default
+
+  // What permissions
+  canView      Boolean @default(false) @map("can_view")
+  canExecute   Boolean @default(false) @map("can_execute")
+  canCreate    Boolean @default(false) @map("can_create")
+  canApprove   Boolean @default(false) @map("can_approve")
+  canConfigure Boolean @default(false) @map("can_configure")
+  canDelete    Boolean @default(false) @map("can_delete")
+
+  // Data visibility
+  dataScope String @default("own") @map("data_scope") @db.VarChar(50) // own, team, all
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  megaAppRole  MegaAppRole? @relation(fields: [megaAppRoleId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, moduleId, userId])
+  @@unique([organizationId, moduleId, megaAppRoleId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([megaAppRoleId])
+  @@map("module_permissions")
+}
+
+/// Feature Requests (Captured from various channels)
+model FeatureRequest {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  // Source
+  source      String  @db.VarChar(50) // slack, web, notion, email
+  sourceRef   String? @map("source_ref") @db.Text // message ID, page ID, etc.
+  requesterId String? @map("requester_id") @db.Uuid
+
+  // Content
+  rawContent     String  @map("raw_content") @db.Text // Original request text
+  analyzedIntent String? @map("analyzed_intent") @db.Text // AI-extracted intent
+
+  // Categorization
+  relatedModules String[] @default([]) @map("related_modules") @db.VarChar(100)
+  tags           String[] @default([]) @db.VarChar(100)
+
+  // Prioritization
+  priority       Int     @default(3) // 0=Critical, 1=High, 2=Medium, 3=Low
+  businessImpact String? @map("business_impact") @db.VarChar(50)
+  requestCount   Int     @default(1) @map("request_count") // Duplicate aggregation
+
+  // Status
+  status String @default("new") @db.VarChar(50) // new, analyzing, backlog, planning, developing, released
+
+  // Linking
+  parentRequestId String? @map("parent_request_id") @db.Uuid // Merged into
+  linkedModuleId  String? @map("linked_module_id") @db.VarChar(100) // When implemented
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, priority])
+  @@index([relatedModules])
+  @@map("feature_requests")
+}
+
+/// Mega App Agent Teams (Hierarchical agent organization - different from core Team)
+model MegaAppTeam {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+
+  // Hierarchy
+  parentTeamId String? @map("parent_team_id") @db.Uuid
+  moduleId     String? @map("module_id") @db.VarChar(100) // Primary module responsibility
+
+  // Lead agent
+  leadAgentId String? @map("lead_agent_id") @db.Uuid
+
+  // Configuration
+  maxAgents     Int    @default(5) @map("max_agents")
+  scalingPolicy String @default("manual") @map("scaling_policy") @db.VarChar(50) // manual, auto, demand-based
+
+  // Status
+  status String @default("active") @db.VarChar(50)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentTeam   MegaAppTeam?  @relation("MegaAppTeamHierarchy", fields: [parentTeamId], references: [id])
+  childTeams   MegaAppTeam[] @relation("MegaAppTeamHierarchy")
+
+  @@index([organizationId])
+  @@index([parentTeamId])
+  @@index([moduleId])
+  @@map("mega_app_teams")
+}
+
+/// Agent Scaling Rules (Auto-scaling configuration for MegaAppTeams)
+model AgentScalingRule {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  teamId         String @map("team_id") @db.Uuid
+
+  // Trigger conditions
+  triggerType  String @map("trigger_type") @db.VarChar(50) // queue-depth, latency, schedule
+  triggerValue Int    @map("trigger_value") // threshold value
+
+  // Action
+  action        String @db.VarChar(50) // scale-up, scale-down
+  agentCount    Int    @map("agent_count")
+  agentTemplate String @map("agent_template") @db.VarChar(100) // Which agent type to spawn
+
+  // Limits
+  minAgents       Int @default(1) @map("min_agents")
+  maxAgents       Int @default(10) @map("max_agents")
+  cooldownMinutes Int @default(5) @map("cooldown_minutes")
+
+  enabled Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([organizationId])
+  @@map("agent_scaling_rules")
+}
+
+/// Value Stream Templates (Pre-defined flows)
+model ValueStreamTemplate {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String? @map("organization_id") @db.Uuid // NULL = global template
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+
+  // Flow definition
+  moduleOrder String[] @map("module_order") @db.VarChar(100)
+  flowConfig  Json     @map("flow_config") @db.JsonB
+
+  // Usage
+  isPublic   Boolean @default(false) @map("is_public")
+  usageCount Int     @default(0) @map("usage_count")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([organizationId])
+  @@index([isPublic])
+  @@map("value_stream_templates")
+}
+
+// ============================================================================
+// ENTERPRISE RESOURCE REGISTRY (ERR) - Resource Mapping System
+// ============================================================================
+
+/// Resource Provider Types
+/// External data sources that can be connected
+enum ResourceProviderType {
+  notion_database
+  google_sheets
+  slack_canvas
+  jira_project
+  confluence_page
+  clickup_list
+  airtable_base
+  custom_api
+}
+
+/// Internal Resource Types
+/// Standard resource types recognized by the system
+enum InternalResourceType {
+  vision
+  mission
+  goal
+  objective
+  key_result
+  strategy
+  business_model
+  value_stream
+  project
+  task
+  department
+  position
+  kpi
+  custom
+}
+
+/// Sync Direction
+/// How data flows between external and internal systems
+enum SyncDirection {
+  pull_only
+  push_only
+  bidirectional
+  manual
+}
+
+/// Resource Provider Connection
+/// Stores connection details to external resource providers
+model ResourceProviderConnection {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  providerType   ResourceProviderType @map("provider_type")
+  displayName    String               @map("display_name") @db.VarChar(255)
+
+  // Connection credentials (encrypted)
+  credentials   Json    @default("{}") @db.JsonB // Encrypted tokens, API keys
+  connectionUrl String? @map("connection_url") @db.Text // Base URL for API
+
+  // Status
+  status          String    @default("active") @db.VarChar(50) // active, inactive, error
+  lastValidatedAt DateTime? @map("last_validated_at") @db.Timestamptz(6)
+  validationError String?   @map("validation_error") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mappings     ResourceMapping[]
+  syncLogs     ResourceSyncLog[]
+
+  @@index([organizationId])
+  @@index([providerType])
+  @@index([status])
+  @@map("resource_provider_connections")
+}
+
+/// Resource Mapping
+/// Maps external resources to internal resource types
+model ResourceMapping {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  connectionId   String @map("connection_id") @db.Uuid
+
+  // External resource identification
+  externalResourceId   String @map("external_resource_id") @db.VarChar(500) // Notion DB ID, Sheet ID, etc.
+  externalResourceName String @map("external_resource_name") @db.VarChar(500) // Human-readable name
+
+  // Internal mapping
+  internalType   InternalResourceType @map("internal_type")
+  customTypeName String?              @map("custom_type_name") @db.VarChar(100) // If internalType is 'custom'
+  typeSchemaId   String?              @map("type_schema_id") @db.Uuid
+
+  // Field mappings
+  fieldMappings Json @default("{}") @map("field_mappings") @db.JsonB // {externalField: internalField, ...}
+
+  // Sync configuration
+  syncDirection SyncDirection @default(pull_only) @map("sync_direction")
+  syncSchedule  String?       @map("sync_schedule") @db.VarChar(100) // Cron expression
+  lastSyncAt    DateTime?     @map("last_sync_at") @db.Timestamptz(6)
+  syncError     String?       @map("sync_error") @db.Text
+
+  // AI detection confidence
+  detectionConfidence Float? @map("detection_confidence") @db.Real // 0-1, from AI schema detection
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection    ResourceProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  typeSchema    ResourceTypeSchema?        @relation(fields: [typeSchemaId], references: [id], onDelete: SetNull)
+  linkedRecords ResourceLinkedRecord[]
+  syncLogs      ResourceSyncLog[]
+
+  @@unique([connectionId, externalResourceId])
+  @@index([organizationId])
+  @@index([connectionId])
+  @@index([internalType])
+  @@index([isActive])
+  @@map("resource_mappings")
+}
+
+/// Resource Linked Record
+/// Individual records synced from external sources
+model ResourceLinkedRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  mappingId      String @map("mapping_id") @db.Uuid
+
+  // External record identification
+  externalRecordId String @map("external_record_id") @db.VarChar(500) // Row ID, Page ID, etc.
+
+  // Cached data from external source
+  cachedData    Json      @default("{}") @map("cached_data") @db.JsonB
+  lastFetchedAt DateTime? @map("last_fetched_at") @db.Timestamptz(6)
+
+  // Link to internal record (if exists)
+  internalRecordId   String? @map("internal_record_id") @db.Uuid // Reference to internal entity
+  internalRecordType String? @map("internal_record_type") @db.VarChar(100) // Table name
+
+  // Sync status
+  syncStatus String    @default("synced") @map("sync_status") @db.VarChar(50) // synced, pending, conflict, error
+  lastSyncAt DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  syncError  String?   @map("sync_error") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mapping      ResourceMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+
+  @@unique([mappingId, externalRecordId])
+  @@index([organizationId])
+  @@index([mappingId])
+  @@index([externalRecordId])
+  @@index([internalRecordId])
+  @@index([syncStatus])
+  @@map("resource_linked_records")
+}
+
+/// Resource Sync Log
+/// Audit trail for synchronization operations
+model ResourceSyncLog {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  connectionId   String? @map("connection_id") @db.Uuid
+  mappingId      String? @map("mapping_id") @db.Uuid
+
+  // Sync operation details
+  operation   String @db.VarChar(50) // pull, push, detect, validate
+  status      String @db.VarChar(50) // started, completed, failed
+  triggeredBy String @map("triggered_by") @db.VarChar(100) // user:id, scheduler, manual
+
+  // Statistics
+  recordsProcessed Int @default(0) @map("records_processed")
+  recordsCreated   Int @default(0) @map("records_created")
+  recordsUpdated   Int @default(0) @map("records_updated")
+  recordsDeleted   Int @default(0) @map("records_deleted")
+  recordsFailed    Int @default(0) @map("records_failed")
+
+  // Timing
+  startedAt   DateTime  @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  durationMs  Int?      @map("duration_ms")
+
+  // Error details
+  errorMessage String? @map("error_message") @db.Text
+  errorDetails Json?   @map("error_details") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection   ResourceProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  mapping      ResourceMapping?            @relation(fields: [mappingId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([connectionId])
+  @@index([mappingId])
+  @@index([operation])
+  @@index([status])
+  @@map("resource_sync_logs")
+}
+
+/// Resource Type Schema
+/// Defines expected schema for each resource type (with AI hints)
+model ResourceTypeSchema {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String?              @map("organization_id") @db.Uuid // NULL for global/built-in schemas
+  internalType   InternalResourceType @map("internal_type")
+  customTypeName String?              @map("custom_type_name") @db.VarChar(100) // For custom types
+
+  displayName String  @map("display_name") @db.VarChar(255)
+  description String? @db.Text
+
+  // Schema definition
+  fields Json @db.JsonB // [{name, type, required, description, aiHints}]
+
+  // AI detection hints
+  aiDetectionKeywords String[] @default([]) @map("ai_detection_keywords") @db.VarChar(100) // Keywords AI looks for
+  aiDetectionPatterns Json     @default("[]") @map("ai_detection_patterns") @db.JsonB // Regex patterns for field detection
+
+  // Examples for AI learning
+  exampleData Json @default("[]") @map("example_data") @db.JsonB // Sample data for pattern matching
+
+  isBuiltIn Boolean  @default(false) @map("is_built_in")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mappings     ResourceMapping[]
+
+  @@unique([organizationId, internalType, customTypeName])
+  @@index([organizationId])
+  @@index([internalType])
+  @@index([isBuiltIn])
+  @@map("resource_type_schemas")
 }

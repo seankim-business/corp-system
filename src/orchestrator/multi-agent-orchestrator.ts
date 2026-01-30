@@ -74,6 +74,9 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
 
   metrics.increment("multi_agent.orchestration_started", { organizationId });
 
+  // Root execution ID for tracking (only created if multi-agent is used)
+  let rootExecutionId: string | undefined;
+
   try {
     const complexity = estimateTaskComplexity(userRequest);
 
@@ -100,12 +103,37 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
       parallelGroups: decomposition.suggestedParallelization.length,
     });
 
+    // Create root execution for tracking sub-agent spawns (E2-T1)
+    const rootExecution = await prisma.orchestratorExecution.create({
+      data: {
+        organizationId,
+        userId,
+        sessionId,
+        category: "multi-agent-root",
+        skills: [],
+        status: "running",
+        duration: 0,
+        inputData: {
+          request: userRequest,
+          enableMultiAgent,
+          enableParallel,
+        },
+        metadata: {
+          complexity: decomposition.estimatedComplexity,
+          subtaskCount: decomposition.subtasks.length,
+        },
+      },
+    });
+
+    rootExecutionId = rootExecution.id;
+
     const context: AgentExecutionContext = {
       organizationId,
       userId,
       sessionId,
       depth: 0,
       maxDepth: 3,
+      rootExecutionId,
     };
 
     let results: Map<string, AgentExecutionResult>;
@@ -153,6 +181,21 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
       executionMode,
     });
 
+    // Update root execution status (E2-T1)
+    if (rootExecutionId) {
+      await prisma.orchestratorExecution.update({
+        where: { id: rootExecutionId },
+        data: {
+          status: failedCount === 0 ? "success" : "failed",
+          duration,
+          outputData: {
+            aggregatedOutput,
+            agentsUsed: Array.from(results.values()).map((r) => r.agentId),
+          },
+        },
+      });
+    }
+
     metrics.increment("multi_agent.orchestration_completed", {
       organizationId,
       executionMode,
@@ -195,11 +238,30 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
 
     logger.error(
       "Multi-agent orchestration failed",
-      { sessionId, organizationId, duration },
+      { sessionId, organizationId, duration, rootExecutionId },
       error instanceof Error ? error : new Error(errorMessage),
     );
 
     metrics.increment("multi_agent.orchestration_failed", { organizationId });
+
+    // Update root execution status on error (E2-T1)
+    if (rootExecutionId) {
+      await prisma.orchestratorExecution
+        .update({
+          where: { id: rootExecutionId },
+          data: {
+            status: "failed",
+            duration,
+            errorMessage,
+          },
+        })
+        .catch((updateError) => {
+          logger.warn("Failed to update root execution on error", {
+            rootExecutionId,
+            error: updateError instanceof Error ? updateError.message : String(updateError),
+          });
+        });
+    }
 
     return {
       output: `Multi-agent orchestration failed: ${errorMessage}`,

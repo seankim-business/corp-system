@@ -2,12 +2,15 @@ import { auditLogger, createAuditLog } from "../services/audit-logger";
 import { db as prisma } from "../db/client";
 import { logger } from "./logger";
 import { startDailyBriefingJob, stopDailyBriefingJob } from "../jobs/daily-briefing.job";
+import { runFeedbackAnalysis } from "../jobs/feedback-analysis.job";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 let cleanupTimer: NodeJS.Timeout | null = null;
 let approvalExpirationTimer: NodeJS.Timeout | null = null;
+let feedbackAnalysisTimer: NodeJS.Timeout | null = null;
 
 export function startScheduledTasks() {
   if (process.env.NODE_ENV === "test") {
@@ -17,6 +20,7 @@ export function startScheduledTasks() {
   scheduleAuditLogCleanup();
   scheduleApprovalExpiration();
   startDailyBriefingJob();
+  scheduleFeedbackAnalysis();
   logger.info("Scheduled tasks started");
 }
 
@@ -28,6 +32,10 @@ export function stopScheduledTasks() {
   if (approvalExpirationTimer) {
     clearInterval(approvalExpirationTimer);
     approvalExpirationTimer = null;
+  }
+  if (feedbackAnalysisTimer) {
+    clearInterval(feedbackAnalysisTimer);
+    feedbackAnalysisTimer = null;
   }
   stopDailyBriefingJob();
   logger.info("Scheduled tasks stopped");
@@ -103,4 +111,40 @@ function scheduleApprovalExpiration() {
   expireApprovals().catch((error) => {
     logger.error("Initial approval expiration check failed", { error });
   });
+}
+
+function scheduleFeedbackAnalysis() {
+  // Calculate time until next Sunday at midnight UTC
+  const now = new Date();
+  const nextSunday = new Date(now);
+  nextSunday.setUTCDate(now.getUTCDate() + ((7 - now.getUTCDay()) % 7));
+  nextSunday.setUTCHours(0, 0, 0, 0);
+
+  const msUntilNextSunday = nextSunday.getTime() - now.getTime();
+
+  // Schedule first run
+  setTimeout(async () => {
+    await runFeedbackAnalysisJob();
+
+    // Then schedule weekly runs
+    feedbackAnalysisTimer = setInterval(async () => {
+      await runFeedbackAnalysisJob();
+    }, ONE_WEEK_MS);
+
+    feedbackAnalysisTimer.unref?.();
+  }, msUntilNextSunday);
+
+  logger.info("Feedback analysis scheduled", {
+    nextRun: nextSunday.toISOString(),
+    msUntilNextRun: msUntilNextSunday,
+  });
+}
+
+async function runFeedbackAnalysisJob() {
+  try {
+    const result = await runFeedbackAnalysis();
+    logger.info("Weekly feedback analysis completed", result);
+  } catch (error) {
+    logger.error("Weekly feedback analysis failed", { error });
+  }
 }

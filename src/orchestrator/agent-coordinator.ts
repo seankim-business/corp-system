@@ -30,6 +30,9 @@ export interface AgentExecutionContext {
   parentTaskId?: string;
   depth: number;
   maxDepth: number;
+  // Sub-agent spawning support (added in E2-T1)
+  parentExecutionId?: string;
+  rootExecutionId?: string;
 }
 
 export interface AgentExecutionResult {
@@ -40,6 +43,7 @@ export interface AgentExecutionResult {
     duration: number;
     model: string;
     delegatedTo?: AgentType[];
+    tokensUsed?: number;
   };
   error?: string;
 }
