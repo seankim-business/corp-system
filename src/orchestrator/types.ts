@@ -49,7 +49,7 @@ export interface OrchestrationRequest {
 
 export interface OrchestrationResult {
   output: string;
-  status: "success" | "failed" | "pending";
+  status: "success" | "failed" | "pending" | "rate_limited";
   metadata: {
     category: Category;
     skills: Skill[];

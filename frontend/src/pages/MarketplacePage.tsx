@@ -36,6 +36,16 @@ interface SearchFacets {
   pricing: { type: string; count: number }[];
 }
 
+interface SkillSuggestion {
+  patternId: string;
+  suggestedName: string;
+  suggestedDescription: string;
+  suggestedTriggers: string[];
+  confidence: number;
+  frequency: number;
+  patternType: string;
+}
+
 export default function MarketplacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -51,6 +61,9 @@ export default function MarketplacePage() {
   const [selectedPricing, setSelectedPricing] = useState(searchParams.get("pricing") || "");
   const [sortBy, setSortBy] = useState(searchParams.get("sort") || "popular");
   const [page, setPage] = useState(1);
+
+  const [suggestions, setSuggestions] = useState<SkillSuggestion[]>([]);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const fetchExtensions = useCallback(async () => {
     setIsLoading(true);
@@ -108,10 +121,23 @@ export default function MarketplacePage() {
     }
   }, []);
 
+  const fetchSuggestions = useCallback(async () => {
+    try {
+      const result = await request<{ suggestions: SkillSuggestion[] }>({
+        url: "/api/marketplace/suggestions",
+        method: "GET",
+      });
+      setSuggestions(result.suggestions || []);
+    } catch {
+      // Suggestions are optional - fail silently
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
     fetchFeatured();
-  }, [fetchCategories, fetchFeatured]);
+    fetchSuggestions();
+  }, [fetchCategories, fetchFeatured, fetchSuggestions]);
 
   useEffect(() => {
     fetchExtensions();
@@ -130,6 +156,33 @@ export default function MarketplacePage() {
     e.preventDefault();
     setPage(1);
     fetchExtensions();
+  };
+
+  const handleAcceptSuggestion = async (patternId: string) => {
+    setAcceptingId(patternId);
+    try {
+      await request({
+        url: `/api/marketplace/suggestions/${patternId}/accept`,
+        method: "POST",
+      });
+      setSuggestions((prev) => prev.filter((s) => s.patternId !== patternId));
+    } catch (error) {
+      console.error("Failed to accept suggestion:", error);
+    } finally {
+      setAcceptingId(null);
+    }
+  };
+
+  const handleDismissSuggestion = async (patternId: string) => {
+    try {
+      await request({
+        url: `/api/marketplace/suggestions/${patternId}/dismiss`,
+        method: "POST",
+      });
+      setSuggestions((prev) => prev.filter((s) => s.patternId !== patternId));
+    } catch (error) {
+      console.error("Failed to dismiss suggestion:", error);
+    }
   };
 
   const formatNumber = (num: number): string => {
@@ -224,6 +277,85 @@ export default function MarketplacePage() {
                     </div>
                   </div>
                 </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Skill Suggestions */}
+        {suggestions.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">AI-Suggested Skills</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Skills automatically detected from your team's usage patterns
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {suggestions.map((suggestion) => (
+                <div
+                  key={suggestion.patternId}
+                  className="bg-white border border-purple-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <span className="text-lg">
+                        {suggestion.patternType === "composite" ? "🧩" : suggestion.patternType === "sequence" ? "🔗" : "🔄"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div
+                        className="h-2 w-16 bg-gray-200 rounded-full overflow-hidden"
+                        title={`${Math.round(suggestion.confidence * 100)}% confidence`}
+                      >
+                        <div
+                          className="h-full bg-purple-500 rounded-full"
+                          style={{ width: `${suggestion.confidence * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {Math.round(suggestion.confidence * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="font-semibold text-gray-900">{suggestion.suggestedName}</h3>
+                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                    {suggestion.suggestedDescription}
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {suggestion.suggestedTriggers.slice(0, 3).map((trigger) => (
+                      <span
+                        key={trigger}
+                        className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs"
+                      >
+                        {trigger}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2">
+                    Detected {suggestion.frequency}x as {suggestion.patternType} pattern
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => handleAcceptSuggestion(suggestion.patternId)}
+                      disabled={acceptingId === suggestion.patternId}
+                      className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {acceptingId === suggestion.patternId ? "Creating..." : "Create Skill"}
+                    </button>
+                    <button
+                      onClick={() => handleDismissSuggestion(suggestion.patternId)}
+                      className="px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

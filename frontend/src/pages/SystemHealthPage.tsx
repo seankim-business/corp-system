@@ -11,6 +11,8 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { isNotAvailableResponse } from "../utils/fetch-helpers";
+import FeatureComingSoon from "../components/FeatureComingSoon";
 
 // ============================================================================
 // Types
@@ -333,6 +335,7 @@ export default function SystemHealthPage() {
   const [reports, setReports] = useState<SystemReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [activeTab, setActiveTab] = useState<"agents" | "gaps" | "recommendations" | "reports">("agents");
 
@@ -344,6 +347,12 @@ export default function SystemHealthPage() {
         fetch("/api/meta-agent/recommendations", { credentials: "include" }),
         fetch("/api/meta-agent/reports?limit=5", { credentials: "include" }),
       ]);
+
+      if (isNotAvailableResponse(healthRes)) {
+        setNotAvailable(true);
+        setLoading(false);
+        return;
+      }
 
       if (!healthRes.ok) throw new Error("Failed to fetch health data");
 
@@ -449,6 +458,16 @@ export default function SystemHealthPage() {
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
+    );
+  }
+
+  if (notAvailable) {
+    return (
+      <FeatureComingSoon
+        title="System Health Monitoring"
+        description="System health monitoring is currently being set up. This feature will display agent status, health scores, and recommendations once the backend service is activated."
+        onRetry={fetchData}
+      />
     );
   }
 

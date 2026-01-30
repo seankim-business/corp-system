@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
+import { isNotAvailableResponse } from "../utils/fetch-helpers";
+import FeatureComingSoon from "../components/FeatureComingSoon";
 
 interface AgentCost {
   agentId: string;
@@ -43,6 +45,7 @@ export default function CostDashboardPage() {
   const [budgetStatus, setBudgetStatus] = useState<BudgetStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState(false);
   const [period, setPeriod] = useState<"day" | "week" | "month">("month");
   const [newBudget, setNewBudget] = useState<string>("");
   const [savingBudget, setSavingBudget] = useState(false);
@@ -62,6 +65,11 @@ export default function CostDashboardPage() {
         fetch("/api/costs/daily?days=30", { credentials: "include" }),
         fetch("/api/costs/budget", { credentials: "include" }),
       ]);
+
+      if (isNotAvailableResponse(summaryRes)) {
+        setNotAvailable(true);
+        return;
+      }
 
       if (!summaryRes.ok || !trendRes.ok || !budgetRes.ok) {
         throw new Error("Failed to fetch cost data");
@@ -149,6 +157,22 @@ export default function CostDashboardPage() {
   const getMaxDailyCost = () => {
     return Math.max(...dailyTrend.map((d) => d.totalCostCents), 1);
   };
+
+  if (notAvailable) {
+    return (
+      <div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Cost Dashboard</h1>
+          <p className="text-gray-600">Monitor and manage your AI agent spending.</p>
+        </div>
+        <FeatureComingSoon
+          title="Cost Dashboard"
+          description="The cost dashboard is currently being set up. This feature will display spending analytics, budget tracking, and cost breakdowns by agent and model once the backend service is activated."
+          onRetry={fetchCostData}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>

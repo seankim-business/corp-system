@@ -135,7 +135,7 @@ slackIntegrationRouter.post(
   },
 );
 
-// Start OAuth flow using org's stored credentials
+// Start OAuth flow using platform-level credentials
 slackIntegrationRouter.get(
   "/slack/oauth/install",
   requireAuth,
@@ -144,17 +144,26 @@ slackIntegrationRouter.get(
     const frontendUrl = process.env.FRONTEND_URL || "https://app.nubabel.com";
     const { organizationId, id: userId } = req.user!;
 
-    // Get org's stored Slack credentials
-    const integration = await prisma.slackIntegration.findUnique({
-      where: { organizationId },
-    });
-
-    if (!integration?.clientId) {
-      logger.error("Slack OAuth: No credentials configured for org", { organizationId });
-      return res.redirect(`${frontendUrl}/settings/slack?error=credentials_not_configured`);
+    // Use platform-level Slack App credentials
+    const clientId = process.env.NUBABEL_SLACK_CLIENT_ID;
+    if (!clientId) {
+      logger.error("Slack OAuth: NUBABEL_SLACK_CLIENT_ID not configured");
+      return res.redirect(`${frontendUrl}/settings/slack?error=slack_not_configured`);
     }
 
-    const clientId = decrypt(integration.clientId);
+    // Ensure integration record exists for this org
+    const existing = await prisma.slackIntegration.findUnique({
+      where: { organizationId },
+    });
+    if (!existing) {
+      await prisma.slackIntegration.create({
+        data: {
+          organizationId,
+          installedBy: userId,
+        },
+      });
+    }
+
     const state = await encodeState(organizationId, userId);
 
     const authorizeUrl = new URL("https://slack.com/oauth/v2/authorize");
@@ -187,20 +196,14 @@ slackOAuthRouter.get("/slack/oauth/callback", async (req: Request, res: Response
     return res.redirect(`${frontendUrl}/settings/slack?error=invalid_state`);
   }
 
-  // Get org's stored Slack credentials
-  const integration = await prisma.slackIntegration.findUnique({
-    where: { organizationId: stateData.organizationId },
-  });
+  // Use platform-level Slack App credentials
+  const clientId = process.env.NUBABEL_SLACK_CLIENT_ID;
+  const clientSecret = process.env.NUBABEL_SLACK_CLIENT_SECRET;
 
-  if (!integration?.clientId || !integration?.clientSecret) {
-    logger.error("Slack OAuth: Missing credentials for org", {
-      organizationId: stateData.organizationId,
-    });
-    return res.redirect(`${frontendUrl}/settings/slack?error=credentials_not_configured`);
+  if (!clientId || !clientSecret) {
+    logger.error("Slack OAuth: Platform credentials not configured");
+    return res.redirect(`${frontendUrl}/settings/slack?error=slack_not_configured`);
   }
-
-  const clientId = decrypt(integration.clientId);
-  const clientSecret = decrypt(integration.clientSecret);
 
   try {
     const tokenResponse = await fetch("https://slack.com/api/oauth.v2.access", {
@@ -463,13 +466,11 @@ export async function getSlackIntegrationByWorkspace(workspaceId: string) {
     botToken: integration.botToken ? decrypt(integration.botToken) : "",
     appToken: integration.appToken !== null ? decrypt(integration.appToken) : null,
     signingSecret: integration.signingSecret !== null ? decrypt(integration.signingSecret) : null,
-    clientId: integration.clientId !== null ? decrypt(integration.clientId) : null,
-    clientSecret: integration.clientSecret !== null ? decrypt(integration.clientSecret) : null,
   };
 }
 
 export async function getSlackIntegrationByOrg(organizationId: string) {
-  const integration = await prisma.slackIntegration.findUnique({
+  const integration = await prisma.slackIntegration.findFirst({
     where: { organizationId },
   });
 
@@ -482,8 +483,6 @@ export async function getSlackIntegrationByOrg(organizationId: string) {
     botToken: integration.botToken ? decrypt(integration.botToken) : "",
     appToken: integration.appToken !== null ? decrypt(integration.appToken) : null,
     signingSecret: integration.signingSecret !== null ? decrypt(integration.signingSecret) : null,
-    clientId: integration.clientId !== null ? decrypt(integration.clientId) : null,
-    clientSecret: integration.clientSecret !== null ? decrypt(integration.clientSecret) : null,
   };
 }
 

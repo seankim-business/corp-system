@@ -7,7 +7,7 @@ import {
   isFollowUpQuery,
   applyContextBoost,
 } from "./session-state";
-import { OrchestrationRequest, OrchestrationResult } from "./types";
+import { OrchestrationRequest, OrchestrationResult, Skill } from "./types";
 import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
 import { metrics, measureTime } from "../utils/metrics";
@@ -24,6 +24,12 @@ import {
 import { recordBudgetDowngrade, recordBudgetRejection, recordAiRequest } from "../services/metrics";
 import { checkApprovalRequired, createApprovalRequest } from "../services/approval-checker";
 import { shouldUseMultiAgent, orchestrateMultiAgent } from "./multi-agent-orchestrator";
+import { resolveSkillsFromRegistry, mergeSkillNames } from './skill-resolver';
+import { SkillExecutorService } from '../services/skill-runtime/skill-executor';
+import type { SkillOutput } from '../services/skill-runtime/types';
+import { ExperienceTracker } from '../services/skill-learning';
+import { recordSkillExecution, registerSkillInIndex } from '../services/skill-performance';
+import { getRedisConnection } from '../db/redis';
 
 const tracer = trace.getTracer("orchestrator");
 
@@ -143,7 +149,39 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         },
       );
 
-      const skills = skillSelection.skills;
+      // Resolve registry-based skills
+      const registrySkillResult = await tracer.startActiveSpan(
+        "orchestrator.resolve_registry_skills",
+        async (registrySpan) => {
+          try {
+            const result = await resolveSkillsFromRegistry(
+              organizationId,
+              userRequest,
+              analysis,
+              skillSelection.skills,
+            );
+            registrySpan.setAttribute("registry_skills.count", result.resolvedSkills.length);
+            registrySpan.setAttribute("registry_skills.executable", result.executableSkills.length);
+            registrySpan.setAttribute("registry_skills.prompt", result.promptSkills.length);
+            return result;
+          } catch (error: unknown) {
+            // Non-fatal: if registry resolution fails, continue with legacy skills
+            const message = error instanceof Error ? error.message : "Unknown error";
+            logger.warn("Registry skill resolution failed, continuing with legacy skills", {
+              error: message,
+            });
+            registrySpan.recordException(error as Error);
+            return null;
+          } finally {
+            registrySpan.end();
+          }
+        },
+      );
+
+      // Merge legacy and registry skills
+      const skills = (registrySkillResult
+        ? mergeSkillNames(skillSelection.skills, registrySkillResult.resolvedSkills)
+        : skillSelection.skills) as Skill[];
 
       span.setAttribute("intent", analysis.intent);
       span.setAttribute("complexity", analysis.complexity);
@@ -171,6 +209,8 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         intent: analysis.intent,
         complexity: analysis.complexity,
         useMultiAgent,
+        registrySkillsCount: registrySkillResult?.resolvedSkills.length || 0,
+        registryExecutableSkills: registrySkillResult?.executableSkills.map(s => s.slug) || [],
       });
 
       metrics.increment("orchestration.category_selected", {
@@ -205,7 +245,116 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         })),
         organizationId,
         userId,
+        registrySkillPrompts: registrySkillResult?.skillPrompts || [],
+        executableSkills: registrySkillResult?.executableSkills || [],
       };
+
+      // Execute registry-based executable skills (code/mcp runtime)
+      let skillExecutionResults: Array<{ slug: string; output: SkillOutput }> = [];
+      const executableSkills = registrySkillResult?.executableSkills || [];
+
+      if (executableSkills.length > 0) {
+        skillExecutionResults = await tracer.startActiveSpan(
+          "orchestrator.execute_skills",
+          async (skillExecSpan) => {
+            try {
+              const executor = new SkillExecutorService();
+              const mcpConnectionsMap = new Map<string, unknown>();
+              for (const conn of mcpConnections) {
+                mcpConnectionsMap.set(conn.provider, conn);
+              }
+
+              const executionContext = {
+                organizationId,
+                userId,
+                sessionId,
+                mcpConnections: mcpConnectionsMap,
+              };
+
+              const results: Array<{ slug: string; output: SkillOutput }> = [];
+
+              for (const skill of executableSkills) {
+                try {
+                  const output = await executor.execute(
+                    skill,
+                    { parameters: {}, context: {} },
+                    executionContext,
+                  );
+                  results.push({ slug: skill.slug, output });
+
+                  logger.info("Skill executed", {
+                    slug: skill.slug,
+                    runtimeType: skill.runtimeType,
+                    success: output.success,
+                    executionTimeMs: output.metadata.executionTimeMs,
+                  });
+                } catch (error) {
+                  logger.warn("Skill execution failed, continuing", {
+                    slug: skill.slug,
+                    error: (error as Error).message,
+                  });
+                }
+              }
+
+              skillExecSpan.setAttribute("skills_executed", results.length);
+              skillExecSpan.setAttribute("skills_succeeded", results.filter(r => r.output.success).length);
+              return results;
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "Unknown error";
+              logger.warn("Skill execution batch failed", { error: message });
+              skillExecSpan.recordException(error as Error);
+              return [];
+            } finally {
+              skillExecSpan.end();
+            }
+          },
+        );
+      }
+
+      // Enrich context with skill execution results
+      if (skillExecutionResults.length > 0) {
+        (context as Record<string, unknown>).skillExecutionResults = skillExecutionResults
+          .filter(r => r.output.success)
+          .map(r => ({
+            skill: r.slug,
+            result: r.output.result,
+            executionTimeMs: r.output.metadata.executionTimeMs,
+          }));
+      }
+
+      // Track skill executions for learning and performance
+      if (skillExecutionResults.length > 0) {
+        const experienceTracker = new ExperienceTracker(prisma, getRedisConnection());
+
+        for (const { slug, output } of skillExecutionResults) {
+          // Record performance metrics
+          recordSkillExecution({
+            skillId: slug,
+            organizationId,
+            durationMs: output.metadata.executionTimeMs,
+            success: output.success,
+            timestamp: Date.now(),
+          }).catch((err: Error) =>
+            logger.warn("Failed to record skill execution", { error: err.message })
+          );
+
+          registerSkillInIndex(slug, organizationId).catch((err: Error) =>
+            logger.warn("Failed to register skill in index", { error: err.message })
+          );
+
+          // Track for pattern learning
+          experienceTracker.trackExecution(organizationId, sessionId, {
+            skillId: slug,
+            input: {},
+            output: output.result,
+            success: output.success,
+            durationMs: output.metadata.executionTimeMs,
+            timestamp: new Date(),
+          }).catch((err: Error) =>
+            logger.warn("Failed to track experience", { error: err.message })
+          );
+        }
+      }
 
       // Decision: hard-block requests when budget is exhausted or estimated cost exceeds remaining.
       // Alerts are emitted via logs + metrics (no email notifications yet).
@@ -412,6 +561,22 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
           lastComplexity: analysis.complexity,
         },
       });
+
+      // Track AI execution step for pattern learning
+      {
+        const experienceTracker = new ExperienceTracker(prisma, getRedisConnection());
+        experienceTracker.trackExecution(organizationId, sessionId, {
+          toolName: 'ai_execution',
+          provider: result.execution.metadata.model,
+          input: { prompt: userRequest.slice(0, 200), category: categorySelection.category },
+          output: result.execution.output.slice(0, 500),
+          success: result.execution.status === 'success',
+          durationMs: result.duration,
+          timestamp: new Date(),
+        }).catch((err: Error) =>
+          logger.warn("Failed to track AI execution experience", { error: err.message })
+        );
+      }
 
       const inputTokens = result.execution.metadata.inputTokens ?? 0;
       const outputTokens = result.execution.metadata.outputTokens ?? 0;

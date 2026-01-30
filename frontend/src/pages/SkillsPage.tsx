@@ -63,6 +63,17 @@ interface PullRequest {
   resource_id: string;
 }
 
+interface SkillMetrics {
+  skillId: string;
+  totalExecutions: number;
+  successCount: number;
+  failureCount: number;
+  successRate: number;
+  avgDurationMs: number;
+  p95DurationMs: number;
+  lastExecutedAt: string | null;
+}
+
 export default function SkillsPage() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -75,6 +86,11 @@ export default function SkillsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeView, setActiveView] = useState<"skills" | "performance">("skills");
+  const [skillMetrics, setSkillMetrics] = useState<SkillMetrics[]>([]);
+  const [topSkills, setTopSkills] = useState<SkillMetrics[]>([]);
+  const [poorSkills, setPoorSkills] = useState<SkillMetrics[]>([]);
+  const [metricsLoading, setMetricsLoading] = useState(false);
 
   const fetchPendingPRs = async () => {
     try {
@@ -125,6 +141,24 @@ export default function SkillsPage() {
     }
   };
 
+  const fetchPerformanceData = async () => {
+    setMetricsLoading(true);
+    try {
+      const [metricsData, topData, poorData] = await Promise.all([
+        request<{ metrics: SkillMetrics[] }>({ url: "/api/optimization/skills/metrics", method: "GET" }).catch(() => ({ metrics: [] })),
+        request<{ skills: SkillMetrics[] }>({ url: "/api/optimization/skills/top", method: "GET" }).catch(() => ({ skills: [] })),
+        request<{ skills: SkillMetrics[] }>({ url: "/api/optimization/skills/poor", method: "GET" }).catch(() => ({ skills: [] })),
+      ]);
+      setSkillMetrics(metricsData.metrics);
+      setTopSkills(topData.skills);
+      setPoorSkills(poorData.skills);
+    } catch {
+      // Performance data is optional
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -133,6 +167,12 @@ export default function SkillsPage() {
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (activeView === "performance") {
+      fetchPerformanceData();
+    }
+  }, [activeView]);
 
   const handleCreate = () => {
     setEditingSkill(null);
@@ -234,8 +274,34 @@ export default function SkillsPage() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* View Toggle */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setActiveView("skills")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${
+            activeView === "skills"
+              ? "bg-indigo-600 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Skills Management
+        </button>
+        <button
+          onClick={() => setActiveView("performance")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${
+            activeView === "performance"
+              ? "bg-indigo-600 text-white"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Performance Dashboard
+        </button>
+      </div>
+
+      {activeView === "skills" && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-2xl font-bold text-purple-600">{skills.length}</div>
           <div className="text-sm text-gray-500">Total Skills</div>
@@ -402,6 +468,163 @@ export default function SkillsPage() {
               onDelete={handleDelete}
             />
           ))}
+        </div>
+      )}
+
+        </>
+      )}
+
+      {activeView === "performance" && (
+        <div>
+          {metricsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="text-sm text-gray-500">Total Skills Tracked</div>
+                  <div className="text-2xl font-bold text-gray-900 mt-1">{skillMetrics.length}</div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="text-sm text-gray-500">Total Executions</div>
+                  <div className="text-2xl font-bold text-gray-900 mt-1">
+                    {skillMetrics.reduce((sum, m) => sum + m.totalExecutions, 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="text-sm text-gray-500">Avg Success Rate</div>
+                  <div className="text-2xl font-bold text-green-600 mt-1">
+                    {skillMetrics.length > 0
+                      ? `${Math.round(
+                          (skillMetrics.reduce((sum, m) => sum + m.successRate, 0) / skillMetrics.length) * 100
+                        )}%`
+                      : "N/A"}
+                  </div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="text-sm text-gray-500">Needs Attention</div>
+                  <div className="text-2xl font-bold text-amber-600 mt-1">{poorSkills.length}</div>
+                </div>
+              </div>
+
+              {/* Top Performing */}
+              {topSkills.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performing Skills</h3>
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Skill</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Executions</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Success Rate</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Avg Latency</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">P95 Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {topSkills.map((skill) => (
+                          <tr key={skill.skillId} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{skill.skillId}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{skill.totalExecutions}</td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              <span className={`font-medium ${skill.successRate >= 0.9 ? "text-green-600" : skill.successRate >= 0.7 ? "text-amber-600" : "text-red-600"}`}>
+                                {Math.round(skill.successRate * 100)}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{skill.avgDurationMs}ms</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{skill.p95DurationMs}ms</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Needs Attention */}
+              {poorSkills.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Needs Attention</h3>
+                  <div className="space-y-3">
+                    {poorSkills.map((skill) => (
+                      <div
+                        key={skill.skillId}
+                        className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-900">{skill.skillId}</div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {skill.successRate < 0.7
+                              ? `Low success rate: ${Math.round(skill.successRate * 100)}%`
+                              : `High latency: ${skill.avgDurationMs}ms avg`}
+                          </div>
+                        </div>
+                        <div className="text-right text-sm">
+                          <div className="text-gray-500">{skill.totalExecutions} executions</div>
+                          <div className="text-gray-500">{skill.failureCount} failures</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* All Skills Metrics */}
+              {skillMetrics.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">All Skills</h3>
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left text-xs font-medium text-gray-500 uppercase px-4 py-3">Skill</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Total</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Success</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Failed</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Rate</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Avg (ms)</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">P95 (ms)</th>
+                          <th className="text-right text-xs font-medium text-gray-500 uppercase px-4 py-3">Last Run</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {skillMetrics.map((m) => (
+                          <tr key={m.skillId} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.skillId}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{m.totalExecutions}</td>
+                            <td className="px-4 py-3 text-sm text-right text-green-600">{m.successCount}</td>
+                            <td className="px-4 py-3 text-sm text-right text-red-600">{m.failureCount}</td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              <span className={`font-medium ${m.successRate >= 0.9 ? "text-green-600" : m.successRate >= 0.7 ? "text-amber-600" : "text-red-600"}`}>
+                                {Math.round(m.successRate * 100)}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{m.avgDurationMs}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{m.p95DurationMs}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-500">
+                              {m.lastExecutedAt ? new Date(m.lastExecutedAt).toLocaleDateString() : "Never"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {skillMetrics.length === 0 && !metricsLoading && (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-4">📊</div>
+                  <h3 className="text-lg font-medium text-gray-900">No performance data yet</h3>
+                  <p className="text-gray-500 mt-1">Skill metrics will appear here once skills are executed</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

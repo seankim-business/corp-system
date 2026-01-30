@@ -86,6 +86,7 @@ model User {
   sessions               Session[]
   orchestratorExecutions OrchestratorExecution[]
   featureFlagAuditLogs   FeatureFlagAuditLog[]
+  slackUsers             SlackUser[]
 
   @@index([email])
   @@index([googleId])
@@ -633,14 +634,23 @@ model ClaudeMaxAccount {
   @@map("claude_max_accounts")
 }
 
-/// Legacy Notion Connections (Backward compatibility)
+/// Notion Connections (supports OAuth and legacy API key)
 model NotionConnection {
-  id                String   @id @default(uuid()) @db.Uuid
-  organizationId    String   @map("organization_id") @db.Uuid
-  apiKey            String   @map("api_key") @db.VarChar(255)
-  defaultDatabaseId String?  @map("default_database_id") @db.VarChar(255)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String    @id @default(uuid()) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  apiKey            String    @default("") @map("api_key") @db.VarChar(255) // Legacy API key (empty when using OAuth)
+
+  // OAuth fields (filled after OAuth flow)
+  accessToken       String?   @map("access_token") @db.Text // OAuth access token (encrypted)
+  botId             String?   @map("bot_id") @db.VarChar(100)
+  workspaceId       String?   @map("workspace_id") @db.VarChar(100)
+  workspaceName     String?   @map("workspace_name") @db.VarChar(255)
+  workspaceIcon     String?   @map("workspace_icon") @db.Text
+  connectedAt       DateTime? @map("connected_at") @db.Timestamptz(6)
+
+  defaultDatabaseId String?   @map("default_database_id") @db.VarChar(255)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -1513,6 +1523,37 @@ model JobExecution {
   @@index([workerId, startedAt(sort: Desc)])
   @@index([status])
   @@map("job_executions")
+}
+
+// ============================================================================
+// SLACK USER PROVISIONING TABLES
+// ============================================================================
+
+/// SlackUser (Maps Slack workspace users to internal Users)
+/// Enables automatic user provisioning from Slack interactions
+model SlackUser {
+  id             String    @id @default(cuid())
+  slackUserId    String    @unique @map("slack_user_id")
+  slackTeamId    String    @map("slack_team_id")
+  userId         String    @map("user_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  displayName    String?   @map("display_name") @db.VarChar(255)
+  realName       String?   @map("real_name") @db.VarChar(255)
+  email          String?   @db.VarChar(255)
+  avatarUrl      String?   @map("avatar_url") @db.Text
+  isBot          Boolean   @default(false) @map("is_bot")
+  isAdmin        Boolean   @default(false) @map("is_admin")
+  lastSyncedAt   DateTime? @map("last_synced_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([slackTeamId])
+  @@index([userId])
+  @@index([organizationId])
+  @@map("slack_users")
 }
 
 

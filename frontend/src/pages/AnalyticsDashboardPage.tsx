@@ -1,5 +1,7 @@
 // Analytics Dashboard Page - Comprehensive agent performance analytics
 import { useState, useCallback, useEffect } from "react";
+import { isNotAvailableResponse } from "../utils/fetch-helpers";
+import FeatureComingSoon from "../components/FeatureComingSoon";
 import {
   LineChart,
   Line,
@@ -743,6 +745,7 @@ export default function AnalyticsDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   const [overview, setOverview] = useState<OrgMetrics | null>(null);
@@ -762,6 +765,11 @@ export default function AnalyticsDashboardPage() {
         fetch(`/api/analytics/leaderboard?period=${period}&limit=10`, { credentials: "include" }),
         fetch(`/api/analytics/trends?period=${period}`, { credentials: "include" }),
       ]);
+
+      if (isNotAvailableResponse(overviewRes)) {
+        setNotAvailable(true);
+        return;
+      }
 
       if (!overviewRes.ok) throw new Error("Failed to fetch overview");
       if (!agentsRes.ok) throw new Error("Failed to fetch agent metrics");
@@ -832,6 +840,22 @@ export default function AnalyticsDashboardPage() {
     const interval = setInterval(fetchData, 60000); // Refresh every minute
     return () => clearInterval(interval);
   }, [autoRefresh, fetchData]);
+
+  if (notAvailable) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <p className="text-gray-600">Agent performance and execution metrics</p>
+        </div>
+        <FeatureComingSoon
+          title="Analytics Dashboard"
+          description="The analytics dashboard is currently being set up. This feature will display agent performance metrics, execution trends, and leaderboards once the backend service is activated."
+          onRetry={fetchData}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

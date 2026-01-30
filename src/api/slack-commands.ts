@@ -17,7 +17,6 @@ function verifySlackSignature(
   timestamp: string,
   body: string,
 ): boolean {
-  // Reject requests older than 5 minutes to prevent replay attacks
   const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 60 * 5;
   if (parseInt(timestamp, 10) < fiveMinutesAgo) {
     logger.warn("Slack request timestamp too old", { timestamp });
@@ -29,14 +28,12 @@ function verifySlackSignature(
   hmac.update(sigBasestring);
   const computedSignature = `v0=${hmac.digest("hex")}`;
 
-  // Use timing-safe comparison to prevent timing attacks
   try {
     return crypto.timingSafeEqual(
       Buffer.from(computedSignature, "utf-8"),
       Buffer.from(signature, "utf-8"),
     );
   } catch {
-    // Buffers of different lengths will throw; treat as mismatch
     return false;
   }
 }
@@ -53,7 +50,6 @@ router.post("/commands", async (req: Request, res: Response) => {
       return res.status(500).json({ error: "Slack integration not configured" });
     }
 
-    // Slack sends these headers with every request
     const slackSignature = req.headers["x-slack-signature"] as string | undefined;
     const slackTimestamp = req.headers["x-slack-request-timestamp"] as string | undefined;
 
@@ -62,9 +58,6 @@ router.post("/commands", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Missing Slack signature headers" });
     }
 
-    // The raw body is needed for signature verification.
-    // Express body-parser should expose it via req.body (url-encoded) or rawBody.
-    // We reconstruct the url-encoded body string from the parsed fields.
     const rawBody =
       typeof (req as any).rawBody === "string"
         ? (req as any).rawBody
@@ -75,25 +68,17 @@ router.post("/commands", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Invalid Slack signature" });
     }
 
-    // Parse the slash-command payload (application/x-www-form-urlencoded)
     const {
       team_id: teamId,
       user_id: slackUserId,
       text: commandText,
       channel_id: channelId,
-      response_url: responseUrl,
     } = req.body as Record<string, string>;
 
-    logger.info("Slack slash command received", {
-      teamId,
-      slackUserId,
-      channelId,
-      commandText,
-    });
+    logger.info("Slack slash command received", { teamId, slackUserId, channelId, commandText });
 
     // Look up the Nubabel organization by Slack workspace
     const organization = await getOrganizationBySlackWorkspace(teamId);
-
     if (!organization) {
       logger.warn("No organization found for Slack workspace", { teamId });
       return res.status(200).json({
@@ -104,7 +89,7 @@ router.post("/commands", async (req: Request, res: Response) => {
 
     const organizationId = organization.id;
 
-    // Look up the Nubabel user by their Slack ID via the Slack API (email-based)
+    // Look up the Nubabel user by Slack ID (via email from Slack API)
     const slackBotToken = process.env.SLACK_BOT_TOKEN;
     if (!slackBotToken) {
       logger.error("SLACK_BOT_TOKEN is not configured");
@@ -114,19 +99,25 @@ router.post("/commands", async (req: Request, res: Response) => {
       });
     }
 
-    const { WebClient } = await import("@slack/web-api");
-    const slackClient = new WebClient(slackBotToken);
-    const user = await getUserBySlackId(slackUserId, slackClient);
-
-    if (!user) {
-      logger.warn("No Nubabel user found for Slack user", { slackUserId, teamId });
+    let userId: string;
+    try {
+      const { WebClient } = await import("@slack/web-api");
+      const slackClient = new WebClient(slackBotToken);
+      const user = await getUserBySlackId(slackUserId, slackClient);
+      if (!user) {
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: "Your Slack account is not linked to a Nubabel user. Please log in and connect your Slack account.",
+        });
+      }
+      userId = user.id;
+    } catch {
+      logger.warn("Failed to resolve Slack user", { slackUserId, teamId });
       return res.status(200).json({
         response_type: "ephemeral",
-        text: "Your Slack account is not linked to a Nubabel user. Please log in at https://nubabel.com and connect your Slack account.",
+        text: "Could not find your Nubabel account. Please log in and connect your Slack account.",
       });
     }
-
-    const userId = user.id;
 
     if (!commandText || commandText.trim().length === 0) {
       return res.status(200).json({
@@ -135,11 +126,9 @@ router.post("/commands", async (req: Request, res: Response) => {
       });
     }
 
-    // Create a session ID for this command invocation
     const sessionId = crypto.randomUUID();
-
-    // Queue the orchestration job
     const eventId = crypto.randomUUID();
+
     await orchestrationQueue.enqueueOrchestration({
       userRequest: commandText.trim(),
       sessionId,
@@ -157,7 +146,6 @@ router.post("/commands", async (req: Request, res: Response) => {
       commandText: commandText.trim(),
     });
 
-    // Immediate acknowledgment (ephemeral — only visible to the invoking user)
     return res.status(200).json({
       response_type: "ephemeral",
       text: `Got it! Processing your request: "${commandText.trim()}"\nI'll respond here shortly.`,
@@ -186,10 +174,7 @@ interface SlackInteractionPayload {
   }>;
   trigger_id?: string;
   response_url?: string;
-  message?: {
-    ts: string;
-    text?: string;
-  };
+  message?: { ts: string; text?: string };
   channel?: { id: string };
 }
 
@@ -205,7 +190,6 @@ router.post("/interactions", async (req: Request, res: Response) => {
     const slackTimestamp = req.headers["x-slack-request-timestamp"] as string | undefined;
 
     if (!slackSignature || !slackTimestamp) {
-      logger.warn("Missing Slack signature headers on /interactions");
       return res.status(401).json({ error: "Missing Slack signature headers" });
     }
 
@@ -215,14 +199,11 @@ router.post("/interactions", async (req: Request, res: Response) => {
         : new URLSearchParams(req.body as Record<string, string>).toString();
 
     if (!verifySlackSignature(signingSecret, slackSignature, slackTimestamp, rawBody)) {
-      logger.warn("Slack signature verification failed on /interactions");
       return res.status(401).json({ error: "Invalid Slack signature" });
     }
 
-    // Slack sends interactive payloads as a JSON string in the 'payload' form field
     const payloadStr = req.body?.payload;
     if (!payloadStr || typeof payloadStr !== "string") {
-      logger.warn("Missing or invalid payload in Slack interaction request");
       return res.status(400).json({ error: "Missing payload" });
     }
 
@@ -230,7 +211,6 @@ router.post("/interactions", async (req: Request, res: Response) => {
     try {
       payload = JSON.parse(payloadStr) as SlackInteractionPayload;
     } catch {
-      logger.warn("Failed to parse Slack interaction payload");
       return res.status(400).json({ error: "Invalid payload JSON" });
     }
 
@@ -245,13 +225,9 @@ router.post("/interactions", async (req: Request, res: Response) => {
       actionCount: actions.length,
     });
 
-    // Resolve the Nubabel organization and user
     const slackIntegration = teamId
-      ? await prisma.slackIntegration.findUnique({
-          where: { workspaceId: teamId },
-        })
+      ? await prisma.slackIntegration.findUnique({ where: { workspaceId: teamId } })
       : null;
-
     const organizationId = slackIntegration?.organizationId;
 
     for (const action of actions) {
@@ -262,44 +238,24 @@ router.post("/interactions", async (req: Request, res: Response) => {
         // ----- Feedback actions -----
         if (actionId === "feedback_positive" || actionId === "feedback_negative") {
           const sentiment = actionId === "feedback_positive" ? "positive" : "negative";
-
           logger.info("Slack feedback received", {
             sentiment,
             slackUserId,
-            actionValue,
+            executionId: actionValue,
             organizationId,
           });
-
-          if (organizationId && actionValue) {
-            // Store feedback as an audit log entry on the execution
-            logger.info("Slack feedback saved", {
-              sentiment,
-              executionId: actionValue,
-              organizationId,
-              slackUserId: slackUserId ?? "unknown",
-            });
-          }
         }
 
         // ----- Approval actions -----
         else if (actionId === "approve_action" || actionId === "reject_action") {
           const status = actionId === "approve_action" ? "approved" : "rejected";
-
-          logger.info("Slack approval action received", {
-            status,
-            slackUserId,
-            actionValue,
-          });
+          logger.info("Slack approval action received", { status, slackUserId, actionValue });
 
           if (actionValue) {
-            const approval = await prisma.approval.findUnique({
-              where: { id: actionValue },
-            });
+            const approval = await prisma.approval.findUnique({ where: { id: actionValue } });
 
             if (!approval) {
-              logger.warn("Approval not found for Slack action", {
-                approvalId: actionValue,
-              });
+              logger.warn("Approval not found for Slack action", { approvalId: actionValue });
               continue;
             }
 
@@ -322,10 +278,7 @@ router.post("/interactions", async (req: Request, res: Response) => {
 
             await prisma.approval.update({
               where: { id: actionValue },
-              data: {
-                status,
-                respondedAt: new Date(),
-              },
+              data: { status, respondedAt: new Date() },
             });
 
             logger.info("Approval updated via Slack interaction", {
@@ -338,46 +291,28 @@ router.post("/interactions", async (req: Request, res: Response) => {
 
         // ----- Retry action -----
         else if (actionId === "retry_action") {
-          logger.info("Slack retry action received", {
-            slackUserId,
-            actionValue,
-          });
+          logger.info("Slack retry action received", { slackUserId, actionValue });
 
           if (actionValue && organizationId) {
-            // actionValue is expected to contain the original job/session data as JSON
-            let retryData: {
-              userRequest: string;
-              sessionId: string;
-              userId: string;
-            } | null = null;
-
+            let retryData: { userRequest: string; sessionId: string; userId: string } | null = null;
             try {
-              retryData = JSON.parse(actionValue) as {
-                userRequest: string;
-                sessionId: string;
-                userId: string;
-              };
+              retryData = JSON.parse(actionValue);
             } catch {
-              logger.warn("Failed to parse retry action value", {
-                actionValue,
-              });
+              logger.warn("Failed to parse retry action value", { actionValue });
             }
 
             if (retryData) {
               const sessionId = crypto.randomUUID();
+              const eventId = crypto.randomUUID();
 
-              await addOrchestrationJob({
+              await orchestrationQueue.enqueueOrchestration({
                 userRequest: retryData.userRequest,
                 sessionId,
                 organizationId,
                 userId: retryData.userId,
-                metadata: {
-                  source: "slack_retry",
-                  originalSessionId: retryData.sessionId,
-                  slackUserId,
-                  slackChannelId: payload.channel?.id,
-                  responseUrl: payload.response_url,
-                },
+                eventId,
+                slackChannel: payload.channel?.id ?? "",
+                slackThreadTs: "",
               });
 
               logger.info("Retry job queued via Slack interaction", {
@@ -391,10 +326,7 @@ router.post("/interactions", async (req: Request, res: Response) => {
 
         // ----- Unknown action -----
         else {
-          logger.warn("Unhandled Slack interaction action", {
-            actionId,
-            actionValue,
-          });
+          logger.warn("Unhandled Slack interaction action", { actionId, actionValue });
         }
       } catch (actionError: unknown) {
         const actionMessage =
@@ -406,12 +338,10 @@ router.post("/interactions", async (req: Request, res: Response) => {
       }
     }
 
-    // Slack requires a 200 OK response to acknowledge the interaction
     return res.status(200).send();
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error("Slack interaction handler error", { error: message });
-    // Still return 200 to avoid Slack retrying indefinitely
     return res.status(200).send();
   }
 });

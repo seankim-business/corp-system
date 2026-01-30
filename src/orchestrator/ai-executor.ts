@@ -97,23 +97,24 @@ Provide production-ready code with modern best practices.`,
 
 const tracer = trace.getTracer("ai-executor");
 
-function buildSystemPrompt(skills: string[]): string {
+function buildSystemPrompt(skills: string[], registrySkillPrompts?: string[]): string {
   const basePrompt = `You are a helpful AI assistant. Respond concisely and accurately.`;
 
-  if (skills.length === 0) {
-    return basePrompt;
-  }
-
-  const skillPrompts = skills
+  // Legacy hardcoded skill prompts
+  const legacyPrompts = skills
     .filter((skill) => SKILL_SYSTEM_PROMPTS[skill])
-    .map((skill) => SKILL_SYSTEM_PROMPTS[skill])
-    .join("\n\n---\n\n");
+    .map((skill) => SKILL_SYSTEM_PROMPTS[skill]);
 
-  if (!skillPrompts) {
+  // Registry-based skill prompts
+  const registryPrompts = registrySkillPrompts || [];
+
+  const allPrompts = [...legacyPrompts, ...registryPrompts].filter(Boolean);
+
+  if (allPrompts.length === 0) {
     return basePrompt;
   }
 
-  return `${skillPrompts}\n\n---\n\nRemember to be helpful, accurate, and concise.`;
+  return `${allPrompts.join("\n\n---\n\n")}\n\n---\n\nRemember to be helpful, accurate, and concise.`;
 }
 
 function calculateCost(model: string, inputTokens: number, outputTokens: number): number {
@@ -163,7 +164,8 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
     async (span: Span): Promise<AIExecutionResult> => {
       const startTime = Date.now();
       const model = CATEGORY_MODEL_MAP[params.category] || "claude-3-5-sonnet-20241022";
-      const systemPrompt = buildSystemPrompt(params.skills);
+      const registrySkillPrompts = (params.context?.registrySkillPrompts as string[] | undefined);
+      const systemPrompt = buildSystemPrompt(params.skills, registrySkillPrompts);
       const environment = process.env.NODE_ENV || "development";
 
       span.setAttribute("ai.model", model);

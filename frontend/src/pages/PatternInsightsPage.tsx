@@ -4,6 +4,8 @@
  */
 
 import { useState, useEffect } from "react";
+import { isNotAvailableResponse } from "../utils/fetch-helpers";
+import FeatureComingSoon from "../components/FeatureComingSoon";
 
 interface DetectedPattern {
   id: string;
@@ -30,6 +32,7 @@ export default function PatternInsightsPage() {
   const [patterns, setPatterns] = useState<DetectedPattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -50,6 +53,11 @@ export default function PatternInsightsPage() {
       const response = await fetch(`/api/patterns?${params}`, {
         credentials: "include",
       });
+
+      if (isNotAvailableResponse(response)) {
+        setNotAvailable(true);
+        return;
+      }
 
       if (!response.ok) throw new Error("Failed to fetch patterns");
 
@@ -165,6 +173,24 @@ export default function PatternInsightsPage() {
   };
 
   const stats = getStats();
+
+  if (notAvailable) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-900">Pattern Insights</h1>
+            <p className="text-gray-600 mt-1">Detected patterns that could be automated as SOPs</p>
+          </div>
+          <FeatureComingSoon
+            title="Pattern Detection"
+            description="Pattern detection is currently being set up. This feature will analyze user actions and suggest automation opportunities once the backend service is activated."
+            onRetry={fetchPatterns}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">

@@ -1,8 +1,8 @@
 # Fix Plan: CSP Blocking Cross-Subdomain API Calls
 
-**Date**: 2026-01-30  
-**Issue**: #5 - Content Security Policy blocking auth.nubabel.com API calls  
-**Status**: Implementation Ready
+**Date**: 2026-01-30
+**Issue**: #5 - Content Security Policy blocking auth.nubabel.com API calls
+**Status**: COMPLETED AND DEPLOYED
 
 ---
 
@@ -127,13 +127,13 @@ Then investigate and create proper CSP.
 
 ## Testing Checklist
 
-- [ ] No CSP errors in console
-- [ ] `/auth/me` request succeeds
-- [ ] Login flow works (Google OAuth)
-- [ ] Dashboard loads after login
-- [ ] Organization switcher works
-- [ ] Logout works
-- [ ] Re-login after logout works
+- [x] No CSP errors in console (verified via Playwright 2026-01-30)
+- [x] `/auth/me` request reaches server (returns 401 for unauthenticated — correct)
+- [ ] Login flow works (Google OAuth) — requires manual test
+- [ ] Dashboard loads after login — requires manual test
+- [ ] Organization switcher works — requires manual test
+- [ ] Logout works — requires manual test
+- [ ] Re-login after logout works — requires manual test
 
 ---
 

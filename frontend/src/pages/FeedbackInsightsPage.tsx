@@ -6,6 +6,8 @@
  */
 
 import { useState, useEffect } from "react";
+import { isNotAvailableResponse } from "../utils/fetch-helpers";
+import FeatureComingSoon from "../components/FeatureComingSoon";
 
 interface FeedbackAnalysis {
   totalCount: number;
@@ -55,6 +57,7 @@ export default function FeedbackInsightsPage() {
   const [stats, setStats] = useState<ImprovementStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
   const [days, setDays] = useState(30);
 
@@ -70,6 +73,11 @@ export default function FeedbackInsightsPage() {
         fetch(`/api/feedback/analysis?days=${days}`, { credentials: "include" }),
         fetch("/api/feedback/actions", { credentials: "include" }),
       ]);
+
+      if (isNotAvailableResponse(analysisRes)) {
+        setNotAvailable(true);
+        return;
+      }
 
       if (!analysisRes.ok || !actionsRes.ok) {
         throw new Error("Failed to fetch feedback data");
@@ -154,6 +162,19 @@ export default function FeedbackInsightsPage() {
         return "text-gray-600 bg-gray-100";
     }
   };
+
+  if (notAvailable) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Feedback Insights</h1>
+        <FeatureComingSoon
+          title="Feedback Analysis"
+          description="Feedback analysis is currently being set up. This feature will display feedback analytics, sentiment patterns, and improvement recommendations once the backend service is activated."
+          onRetry={fetchData}
+        />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -12,6 +12,10 @@ interface SSEClient {
   userId: string;
   res: Response;
   lastEventId?: string;
+  /** If set, only deliver events matching these types */
+  eventFilter?: Set<string>;
+  /** If set, only deliver events for this specific user */
+  userFilter?: string;
 }
 
 class SSEManager extends EventEmitter {
@@ -35,6 +39,7 @@ class SSEManager extends EventEmitter {
           event: string;
           data: unknown;
           id?: string;
+          userId?: string;
         };
 
         const orgClients = Array.from(this.clients.values()).filter(
@@ -42,7 +47,9 @@ class SSEManager extends EventEmitter {
         );
 
         orgClients.forEach((client) => {
-          this.sendEvent(client, parsed.event, parsed.data, parsed.id);
+          if (this.shouldDeliverEvent(client, parsed.event, parsed.userId)) {
+            this.sendEvent(client, parsed.event, parsed.data, parsed.id);
+          }
         });
       } catch (err) {
         logger.error("Failed to parse SSE pubsub message", { err: String(err) });
@@ -111,6 +118,26 @@ class SSEManager extends EventEmitter {
     return orgClients.length;
   }
 
+  /**
+   * Check whether an event should be delivered to a client based on its filters.
+   */
+  private shouldDeliverEvent(client: SSEClient, eventType: string, eventUserId?: string): boolean {
+    // Event type filter: if set, only deliver matching event types
+    if (client.eventFilter && client.eventFilter.size > 0) {
+      // Support prefix matching (e.g., "job:" matches "job:completed", "job:failed")
+      const matches = client.eventFilter.has(eventType) ||
+        Array.from(client.eventFilter).some((f) => f.endsWith(":*") && eventType.startsWith(f.slice(0, -1)));
+      if (!matches) return false;
+    }
+
+    // User filter: if set, only deliver events for this specific user
+    if (client.userFilter && eventUserId && client.userFilter !== eventUserId) {
+      return false;
+    }
+
+    return true;
+  }
+
   private sendEvent(client: SSEClient, event: string, data: any, id?: string) {
     if (id) {
       client.res.write(`id: ${id}\n`);
@@ -167,6 +194,17 @@ sseRouter.get("/events", authenticate, (req: Request, res: Response) => {
   const lastEventIdHeader = req.header("Last-Event-ID");
   const lastEventId = typeof lastEventIdHeader === "string" ? lastEventIdHeader : undefined;
 
+  // Parse event type filter from query params: ?events=job:completed,job:failed
+  const eventsParam = req.query.events;
+  let eventFilter: Set<string> | undefined;
+  if (typeof eventsParam === "string" && eventsParam.length > 0) {
+    eventFilter = new Set(eventsParam.split(",").map((e) => e.trim()).filter(Boolean));
+  }
+
+  // Parse user filter: ?userId=<id> — only receive events for a specific user
+  const userFilterParam = req.query.userId;
+  const userFilter = typeof userFilterParam === "string" ? userFilterParam : undefined;
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -181,6 +219,8 @@ sseRouter.get("/events", authenticate, (req: Request, res: Response) => {
     userId: req.user!.id,
     res,
     lastEventId,
+    eventFilter,
+    userFilter,
   };
 
   sseManager.addClient(client);
@@ -215,6 +255,78 @@ sseRouter.get("/events", authenticate, (req: Request, res: Response) => {
   req.on("close", () => {
     sseManager.removeClient(clientId);
   });
+});
+
+// =============================================================================
+// SSE Fallback: Long-Polling Endpoint
+// For clients that cannot maintain persistent SSE connections (firewalls,
+// proxies, mobile networks). Clients poll periodically with ?since=<eventId>.
+// =============================================================================
+
+sseRouter.get("/events/poll", authenticate, async (req: Request, res: Response) => {
+  const organizationId = req.organization!.id;
+  const sinceId = typeof req.query.since === "string" ? req.query.since : "0-0";
+  const limitParam = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : 50;
+  const limit = Math.min(Math.max(limitParam, 1), 200);
+
+  // Parse event filter from query params
+  const eventsParam = req.query.events;
+  let eventFilter: Set<string> | undefined;
+  if (typeof eventsParam === "string" && eventsParam.length > 0) {
+    eventFilter = new Set(eventsParam.split(",").map((e) => e.trim()).filter(Boolean));
+  }
+
+  const streamKey = `sse:org:${organizationId}`;
+
+  try {
+    const rawResult = await withQueueConnection(
+      (conn) => conn.xread("COUNT", limit, "STREAMS", streamKey, sinceId) as Promise<any>,
+    );
+
+    const events: Array<{ id: string; event: string; data: unknown; timestamp: string }> = [];
+
+    if (rawResult) {
+      const entries = rawResult[0]?.[1] as Array<[string, string[]]> | undefined;
+      if (entries) {
+        for (const [id, fields] of entries) {
+          const map: Record<string, string> = {};
+          for (let i = 0; i < fields.length; i += 2) {
+            map[fields[i]] = fields[i + 1];
+          }
+          const event = map.event || "message";
+
+          // Apply event filter if provided
+          if (eventFilter && eventFilter.size > 0) {
+            const matches = eventFilter.has(event) ||
+              Array.from(eventFilter).some((f) => f.endsWith(":*") && event.startsWith(f.slice(0, -1)));
+            if (!matches) continue;
+          }
+
+          const data = map.data ? JSON.parse(map.data) : {};
+          // Extract timestamp from Redis stream ID (format: <millisecondTimestamp>-<sequence>)
+          const ts = id.split("-")[0];
+          events.push({
+            id,
+            event,
+            data,
+            timestamp: new Date(parseInt(ts, 10)).toISOString(),
+          });
+        }
+      }
+    }
+
+    const lastEventId = events.length > 0 ? events[events.length - 1].id : sinceId;
+
+    res.json({
+      events,
+      lastEventId,
+      hasMore: events.length === limit,
+      pollIntervalMs: events.length > 0 ? 1000 : 5000, // Faster polling when active
+    });
+  } catch (err) {
+    logger.error("SSE polling error", { organizationId, error: String(err) });
+    res.status(500).json({ error: "Failed to fetch events" });
+  }
 });
 
 sseRouter.get("/activity/stream", authenticate, async (req: Request, res: Response) => {

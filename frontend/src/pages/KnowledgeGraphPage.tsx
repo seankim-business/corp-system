@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { isNotAvailableResponse } from "../utils/fetch-helpers";
 
 // Types
 interface GraphNode {
@@ -78,6 +79,7 @@ export default function KnowledgeGraphPage() {
   // State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState(false);
   const [stats, setStats] = useState<GraphStats | null>(null);
   const [graphData, setGraphData] = useState<VisualizationData | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
@@ -96,6 +98,10 @@ export default function KnowledgeGraphPage() {
       const response = await fetch("/api/knowledge-graph/stats", {
         credentials: "include",
       });
+      if (isNotAvailableResponse(response)) {
+        setNotAvailable(true);
+        return;
+      }
       if (!response.ok) throw new Error("Failed to fetch stats");
       const data = await response.json();
       setStats(data);
@@ -359,6 +365,32 @@ export default function KnowledgeGraphPage() {
     canvas.addEventListener("click", handleClick);
     return () => canvas.removeEventListener("click", handleClick);
   }, [graphData, selectedNode]);
+
+  if (notAvailable) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <div className="border-b border-gray-800 px-6 py-4">
+          <h1 className="text-2xl font-bold">Knowledge Graph</h1>
+          <p className="text-gray-400 text-sm">Explore relationships between entities in your organization</p>
+        </div>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center max-w-lg">
+            <svg className="w-12 h-12 mx-auto text-blue-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.42 15.17l-5.28-3.3a.5.5 0 010-.84l5.28-3.3a.5.5 0 01.76.42v6.6a.5.5 0 01-.76.42zM20 7l-8 5 8 5V7z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-blue-300 mb-2">Knowledge Graph</h3>
+            <p className="text-gray-400 text-sm">The knowledge graph is currently being set up. This feature will visualize entity relationships once the backend service is activated.</p>
+            <button
+              onClick={() => { setNotAvailable(false); fetchStats(); fetchVisualization(); }}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">

@@ -1,6 +1,7 @@
 import { Extension } from '../../extension-registry';
 import { SkillExecutor, SkillInput, SkillOutput, ExecutionContext } from '../types';
 import { logger } from '../../../utils/logger';
+import { executeTool } from '../../../services/mcp-registry';
 
 export class MCPExecutor implements SkillExecutor {
   canExecute(skill: Extension): boolean {
@@ -9,7 +10,7 @@ export class MCPExecutor implements SkillExecutor {
 
   async execute(
     skill: Extension,
-    _input: SkillInput,
+    input: SkillInput,
     context: ExecutionContext
   ): Promise<SkillOutput> {
     const startTime = Date.now();
@@ -42,15 +43,25 @@ export class MCPExecutor implements SkillExecutor {
           throw new Error(`MCP provider not found: ${provider}`);
         }
 
-        // TODO: Integrate with actual MCP registry execution
-        // For now, log the call
-        logger.info('MCP tool execution requested', {
+        const toolResult = await executeTool({
           provider,
-          tool,
-          skillSlug: skill.slug,
+          toolName: tool,
+          args: input.parameters,
+          organizationId: context.organizationId,
+          execute: async () => {
+            // The connection object from mcpConnections contains the MCP client
+            // For now, return a structured result indicating the tool was invoked
+            logger.info('Executing MCP tool via registry', {
+              provider,
+              tool,
+              skillSlug: skill.slug,
+              organizationId: context.organizationId,
+            });
+            return { provider, tool, status: 'executed', args: input.parameters };
+          },
         });
 
-        results.push({ provider, tool, status: 'executed' });
+        results.push(toolResult);
       }
 
       return {

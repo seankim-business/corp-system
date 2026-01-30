@@ -1,0 +1,12 @@
+{
+  "src/**/*.{ts,tsx}": [
+    "prettier --write",
+    "eslint --fix --max-warnings=0"
+  ],
+  "frontend/src/**/*.{ts,tsx}": [
+    "prettier --write"
+  ],
+  "*.{json,md,yml,yaml}": [
+    "prettier --write"
+  ]
+}

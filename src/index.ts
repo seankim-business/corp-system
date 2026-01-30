@@ -42,6 +42,7 @@ import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 import { googleAiOAuthRouter } from "./api/google-ai-oauth";
+import notionOAuthRoutes from "./api/notion-oauth";
 // import { githubModelsOAuthRouter } from "./api/github-models-oauth";
 // import { providersRouter } from "./api/providers";
 import { organizationSettingsRouter } from "./api/organization-settings";
@@ -482,6 +483,7 @@ app.use("/api", webhookRateLimiter, syncRoutes);
 
 app.use("/api", apiRateLimiter, slackOAuthRouter);
 app.use("/api", apiRateLimiter, googleAiOAuthRouter);
+app.use("/api", apiRateLimiter, notionOAuthRoutes);
 // app.use("/api", apiRateLimiter, githubModelsOAuthRouter);
 
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, providersRouter);
