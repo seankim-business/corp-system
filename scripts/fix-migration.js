@@ -18,31 +18,28 @@ async function main() {
     `);
     console.log("   ✓ set_current_organization function created");
 
-    console.log("2. Fixing failed migrations...");
-    const failedMigrations = [
-      "20260126_add_feature_flags",
-      "20260126_add_oauth_refresh_fields",
-      "20260126_add_orchestrator_executions",
-      "20260126_add_organization_budgets",
-      "20260126_add_performance_indexes",
-      "20260126_enable_row_level_security",
-      "20260128_add_analytics_materialized_views",
-    ];
+    console.log("2. Finding all failed migrations...");
+    const failedMigrations = await prisma.$queryRaw`
+      SELECT migration_name 
+      FROM _prisma_migrations 
+      WHERE finished_at IS NULL
+    `;
 
-    for (const migration of failedMigrations) {
-      const result = await prisma.$queryRaw`
-        SELECT migration_name, finished_at 
-        FROM _prisma_migrations 
-        WHERE migration_name = ${migration} AND finished_at IS NULL
-      `;
+    if (failedMigrations.length === 0) {
+      console.log("   ✓ No failed migrations found");
+    } else {
+      console.log(`   Found ${failedMigrations.length} failed migration(s)`);
 
-      if (result.length > 0) {
-        await prisma.$executeRaw`
+      for (const { migration_name } of failedMigrations) {
+        await prisma.$executeRawUnsafe(
+          `
           UPDATE _prisma_migrations
           SET finished_at = NOW(), applied_steps_count = 1, rolled_back_at = NULL
-          WHERE migration_name = ${migration}
-        `;
-        console.log(`   ✓ ${migration} marked as applied`);
+          WHERE migration_name = $1
+        `,
+          migration_name,
+        );
+        console.log(`   ✓ ${migration_name} marked as applied`);
       }
     }
 
