@@ -29,6 +29,152 @@ function getRegistry(req: Request): ExtensionRegistry {
 }
 
 /**
+ * GET /api/marketplace/extensions
+ * List all published extensions
+ */
+router.get('/extensions', requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+      const pricing = typeof req.query.pricing === 'string' ? req.query.pricing : undefined;
+      const sort = typeof req.query.sort === 'string' ? req.query.sort : 'popular';
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+
+      const where: any = {
+        status: 'published',
+        isPublic: true,
+      };
+
+      if (category) {
+        where.category = category;
+      }
+
+      if (pricing) {
+        where.pricing = pricing;
+      }
+
+      const orderBy: any = {};
+      switch (sort) {
+        case 'recent':
+          orderBy.createdAt = 'desc';
+          break;
+        case 'rating':
+          orderBy.rating = 'desc';
+          break;
+        case 'trending':
+          orderBy.downloads = 'desc';
+          break;
+        default: // popular
+          orderBy.downloads = 'desc';
+      }
+
+      const [extensions, total] = await Promise.all([
+        prisma.marketplaceExtension.findMany({
+          where,
+          orderBy,
+          skip: (page - 1) * limit,
+          take: limit,
+          include: {
+            publisher: {
+              select: {
+                name: true,
+                slug: true,
+                verified: true,
+              },
+            },
+          },
+        }),
+        prisma.marketplaceExtension.count({ where }),
+      ]);
+
+      // Transform to match frontend expected format
+      const transformed = extensions.map(ext => ({
+        id: ext.id,
+        name: ext.name,
+        slug: ext.slug,
+        description: ext.description,
+        publisherName: ext.publisher?.name || 'Unknown',
+        publisherVerified: ext.publisher?.verified || false,
+        category: ext.category,
+        pricing: ext.pricing || 'free',
+        price: ext.price as any,
+        stats: {
+          downloads: ext.downloads || 0,
+          activeInstalls: ext.activeInstalls || 0,
+          rating: ext.rating || 0,
+          reviewCount: ext.reviewCount || 0,
+        },
+        icon: ext.icon,
+        featured: ext.featured || false,
+      }));
+
+      res.json({
+        extensions: transformed,
+        total,
+        page,
+        limit,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch extensions', {}, error as Error);
+      res.status(500).json({
+        error: { code: 'FETCH_FAILED', message: 'Failed to fetch extensions' },
+      });
+    }
+  })();
+});
+
+/**
+ * GET /api/marketplace/categories
+ * List all extension categories
+ */
+router.get('/categories', requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      // Get unique categories with counts
+      const categoryCounts = await prisma.marketplaceExtension.groupBy({
+        by: ['category'],
+        where: {
+          status: 'published',
+          isPublic: true,
+        },
+        _count: {
+          id: true,
+        },
+      });
+
+      // Define standard categories
+      const standardCategories = [
+        { id: 'productivity', slug: 'productivity', name: 'Productivity', icon: '📊' },
+        { id: 'automation', slug: 'automation', name: 'Automation', icon: '⚙️' },
+        { id: 'integration', slug: 'integration', name: 'Integration', icon: '🔗' },
+        { id: 'analytics', slug: 'analytics', name: 'Analytics', icon: '📈' },
+        { id: 'communication', slug: 'communication', name: 'Communication', icon: '💬' },
+        { id: 'development', slug: 'development', name: 'Development', icon: '💻' },
+        { id: 'ai-ml', slug: 'ai-ml', name: 'AI & Machine Learning', icon: '🤖' },
+        { id: 'security', slug: 'security', name: 'Security', icon: '🔒' },
+        { id: 'general', slug: 'general', name: 'General', icon: '📦' },
+      ];
+
+      // Map counts to categories
+      const countMap = new Map(categoryCounts.map(c => [c.category, c._count.id]));
+
+      const categories = standardCategories.map(cat => ({
+        ...cat,
+        extensionCount: countMap.get(cat.slug) || 0,
+      }));
+
+      res.json({ categories });
+    } catch (error) {
+      logger.error('Failed to fetch categories', {}, error as Error);
+      res.status(500).json({
+        error: { code: 'FETCH_FAILED', message: 'Failed to fetch categories' },
+      });
+    }
+  })();
+});
+
+/**
  * GET /api/marketplace/search
  * Search across external sources (GitHub, npm)
  */

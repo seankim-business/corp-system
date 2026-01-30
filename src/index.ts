@@ -69,6 +69,7 @@ import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
 import schedulesRoutes from "./api/schedules";
 import marketplaceHubRoutes from "./api/marketplace-hub";
+import marketplaceRoutes from "./api/marketplace";
 // import taskPrioritizationRoutes from "./api/task-prioritization";
 import syncRoutes from "./api/sync";
 import delegationRoutes from "./api/delegations";
@@ -588,6 +589,13 @@ app.use(
   authenticate,
   sentryUserContext,
   marketplaceHubRoutes,
+);
+app.use(
+  "/api/marketplace",
+  apiRateLimiter,
+  authenticate,
+  sentryUserContext,
+  marketplaceRoutes,
 );
 app.use(
   "/api/mcp",
