@@ -1,27 +1,23 @@
 /**
  * Notion Settings Page
  *
- * 기획:
- * - Organization의 Notion API Key 설정
- * - 데이터베이스 목록 조회
- * - 연결 테스트
- *
- * 구조:
- * NotionSettingsPage
- * ├── API Key Input Form
- * ├── Test Connection Button
- * └── Database List (if connected)
+ * Single-click OAuth flow to connect Notion.
+ * Shows workspace info and available databases after connection.
  */
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ApiError, request } from "../api/client";
 
-interface NotionConnection {
-  id: string;
-  organizationId: string;
-  defaultDatabaseId?: string;
-  createdAt: string;
-  updatedAt: string;
+interface NotionStatus {
+  connected: boolean;
+  method: "oauth" | "api_key" | "none";
+  workspaceId: string | null;
+  workspaceName: string | null;
+  workspaceIcon: string | null;
+  botId: string | null;
+  connectedAt: string | null;
+  defaultDatabaseId: string | null;
 }
 
 interface NotionDatabase {
@@ -31,53 +27,53 @@ interface NotionDatabase {
 }
 
 export default function NotionSettingsPage() {
-  const [connection, setConnection] = useState<NotionConnection | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [status, setStatus] = useState<NotionStatus | null>(null);
   const [databases, setDatabases] = useState<NotionDatabase[]>([]);
-  const [apiKey, setApiKey] = useState("");
-  const [defaultDatabaseId, setDefaultDatabaseId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [isResettingCircuit, setIsResettingCircuit] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const isCircuitBreakerError = message?.text?.toLowerCase().includes("circuit breaker");
-
-  const resetCircuitBreaker = async () => {
-    setIsResettingCircuit(true);
-    try {
-      await request({
-        url: "/health/circuits/reset",
-        method: "POST",
-        data: { name: "notion-api" },
-      });
-      setMessage({ type: "success", text: "Circuit breaker reset. Please try again." });
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to reset circuit breaker" });
-    } finally {
-      setIsResettingCircuit(false);
-    }
-  };
-
   useEffect(() => {
-    fetchConnection();
-  }, []);
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
 
-  const fetchConnection = async () => {
+    if (success === "true") {
+      setMessage({ type: "success", text: "Notion workspace connected successfully!" });
+      setSearchParams({});
+    } else if (error) {
+      const errorMessages: Record<string, string> = {
+        access_denied: "You denied the Notion authorization request.",
+        missing_params: "Missing required parameters from Notion.",
+        invalid_state: "Invalid state parameter. Please try again.",
+        token_exchange_failed: "Failed to exchange token with Notion.",
+        server_error: "Server error occurred. Please try again.",
+        notion_not_configured: "Notion integration is not yet configured. Please contact support.",
+      };
+      setMessage({ type: "error", text: errorMessages[error] || `Error: ${error}` });
+      setSearchParams({});
+    }
+
+    fetchStatus();
+  }, [searchParams, setSearchParams]);
+
+  const fetchStatus = async () => {
     try {
-      const data = await request<{ connection: NotionConnection }>({
-        url: "/api/notion/connection",
+      const data = await request<NotionStatus>({
+        url: "/api/notion/oauth/status",
         method: "GET",
       });
-      setConnection(data.connection);
-      setDefaultDatabaseId(data.connection.defaultDatabaseId || "");
-      await fetchDatabases();
+      setStatus(data);
+
+      if (data.connected) {
+        await fetchDatabases();
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
-        setConnection(null);
+        setStatus({ connected: false, method: "none", workspaceId: null, workspaceName: null, workspaceIcon: null, botId: null, connectedAt: null, defaultDatabaseId: null });
         return;
       }
-      console.error("Fetch connection error:", error);
+      console.error("Fetch status error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -90,102 +86,37 @@ export default function NotionSettingsPage() {
         method: "GET",
       });
       setDatabases(data.databases || []);
-    } catch (error) {
-      console.error("Fetch databases error:", error);
+    } catch {
+      // Databases may not be accessible yet
+      setDatabases([]);
     }
   };
 
-  const testConnection = async () => {
-    if (!apiKey) {
-      setMessage({ type: "error", text: "Please enter an API key" });
-      return;
-    }
-
-    setIsTesting(true);
-    setMessage(null);
-
-    try {
-      const data = await request<{ success: boolean; databaseCount?: number; error?: string }>({
-        url: "/api/notion/test",
-        method: "POST",
-        data: { apiKey },
-      });
-
-      if (data.success) {
-        setMessage({
-          type: "success",
-          text: `Connection successful! Found ${data.databaseCount || 0} databases.`,
-        });
-      } else {
-        setMessage({ type: "error", text: data.error || "Connection failed" });
-      }
-    } catch (error) {
-      const text = error instanceof ApiError ? error.message : "Failed to test connection";
-      setMessage({ type: "error", text });
-    } finally {
-      setIsTesting(false);
-    }
+  const handleConnectNotion = () => {
+    window.location.href = "/api/notion/oauth/install";
   };
 
-  const saveConnection = async () => {
-    if (!apiKey) {
-      setMessage({ type: "error", text: "Please enter an API key" });
+  const handleDisconnect = async () => {
+    if (!confirm("Are you sure you want to disconnect Notion?")) {
       return;
     }
 
-    setIsSaving(true);
+    setIsDisconnecting(true);
     setMessage(null);
 
     try {
-      const method = connection ? "PUT" : "POST";
-      interface SaveConnectionResponse {
-        connection: NotionConnection;
-        error?: string;
-      }
-      const data = await request<SaveConnectionResponse>({
-        url: "/api/notion/connection",
-        method,
-        data: { apiKey, defaultDatabaseId },
-      });
-
-      setConnection(data.connection);
-      setMessage({ type: "success", text: "Notion connection saved successfully" });
-      await fetchDatabases();
-      setApiKey("");
-    } catch (error) {
-      const text = error instanceof ApiError ? error.message : "Failed to save connection";
-      setMessage({ type: "error", text });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const deleteConnection = async () => {
-    if (!confirm("Are you sure you want to delete the Notion connection?")) {
-      return;
-    }
-
-    setIsSaving(true);
-    setMessage(null);
-
-    try {
-      interface DeleteConnectionResponse {
-        success: boolean;
-      }
-      await request<DeleteConnectionResponse>({
-        url: "/api/notion/connection",
+      await request<{ success: boolean }>({
+        url: "/api/notion/oauth/disconnect",
         method: "DELETE",
       });
 
-      setConnection(null);
+      setStatus({ connected: false, method: "none", workspaceId: null, workspaceName: null, workspaceIcon: null, botId: null, connectedAt: null, defaultDatabaseId: null });
       setDatabases([]);
-      setDefaultDatabaseId("");
-      setMessage({ type: "success", text: "Notion connection deleted" });
-    } catch (error) {
-      const text = error instanceof ApiError ? error.message : "Failed to delete connection";
-      setMessage({ type: "error", text });
+      setMessage({ type: "success", text: "Notion disconnected successfully." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to disconnect Notion." });
     } finally {
-      setIsSaving(false);
+      setIsDisconnecting(false);
     }
   };
 
@@ -200,11 +131,13 @@ export default function NotionSettingsPage() {
     );
   }
 
+  const isConnected = status?.connected ?? false;
+
   return (
     <div className="max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Notion Settings</h1>
-        <p className="text-gray-600">Configure Notion integration for workflows</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Notion Integration</h1>
+        <p className="text-gray-600">Connect your Notion workspace for workflows and knowledge management</p>
       </div>
 
       {message && (
@@ -215,101 +148,121 @@ export default function NotionSettingsPage() {
               : "bg-red-50 text-red-800 border border-red-200"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span>{message.text}</span>
-            {isCircuitBreakerError && (
-              <button
-                onClick={resetCircuitBreaker}
-                disabled={isResettingCircuit}
-                className="ml-4 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
-              >
-                {isResettingCircuit ? "Resetting..." : "Reset Circuit Breaker"}
-              </button>
-            )}
-          </div>
+          {message.text}
         </div>
       )}
 
+      {/* Connection Status */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">API Key</h2>
+        {isConnected && status ? (
+          /* Connected State */
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
+                  {status.workspaceIcon ? (
+                    <img
+                      src={status.workspaceIcon}
+                      alt=""
+                      className="w-8 h-8 rounded"
+                    />
+                  ) : (
+                    <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.119 20 4.5v15c0 1.381-1.119 2.5-2.5 2.5h-11C5.119 22 4 20.881 4 19.5v-15zM6.5 4C6.224 4 6 4.224 6 4.5v15c0 .276.224.5.5.5h11c.276 0 .5-.224.5-.5v-15c0-.276-.224-.5-.5-.5h-11zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z" />
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    {status.workspaceName || "Notion Workspace"}
+                  </h3>
+                  <p className="text-sm text-gray-500">Connected via OAuth</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                Connected
+              </span>
+            </div>
 
-        <div className="mb-4">
-          <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 mb-2">
-            Notion Internal Integration Token
-          </label>
-          <input
-            id="apiKey"
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder={connection ? "••••••••••••••••" : "secret_..."}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          />
-          <p className="mt-2 text-sm text-gray-500">
-            Create an integration at{" "}
-            <a
-              href="https://www.notion.so/my-integrations"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-indigo-600 hover:underline"
-            >
-              notion.so/my-integrations
-            </a>
-          </p>
-        </div>
+            <div className="grid grid-cols-2 gap-4 text-sm border-t border-gray-100 pt-4">
+              {status.workspaceId && (
+                <div>
+                  <span className="text-gray-500">Workspace ID:</span>
+                  <span className="ml-2 font-mono text-xs text-gray-700">{status.workspaceId}</span>
+                </div>
+              )}
+              {status.botId && (
+                <div>
+                  <span className="text-gray-500">Bot ID:</span>
+                  <span className="ml-2 font-mono text-xs text-gray-700">{status.botId}</span>
+                </div>
+              )}
+              {status.connectedAt && (
+                <div>
+                  <span className="text-gray-500">Connected:</span>
+                  <span className="ml-2 text-gray-700">
+                    {new Date(status.connectedAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+            </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={testConnection}
-            disabled={isTesting || !apiKey}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isTesting ? "Testing..." : "Test Connection"}
-          </button>
-
-          <button
-            onClick={saveConnection}
-            disabled={isSaving || !apiKey}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? "Saving..." : connection ? "Update" : "Save"}
-          </button>
-
-          {connection && (
+            <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+              <button
+                onClick={handleConnectNotion}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Reconnect
+              </button>
+              <button
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isDisconnecting ? "Disconnecting..." : "Disconnect"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Not Connected State */
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.119 20 4.5v15c0 1.381-1.119 2.5-2.5 2.5h-11C5.119 22 4 20.881 4 19.5v-15zM6.5 4C6.224 4 6 4.224 6 4.5v15c0 .276.224.5.5.5h11c.276 0 .5-.224.5-.5v-15c0-.276-.224-.5-.5-.5h-11zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Connect your Notion workspace
+            </h2>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              Click the button below to authorize Nubabel to access your Notion workspace.
+              Your team's pages and databases will be available for AI workflows.
+            </p>
             <button
-              onClick={deleteConnection}
-              disabled={isSaving}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleConnectNotion}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-lg"
             >
-              Delete
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.119 20 4.5v15c0 1.381-1.119 2.5-2.5 2.5h-11C5.119 22 4 20.881 4 19.5v-15zM6.5 4C6.224 4 6 4.224 6 4.5v15c0 .276.224.5.5.5h11c.276 0 .5-.224.5-.5v-15c0-.276-.224-.5-.5-.5h-11zM8 7h8v2H8V7zm0 4h8v2H8v-2zm0 4h5v2H8v-2z" />
+              </svg>
+              Connect to Notion
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {connection && databases.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Available Databases</h2>
-
-          <div className="mb-4">
-            <label htmlFor="defaultDb" className="block text-sm font-medium text-gray-700 mb-2">
-              Default Database (optional)
-            </label>
-            <select
-              id="defaultDb"
-              value={defaultDatabaseId}
-              onChange={(e) => setDefaultDatabaseId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+      {/* Databases */}
+      {isConnected && databases.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Available Databases</h2>
+            <button
+              onClick={fetchDatabases}
+              className="text-sm text-indigo-600 hover:text-indigo-700"
             >
-              <option value="">-- Select a database --</option>
-              {databases.map((db) => (
-                <option key={db.id} value={db.id}>
-                  {db.title}
-                </option>
-              ))}
-            </select>
+              Refresh
+            </button>
           </div>
-
           <div className="space-y-2">
             {databases.map((db) => (
               <div
@@ -327,7 +280,7 @@ export default function NotionSettingsPage() {
                     rel="noopener noreferrer"
                     className="text-indigo-600 hover:underline text-sm"
                   >
-                    Open in Notion →
+                    Open in Notion
                   </a>
                 </div>
               </div>
@@ -336,25 +289,13 @@ export default function NotionSettingsPage() {
         </div>
       )}
 
-      {connection && databases.length === 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+      {isConnected && databases.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
           <h3 className="text-lg font-medium text-yellow-900 mb-2">No databases found</h3>
           <p className="text-yellow-700 mb-4">
-            Your Notion integration is connected, but it doesn't have access to any databases yet.
+            Your Notion workspace is connected, but no databases are accessible yet.
+            Grant access to specific pages in Notion for the integration to see them.
           </p>
-          <div className="bg-yellow-100 rounded-md p-4 mb-4">
-            <p className="text-sm font-medium text-yellow-800 mb-2">How to grant access:</p>
-            <ol className="text-sm text-yellow-700 list-decimal list-inside space-y-1">
-              <li>Open the database you want to connect in Notion</li>
-              <li>
-                Click the <strong>...</strong> menu in the top-right corner
-              </li>
-              <li>
-                Select <strong>Connections</strong> (or Add connections)
-              </li>
-              <li>Find and add your integration</li>
-            </ol>
-          </div>
           <div className="flex gap-3">
             <a
               href="https://notion.so"
@@ -364,31 +305,58 @@ export default function NotionSettingsPage() {
             >
               Open Notion
               <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
             <button
-              onClick={() => fetchDatabases()}
+              onClick={fetchDatabases}
               className="inline-flex items-center px-4 py-2 bg-white border border-yellow-300 text-yellow-700 text-sm font-medium rounded-md hover:bg-yellow-50"
             >
-              <svg className="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
               Refresh Databases
             </button>
           </div>
         </div>
       )}
+
+      {/* How It Works */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">How It Works</h3>
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-medium">
+              1
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900">Connect your workspace</h4>
+              <p className="text-sm text-gray-600">
+                Click "Connect to Notion" and authorize Nubabel to access your workspace.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-medium">
+              2
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900">Share pages with the integration</h4>
+              <p className="text-sm text-gray-600">
+                In Notion, share specific pages or databases with the Nubabel integration to give it access.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-medium">
+              3
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900">Use in workflows</h4>
+              <p className="text-sm text-gray-600">
+                Your Notion content will be available to AI agents for knowledge retrieval and automation.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
