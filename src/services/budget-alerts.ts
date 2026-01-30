@@ -128,6 +128,10 @@ async function sendSlackAlert(
     }
 
     // Decrypt bot token
+    if (!slackIntegration.botToken) {
+      logger.warn("No bot token available for budget alert", { organizationId });
+      return false;
+    }
     const botToken = decrypt(slackIntegration.botToken);
     const client = new WebClient(botToken);
 

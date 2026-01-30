@@ -72,7 +72,7 @@ router.get("/costs/agents", requireAuth, async (req: Request, res: Response): Pr
         period,
         agents: summary.byAgent,
         totalCostCents: summary.totalCostCents,
-        totalRequests: summary.byAgent.reduce((sum, a) => sum + a.requestCount, 0),
+        totalRequests: Object.values(summary.byAgent).reduce((sum, a) => sum + a.requests, 0),
       },
     });
   } catch (error) {
