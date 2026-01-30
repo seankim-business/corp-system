@@ -101,7 +101,7 @@ import { shutdownOpenTelemetry } from "./instrumentation";
 import { logger } from "./utils/logger";
 import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
 import { adminRouter } from "./admin";
-import accountsRouter from "./api/routes/accounts.routes";
+// import accountsRouter from "./api/routes/accounts.routes"; // TODO: File not found
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
 // import { createHealthDashboardRouter } from "./api/health-dashboard";
@@ -134,17 +134,34 @@ let isShuttingDown = false;
 app.use(sentryRequestHandler());
 app.use(sentryTracingHandler());
 
+// Configure helmet with explicit CSP to allow cross-subdomain API calls
+// See: docs/troubleshooting/AUTH_REDIRECT_LOOP.md#issue-5
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: ["'self'", "https://*.nubabel.com", "wss://*.nubabel.com"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        connectSrc: [
+          "'self'",
+          "https://auth.nubabel.com",
+          "https://*.nubabel.com",
+          "wss://*.nubabel.com",
+        ],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          "https://static.cloudflareinsights.com",
+        ],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
         frameSrc: ["'self'", "https://accounts.google.com"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        upgradeInsecureRequests: [],
       },
     },
   }),
@@ -506,7 +523,7 @@ app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regions
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
 app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
-app.use("/api/admin/accounts", apiRateLimiter, authenticate, sentryUserContext, accountsRouter);
+// app.use("/api/admin/accounts", apiRateLimiter, authenticate, sentryUserContext, accountsRouter);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
 // app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
