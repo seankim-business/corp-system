@@ -23,6 +23,16 @@ const organizationNavItems: NavItem[] = [
   { name: "Changes", path: "/org-changes", icon: "📊" },
 ];
 
+const arNavItems: NavItem[] = [
+  { name: "AR Dashboard", path: "/ar", icon: "🏢" },
+  { name: "Departments", path: "/ar/departments", icon: "🏛️" },
+  { name: "Positions", path: "/ar/positions", icon: "💼" },
+  { name: "Assignments", path: "/ar/assignments", icon: "👤" },
+  { name: "AR Approvals", path: "/ar/approvals", icon: "📋" },
+  { name: "AR Analytics", path: "/ar/analytics", icon: "📊" },
+  { name: "Workload", path: "/ar/workload", icon: "⚖️" },
+];
+
 const integrationNavItems: NavItem[] = [
   { name: "Notion Settings", path: "/settings/notion", icon: "📝" },
   { name: "Slack Settings", path: "/settings/slack", icon: "💬" },
@@ -51,6 +61,7 @@ const marketplaceNavItems: NavItem[] = [
 const adminNavItems: NavItem[] = [
   { name: "Admin Dashboard", path: "/admin", icon: "🔧" },
   { name: "Agents", path: "/admin/agents", icon: "🤖" },
+  { name: "Agent Monitor", path: "/admin/agent-monitor", icon: "🖥️" },
   { name: "Skills", path: "/admin/skills", icon: "⚡" },
   { name: "Claude Max", path: "/admin/claude-max-accounts", icon: "🧠" },
   { name: "Optimization", path: "/admin/optimization", icon: "🔬" },
@@ -90,6 +101,12 @@ export default function Sidebar() {
               Organization
             </h3>
             <ul className="space-y-2">{renderNavItems(organizationNavItems)}</ul>
+          </div>
+          <div>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Agent Resources
+            </h3>
+            <ul className="space-y-2">{renderNavItems(arNavItems)}</ul>
           </div>
           <div>
             <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">

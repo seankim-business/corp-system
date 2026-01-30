@@ -121,6 +121,7 @@ model Organization {
   resourceLinkedRecords        ResourceLinkedRecord[]
   resourceSyncLogs             ResourceSyncLog[]
   resourceTypeSchemas          ResourceTypeSchema[]
+  codeOperations               CodeOperation[]
 
   @@map("organizations")
 }
@@ -155,6 +156,7 @@ model User {
   humanAssignments            HumanAssignment[]
   // Mega App relations
   modulePermissions           ModulePermission[]
+  codeOperations              CodeOperation[]
 
   @@index([email])
   @@index([googleId])
@@ -295,6 +297,7 @@ model Agent {
   executions       AgentExecution[]
   // AR (Agent Resource) Management relations
   arAssignments    AgentAssignment[]
+  codeOperations   CodeOperation[]
 
   @@index([organizationId])
   @@index([managerId])
@@ -3827,4 +3830,107 @@ model ResourceTypeSchema {
   @@index([internalType])
   @@index([isBuiltIn])
   @@map("resource_type_schemas")
+}
+
+// ============================================================================
+// CODE OPERATION SYSTEM
+// Self-modifying agent system for autonomous code changes
+// ============================================================================
+
+/// Code Operation Type
+enum CodeOperationType {
+  debug
+  implement
+  refactor
+  fix
+  test
+}
+
+/// Code Operation Status
+enum CodeOperationStatus {
+  queued
+  cloning
+  analyzing
+  executing
+  testing
+  scanning
+  committing
+  pushing
+  creating_pr
+  completed
+  failed
+  cancelled
+}
+
+/// Code Operation
+/// Tracks autonomous code modification operations
+model CodeOperation {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+
+  // Operation details
+  operationType  CodeOperationType   @map("operation_type")
+  status         CodeOperationStatus @default(queued)
+  description    String              @db.Text
+
+  // Repository info
+  repoOwner      String              @map("repo_owner") @db.VarChar(255)
+  repoName       String              @map("repo_name") @db.VarChar(255)
+  baseBranch     String              @map("base_branch") @db.VarChar(255)
+  workingBranch  String?             @map("working_branch") @db.VarChar(255)
+
+  // Context
+  targetFiles    String[]            @default([]) @map("target_files")
+  errorContext   Json?               @map("error_context") @db.JsonB
+  featureContext Json?               @map("feature_context") @db.JsonB
+
+  // User/Agent info
+  userId         String?             @map("user_id") @db.Uuid
+  agentId        String?             @map("agent_id") @db.Uuid
+  agentPosition  Int                 @default(0) @map("agent_position")
+
+  // Slack integration
+  slackChannel   String?             @map("slack_channel") @db.VarChar(255)
+  slackThreadTs  String?             @map("slack_thread_ts") @db.VarChar(255)
+  slackTeamId    String?             @map("slack_team_id") @db.VarChar(255)
+
+  // Result tracking
+  filesModified  String[]            @default([]) @map("files_modified")
+  commits        Json                @default("[]") @db.JsonB
+  prNumber       Int?                @map("pr_number")
+  prUrl          String?             @map("pr_url") @db.Text
+
+  // Execution metrics
+  iterations     Int                 @default(0)
+  startedAt      DateTime?           @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime?           @map("completed_at") @db.Timestamptz(6)
+  durationMs     Int?                @map("duration_ms")
+
+  // Error tracking
+  errorMessage   String?             @map("error_message") @db.Text
+  errorStep      String?             @map("error_step") @db.VarChar(255)
+
+  // Safety
+  approvalRequired Boolean           @default(true) @map("approval_required")
+  approvedBy     String?             @map("approved_by") @db.Uuid
+  approvedAt     DateTime?           @map("approved_at") @db.Timestamptz(6)
+
+  // Audit
+  aiLogs         Json                @default("[]") @map("ai_logs") @db.JsonB
+  secretsScanned Boolean             @default(false) @map("secrets_scanned")
+
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  agent          Agent?              @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([operationType])
+  @@index([userId])
+  @@index([agentId])
+  @@index([createdAt(sort: Desc)])
+  @@map("code_operations")
 }

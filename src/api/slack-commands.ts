@@ -4,6 +4,8 @@ import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
 import { orchestrationQueue } from "../queue/orchestration.queue";
 import { getUserBySlackId, getOrganizationBySlackWorkspace } from "../services/slack-service";
+import { encrypt } from "../utils/encryption";
+import { getMarketplaceApiKeys } from "./marketplace-hub";
 
 const router = Router();
 
@@ -36,6 +38,144 @@ function verifySlackSignature(
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: Handle marketplace API key commands
+// ---------------------------------------------------------------------------
+
+const VALID_API_KEY_SOURCES = ["smithery", "civitai", "langchain"] as const;
+type ApiKeySource = (typeof VALID_API_KEY_SOURCES)[number];
+
+function getApiKeyFieldName(source: ApiKeySource): string {
+  return `${source}ApiKey`;
+}
+
+async function handleMarketplaceApiKeyCommand(
+  res: Response,
+  commandText: string,
+  organizationId: string,
+): Promise<Response> {
+  const parts = commandText.split(/\s+/);
+  // Format: "marketplace apikey <action> [source] [key]"
+  const action = parts[2]?.toLowerCase();
+  const source = parts[3]?.toLowerCase() as ApiKeySource | undefined;
+  const apiKey = parts.slice(4).join(" ");
+
+  // List command
+  if (action === "list") {
+    try {
+      const keys = await getMarketplaceApiKeys(organizationId);
+      const configured = [];
+      if (keys.smitheryApiKey) configured.push("• Smithery: Configured");
+      if (keys.civitaiApiKey) configured.push("• CivitAI: Configured");
+      if (keys.langchainApiKey) configured.push("• LangChain Hub: Configured");
+
+      if (configured.length === 0) {
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: "No marketplace API keys are configured.\n\nSet one with: `/nubabel marketplace apikey set <source> <key>`\nSources: smithery, civitai, langchain",
+        });
+      }
+
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: `Configured marketplace API keys:\n${configured.join("\n")}`,
+      });
+    } catch (error) {
+      logger.error("Failed to list marketplace API keys", {}, error as Error);
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Failed to list API keys. Please try again.",
+      });
+    }
+  }
+
+  // Set command
+  if (action === "set") {
+    if (!source || !VALID_API_KEY_SOURCES.includes(source)) {
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Invalid source. Use: smithery, civitai, or langchain\n\nExample: `/nubabel marketplace apikey set smithery sk-xxxx`",
+      });
+    }
+
+    if (!apiKey) {
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Please provide an API key.\n\nExample: `/nubabel marketplace apikey set smithery sk-xxxx`",
+      });
+    }
+
+    try {
+      const fieldName = getApiKeyFieldName(source);
+      const encryptedKey = encrypt(apiKey);
+
+      await prisma.organizationMarketplaceSettings.upsert({
+        where: { organizationId },
+        create: {
+          organizationId,
+          [fieldName]: encryptedKey,
+        } as any,
+        update: {
+          [fieldName]: encryptedKey,
+        } as any,
+      });
+
+      logger.info("Marketplace API key set via Slack", { organizationId, source });
+
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: `${source.charAt(0).toUpperCase() + source.slice(1)} API key has been configured.`,
+      });
+    } catch (error) {
+      logger.error("Failed to set marketplace API key", {}, error as Error);
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Failed to save API key. Please try again.",
+      });
+    }
+  }
+
+  // Delete command
+  if (action === "delete" || action === "remove") {
+    if (!source || !VALID_API_KEY_SOURCES.includes(source)) {
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Invalid source. Use: smithery, civitai, or langchain\n\nExample: `/nubabel marketplace apikey delete smithery`",
+      });
+    }
+
+    try {
+      const fieldName = getApiKeyFieldName(source);
+
+      await prisma.organizationMarketplaceSettings.update({
+        where: { organizationId },
+        data: {
+          [fieldName]: null,
+        } as any,
+      });
+
+      logger.info("Marketplace API key deleted via Slack", { organizationId, source });
+
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: `${source.charAt(0).toUpperCase() + source.slice(1)} API key has been removed.`,
+      });
+    } catch (error) {
+      logger.error("Failed to delete marketplace API key", {}, error as Error);
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Failed to delete API key. Please try again.",
+      });
+    }
+  }
+
+  // Unknown action
+  return res.status(200).json({
+    response_type: "ephemeral",
+    text: "Unknown command. Available actions:\n• `list` - List configured API keys\n• `set <source> <key>` - Set an API key\n• `delete <source>` - Remove an API key\n\nSources: smithery, civitai, langchain",
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -122,8 +262,14 @@ router.post("/commands", async (req: Request, res: Response) => {
     if (!commandText || commandText.trim().length === 0) {
       return res.status(200).json({
         response_type: "ephemeral",
-        text: "Usage: `/nubabel <your request>` — tell me what you need help with.",
+        text: "Usage: `/nubabel <your request>` — tell me what you need help with.\n\nSettings commands:\n• `/nubabel marketplace apikey list` - List configured API keys\n• `/nubabel marketplace apikey set <source> <key>` - Set an API key\n• `/nubabel marketplace apikey delete <source>` - Remove an API key\n\nSources: smithery, civitai, langchain",
       });
+    }
+
+    // Check for marketplace settings commands
+    const trimmedCommand = commandText.trim().toLowerCase();
+    if (trimmedCommand.startsWith("marketplace apikey")) {
+      return handleMarketplaceApiKeyCommand(res, commandText.trim(), organizationId);
     }
 
     const sessionId = crypto.randomUUID();

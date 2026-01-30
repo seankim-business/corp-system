@@ -32,6 +32,15 @@ interface InstalledExtension {
   installedAt: string;
 }
 
+interface MarketplaceSettings {
+  smitheryApiKey?: string | null;
+  smitheryApiKeySet?: boolean;
+  civitaiApiKey?: string | null;
+  civitaiApiKeySet?: boolean;
+  langchainApiKey?: string | null;
+  langchainApiKeySet?: boolean;
+}
+
 const SOURCE_COLORS: Record<string, string> = {
   smithery: "bg-purple-100 text-purple-800",
   "mcp-registry": "bg-blue-100 text-blue-800",
@@ -60,9 +69,19 @@ export default function MarketplaceHubPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
   const [showInstalled, setShowInstalled] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [recommendQuery, setRecommendQuery] = useState("");
   const [isRecommending, setIsRecommending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // API Key settings state
+  const [settings, setSettings] = useState<MarketplaceSettings>({});
+  const [apiKeyInputs, setApiKeyInputs] = useState({
+    smitheryApiKey: "",
+    civitaiApiKey: "",
+    langchainApiKey: "",
+  });
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
 
   const sources = [
     { id: "smithery", name: "Smithery", types: ["mcp_server"] },
@@ -93,9 +112,22 @@ export default function MarketplaceHubPage() {
     }
   }, []);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const result = await request<{ success: boolean; data: MarketplaceSettings }>({
+        url: "/api/marketplace-hub/settings",
+        method: "GET",
+      });
+      setSettings(result.data || {});
+    } catch (err) {
+      console.error("Failed to fetch settings:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchInstalled();
-  }, [fetchInstalled]);
+    fetchSettings();
+  }, [fetchInstalled, fetchSettings]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -190,6 +222,53 @@ export default function MarketplaceHubPage() {
     setSelectedSources((prev) =>
       prev.includes(sourceId) ? prev.filter((s) => s !== sourceId) : [...prev, sourceId],
     );
+  };
+
+  const handleSaveApiKeys = async () => {
+    setIsSavingKeys(true);
+    setError(null);
+
+    try {
+      const updates: Record<string, string | null> = {};
+      if (apiKeyInputs.smitheryApiKey) updates.smitheryApiKey = apiKeyInputs.smitheryApiKey;
+      if (apiKeyInputs.civitaiApiKey) updates.civitaiApiKey = apiKeyInputs.civitaiApiKey;
+      if (apiKeyInputs.langchainApiKey) updates.langchainApiKey = apiKeyInputs.langchainApiKey;
+
+      if (Object.keys(updates).length === 0) {
+        setError("Please enter at least one API key");
+        return;
+      }
+
+      await request({
+        url: "/api/marketplace-hub/settings/api-keys",
+        method: "PUT",
+        data: updates,
+      });
+
+      await fetchSettings();
+      setApiKeyInputs({ smitheryApiKey: "", civitaiApiKey: "", langchainApiKey: "" });
+      alert("API keys saved successfully");
+    } catch (err) {
+      setError("Failed to save API keys");
+      console.error("Save API keys failed:", err);
+    } finally {
+      setIsSavingKeys(false);
+    }
+  };
+
+  const handleDeleteApiKey = async (keyName: string) => {
+    if (!confirm(`Are you sure you want to delete ${keyName}?`)) return;
+
+    try {
+      await request({
+        url: `/api/marketplace-hub/settings/api-keys/${keyName}`,
+        method: "DELETE",
+      });
+      await fetchSettings();
+    } catch (err) {
+      setError(`Failed to delete ${keyName}`);
+      console.error("Delete API key failed:", err);
+    }
   };
 
   const isInstalled = (itemId: string) => {
@@ -441,6 +520,143 @@ export default function MarketplaceHubPage() {
           {showInstalled && installed.length === 0 && (
             <div className="px-6 pb-6 text-center text-gray-500">
               No external extensions installed yet
+            </div>
+          )}
+        </div>
+
+        {/* API Key Settings Section */}
+        <div className="bg-white rounded-lg shadow mt-6">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="w-full px-6 py-4 flex items-center justify-between text-left"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">API Key Settings</h2>
+              <p className="text-sm text-gray-500">
+                Optional: Configure API keys for premium features or higher rate limits
+              </p>
+            </div>
+            <svg
+              className={`w-5 h-5 text-gray-500 transition-transform ${
+                showSettings ? "rotate-180" : ""
+              }`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          {showSettings && (
+            <div className="px-6 pb-6 space-y-4">
+              <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+                API keys are <strong>optional</strong>. External sources work without keys,
+                but keys may unlock premium features or bypass rate limits.
+              </p>
+
+              {/* Smithery API Key */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS.smithery}`}>
+                      Smithery
+                    </span>
+                    {settings.smitheryApiKeySet && (
+                      <span className="text-green-600 text-xs">Configured</span>
+                    )}
+                  </div>
+                  {settings.smitheryApiKeySet && (
+                    <button
+                      onClick={() => handleDeleteApiKey("smitheryApiKey")}
+                      className="text-red-600 hover:text-red-700 text-xs"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  placeholder={settings.smitheryApiKeySet ? settings.smitheryApiKey || "••••••••" : "Enter Smithery API key"}
+                  value={apiKeyInputs.smitheryApiKey}
+                  onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, smitheryApiKey: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">For premium MCP servers access</p>
+              </div>
+
+              {/* CivitAI API Key */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS.civitai}`}>
+                      CivitAI
+                    </span>
+                    {settings.civitaiApiKeySet && (
+                      <span className="text-green-600 text-xs">Configured</span>
+                    )}
+                  </div>
+                  {settings.civitaiApiKeySet && (
+                    <button
+                      onClick={() => handleDeleteApiKey("civitaiApiKey")}
+                      className="text-red-600 hover:text-red-700 text-xs"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  placeholder={settings.civitaiApiKeySet ? settings.civitaiApiKey || "••••••••" : "Enter CivitAI API key"}
+                  value={apiKeyInputs.civitaiApiKey}
+                  onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, civitaiApiKey: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">For higher rate limits and NSFW content access</p>
+              </div>
+
+              {/* LangChain Hub API Key */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS["langchain-hub"]}`}>
+                      LangChain Hub
+                    </span>
+                    {settings.langchainApiKeySet && (
+                      <span className="text-green-600 text-xs">Configured</span>
+                    )}
+                  </div>
+                  {settings.langchainApiKeySet && (
+                    <button
+                      onClick={() => handleDeleteApiKey("langchainApiKey")}
+                      className="text-red-600 hover:text-red-700 text-xs"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  placeholder={settings.langchainApiKeySet ? settings.langchainApiKey || "••••••••" : "Enter LangChain Hub API key"}
+                  value={apiKeyInputs.langchainApiKey}
+                  onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, langchainApiKey: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">For private prompts and chains access</p>
+              </div>
+
+              <button
+                onClick={handleSaveApiKeys}
+                disabled={isSavingKeys}
+                className="w-full py-2 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50"
+              >
+                {isSavingKeys ? "Saving..." : "Save API Keys"}
+              </button>
             </div>
           )}
         </div>

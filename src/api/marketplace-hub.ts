@@ -11,6 +11,7 @@ import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.middleware";
 import { logger } from "../utils/logger";
+import { encrypt, decrypt } from "../utils/encryption";
 import { createAllSources } from "../marketplace/services/sources/external";
 import type {
   BaseExternalSource,
@@ -23,6 +24,19 @@ import {
   InstallationPolicyChecker,
   getDefaultPolicy,
 } from "../marketplace/types/installation-modes";
+
+// Marketplace API key names
+const MARKETPLACE_API_KEYS = ["smitheryApiKey", "civitaiApiKey", "langchainApiKey"] as const;
+type MarketplaceApiKeyName = (typeof MARKETPLACE_API_KEYS)[number];
+
+function isMarketplaceApiKey(key: string): key is MarketplaceApiKeyName {
+  return MARKETPLACE_API_KEYS.includes(key as MarketplaceApiKeyName);
+}
+
+function maskApiKey(key: string | null | undefined): string | null {
+  if (!key) return null;
+  return "••••••••" + (key.length > 8 ? key.slice(-4) : "");
+}
 import { marketplaceAnalytics } from "../marketplace/services/marketplace-analytics";
 
 const router = Router();
@@ -672,7 +686,7 @@ router.get("/installed", requireAuth, (req: Request, res: Response) => {
 
 /**
  * GET /api/marketplace-hub/settings
- * Get organization marketplace settings
+ * Get organization marketplace settings (with masked API keys)
  */
 router.get("/settings", requireAuth, (req: Request, res: Response) => {
   void (async () => {
@@ -698,11 +712,27 @@ router.get("/settings", requireAuth, (req: Request, res: Response) => {
         });
       }
 
+      // Mask API keys in response (use type assertion for new fields pending migration)
+      const settingsWithKeys = settings as typeof settings & {
+        smitheryApiKey?: string | null;
+        civitaiApiKey?: string | null;
+        langchainApiKey?: string | null;
+      };
+      const maskedSettings = {
+        ...settings,
+        smitheryApiKey: maskApiKey(settingsWithKeys.smitheryApiKey),
+        smitheryApiKeySet: !!settingsWithKeys.smitheryApiKey,
+        civitaiApiKey: maskApiKey(settingsWithKeys.civitaiApiKey),
+        civitaiApiKeySet: !!settingsWithKeys.civitaiApiKey,
+        langchainApiKey: maskApiKey(settingsWithKeys.langchainApiKey),
+        langchainApiKeySet: !!settingsWithKeys.langchainApiKey,
+      };
+
       logger.info("Marketplace settings retrieved", { orgId });
 
       res.json({
         success: true,
-        data: settings,
+        data: maskedSettings,
       });
     } catch (error) {
       logger.error("Failed to get marketplace settings", {}, error as Error);
@@ -777,6 +807,180 @@ router.put("/settings", requireAuth, (req: Request, res: Response) => {
     }
   })();
 });
+
+/**
+ * PUT /api/marketplace-hub/settings/api-keys
+ * Update marketplace API keys (Smithery, CivitAI, LangChain Hub)
+ *
+ * Body:
+ * - smitheryApiKey: Smithery API key (optional)
+ * - civitaiApiKey: CivitAI API key (optional)
+ * - langchainApiKey: LangChain Hub API key (optional)
+ */
+router.put("/settings/api-keys", requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const orgId = getOrgId(req);
+      const { smitheryApiKey, civitaiApiKey, langchainApiKey } = req.body;
+
+      // Build update data
+      const updateData: Record<string, string | null> = {};
+
+      // Handle Smithery API key
+      if (smitheryApiKey !== undefined) {
+        if (smitheryApiKey === "" || smitheryApiKey === null) {
+          updateData.smitheryApiKey = null;
+        } else {
+          updateData.smitheryApiKey = encrypt(smitheryApiKey);
+        }
+      }
+
+      // Handle CivitAI API key
+      if (civitaiApiKey !== undefined) {
+        if (civitaiApiKey === "" || civitaiApiKey === null) {
+          updateData.civitaiApiKey = null;
+        } else {
+          updateData.civitaiApiKey = encrypt(civitaiApiKey);
+        }
+      }
+
+      // Handle LangChain API key
+      if (langchainApiKey !== undefined) {
+        if (langchainApiKey === "" || langchainApiKey === null) {
+          updateData.langchainApiKey = null;
+        } else {
+          updateData.langchainApiKey = encrypt(langchainApiKey);
+        }
+      }
+
+      // Update or create settings (uses type assertion for fields pending migration)
+      await prisma.organizationMarketplaceSettings.upsert({
+        where: { organizationId: orgId },
+        create: {
+          organizationId: orgId,
+          ...updateData,
+        } as any,
+        update: updateData as any,
+      });
+
+      logger.info("Marketplace API keys updated", {
+        orgId,
+        keysUpdated: Object.keys(updateData),
+      });
+
+      res.json({
+        success: true,
+        message: "API keys updated successfully",
+      });
+    } catch (error) {
+      logger.error("Failed to update marketplace API keys", {}, error as Error);
+      res.status(500).json({
+        error: {
+          code: "UPDATE_API_KEYS_FAILED",
+          message: "Failed to update API keys",
+        },
+      });
+    }
+  })();
+});
+
+/**
+ * DELETE /api/marketplace-hub/settings/api-keys/:keyName
+ * Delete a specific marketplace API key
+ */
+router.delete("/settings/api-keys/:keyName", requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const orgId = getOrgId(req);
+      const keyName = req.params.keyName as string;
+
+      if (!isMarketplaceApiKey(keyName)) {
+        res.status(400).json({
+          error: {
+            code: "INVALID_KEY_NAME",
+            message: "Invalid API key name. Must be smitheryApiKey, civitaiApiKey, or langchainApiKey",
+          },
+        });
+        return;
+      }
+
+      // Note: Uses type assertion for fields pending migration
+      await prisma.organizationMarketplaceSettings.update({
+        where: { organizationId: orgId },
+        data: { [keyName]: null } as any,
+      });
+
+      logger.info("Marketplace API key deleted", { orgId, keyName });
+
+      res.json({
+        success: true,
+        message: `${keyName} deleted successfully`,
+      });
+    } catch (error) {
+      logger.error("Failed to delete marketplace API key", {}, error as Error);
+      res.status(500).json({
+        error: {
+          code: "DELETE_API_KEY_FAILED",
+          message: "Failed to delete API key",
+        },
+      });
+    }
+  })();
+});
+
+/**
+ * Get decrypted marketplace API keys for an organization
+ * Used internally by source connectors
+ */
+export async function getMarketplaceApiKeys(organizationId: string): Promise<{
+  smitheryApiKey?: string;
+  civitaiApiKey?: string;
+  langchainApiKey?: string;
+}> {
+  // Use raw query to handle fields that may not exist yet in Prisma client
+  const settings = await prisma.organizationMarketplaceSettings.findUnique({
+    where: { organizationId },
+  });
+
+  if (!settings) {
+    return {};
+  }
+
+  // Type assertion for new fields pending migration
+  const settingsWithKeys = settings as typeof settings & {
+    smitheryApiKey?: string | null;
+    civitaiApiKey?: string | null;
+    langchainApiKey?: string | null;
+  };
+
+  const result: Record<string, string | undefined> = {};
+
+  if (settingsWithKeys.smitheryApiKey) {
+    try {
+      result.smitheryApiKey = decrypt(settingsWithKeys.smitheryApiKey);
+    } catch (e) {
+      logger.error("Failed to decrypt smitheryApiKey", {}, e as Error);
+    }
+  }
+
+  if (settingsWithKeys.civitaiApiKey) {
+    try {
+      result.civitaiApiKey = decrypt(settingsWithKeys.civitaiApiKey);
+    } catch (e) {
+      logger.error("Failed to decrypt civitaiApiKey", {}, e as Error);
+    }
+  }
+
+  if (settingsWithKeys.langchainApiKey) {
+    try {
+      result.langchainApiKey = decrypt(settingsWithKeys.langchainApiKey);
+    } catch (e) {
+      logger.error("Failed to decrypt langchainApiKey", {}, e as Error);
+    }
+  }
+
+  return result;
+}
 
 /**
  * GET /api/marketplace-hub/analytics/overview
