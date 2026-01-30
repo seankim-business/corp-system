@@ -40,6 +40,7 @@ import {
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
+import n8nRoutes from "./api/n8n";
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 import { googleAiOAuthRouter } from "./api/google-ai-oauth";
 import notionOAuthRoutes from "./api/notion-oauth";
@@ -65,6 +66,8 @@ import sopRoutes from "./api/sop";
 // import sopEditorRoutes from "./api/sop-editor";
 import sopGeneratorRoutes from "./api/sop-generator";
 import dailyBriefingRoutes from "./api/daily-briefing";
+import schedulesRoutes from "./api/schedules";
+import marketplaceHubRoutes from "./api/marketplace-hub";
 // import taskPrioritizationRoutes from "./api/task-prioritization";
 import syncRoutes from "./api/sync";
 import delegationRoutes from "./api/delegations";
@@ -103,7 +106,7 @@ import { logger } from "./utils/logger";
 import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
 import { adminRouter } from "./admin";
 import { claudeMaxAccountsRouter } from "./api/claude-max-accounts";
-// import accountsRouter from "./api/routes/accounts.routes"; // TODO: File not found
+// NOTE: accounts.routes.ts removed - functionality migrated to user.routes.ts
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
 // import { createHealthDashboardRouter } from "./api/health-dashboard";
@@ -490,6 +493,7 @@ app.use("/api", apiRateLimiter, notionOAuthRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, providersRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, notionRoutes);
+app.use("/api/n8n", apiRateLimiter, authenticate, sentryUserContext, n8nRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, slackIntegrationRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, featureFlagsRouter);
 app.use(
@@ -516,6 +520,7 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopRoutes);
 // app.use("/api/sops", apiRateLimiter, authenticate, sentryUserContext, sopEditorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, sopGeneratorRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, dailyBriefingRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, schedulesRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, taskPrioritizationRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, organizationSettingsRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, delegationRoutes);
@@ -543,6 +548,13 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, claudeMaxAccoun
 // app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
 // app.use("/api/webhooks/stripe", webhookRateLimiter, stripeWebhookRoutes);
 app.use("/api", sseRouter);
+app.use(
+  "/api/marketplace-hub",
+  apiRateLimiter,
+  authenticate,
+  sentryUserContext,
+  marketplaceHubRoutes,
+);
 
 // Public API v1 (external developer access with API key auth)
 // app.use("/api/v1", v1ApiRouter);
