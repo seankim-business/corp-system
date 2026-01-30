@@ -17,6 +17,7 @@ export interface DelegateTaskParams {
   organizationId?: string;
   userId?: string;
   context?: Record<string, unknown>;
+  eventId?: string; // For Slack status updates during MCP tool execution
 }
 
 export interface DelegateTaskResult {
@@ -166,6 +167,7 @@ export async function delegateTask(params: DelegateTaskParams): Promise<Delegate
             selectedAccount: currentAccount || undefined,
             agentType: (params.context?.agentType as string) || "ai_executor",
             enablePatternOptimization: true,
+            eventId: params.eventId,
           });
 
           if (currentAccount && result.status !== "rate_limited") {

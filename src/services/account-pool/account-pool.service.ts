@@ -2,6 +2,8 @@ import { db as prisma } from "../../db/client";
 import { logger } from "../../utils/logger";
 import { redis } from "../../db/redis";
 
+export type AccountType = "anthropic-api" | "claude-max";
+
 export interface ClaudeAccount {
   id: string;
   name: string;
@@ -20,6 +22,8 @@ export interface ClaudeAccount {
     outputTokens: number;
     requestCount: number;
   };
+  /** Account type: claude-max (session-based) or anthropic-api (API key) */
+  accountType?: AccountType;
 }
 
 export interface AccountSelectionCriteria {
@@ -266,14 +270,46 @@ export class AccountPoolService {
    * Map database record to ClaudeAccount
    */
   private mapToClaudeAccount(dbRecord: any): ClaudeAccount {
+    const metadata = typeof dbRecord.metadata === "object" ? dbRecord.metadata : {};
+
+    // Detect account type based on metadata
+    const accountType = this.detectAccountType(metadata);
+
     return {
       id: dbRecord.id,
       name: dbRecord.name || "Unnamed Account",
       provider: dbRecord.provider || "anthropic",
       tier: dbRecord.tier || "pro",
       status: dbRecord.status || "active",
-      metadata: typeof dbRecord.metadata === "object" ? dbRecord.metadata : {},
+      metadata,
       rateLimits: dbRecord.rateLimits,
+      accountType,
     };
+  }
+
+  /**
+   * Detect account type from metadata
+   * - If has encryptedSessionKey or sessionKey -> claude-max
+   * - Otherwise -> anthropic-api
+   */
+  private detectAccountType(metadata: Record<string, unknown>): AccountType {
+    if (metadata?.encryptedSessionKey || metadata?.sessionKey) {
+      return "claude-max";
+    }
+    return "anthropic-api";
+  }
+
+  /**
+   * Check if an account is a Claude Max account (uses session key)
+   */
+  isClaudeMaxAccount(account: ClaudeAccount): boolean {
+    return account.accountType === "claude-max" || this.detectAccountType(account.metadata) === "claude-max";
+  }
+
+  /**
+   * Get the account type for an account
+   */
+  getAccountType(account: ClaudeAccount): AccountType {
+    return account.accountType || this.detectAccountType(account.metadata);
   }
 }

@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 const { PrismaClient } = require("@prisma/client");
-const fs = require("fs");
-const path = require("path");
 
 async function main() {
   const prisma = new PrismaClient();
@@ -9,94 +7,60 @@ async function main() {
   try {
     console.log("=== Database Migration Fix ===");
 
-    console.log("1. Creating RLS helper function...");
-    await prisma.$executeRawUnsafe(`
-      CREATE OR REPLACE FUNCTION set_current_organization(org_id TEXT)
-      RETURNS VOID AS $$
-      BEGIN
-        PERFORM set_config('app.current_organization_id', org_id, false);
-      END;
-      $$ LANGUAGE plpgsql;
-    `);
-    console.log("   ✓ set_current_organization function created");
-
-    console.log("2. Fixing failed migrations...");
-
-    // Add missing installation_mode column to organizations if it doesn't exist
+    // Check if core tables exist
+    console.log("1. Checking if core tables exist...");
+    let coreTablesExist = false;
     try {
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE organizations 
-        ADD COLUMN IF NOT EXISTS installation_mode VARCHAR(20) NOT NULL DEFAULT 'recommend'
-      `);
-      console.log("   ✓ installation_mode column ensured on organizations");
+      await prisma.$queryRaw`SELECT 1 FROM organizations LIMIT 1`;
+      coreTablesExist = true;
+      console.log("   ✓ Core tables exist - database is healthy");
     } catch (e) {
-      if (!e.message.includes("already exists")) {
-        console.log("   ⚠ installation_mode column error:", e.message);
-      }
+      console.log("   ⚠ Core tables missing - will reset migration history");
     }
 
-    // Add missing namespace column to mcp_connections if it doesn't exist
-    try {
+    if (!coreTablesExist) {
+      console.log("2. Clearing migration history for fresh start...");
+      try {
+        // Clear the _prisma_migrations table so migrate deploy runs everything fresh
+        await prisma.$executeRawUnsafe(`DELETE FROM _prisma_migrations`);
+        console.log("   ✓ Migration history cleared");
+      } catch (e) {
+        // Table might not exist yet, that's ok
+        console.log("   ⚠ Migration table not found (first run)");
+      }
+      console.log("   → Prisma will now run all migrations from scratch");
+    } else {
+      // Tables exist, create helper function
+      console.log("2. Creating RLS helper function...");
       await prisma.$executeRawUnsafe(`
-        ALTER TABLE mcp_connections 
-        ADD COLUMN IF NOT EXISTS namespace VARCHAR(100) DEFAULT 'default'
+        CREATE OR REPLACE FUNCTION set_current_organization(org_id TEXT)
+        RETURNS VOID AS $$
+        BEGIN
+          PERFORM set_config('app.current_organization_id', org_id, false);
+        END;
+        $$ LANGUAGE plpgsql;
       `);
-      console.log("   ✓ namespace column ensured on mcp_connections");
-    } catch (e) {
-      if (!e.message.includes("already exists")) {
-        console.log("   ⚠ namespace column error:", e.message);
-      }
-    }
+      console.log("   ✓ set_current_organization function created");
 
-    console.log("3. Finding all failed migrations...");
-    const failedMigrations = await prisma.$queryRaw`
-      SELECT migration_name
-      FROM _prisma_migrations
-      WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL
-    `;
-
-    if (failedMigrations.length > 0) {
-      console.log(`   Found ${failedMigrations.length} failed/rolled-back migration(s)`);
-      for (const { migration_name } of failedMigrations) {
-        await prisma.$executeRawUnsafe(
-          `
-          UPDATE _prisma_migrations
-          SET finished_at = NOW(), applied_steps_count = 1, rolled_back_at = NULL
-          WHERE migration_name = $1
-        `,
-          migration_name,
-        );
-        console.log(`   ✓ ${migration_name} marked as applied`);
-      }
-    }
-
-    console.log("3. Ensuring all migrations are registered...");
-    const migrationsDir = path.join(__dirname, "../prisma/migrations");
-    const migrationFolders = fs
-      .readdirSync(migrationsDir)
-      .filter(
-        (f) =>
-          f !== "migration_lock.toml" && fs.statSync(path.join(migrationsDir, f)).isDirectory(),
-      )
-      .sort();
-
-    for (const migrationName of migrationFolders) {
-      const exists = await prisma.$queryRaw`
-        SELECT 1 FROM _prisma_migrations WHERE migration_name = ${migrationName}
+      // Fix any failed migrations
+      console.log("3. Fixing failed migrations...");
+      const failedMigrations = await prisma.$queryRaw`
+        SELECT migration_name
+        FROM _prisma_migrations
+        WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL
       `;
 
-      if (exists.length === 0) {
-        const checksum = require("crypto").createHash("sha256").update(migrationName).digest("hex");
-
-        await prisma.$executeRawUnsafe(
-          `
-          INSERT INTO _prisma_migrations (id, checksum, migration_name, finished_at, started_at, applied_steps_count)
-          VALUES (gen_random_uuid(), $1, $2, NOW(), NOW(), 1)
-        `,
-          checksum,
-          migrationName,
-        );
-        console.log(`   ✓ ${migrationName} registered as applied`);
+      if (failedMigrations.length > 0) {
+        console.log(`   Found ${failedMigrations.length} failed migration(s)`);
+        for (const { migration_name } of failedMigrations) {
+          await prisma.$executeRawUnsafe(
+            `DELETE FROM _prisma_migrations WHERE migration_name = $1`,
+            migration_name,
+          );
+          console.log(`   ✓ ${migration_name} removed (will be re-applied)`);
+        }
+      } else {
+        console.log("   ✓ No failed migrations found");
       }
     }
 

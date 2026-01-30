@@ -9,6 +9,7 @@ import { anthropicMetricsTracker } from "../services/anthropic-metrics";
 import { getSlackAlerts } from "../services/slack-anthropic-alerts";
 import { ClaudeAccount } from "../services/account-pool";
 import { AnthropicProvider } from "../providers/anthropic-provider";
+import { ClaudeMaxProvider, isClaudeMaxAccount } from "../providers/claude-max-provider";
 import { mcpRegistry } from "../mcp/registry";
 import { executeProviderTool, getAllProviderTools } from "../mcp/providers";
 import { MCPTool } from "../mcp/types";
@@ -986,15 +987,30 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
 
       try {
         const isMultiAccountMode = !!params.selectedAccount;
-        let client: Anthropic;
+        const isClaudeMax = isMultiAccountMode && isClaudeMaxAccount(params.selectedAccount!);
+        let client: Anthropic | null = null;
+        let claudeMaxProvider: ClaudeMaxProvider | null = null;
 
-        if (isMultiAccountMode) {
+        if (isClaudeMax) {
+          // Claude Max account (uses session key instead of API key)
+          claudeMaxProvider = new ClaudeMaxProvider({ account: params.selectedAccount! });
+          accountId = params.selectedAccount!.id;
+          accountName = params.selectedAccount!.name;
+
+          logger.info("AI execution with Claude Max account", {
+            accountId,
+            accountName,
+            model,
+            category: params.category,
+          });
+        } else if (isMultiAccountMode) {
+          // Standard Anthropic API account
           const provider = new AnthropicProvider({ account: params.selectedAccount! });
           client = (provider as any).client;
           accountId = params.selectedAccount!.id;
           accountName = params.selectedAccount!.name;
 
-          logger.info("AI execution with account", {
+          logger.info("AI execution with Anthropic API account", {
             accountId,
             accountName,
             model,
@@ -1033,19 +1049,69 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
         span.setAttribute("ai.tokens.input_estimate", inputTokenEstimate);
 
         // Get available tools (async to load organization MCP connections)
+        // Note: Tools are only supported with Anthropic API, not Claude Max
         const { tools: availableTools, connections: orgConnections } =
           await getAvailableToolsAsync(params.organizationId, params.skills);
-        const hasTools = availableTools.length > 0;
+        const hasTools = availableTools.length > 0 && !isClaudeMax;
 
         logger.info("AI execution with tools", {
-          toolCount: availableTools.length,
-          tools: availableTools.map((t) => t.name),
+          toolCount: hasTools ? availableTools.length : 0,
+          tools: hasTools ? availableTools.map((t) => t.name) : [],
           orgConnectionCount: orgConnections.length,
+          isClaudeMax,
         });
+
+        // Response type that works for both Anthropic API and Claude Max
+        interface UnifiedResponse {
+          content: string;
+          usage: {
+            input_tokens: number;
+            output_tokens: number;
+          };
+          stop_reason: string;
+        }
 
         const response = await tracer.startActiveSpan("ai_executor.api_call", async (apiSpan) => {
           const callStart = Date.now();
           try {
+            // =====================================================================
+            // Claude Max execution path (no tools support, uses web API)
+            // =====================================================================
+            if (isClaudeMax && claudeMaxProvider) {
+              apiSpan.setAttribute("ai.provider", "claude-max");
+              apiSpan.setAttribute("ai.endpoint", "claude.ai/api");
+              apiSpan.setAttribute("ai.model", model);
+              apiSpan.setAttribute("ai.tools_count", 0);
+
+              const chatResponse = await claudeMaxProvider.chat(
+                [{ role: "user", content: params.prompt }],
+                { model, systemPrompt },
+              );
+
+              const durationMs = Date.now() - callStart;
+
+              apiSpan.setAttribute("ai.tokens.input", chatResponse.usage.inputTokens);
+              apiSpan.setAttribute("ai.tokens.output", chatResponse.usage.outputTokens);
+              apiSpan.setAttribute("ai.duration_ms", durationMs);
+              apiSpan.setAttribute("ai.finish_reason", chatResponse.finishReason);
+
+              return {
+                content: chatResponse.content,
+                usage: {
+                  input_tokens: chatResponse.usage.inputTokens,
+                  output_tokens: chatResponse.usage.outputTokens,
+                },
+                stop_reason: chatResponse.finishReason,
+              } satisfies UnifiedResponse;
+            }
+
+            // =====================================================================
+            // Anthropic API execution path (with tools support)
+            // =====================================================================
+            if (!client) {
+              throw new Error("No Anthropic client available");
+            }
+
             apiSpan.setAttribute("ai.provider", "anthropic");
             apiSpan.setAttribute("ai.endpoint", "/v1/messages");
             apiSpan.setAttribute("ai.model", model);
@@ -1169,14 +1235,23 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
             apiSpan.setAttribute("ai.duration_ms", durationMs);
             apiSpan.setAttribute("ai.finish_reason", result.stop_reason ?? "unknown");
 
-            // Return result with accumulated token counts
+            // Extract text content from Anthropic response
+            let textContent = "";
+            for (const block of result.content) {
+              if (block.type === "text") {
+                textContent += block.text;
+              }
+            }
+
+            // Return unified response format
             return {
-              ...result,
+              content: textContent,
               usage: {
                 input_tokens: totalInputTokens,
                 output_tokens: totalOutputTokens,
               },
-            };
+              stop_reason: result.stop_reason ?? "unknown",
+            } satisfies UnifiedResponse;
           } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Unknown error";
             apiSpan.recordException(error as Error);
@@ -1218,11 +1293,13 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
         const inputTokens = response.usage.input_tokens;
         const outputTokens = response.usage.output_tokens;
 
+        // Calculate cost - Claude Max is free (subscription-based), Anthropic API has per-token cost
         const cost = await tracer.startActiveSpan(
           "ai_executor.calculate_cost",
           async (costSpan) => {
             try {
-              const computed = calculateCost(model, inputTokens, outputTokens);
+              // Claude Max has no per-token cost
+              const computed = isClaudeMax ? 0 : calculateCost(model, inputTokens, outputTokens);
               costSpan.setAttribute("ai.cost_usd", computed);
               return computed;
             } finally {
@@ -1236,12 +1313,8 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
         span.setAttribute("ai.cost_usd", cost);
         span.setAttribute("ai.duration_ms", duration);
 
-        let output = "";
-        for (const block of response.content) {
-          if (block.type === "text") {
-            output += block.text;
-          }
-        }
+        // Output is already extracted in the unified response format
+        const output = response.content;
 
         await trackUsage({
           organizationId: params.organizationId,
@@ -1289,6 +1362,7 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
           duration,
           accountId,
           accountName,
+          isClaudeMax,
         });
 
         span.setStatus({ code: SpanStatusCode.OK });

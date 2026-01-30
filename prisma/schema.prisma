@@ -1947,6 +1947,11 @@ model OrganizationMarketplaceSettings {
   maxAutoInstalls  Int      @default(5) @map("max_auto_installs") // Per session limit
   requireReview    Boolean  @default(false) @map("require_review") // Human review for YOLO
 
+  // External source API keys (encrypted)
+  smitheryApiKey   String? @map("smithery_api_key") // Optional: for premium Smithery features
+  civitaiApiKey    String? @map("civitai_api_key") // Optional: for CivitAI rate limits & NSFW
+  langchainApiKey  String? @map("langchain_api_key") // Optional: for private LangChain Hub prompts
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

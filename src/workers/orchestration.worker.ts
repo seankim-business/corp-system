@@ -118,6 +118,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         organizationId,
         userId,
         threadContext,
+        eventId,
       });
 
       await job.updateProgress(PROGRESS_PERCENTAGES.PROCESSING);
@@ -192,6 +193,16 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         });
       }
 
+      // Determine agent type for dynamic identity based on category/skills
+      // MCP providers take priority, then fall back to "generating" for response
+      const mcpProviders = ["notion", "linear", "github", "slack"];
+      const detectedProvider = result.metadata.skills?.find((s: string) =>
+        mcpProviders.some((p) => s.toLowerCase().includes(p)),
+      );
+      const agentType = detectedProvider
+        ? mcpProviders.find((p) => detectedProvider.toLowerCase().includes(p)) || "generating"
+        : "generating";
+
       await notificationQueue.enqueueNotification({
         channel: slackChannel,
         threadTs: slackThreadTs,
@@ -200,6 +211,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         organizationId,
         userId,
         eventId,
+        agentType,
       });
 
       await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);

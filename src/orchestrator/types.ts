@@ -47,6 +47,8 @@ export interface OrchestrationRequest {
   userId: string;
   /** Thread context prompt for Slack - includes conversation history */
   threadContext?: string;
+  /** Event ID for Slack status updates during MCP tool execution */
+  eventId?: string;
 }
 
 export interface OrchestrationResult {

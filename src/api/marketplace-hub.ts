@@ -778,4 +778,99 @@ router.put("/settings", requireAuth, (req: Request, res: Response) => {
   })();
 });
 
+/**
+ * GET /api/marketplace-hub/analytics/overview
+ * Get analytics overview for organization
+ *
+ * Query params:
+ * - days: Number of days to analyze (default: 30)
+ */
+router.get("/analytics/overview", requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const orgId = getOrgId(req);
+      const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
+
+      const overview = await marketplaceAnalytics.getOverview(orgId, days);
+
+      res.json({
+        success: true,
+        data: overview,
+      });
+    } catch (error) {
+      logger.error("Failed to get analytics overview", {}, error as Error);
+      res.status(500).json({
+        error: {
+          code: "ANALYTICS_FAILED",
+          message: "Failed to get analytics overview",
+        },
+      });
+    }
+  })();
+});
+
+/**
+ * GET /api/marketplace-hub/analytics/installations
+ * Get installation metrics for organization
+ *
+ * Query params:
+ * - days: Number of days to analyze (default: 30)
+ */
+router.get("/analytics/installations", requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const orgId = getOrgId(req);
+      const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
+
+      const metrics = await marketplaceAnalytics.getInstallationMetrics(orgId, days);
+
+      res.json({
+        success: true,
+        data: metrics,
+      });
+    } catch (error) {
+      logger.error("Failed to get installation metrics", {}, error as Error);
+      res.status(500).json({
+        error: {
+          code: "ANALYTICS_FAILED",
+          message: "Failed to get installation metrics",
+        },
+      });
+    }
+  })();
+});
+
+/**
+ * GET /api/marketplace-hub/analytics/popular
+ * Get popular tools for organization
+ *
+ * Query params:
+ * - limit: Maximum number of tools to return (default: 10)
+ */
+router.get("/analytics/popular", requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const orgId = getOrgId(req);
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+
+      const popularTools = await marketplaceAnalytics.getPopularTools(orgId, limit);
+
+      res.json({
+        success: true,
+        data: {
+          tools: popularTools,
+        },
+      });
+    } catch (error) {
+      logger.error("Failed to get popular tools", {}, error as Error);
+      res.status(500).json({
+        error: {
+          code: "ANALYTICS_FAILED",
+          message: "Failed to get popular tools",
+        },
+      });
+    }
+  })();
+});
+
 export default router;

@@ -35,7 +35,7 @@ const tracer = trace.getTracer("orchestrator");
 
 export async function orchestrate(request: OrchestrationRequest): Promise<OrchestrationResult> {
   return await tracer.startActiveSpan("orchestrator.orchestrate", async (span) => {
-    const { userRequest, sessionId, organizationId, userId, threadContext } = request;
+    const { userRequest, sessionId, organizationId, userId, threadContext, eventId } = request;
     const environment = process.env.NODE_ENV || "development";
 
     try {
@@ -540,6 +540,7 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
             organizationId,
             userId,
             context,
+            eventId,
           });
           const duration = Date.now() - startTime;
           execSpan.setAttribute("result.status", execution.status);
