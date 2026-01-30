@@ -1,0 +1,304 @@
+id: work-order
+name: Work Order Auto
+version: 1.0.0
+description: |
+  작업지시서 자동 생성 모듈.
+  디자인 파일로부터 테크팩과 스펙을 자동 추출하여
+  생산을 위한 정확한 작업지시서를 생성합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - techpack
+  - work-order
+  - specifications
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: work-order
+  inputSchema:
+    type: object
+    properties:
+      designArtifactId:
+        type: string
+        description: Reference to Design Auto artifact
+      seasonCode:
+        type: string
+        description: Target season (e.g., 2026SS)
+      designFiles:
+        type: array
+        items:
+          type: object
+          properties:
+            fileId:
+              type: string
+            fileType:
+              type: string
+              enum: [sketch, cad, photo, pdf]
+            url:
+              type: string
+        description: Design files to analyze
+      specifications:
+        type: object
+        properties:
+          garmentType:
+            type: string
+            description: Type of garment (e.g., blouse, pants, dress)
+          targetPrice:
+            type: number
+            description: Target retail price in KRW
+          fabricPreferences:
+            type: array
+            items:
+              type: string
+            description: Preferred fabric types
+          sizeRange:
+            type: array
+            items:
+              type: string
+              enum: [XS, S, M, L, XL, XXL, FREE]
+            description: Size range to produce
+          colorOptions:
+            type: array
+            items:
+              type: string
+            description: Color variations
+    required:
+      - designArtifactId
+      - seasonCode
+
+  outputSchema:
+    type: object
+    properties:
+      techPack:
+        type: object
+        properties:
+          techPackId:
+            type: string
+          version:
+            type: string
+          garmentName:
+            type: string
+          designDetails:
+            type: object
+            properties:
+              frontView:
+                type: string
+                description: Front view image URL
+              backView:
+                type: string
+                description: Back view image URL
+              detailViews:
+                type: array
+                items:
+                  type: string
+              constructionNotes:
+                type: array
+                items:
+                  type: string
+          measurements:
+            type: object
+            properties:
+              sizeGrading:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    size:
+                      type: string
+                    measurements:
+                      type: object
+                      description: Key measurements (chest, length, sleeve, etc.)
+              measurementPoints:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    point:
+                      type: string
+                    description:
+                      type: string
+                    tolerance:
+                      type: string
+          materials:
+            type: array
+            items:
+              type: object
+              properties:
+                materialType:
+                  type: string
+                  enum: [main-fabric, lining, trim, hardware]
+                description:
+                  type: string
+                composition:
+                  type: string
+                supplier:
+                  type: string
+                color:
+                  type: string
+                quantity:
+                  type: string
+          construction:
+            type: object
+            properties:
+              stitchTypes:
+                type: array
+                items:
+                  type: string
+              seamAllowance:
+                type: string
+              specialInstructions:
+                type: array
+                items:
+                  type: string
+          qualityStandards:
+            type: object
+            properties:
+              criticalPoints:
+                type: array
+                items:
+                  type: string
+              tolerances:
+                type: object
+              inspectionCriteria:
+                type: array
+                items:
+                  type: string
+      garmentSpecs:
+        type: array
+        items:
+          type: object
+          properties:
+            specId:
+              type: string
+            size:
+              type: string
+            color:
+              type: string
+            measurements:
+              type: object
+            billOfMaterials:
+              type: array
+              items:
+                type: object
+                properties:
+                  item:
+                    type: string
+                  quantity:
+                    type: string
+                  unit:
+                    type: string
+      sizeGrading:
+        type: object
+        properties:
+          baseSize:
+            type: string
+          gradingRules:
+            type: array
+            items:
+              type: object
+              properties:
+                measurementPoint:
+                  type: string
+                increment:
+                  type: number
+                unit:
+                  type: string
+          sizeChart:
+            type: array
+            items:
+              type: object
+              properties:
+                size:
+                  type: string
+                dimensions:
+                  type: object
+      costEstimate:
+        type: object
+        properties:
+          materialCost:
+            type: number
+          laborCost:
+            type: number
+          trimCost:
+            type: number
+          totalCost:
+            type: number
+          targetMargin:
+            type: number
+          suggestedRetailPrice:
+            type: number
+
+  requiredInputs:
+    - design-auto  # Requires design files from Design Auto module
+  optionalInputs:
+    - product-planning  # Can reference SKU planning data
+
+  executorConfig:
+    type: ai-agent
+    agentId: techpack-generator
+    skillIds:
+      - spec-extraction
+      - techpack-creation
+
+components:
+  agents:
+    - id: techpack-generator
+      configPath: ./agents/techpack-generator.yaml
+
+  skills:
+    - id: spec-extraction
+      configPath: ./skills/spec-extraction.yaml
+    - id: techpack-creation
+      configPath: ./skills/techpack-creation.yaml
+
+permissions:
+  - read:artifacts
+  - read:files
+  - write:artifacts
+  - execute:workflows
+
+configSchema:
+  type: object
+  properties:
+    defaultTolerances:
+      type: object
+      description: Default measurement tolerances by garment type
+      properties:
+        tops:
+          type: string
+          default: "±0.5cm"
+        bottoms:
+          type: string
+          default: "±0.7cm"
+        outerwear:
+          type: string
+          default: "±1.0cm"
+    sizeGradingRules:
+      type: object
+      description: Standard size grading increments
+    qualityCheckpoints:
+      type: array
+      description: Standard quality checkpoints for all garments
+      items:
+        type: string
+    techPackTemplates:
+      type: object
+      description: Pre-defined tech pack templates by garment type
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

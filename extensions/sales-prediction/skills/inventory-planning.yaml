@@ -1,0 +1,275 @@
+id: inventory-planning
+name: Inventory Planning
+nameKo: 재고 계획
+description: |
+  수요 예측 결과를 기반으로 최적의 재고 계획을 수립합니다.
+  초기 입고량, 안전 재고, 재발주 시점, 창고 배분 등을
+  계산하여 재고 회전율을 최적화하고 품절/과재고를 방지합니다.
+
+triggers:
+  - 재고 계획
+  - inventory planning
+  - 입고 계획
+  - 발주 계획
+  - 재고 최적화
+
+category: forecasting
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  maxTokens: 5000
+
+parameters:
+  - name: salesForecast
+    type: object
+    required: true
+    description: Demand Analysis의 판매량 예측 결과
+
+  - name: leadTimeDays
+    type: object
+    properties:
+      domestic:
+        type: number
+      overseas:
+        type: number
+    required: false
+    default:
+      domestic: 14
+      overseas: 60
+    description: 공급 리드타임 (일 단위)
+
+  - name: safetyStockMultiplier
+    type: number
+    required: false
+    default: 1.5
+    description: 안전 재고 배수
+
+  - name: targetServiceLevel
+    type: number
+    required: false
+    default: 0.95
+    description: 목표 서비스 레벨 (품절 방지율)
+
+  - name: warehouseCapacity
+    type: object
+    properties:
+      mainWarehouse:
+        type: number
+      distributionCenter:
+        type: number
+      retailStores:
+        type: number
+    required: false
+    description: 창고별 수용 가능 물량
+
+  - name: budgetConstraint
+    type: number
+    required: false
+    description: 재고 예산 제약 (KRW)
+
+outputs:
+  - name: inventoryPlan
+    type: object
+    description: 재고 계획 (초기 입고량, 재발주 스케줄)
+  - name: warehouseAllocation
+    type: array
+    description: 창고별 재고 배분
+  - name: inventoryMetrics
+    type: object
+    description: 예상 재고 회전율, 재고 비용 등
+
+toolsRequired:
+  - notion__createPage
+
+promptTemplate: |
+  당신은 패션 재고 관리 및 최적화 전문가입니다.
+
+  ## 재고 계획 요청
+  - 판매 예측: {{salesForecast}}
+  - 리드타임: {{leadTimeDays}}
+  - 안전 재고 배수: {{safetyStockMultiplier}}
+  - 목표 서비스 레벨: {{targetServiceLevel}}
+  - 창고 용량: {{warehouseCapacity}}
+  - 재고 예산: {{budgetConstraint}}
+
+  ## 재고 관리 원칙
+  1. **적정 재고 유지**: 품절과 과재고 사이의 균형
+  2. **재고 회전율 최적화**: 자본 효율성 극대화
+  3. **서비스 레벨 달성**: 목표 품절 방지율 유지
+  4. **리스크 관리**: 불확실성에 대비한 안전 재고
+  5. **비용 최소화**: 재고 보유 비용 및 물류 비용 최소화
+
+  ## 재고 계획 프로세스
+
+  ### 1. 초기 입고량 계산
+  각 SKU의 초기 입고량을 다음 공식으로 계산:
+
+  **기본 공식:**
+  ```
+  초기 입고량 = (예측 판매량 × 초기 기간 비율) + 안전 재고
+  ```
+
+  **초기 기간 비율:**
+  - 리드타임 ≤ 2주: 40% (빠른 재발주 가능)
+  - 리드타임 2-4주: 50% (중간)
+  - 리드타임 ≥ 4주: 60% (재발주 어려움)
+
+  **안전 재고 계산:**
+  ```
+  안전 재고 = (주간 평균 판매량 × 리드타임 주수) × 안전 재고 배수 × Z-score
+
+  Z-score (서비스 레벨):
+  - 95%: 1.65
+  - 97%: 1.88
+  - 99%: 2.33
+  ```
+
+  **수요 패턴별 조정:**
+  - `steady`: 표준 계산
+  - `peak-early`: 초기 입고량 +20%
+  - `peak-mid`: 표준 계산, 중기 재발주 준비
+  - `peak-late`: 초기 입고량 -10%, 후기 재발주
+  - `volatile`: 안전 재고 +30%
+
+  ### 2. 재발주 시점 계산
+  재발주 시점(Reorder Point)을 계산:
+
+  ```
+  재발주점 = (일평균 판매량 × 리드타임 일수) + 안전 재고
+  ```
+
+  **재발주 스케줄:**
+  - 판매 추이를 모니터링하여 재발주 시점 자동 알림
+  - 피크 시기 직전 재발주 실행
+  - 빠른 회전 SKU는 시즌 중 2-3회 재발주
+
+  ### 3. 창고 배분 전략
+  총 재고를 창고별로 배분:
+
+  **본사 창고 (50%):**
+  - 전체 재고의 허브
+  - 재발주 및 긴급 배송용
+
+  **물류센터 (30%):**
+  - 온라인 주문 빠른 배송
+  - 수도권 중심
+
+  **오프라인 매장 (20%):**
+  - 즉시 판매 가능
+  - 고회전 SKU 중심
+
+  **배분 원칙:**
+  - 빠른 회전 SKU → 물류센터 우선
+  - 고가 SKU → 본사 창고 중심 관리
+  - 시즌 트렌드 SKU → 매장 전시 우선
+
+  ### 4. 재고 회전율 예측
+  재고 회전율을 계산:
+
+  ```
+  재고 회전율 = 예측 판매량 / 평균 재고량
+  평균 재고량 = (초기 재고 + 최종 재고) / 2
+  ```
+
+  **목표 회전율:**
+  - 업계 평균: 5-6회/년
+  - 목표: 5.5회/년 이상
+  - 카테고리별 목표 차이 고려
+
+  ### 5. 재고 비용 계산
+  재고 보유 비용을 추정:
+
+  ```
+  재고 비용 = 평균 재고량 × 단위 원가 × 연간 보유 비용률
+  보유 비용률: 20-25% (자본 비용, 창고 비용, 손실 등)
+  ```
+
+  ### 6. 시나리오 분석
+  다양한 시나리오에서 재고 계획 검증:
+
+  **낙관 시나리오 (판매 +30%):**
+  - 재고 부족 리스크
+  - 긴급 재발주 필요 여부
+  - 추가 물류 비용
+
+  **비관 시나리오 (판매 -20%):**
+  - 과재고 리스크
+  - 재고 적체 물량
+  - 프로모션 또는 할인 필요성
+
+  ## 출력 형식
+  재고 계획을 다음 JSON 구조로 정리:
+  ```json
+  {
+    "inventoryPlan": {
+      "initialPurchase": [
+        {
+          "skuName": "린넨 블렌드 셔츠",
+          "forecastUnits": 800,
+          "recommendedQuantity": 600,
+          "safetyStock": 100,
+          "reorderPoint": 200,
+          "unitCost": 45000,
+          "totalCost": 27000000
+        }
+      ],
+      "replenishmentSchedule": [
+        {
+          "week": "4주차",
+          "skus": [
+            {
+              "skuName": "린넨 블렌드 셔츠",
+              "quantity": 200,
+              "reason": "빠른 회전 예상",
+              "estimatedArrival": "5주차"
+            }
+          ]
+        }
+      ],
+      "totalInitialInvestment": 450000000,
+      "totalForecastInvestment": 600000000
+    },
+    "warehouseAllocation": [
+      {
+        "location": "본사 창고",
+        "totalUnits": 7500,
+        "percentage": 50,
+        "skus": [
+          {
+            "skuName": "린넨 블렌드 셔츠",
+            "quantity": 300
+          }
+        ]
+      }
+    ],
+    "inventoryMetrics": {
+      "expectedTurnoverRate": 5.2,
+      "averageInventory": 2885,
+      "inventoryHoldingCost": 90000000,
+      "serviceLevelAchievable": 0.95,
+      "stockoutRisk": "low",
+      "overstockRisk": "medium"
+    }
+  }
+  ```
+
+  ## 최적화 지침
+  1. **빠른 회전 SKU 우선**: 인기 예상 SKU에 초기 물량 집중
+  2. **신규 SKU 보수적 접근**: 과거 데이터 없는 SKU는 적게 입고
+  3. **재발주 유연성**: 리드타임 짧은 공급사 우선
+  4. **시즌별 패턴 반영**: 봄/여름은 후기 판매 감소 고려
+  5. **재고 예산 준수**: 예산 제약 시 우선순위 SKU 선정
+
+  ## 리스크 관리
+  - **품절 리스크**: 인기 SKU 조기 품절 방지 (안전 재고 충분)
+  - **과재고 리스크**: 예측 실패 시 프로모션 계획 준비
+  - **자금 리스크**: 초기 투자 규모 관리
+  - **물류 리스크**: 리드타임 지연 대비 버퍼
+
+  ## 권장 사항
+  - 주간 판매 모니터링 및 예측 보정
+  - 재발주 타이밍 자동 알림 시스템 구축
+  - 실제 판매 데이터로 모델 지속 개선
+  - 공급사와 긴밀한 협력 관계 유지

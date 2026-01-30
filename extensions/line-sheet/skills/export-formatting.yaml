@@ -1,0 +1,264 @@
+id: export-formatting
+name: Export Formatting
+nameKo: 출력 포맷팅
+description: |
+  라인시트를 PDF 및 Excel 형식으로 출력합니다.
+  레이아웃 데이터를 실제 파일로 변환하고,
+  인쇄 품질 및 데이터 무결성을 보장합니다.
+
+triggers:
+  - 출력 포맷팅
+  - export formatting
+  - PDF 생성
+  - Excel 생성
+
+category: export
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  maxTokens: 3000
+
+parameters:
+  - name: layoutData
+    type: object
+    required: true
+    description: layout-generation에서 생성된 레이아웃 데이터
+
+  - name: exportFormat
+    type: array
+    items:
+      type: string
+      enum: [pdf, excel]
+    required: true
+    description: 출력 형식 (pdf, excel 또는 둘 다)
+
+  - name: quality
+    type: string
+    required: false
+    default: high
+    enum: [standard, high, print]
+    description: PDF 출력 품질
+
+  - name: excelSheets
+    type: array
+    items:
+      type: string
+      enum: [catalog, pricing, specs, orderForm]
+    required: false
+    default: [catalog, pricing, specs, orderForm]
+    description: Excel에 포함할 시트 목록
+
+  - name: watermark
+    type: object
+    required: false
+    description: 워터마크 설정
+    properties:
+      enabled:
+        type: boolean
+      text:
+        type: string
+      opacity:
+        type: number
+
+outputs:
+  - name: pdfFile
+    type: object
+    description: 생성된 PDF 파일 정보
+  - name: excelFile
+    type: object
+    description: 생성된 Excel 파일 정보
+  - name: exportMetadata
+    type: object
+    description: 출력 메타데이터
+
+promptTemplate: |
+  당신은 라인시트 파일 출력 전문가입니다.
+
+  ## 입력 데이터
+  - 레이아웃 데이터: {{layoutData}}
+  - 출력 형식: {{exportFormat}}
+  - 품질: {{quality}}
+  - Excel 시트: {{excelSheets}}
+  - 워터마크: {{watermark}}
+
+  ## PDF 출력 사양
+
+  ### Quality: {{quality}}
+
+  #### Standard (표준)
+  - 해상도: 150 DPI
+  - 이미지 압축: Medium
+  - 파일 크기: 최적화 우선
+  - 용도: 디지털 배포, 이메일 첨부
+
+  #### High (고품질)
+  - 해상도: 300 DPI
+  - 이미지 압축: Low
+  - 파일 크기: 품질 우선
+  - 용도: 일반 인쇄, 프레젠테이션
+
+  #### Print (인쇄용)
+  - 해상도: 300 DPI (CMYK)
+  - 이미지 압축: None
+  - 파일 크기: 무압축
+  - 용도: 전문 인쇄소, 고품질 출력
+
+  ### PDF 구성
+  ```
+  메타데이터:
+  - Title: "{{layoutData.brandInfo.brandName}} {{layoutData.seasonCode}} Line Sheet"
+  - Author: "{{layoutData.brandInfo.brandName}}"
+  - Subject: "Fashion Line Sheet"
+  - Keywords: "fashion, linesheet, {{layoutData.seasonCode}}"
+
+  페이지 설정:
+  - Size: A4 (210mm x 297mm)
+  - Orientation: Portrait
+  - Margins: 20mm all sides
+  - Bleed: 3mm (print quality only)
+
+  임베딩:
+  - Fonts: Embed all fonts
+  - Images: High-resolution ({{quality}} setting)
+  - Color Space: RGB (standard/high), CMYK (print)
+  ```
+
+  ## Excel 출력 사양
+
+  ### Sheet 1: Product Catalog ({{excelSheets}} includes "catalog")
+  ```
+  열 구성:
+  A: Style Number (품번)
+  B: Product Name (제품명)
+  C: Category (카테고리)
+  D: Colors (컬러)
+  E: Sizes (사이즈)
+  F: Materials (소재)
+  G: Retail Price (소비자가)
+  H: Wholesale Price (도매가)
+  I: MOQ (최소주문수량)
+  J: Availability (입고가능일)
+  K: Image URL (이미지 링크)
+
+  서식:
+  - 헤더: 볼드, 배경색 {{layoutData.brandInfo.primaryColor}}
+  - 가격: 통화 형식 (₩#,##0)
+  - 테두리: 모든 셀
+  - 필터: 자동 필터 활성화
+  ```
+
+  ### Sheet 2: Pricing ({{excelSheets}} includes "pricing")
+  ```
+  가격표 요약:
+  - 카테고리별 가격 범위
+  - 가격대별 제품 수
+  - 평균 가격
+  - 마진 계산
+
+  피벗 테이블:
+  - 카테고리 x 가격대 크로스탭
+  ```
+
+  ### Sheet 3: Materials & Specs ({{excelSheets}} includes "specs")
+  ```
+  상세 스펙:
+  - 소재 구성 (%, 혼용률)
+  - 세탁 방법
+  - 원산지
+  - 사이즈 스펙 (치수표)
+  ```
+
+  ### Sheet 4: Order Form ({{excelSheets}} includes "orderForm")
+  ```
+  주문서 템플릿:
+
+  Section 1: Buyer Information
+  - Company Name: [입력란]
+  - Contact Person: [입력란]
+  - Email: [입력란]
+  - Phone: [입력란]
+
+  Section 2: Product Selection
+  [제품 목록 with 체크박스]
+  - Style Number | Product Name | Color | Size | Qty | Unit Price | Total
+  [각 제품별 행]
+
+  Section 3: Order Summary
+  - Total Quantity: =SUM(Qty column)
+  - Total Amount: =SUM(Total column)
+  - MOQ Check: =IF(Total Qty >= MOQ, "OK", "Insufficient")
+
+  Section 4: Delivery Info
+  - Delivery Address: [입력란]
+  - Requested Delivery Date: [날짜 선택]
+  - Special Instructions: [텍스트 박스]
+
+  수식 및 검증:
+  - Qty 셀: 숫자만 입력 가능
+  - Total: 자동 계산 (Qty * Unit Price)
+  - 조건부 서식: MOQ 미달 시 빨간색 표시
+  ```
+
+  ## 워터마크 적용 ({{watermark.enabled}})
+  ```
+  위치: 대각선 (좌하단 → 우상단)
+  텍스트: "{{watermark.text}}"
+  투명도: {{watermark.opacity}}
+  폰트: Arial, 72pt
+  색상: #CCCCCC
+  회전: 45도
+  ```
+
+  ## 파일명 규칙
+  ```
+  PDF: {{brandName}}_{{seasonCode}}_LineSheet_v{{version}}.pdf
+  Excel: {{brandName}}_{{seasonCode}}_ProductCatalog_v{{version}}.xlsx
+
+  예시:
+  - Kyndof_2026SS_LineSheet_v1.0.pdf
+  - Kyndof_2026SS_ProductCatalog_v1.0.xlsx
+  ```
+
+  ## 출력 형식
+  ```json
+  {
+    "pdfFile": {
+      "fileName": "Kyndof_2026SS_LineSheet_v1.0.pdf",
+      "filePath": "/exports/line-sheets/2026SS/",
+      "url": "https://storage.kyndof.com/...",
+      "fileSize": "45.2 MB",
+      "pageCount": 34,
+      "quality": "{{quality}}",
+      "createdAt": "2026-01-30T12:00:00Z"
+    },
+    "excelFile": {
+      "fileName": "Kyndof_2026SS_ProductCatalog_v1.0.xlsx",
+      "filePath": "/exports/line-sheets/2026SS/",
+      "url": "https://storage.kyndof.com/...",
+      "fileSize": "8.3 MB",
+      "sheetCount": 4,
+      "sheets": ["catalog", "pricing", "specs", "orderForm"],
+      "createdAt": "2026-01-30T12:00:00Z"
+    },
+    "exportMetadata": {
+      "totalProducts": {{layoutData.layoutMetadata.totalProducts}},
+      "exportFormat": {{exportFormat}},
+      "quality": "{{quality}}",
+      "watermarkApplied": {{watermark.enabled}},
+      "generatedBy": "Nubabel Line Sheet Generator v1.0"
+    }
+  }
+  ```
+
+  ## 품질 검증 체크리스트
+  - [ ] 모든 이미지가 올바르게 임베딩되었는가?
+  - [ ] 가격 정보가 정확한가?
+  - [ ] 폰트가 모두 임베딩되었는가?
+  - [ ] 페이지 번호가 올바른가?
+  - [ ] Excel 수식이 정상 작동하는가?
+  - [ ] 파일 크기가 적정한가?
+  - [ ] 워터마크가 적용되었는가? (옵션)
+
+  위 사양에 따라 {{exportFormat}} 형식으로 라인시트를 출력하세요.

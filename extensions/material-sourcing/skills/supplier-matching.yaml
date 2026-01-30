@@ -1,0 +1,364 @@
+id: supplier-matching
+name: Supplier Matching
+nameKo: 공급업체 매칭
+description: |
+  소재 요구사항에 적합한 공급업체를 매칭하고,
+  가격, 품질, 리드타임, 신뢰도를 기준으로 최적 업체를 추천합니다.
+
+triggers:
+  - 공급업체 매칭
+  - supplier matching
+  - 업체 추천
+  - supplier recommendation
+  - 소싱 추천
+
+category: sourcing
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.3
+  maxTokens: 4000
+
+parameters:
+  - name: materialRequirements
+    type: array
+    required: true
+    description: Material Analysis에서 도출된 소재 요구사항
+
+  - name: targetBudget
+    type: number
+    required: false
+    description: 목표 원가 (KRW)
+
+  - name: maxLeadTime
+    type: number
+    required: false
+    description: 최대 허용 리드타임 (일)
+
+  - name: preferredSuppliers
+    type: array
+    required: false
+    description: 선호 공급업체 리스트
+
+  - name: sustainabilityPriority
+    type: string
+    enum: [high, medium, low]
+    default: medium
+    description: 지속가능성 우선순위
+
+outputs:
+  - name: supplierRecommendations
+    type: array
+    description: 소재별 추천 공급업체 목록 (상위 3개)
+  - name: costEstimate
+    type: object
+    description: 총 원가 추정
+  - name: riskAnalysis
+    type: object
+    description: 공급 리스크 분석
+
+toolsRequired:
+  - notion__query
+
+promptTemplate: |
+  당신은 패션 소재 공급업체 매칭 전문가입니다.
+
+  ## 매칭 요청
+  - 소재 요구사항: {{materialRequirements}}
+  - 목표 원가: {{targetBudget}} KRW
+  - 최대 리드타임: {{maxLeadTime}}일
+  - 선호 공급업체: {{preferredSuppliers}}
+  - 지속가능성 우선순위: {{sustainabilityPriority}}
+
+  ## 매칭 기준
+
+  ### 1. 공급업체 평가 항목
+  각 공급업체를 다음 기준으로 평가 (10점 만점):
+
+  #### 가격 경쟁력 (20%)
+  - 시장 평균 대비 가격 수준
+  - 수량별 할인 정책
+  - 최소 주문 수량(MOQ) 합리성
+
+  #### 품질 신뢰도 (30%)
+  - 과거 품질 이슈 이력
+  - 인증 보유 현황 (OEKO-TEX, GOTS, BCI 등)
+  - 품질 관리 시스템
+
+  #### 납기 이행률 (25%)
+  - 과거 납기 준수 비율
+  - 리드타임 정확도
+  - 긴급 조달 가능 여부
+
+  #### 서비스 만족도 (15%)
+  - 의사소통 품질
+  - 문제 해결 능력
+  - 샘플 제공 속도
+
+  #### 지속가능성 (10%)
+  - 친환경 인증
+  - 윤리적 생산 여부
+  - 탄소 배출 관리
+
+  ### 2. 매칭 알고리즘
+
+  **Step 1: 기본 필터링**
+  - 요구사항 충족 여부 (소재 타입, 품질 스펙)
+  - 최대 리드타임 내 납품 가능
+  - MOQ가 생산 수량 이하
+
+  **Step 2: 점수 계산**
+  - 각 평가 항목별 점수 산출
+  - 가중치 적용하여 총점 계산
+  - 선호 공급업체는 +5% 가산점
+
+  **Step 3: 추천 순위**
+  - 총점 기준 상위 3개 업체 선정
+  - 동점 시 납기 이행률 높은 업체 우선
+  - 다양성 확보 (가격대 분산)
+
+  ### 3. 지속가능성 우선순위별 가중치 조정
+  ```
+  high:   가격 10%, 품질 30%, 납기 20%, 서비스 10%, 지속가능성 30%
+  medium: 가격 20%, 품질 30%, 납기 25%, 서비스 15%, 지속가능성 10%
+  low:    가격 30%, 품질 30%, 납기 25%, 서비스 15%, 지속가능성 0%
+  ```
+
+  ## 리스크 분석
+
+  ### 공급 리스크 유형
+  1. **독점 공급 리스크**: 특정 소재를 1개 업체만 공급
+  2. **리드타임 리스크**: 생산 일정 대비 리드타임 부족
+  3. **원가 리스크**: 목표 원가 초과
+  4. **품질 리스크**: 과거 품질 이슈 이력
+  5. **공급 안정성 리스크**: 업체의 재무/운영 불안정
+
+  각 리스크에 대해 완화 방안 제시
+
+  ## 출력 형식
+  ```json
+  {
+    "supplierRecommendations": [
+      {
+        "materialId": "MAT-001",
+        "materialType": "Cotton 100% Fabric",
+        "recommendations": [
+          {
+            "rank": 1,
+            "supplierId": "SUP-A001",
+            "supplierName": "한국섬유(주)",
+            "scores": {
+              "price": 8.5,
+              "quality": 9.0,
+              "delivery": 9.5,
+              "service": 8.0,
+              "sustainability": 8.5,
+              "total": 8.8
+            },
+            "pricing": {
+              "pricePerUnit": 12000,
+              "currency": "KRW",
+              "moq": 30,
+              "unit": "m",
+              "discounts": [
+                { "quantity": 100, "discount": "5%" },
+                { "quantity": 500, "discount": "10%" }
+              ]
+            },
+            "leadTime": {
+              "standard": 7,
+              "urgent": 3,
+              "urgentSurcharge": "20%"
+            },
+            "certifications": ["OEKO-TEX Standard 100", "BCI"],
+            "reliability": {
+              "onTimeDeliveryRate": 95,
+              "qualityIssueRate": 2,
+              "responseTime": "4 hours"
+            },
+            "notes": "품질 우수, 빠른 납기, 긴급 조달 가능"
+          },
+          {
+            "rank": 2,
+            "supplierId": "SUP-B002",
+            "supplierName": "대한원단",
+            "scores": {
+              "price": 9.0,
+              "quality": 8.5,
+              "delivery": 8.0,
+              "service": 7.5,
+              "sustainability": 9.0,
+              "total": 8.5
+            },
+            "pricing": {
+              "pricePerUnit": 11500,
+              "currency": "KRW",
+              "moq": 50,
+              "unit": "m"
+            },
+            "leadTime": {
+              "standard": 10,
+              "urgent": null
+            },
+            "certifications": ["GOTS", "OEKO-TEX"],
+            "reliability": {
+              "onTimeDeliveryRate": 90,
+              "qualityIssueRate": 3,
+              "responseTime": "8 hours"
+            },
+            "notes": "저렴한 가격, 친환경 인증 우수, MOQ 다소 높음"
+          },
+          {
+            "rank": 3,
+            "supplierId": "SUP-C003",
+            "supplierName": "글로벌텍스타일",
+            "scores": {
+              "price": 7.5,
+              "quality": 9.0,
+              "delivery": 10.0,
+              "service": 8.5,
+              "sustainability": 7.0,
+              "total": 8.4
+            },
+            "pricing": {
+              "pricePerUnit": 13500,
+              "currency": "KRW",
+              "moq": 20,
+              "unit": "m"
+            },
+            "leadTime": {
+              "standard": 5,
+              "urgent": 2
+            },
+            "certifications": ["BCI"],
+            "reliability": {
+              "onTimeDeliveryRate": 98,
+              "qualityIssueRate": 1,
+              "responseTime": "2 hours"
+            },
+            "notes": "최단 납기, 품질 최상, 가격 높음"
+          }
+        ],
+        "recommendedChoice": {
+          "supplierId": "SUP-A001",
+          "supplierName": "한국섬유(주)",
+          "reason": "가격, 품질, 납기의 최적 균형"
+        }
+      }
+    ],
+    "costEstimate": {
+      "totalCost": 795000,
+      "currency": "KRW",
+      "breakdown": [
+        {
+          "materialType": "Cotton Fabric",
+          "quantity": "50m",
+          "unitPrice": 12000,
+          "subtotal": 600000,
+          "percentage": 75.5
+        },
+        {
+          "materialType": "YKK Zipper",
+          "quantity": "100pcs",
+          "unitPrice": 1650,
+          "subtotal": 165000,
+          "percentage": 20.8
+        },
+        {
+          "materialType": "Thread",
+          "quantity": "Estimated",
+          "unitPrice": null,
+          "subtotal": 30000,
+          "percentage": 3.7
+        }
+      ],
+      "comparison": {
+        "targetBudget": {{targetBudget}},
+        "estimatedCost": 795000,
+        "variance": "{{계산}}",
+        "variancePercentage": "{{계산}}%"
+      },
+      "leadTime": {
+        "longestLeadTime": 14,
+        "criticalPath": "YKK Zipper (SUP-Z001)",
+        "estimatedDeliveryDate": "2026-02-13"
+      }
+    },
+    "riskAnalysis": {
+      "overallRiskLevel": "low",
+      "risks": [
+        {
+          "type": "독점 공급 리스크",
+          "level": "medium",
+          "description": "YKK 지퍼는 공식 딜러만 공급 가능",
+          "impact": "공급 차질 시 대체 어려움",
+          "mitigation": "국산 브랜드 지퍼를 대체재로 사전 검증"
+        },
+        {
+          "type": "리드타임 리스크",
+          "level": "low",
+          "description": "생산 일정 대비 충분한 조달 기간 확보",
+          "impact": null,
+          "mitigation": null
+        }
+      ],
+      "alternatives": [
+        {
+          "scenario": "원가 절감 (-5%)",
+          "changes": [
+            "YKK 지퍼 → 국산 브랜드 지퍼 대체",
+            "대한원단으로 공급업체 변경"
+          ],
+          "costImpact": -40000,
+          "leadTimeImpact": 0,
+          "qualityImpact": "국산 지퍼 샘플 테스트 필요",
+          "riskLevel": "medium"
+        },
+        {
+          "scenario": "리드타임 단축 (-7일)",
+          "changes": [
+            "모든 소재 재고 보유 업체 선택",
+            "긴급 조달 옵션 활용"
+          ],
+          "costImpact": 15000,
+          "leadTimeImpact": -7,
+          "qualityImpact": "없음",
+          "riskLevel": "low"
+        }
+      ]
+    },
+    "sustainability": {
+      "certifiedMaterialsPercentage": 75,
+      "sustainabilityScore": 7.0,
+      "carbonFootprint": "medium",
+      "recommendations": [
+        "GOTS 인증 원단(대한원단) 선택 시 점수 9.0 달성 가능",
+        "재활용 폴리에스터 실 사용 고려"
+      ]
+    }
+  }
+  ```
+
+  ## 매칭 전략
+
+  ### 비용 최적화 전략
+  - 대량 구매 할인 활용
+  - 재고 보유 업체 우선 (긴급 할증료 회피)
+  - 국산/수입 믹스로 원가 절감
+
+  ### 리스크 분산 전략
+  - 핵심 소재는 2개 이상 백업 업체 확보
+  - 리드타임 다양화 (일부 빠른 조달, 일부 저렴한 업체)
+  - 신규 업체는 소량 테스트 후 확대
+
+  ### 품질 보증 전략
+  - 인증 보유 업체 우선
+  - 샘플 테스트 필수 항목 명시
+  - 품질 이슈 이력 있는 업체 제외
+
+  ## 최종 추천
+  각 소재별로:
+  1. **1순위**: 종합 점수 최고 (균형)
+  2. **2순위**: 가격 또는 리드타임 우수 (대안)
+  3. **3순위**: 품질 최상 또는 지속가능성 우수 (프리미엄 옵션)

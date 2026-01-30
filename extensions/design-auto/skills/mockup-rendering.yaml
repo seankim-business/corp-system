@@ -1,0 +1,297 @@
+id: mockup-rendering
+name: Mockup Rendering
+nameKo: 목업 렌더링
+description: |
+  디자인 컨셉을 기반으로 비주얼 목업과 렌더링을 생성합니다.
+  Flat-lay, on-model, 3D 렌더링, 디테일 샷 등을 자동으로 생성하여
+  디자인을 시각화합니다.
+
+triggers:
+  - 목업
+  - mockup
+  - 렌더링
+  - rendering
+  - 비주얼
+  - visual
+  - 이미지 생성
+
+category: design
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.5
+  maxTokens: 4000
+
+parameters:
+  - name: designConcept
+    type: object
+    required: true
+    description: 디자인 컨셉 데이터 (concept-generation 출력)
+
+  - name: colorways
+    type: array
+    required: true
+    description: 렌더링할 컬러웨이 목록
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+        colors:
+          type: array
+
+  - name: renderOptions
+    type: object
+    required: false
+    description: 렌더링 옵션
+    properties:
+      quality:
+        type: string
+        enum: [draft, preview, production]
+        default: preview
+      types:
+        type: array
+        items:
+          type: string
+          enum: [flat-lay, on-model, detail, 3d-render]
+        default: [flat-lay, on-model]
+      style:
+        type: string
+        description: 렌더링 스타일 (예: studio, lifestyle, editorial)
+
+  - name: techSpecs
+    type: object
+    required: false
+    description: 기술 사양 (치수, 소재 등)
+
+outputs:
+  - name: mockups
+    type: array
+    description: 생성된 목업 이미지 목록
+  - name: techDrawings
+    type: array
+    description: 테크니컬 드로잉
+  - name: specifications
+    type: object
+    description: 상세 기술 사양
+
+promptTemplate: |
+  당신은 패션 디자인 비주얼라이제이션 전문가입니다.
+
+  ## 입력 데이터
+  - 디자인 컨셉: {{designConcept}}
+  - 컬러웨이: {{colorways}}
+  - 렌더링 옵션: {{renderOptions}}
+  - 기술 사양: {{techSpecs}}
+
+  ## 목업 렌더링 프로세스
+
+  ### 1. 비주얼 타입별 생성
+
+  #### Flat-lay (평면 배치)
+  - 용도: 온라인 상품 이미지, 카탈로그
+  - 구성: 깔끔한 배경, 정면 뷰
+  - 스타일: 미니멀, 프로페셔널
+  - 조명: 소프트 라이팅, 그림자 최소화
+
+  #### On-model (모델 착용)
+  - 용도: 광고, 룩북, SNS
+  - 구성: 모델 포즈, 라이프스타일 컨텍스트
+  - 스타일: 브랜드 무드에 맞는 스타일링
+  - 조명: 자연광 또는 스튜디오 조명
+
+  #### Detail (디테일 샷)
+  - 용도: 소재/디테일 강조, 품질 소구
+  - 구성: 클로즈업, 특정 부분 포커스
+  - 포커스: 소재 질감, 봉제선, 디테일
+  - 조명: 질감 강조를 위한 사이드 라이팅
+
+  #### 3D Render (3D 렌더링)
+  - 용도: 프로토타입, 디자인 검토
+  - 구성: 360도 뷰, 다각도 렌더
+  - 스타일: 사실적 렌더링
+  - 표현: 소재 질감, 주름, 실루엣
+
+  ### 2. 이미지 생성 프롬프트 구조
+
+  ```
+  [아이템 설명] + [스타일/무드] + [컬러웨이] + [뷰/앵글] + [배경/컨텍스트] + [조명/분위기] + [품질 키워드]
+  ```
+
+  예시:
+  ```
+  "Minimal oversized cotton t-shirt, quiet luxury aesthetic, sage green colorway,
+  front flat-lay view, white studio background, soft natural lighting,
+  high-end fashion photography, 4K quality, professional product shot"
+  ```
+
+  ### 3. 컬러웨이별 렌더링
+  각 컬러웨이에 대해:
+  - 메인 컬러 정확한 표현
+  - 컬러 조합의 조화
+  - Pantone/Hex 코드 참조
+  - 소재별 컬러 표현 차이
+
+  ### 4. 테크니컬 드로잉 생성
+
+  #### 앞면 (Front View)
+  - 전체 실루엣
+  - 주요 치수 표기
+  - 디테일 위치 명시
+
+  #### 뒷면 (Back View)
+  - 백 디자인 요소
+  - 봉제선 위치
+  - 마감 디테일
+
+  #### 사이드 뷰 (Side View)
+  - 두께/볼륨감
+  - 레이어링 구조
+
+  #### 디테일 뷰 (Detail View)
+  - 특수 디테일 확대
+  - 구성 방법 표기
+  - 소재 전환점
+
+  ### 5. 기술 사양 문서화
+
+  ```json
+  {
+    "measurements": {
+      "sizeChart": {
+        "Free": {
+          "chest": "95cm",
+          "length": "68cm",
+          "shoulder": "52cm",
+          "sleeve": "20cm"
+        }
+      },
+      "fit": "오버사이즈 (Oversized)",
+      "model": "168cm, 55kg 착용"
+    },
+    "materials": [
+      {
+        "name": "메인 원단",
+        "composition": "면 100%",
+        "weight": "220g/m²",
+        "treatment": "워싱 가공",
+        "supplier": "TBD"
+      }
+    ],
+    "construction": [
+      "오버락 봉제",
+      "더블 스티치 마감",
+      "드롭 숄더 구조",
+      "리브 네크라인"
+    ],
+    "embellishments": [
+      "브랜드 워싱 택 (목 뒤)"
+    ],
+    "care": [
+      "세탁기 사용 가능 (30°C)",
+      "표백제 사용 금지",
+      "다림질 낮은 온도",
+      "드라이클리닝 가능"
+    ],
+    "packaging": "개별 폴리백 포장",
+    "origin": "중국"
+  }
+  ```
+
+  ## 출력 형식
+  ```json
+  {
+    "mockups": [
+      {
+        "type": "flat-lay",
+        "colorway": "Sage Green",
+        "prompt": "Minimal oversized cotton t-shirt, quiet luxury aesthetic...",
+        "generatedImageUrl": "https://storage.../mockup-001-flat.png",
+        "metadata": {
+          "resolution": "4096x4096",
+          "format": "PNG",
+          "generatedAt": "2026-01-30T10:00:00Z",
+          "provider": "stable-diffusion"
+        }
+      },
+      {
+        "type": "on-model",
+        "colorway": "Sage Green",
+        "prompt": "Female model wearing minimal oversized cotton t-shirt...",
+        "generatedImageUrl": "https://storage.../mockup-001-model.png",
+        "metadata": {
+          "resolution": "3000x4000",
+          "format": "PNG",
+          "generatedAt": "2026-01-30T10:01:00Z",
+          "provider": "midjourney"
+        }
+      }
+    ],
+    "techDrawings": [
+      {
+        "view": "front",
+        "url": "https://storage.../tech-001-front.svg",
+        "annotations": [
+          "오버사이즈 핏",
+          "드롭 숄더 52cm",
+          "총 기장 68cm",
+          "리브 네크라인"
+        ]
+      },
+      {
+        "view": "back",
+        "url": "https://storage.../tech-001-back.svg",
+        "annotations": [
+          "브랜드 워싱 택",
+          "더블 스티치 마감"
+        ]
+      }
+    ],
+    "specifications": {
+      "measurements": { /* ... */ },
+      "materials": [ /* ... */ ],
+      "construction": [ /* ... */ ],
+      "estimatedCost": {
+        "material": 8000,
+        "labor": 5000,
+        "overhead": 2000,
+        "total": 15000,
+        "currency": "KRW"
+      },
+      "leadTime": {
+        "sampling": "14 days",
+        "production": "30 days"
+      }
+    }
+  }
+  ```
+
+  ## 렌더링 품질 가이드
+
+  ### Draft (초안)
+  - 해상도: 1024x1024
+  - 용도: 빠른 컨셉 검토
+  - 디테일: 기본
+
+  ### Preview (프리뷰)
+  - 해상도: 2048x2048
+  - 용도: 내부 검토, 승인
+  - 디테일: 상세
+
+  ### Production (제작용)
+  - 해상도: 4096x4096
+  - 용도: 최종 마케팅, 인쇄
+  - 디테일: 최고
+
+  이제 주어진 디자인 컨셉과 컬러웨이를 바탕으로
+  고품질의 비주얼 목업과 테크니컬 드로잉을 생성하세요.
+
+  ## 이미지 생성 API 호출
+  실제 이미지 생성을 위해서는 다음 API를 사용합니다:
+  - Stable Diffusion API
+  - Midjourney API (고품질 필요 시)
+  - DALL-E API (대안)
+
+  각 목업에 대해 적절한 프롬프트를 생성하고,
+  이미지 생성 API를 호출하여 실제 이미지를 생성합니다.

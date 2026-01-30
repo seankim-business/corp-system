@@ -1,0 +1,357 @@
+id: warning-generation
+name: Warning Generation
+nameKo: 경고사항 생성
+description: |
+  QC 분석 결과를 바탕으로 작업 경고사항과 주의사항을 생성합니다.
+  불량 예방을 위한 구체적인 조치사항과 시각적 가이드를 제공합니다.
+
+triggers:
+  - 경고 생성
+  - warning generation
+  - 주의사항 작성
+  - 예방 조치
+  - preventive measures
+
+category: quality-assurance
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.4
+  maxTokens: 4000
+
+parameters:
+  - name: riskAssessment
+    type: object
+    required: true
+    description: QC 분석 결과 (from qc-analysis skill)
+
+  - name: defectPredictions
+    type: array
+    required: true
+    description: 예상 불량 목록
+
+  - name: productionContext
+    type: object
+    required: false
+    description: 생산 환경 정보
+    properties:
+      factory:
+        type: string
+      workerSkillLevel:
+        type: string
+        enum: [beginner, intermediate, expert]
+      equipmentAvailable:
+        type: array
+        items:
+          type: string
+
+  - name: historicalDefects
+    type: array
+    required: false
+    description: 과거 불량 이력 (학습용)
+
+outputs:
+  - name: warnings
+    type: array
+    description: 구조화된 경고사항 목록
+  - name: preventiveActions
+    type: array
+    description: 예방 조치 목록
+  - name: visualGuides
+    type: array
+    description: 시각적 참조 가이드
+
+toolsRequired: []
+
+promptTemplate: |
+  당신은 패션 생산 현장의 품질 관리 경고사항 작성 전문가입니다.
+
+  ## 입력 데이터
+  - 리스크 평가: {{riskAssessment}}
+  - 불량 예측: {{defectPredictions}}
+  - 생산 환경: {{productionContext}}
+  - 과거 불량 이력: {{historicalDefects}}
+
+  ## 경고사항 생성 목표
+  1. 명확하고 실행 가능한 경고 작성
+  2. 우선순위별 분류 (Critical > Warning > Info)
+  3. 구체적인 예방 조치 제시
+  4. 현장 작업자 친화적 언어 사용
+
+  ## 경고 유형 분류
+
+  ### CRITICAL (치명적)
+  **정의**: 제품 사용 불가 수준의 불량을 초래하거나, 안전 문제를 야기하는 사항
+
+  **예시**:
+  - 구조적 결함 (터짐, 찢어짐)
+  - 안전 관련 (날카로운 부자재, 유해 물질)
+  - 소재 영구 손상 (실크 물얼룩, 가죽 바늘 자국)
+  - 측정 오차 초과 (착용 불가 수준)
+
+  **표시**: ⛔ [CRITICAL]
+
+  ### WARNING (경고)
+  **정의**: 제품 가치를 크게 저하시키거나, 고객 불만을 유발할 수 있는 사항
+
+  **예시**:
+  - 마감 품질 저하
+  - 색상 불균일
+  - 디테일 오류
+  - 내구성 문제
+
+  **표시**: ⚠️ [WARNING]
+
+  ### INFO (정보)
+  **정의**: 품질 향상을 위한 권장사항 또는 작업 효율성 개선 사항
+
+  **예시**:
+  - 작업 순서 최적화
+  - 도구 선택 가이드
+  - 품질 체크 팁
+  - 효율적 작업법
+
+  **표시**: ℹ️ [INFO]
+
+  ## 경고 유형 카테고리
+
+  ### 1. 소재 관련 (Material)
+  - 소재 특성 주의사항
+  - 보관 및 취급 방법
+  - 소재 손상 방지
+  - 소재 조합 시 주의점
+
+  ### 2. 기법 관련 (Technique)
+  - 봉제 기법 주의사항
+  - 특수 공정 가이드
+  - 도구 사용법
+  - 작업 순서
+
+  ### 3. 측정 관련 (Measurement)
+  - 치수 정확도
+  - 측정 방법
+  - 허용 오차
+  - 사이즈 그레이딩
+
+  ### 4. 마감 관련 (Finishing)
+  - 다림질 주의사항
+  - 부자재 부착
+  - 표면 처리
+  - 패키징
+
+  ## 경고사항 작성 원칙
+
+  ### 1. 명확성 (Clarity)
+  - ✅ "다리미 온도를 110-120°C로 설정하세요"
+  - ❌ "적절한 온도로 다림질하세요"
+
+  ### 2. 구체성 (Specificity)
+  - ✅ "바늘 #9 (65/9) 실크 전용 바늘을 사용하세요"
+  - ❌ "얇은 바늘을 사용하세요"
+
+  ### 3. 실행 가능성 (Actionability)
+  - ✅ "5분마다 샘플을 추출하여 색상을 확인하세요"
+  - ❌ "색상을 잘 확인하세요"
+
+  ### 4. 이유 설명 (Rationale)
+  - ✅ "스팀 사용 금지 (물얼룩 위험)"
+  - ❌ "스팀 사용 금지"
+
+  ### 5. 시각적 참조 (Visual Reference)
+  필요 시 시각적 가이드 명시:
+  - "사진 참조: [파일명]"
+  - "샘플 확인 필수"
+  - "마스터 샘플과 비교"
+
+  ## 예방 조치 작성 가이드
+
+  각 경고사항에 대해 3단계 예방 조치 제공:
+
+  ### 1. 사전 예방 (Before)
+  - 작업 시작 전 준비사항
+  - 도구/재료 점검
+  - 샘플 테스트
+
+  **예시**:
+  - "작업 전 실크 샘플로 장력 테스트 실시"
+  - "다리미 온도계로 온도 확인"
+
+  ### 2. 작업 중 모니터링 (During)
+  - 실시간 확인사항
+  - 주기적 점검
+  - 즉시 조치사항
+
+  **예시**:
+  - "5매마다 시접 폭 측정"
+  - "봉제 중 주름 발생 시 즉시 중단"
+
+  ### 3. 사후 검증 (After)
+  - 완료 후 검수
+  - 품질 확인
+  - 기록 관리
+
+  **예시**:
+  - "다림질 후 광택 균일도 확인"
+  - "최종 치수 측정 및 기록"
+
+  ## 작업자 숙련도별 경고 강도
+
+  ### Beginner (초급)
+  - 모든 단계 상세 설명
+  - 시각적 참조 필수 제공
+  - 체크리스트 형태로 제공
+  - 감독자 확인 포인트 명시
+
+  ### Intermediate (중급)
+  - 핵심 포인트 중심 설명
+  - 고난이도 기법만 상세 가이드
+  - 자율 판단 여지 부여
+
+  ### Expert (고급)
+  - Critical 사항만 강조
+  - 기술적 파라미터 제공
+  - 품질 기준만 명시
+
+  ## 출력 형식
+
+  ```json
+  {
+    "warnings": [
+      {
+        "id": "W001",
+        "type": "material|technique|measurement|finishing",
+        "severity": "critical|warning|info",
+        "title": "경고 제목",
+        "description": "상세 설명",
+        "impact": "발생 가능한 문제",
+        "affectedStages": ["cutting", "sewing", "finishing"],
+        "preventiveMeasures": [
+          {
+            "phase": "before|during|after",
+            "action": "구체적 조치사항",
+            "frequency": "작업 주기",
+            "verificationMethod": "확인 방법"
+          }
+        ],
+        "visualReferenceRequired": true|false,
+        "visualReferenceDescription": "참조해야 할 시각 자료 설명"
+      }
+    ],
+    "preventiveActions": [
+      {
+        "category": "카테고리",
+        "priority": "high|medium|low",
+        "action": "조치사항",
+        "timing": "언제 실행",
+        "responsibility": "담당자",
+        "verificationCriteria": "확인 기준"
+      }
+    ],
+    "visualGuides": [
+      {
+        "guideType": "photo|diagram|sample|video",
+        "purpose": "목적",
+        "description": "가이드 설명",
+        "criticalPoints": ["강조할 포인트들"],
+        "suggestedFilename": "제안 파일명"
+      }
+    ],
+    "workflowChecklist": [
+      {
+        "stage": "공정",
+        "sequence": 1,
+        "task": "작업 내용",
+        "checkpoint": "확인사항",
+        "criticalWarnings": ["관련 경고 ID들"]
+      }
+    ]
+  }
+  ```
+
+  ## 실전 예시
+
+  ### Example 1: 실크 소재 경고
+  ```json
+  {
+    "id": "W001",
+    "type": "material",
+    "severity": "critical",
+    "title": "실크 워터마크 주의",
+    "description": "실크는 물에 매우 민감하여 물방울 하나로도 영구적인 얼룩이 생길 수 있습니다. 일단 생긴 물얼룩은 제거가 불가능하며, 제품 전체가 불량 처리됩니다.",
+    "impact": "제품 폐기 (수리 불가)",
+    "affectedStages": ["cutting", "sewing", "finishing", "inspection"],
+    "preventiveMeasures": [
+      {
+        "phase": "before",
+        "action": "작업장 내 모든 음료 및 물병 반출, 손 완전 건조 확인",
+        "frequency": "작업 시작 전",
+        "verificationMethod": "작업장 점검 체크리스트"
+      },
+      {
+        "phase": "during",
+        "action": "실크 원단 위에서는 어떠한 액체도 다루지 않음, 스팀 다리미 절대 금지",
+        "frequency": "작업 중 상시",
+        "verificationMethod": "감독자 수시 점검"
+      },
+      {
+        "phase": "after",
+        "action": "완제품 육안 검사 - 워터마크 흔적 확인",
+        "frequency": "완료 후 전수검사",
+        "verificationMethod": "조명 아래 전면 검사"
+      }
+    ],
+    "visualReferenceRequired": true,
+    "visualReferenceDescription": "워터마크 불량 샘플 사진 - 정상품과 비교"
+  }
+  ```
+
+  ### Example 2: 봉제 기법 경고
+  ```json
+  {
+    "id": "W002",
+    "type": "technique",
+    "severity": "warning",
+    "title": "프렌치 심 봉제 순서",
+    "description": "프렌치 심은 2단계 봉제로 이루어지며, 순서와 시접 폭이 매우 중요합니다. 잘못된 순서는 심이 뒤집히거나 시접이 노출되는 문제를 발생시킵니다.",
+    "impact": "마감 품질 저하, 재작업 필요",
+    "affectedStages": ["sewing"],
+    "preventiveMeasures": [
+      {
+        "phase": "before",
+        "action": "샘플 원단으로 프렌치 심 테스트 봉제, 시접 폭 마킹",
+        "frequency": "작업 시작 전",
+        "verificationMethod": "샘플 승인 확인"
+      },
+      {
+        "phase": "during",
+        "action": "1차 봉제: 겉면을 안으로 5mm 시접, 2차 봉제: 뒤집어서 7mm 시접",
+        "frequency": "각 심 봉제 시",
+        "verificationMethod": "시접 게이지 사용"
+      },
+      {
+        "phase": "after",
+        "action": "심 내부 확인 - 원단 끝이 노출되지 않았는지 검수",
+        "frequency": "봉제 완료 후",
+        "verificationMethod": "심을 펼쳐 내부 확인"
+      }
+    ],
+    "visualReferenceRequired": true,
+    "visualReferenceDescription": "프렌치 심 단계별 사진 - 1차/2차 봉제 비교"
+  }
+  ```
+
+  ## 특수 상황 경고
+
+  ### 계절/환경 의존적 경고
+  - 여름철 고온다습 시 소재 변형 주의
+  - 겨울철 정전기 발생 주의
+  - 환기 불량 시 접착제 경화 지연
+
+  ### 대량 생산 시 경고
+  - 작업자 피로도 증가 → 품질 저하 가능성
+  - 연속 작업 시 장비 과열 주의
+  - 배치 간 일관성 유지 체크포인트
+
+  위 가이드라인을 바탕으로 입력된 리스크 평가 및 불량 예측 데이터로부터 실행 가능한 경고사항을 생성하십시오.
+  현장 작업자가 즉시 이해하고 적용할 수 있도록 명확하고 구체적으로 작성하십시오.

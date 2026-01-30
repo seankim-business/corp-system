@@ -18,8 +18,9 @@ function createPrismaClient(): PrismaClient {
     log: process.env.NODE_ENV === "production" ? [] : ["warn", "error"],
   });
 
-  // Note: $extends returns a client that works at runtime but TypeScript loses model types
-  // Using 'as unknown as PrismaClient' preserves model type inference for consumers
+  // Note: $extends returns a client that works at runtime but TypeScript loses some internal types
+  // Using 'as unknown as PrismaClient' preserves model type inference from @prisma/client
+  // The extended client still has all model accessors (e.g., featureRequest, user, etc.)
   return baseClient.$extends({
     query: {
       $allModels: {

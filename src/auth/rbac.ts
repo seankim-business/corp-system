@@ -93,6 +93,9 @@ export enum Permission {
   // Dashboard permissions
   DASHBOARD_READ = "dashboard:read",
 
+  // Feature Request permissions
+  FEATURE_REQUEST_MANAGE = "feature_request:manage",
+
   // Legacy permission mappings (for backwards compatibility)
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   WORKFLOWS_READ = "workflow:read",
@@ -166,6 +169,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // AR permissions
     Permission.AR_READ,
     Permission.AR_WRITE,
+    // Feature Request management
+    Permission.FEATURE_REQUEST_MANAGE,
   ],
 
   [Role.ADMIN]: [
@@ -198,6 +203,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // AR permissions
     Permission.AR_READ,
     Permission.AR_WRITE,
+    // Feature Request management
+    Permission.FEATURE_REQUEST_MANAGE,
     // NO billing access
     // NO org deletion
   ],

@@ -1,0 +1,225 @@
+id: line-sheet
+name: Line Sheet Generator
+version: 1.0.0
+description: |
+  라인시트 생성 모듈.
+  디자인과 SKU 정보를 기반으로 프로페셔널한 라인시트를
+  PDF 및 Excel 형식으로 자동 생성합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - line-sheet
+  - catalog
+  - pdf
+  - excel
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: line-sheet
+  inputSchema:
+    type: object
+    properties:
+      designArtifactId:
+        type: string
+        description: Reference to Design Automation artifact
+      skuPlanArtifactId:
+        type: string
+        description: Reference to Product Planning SKU artifact
+      seasonCode:
+        type: string
+        description: Target season (e.g., 2026SS)
+      companyInfo:
+        type: object
+        properties:
+          brandName:
+            type: string
+          contactEmail:
+            type: string
+          contactPhone:
+            type: string
+          website:
+            type: string
+        description: Company/brand information for line sheet header
+      pricingInfo:
+        type: object
+        properties:
+          currency:
+            type: string
+            default: KRW
+          showWholesalePrice:
+            type: boolean
+            default: false
+          wholesaleMargin:
+            type: number
+            description: Wholesale margin percentage
+        description: Pricing display options
+      formatPreferences:
+        type: object
+        properties:
+          layout:
+            type: string
+            enum: [grid, list, detailed]
+            default: grid
+          includeSpecs:
+            type: boolean
+            default: true
+          includeMaterials:
+            type: boolean
+            default: true
+          includeSizing:
+            type: boolean
+            default: true
+        description: Line sheet format preferences
+    required:
+      - seasonCode
+
+  outputSchema:
+    type: object
+    properties:
+      lineSheetPDF:
+        type: object
+        properties:
+          url:
+            type: string
+          fileName:
+            type: string
+          pageCount:
+            type: number
+        description: Generated PDF line sheet
+      lineSheetExcel:
+        type: object
+        properties:
+          url:
+            type: string
+          fileName:
+            type: string
+          sheetCount:
+            type: number
+        description: Generated Excel line sheet
+      productCatalog:
+        type: array
+        items:
+          type: object
+          properties:
+            styleNumber:
+              type: string
+            productName:
+              type: string
+            category:
+              type: string
+            images:
+              type: array
+              items:
+                type: string
+            colors:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  hex:
+                    type: string
+            sizes:
+              type: array
+              items:
+                type: string
+            materials:
+              type: string
+            retailPrice:
+              type: number
+            wholesalePrice:
+              type: number
+            moq:
+              type: number
+              description: Minimum Order Quantity
+            availability:
+              type: string
+        description: Structured product catalog data
+      summary:
+        type: object
+        properties:
+          totalProducts:
+            type: number
+          categoryBreakdown:
+            type: object
+          priceRange:
+            type: object
+            properties:
+              min:
+                type: number
+              max:
+                type: number
+              avg:
+                type: number
+
+  requiredInputs:
+    - design-auto     # Requires designs from Design Automation
+    - product-planning  # Requires SKU plan from Product Planning
+  optionalInputs: []
+
+  executorConfig:
+    type: ai-agent
+    agentId: linesheet-creator
+    skillIds:
+      - layout-generation
+      - export-formatting
+
+components:
+  agents:
+    - id: linesheet-creator
+      configPath: ./agents/linesheet-creator.yaml
+
+  skills:
+    - id: layout-generation
+      configPath: ./skills/layout-generation.yaml
+    - id: export-formatting
+      configPath: ./skills/export-formatting.yaml
+
+permissions:
+  - read:artifacts
+  - write:artifacts
+  - execute:workflows
+  - write:files
+
+configSchema:
+  type: object
+  properties:
+    defaultLayout:
+      type: string
+      enum: [grid, list, detailed]
+      description: Default line sheet layout
+      default: grid
+    pdfQuality:
+      type: string
+      enum: [standard, high, print]
+      description: PDF export quality
+      default: high
+    watermarkEnabled:
+      type: boolean
+      description: Add watermark to line sheets
+      default: false
+    watermarkText:
+      type: string
+      description: Watermark text (if enabled)
+    templatePath:
+      type: string
+      description: Custom line sheet template path
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

@@ -48,8 +48,17 @@ cat .omc/AGENT_BOARD.md   # 다른 에이전트 현황 확인
 ### 2. Browser Testing (MUST)
 
 ```
-Claude in Chrome 사용 (유저 프로필)
-Playwright MCP는 Claude in Chrome 불가 시에만
+우선순위:
+1. Chrome DevTools MCP (설정됨 - ~/.claude/settings.json)
+   - Node 20.19+ 필요 (/usr/local/opt/node@20/bin)
+   - 26개 도구: 클릭, 입력, 스크린샷, 네트워크 모니터링 등
+
+2. Claude in Chrome 확장 (공식)
+   - claude --chrome 으로 실행
+   - 확장 프로그램 설치 필요
+
+3. Playwright MCP (fallback)
+   - 위 옵션 불가 시에만 사용
 ```
 
 ### 3. 인증/연동 작업 (MUST)

@@ -1,0 +1,203 @@
+id: material-analysis
+name: Material Analysis
+nameKo: 소재 분석
+description: |
+  디자인 스펙에서 소재 요구사항을 분석하고,
+  필요한 소재의 종류, 수량, 품질 기준을 추출합니다.
+
+triggers:
+  - 소재 분석
+  - material analysis
+  - 소재 요구사항
+  - material requirements
+  - 원자재 분석
+
+category: sourcing
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.3
+  maxTokens: 4000
+
+parameters:
+  - name: designSpecifications
+    type: object
+    required: true
+    description: 디자인 스펙 데이터
+    properties:
+      materials:
+        type: array
+        description: 소재 목록
+      components:
+        type: array
+        description: 부자재 목록
+      qualityRequirements:
+        type: object
+        description: 품질 요구사항
+
+  - name: productionQuantity
+    type: number
+    required: false
+    description: 생산 수량 (Work Order에서 참조)
+
+  - name: sustainabilityRequired
+    type: boolean
+    required: false
+    default: false
+    description: 지속가능 소재 필수 여부
+
+outputs:
+  - name: materialBreakdown
+    type: array
+    description: 소재별 상세 분석
+  - name: quantityEstimates
+    type: object
+    description: 소재별 필요 수량 추정
+  - name: qualitySpecs
+    type: object
+    description: 소재별 품질 기준
+
+toolsRequired:
+  - notion__query
+
+promptTemplate: |
+  당신은 패션 소재 분석 전문가입니다.
+
+  ## 분석 요청
+  - 디자인 스펙: {{designSpecifications}}
+  - 생산 수량: {{productionQuantity}}
+  - 지속가능성 요구: {{sustainabilityRequired}}
+
+  ## 분석 목표
+  1. 디자인 스펙에서 모든 소재 및 부자재 추출
+  2. 각 소재의 필요 수량 정확히 계산
+  3. 품질 기준 및 사양 명확화
+  4. 소재 간 호환성 및 의존성 파악
+
+  ## 소재 카테고리
+
+  ### 주자재 (Main Materials)
+  - 원단 (Fabric): 면, 폴리에스터, 울, 린넨, 실크, 레이온 등
+  - 니트 (Knit): 저지, 리브, 스판 등
+  - 가죽 (Leather): 천연가죽, 인조가죽
+
+  ### 부자재 (Trims & Components)
+  - 단추 (Buttons): 재질, 크기, 색상
+  - 지퍼 (Zippers): 길이, 종류 (코일/메탈/비스론), 브랜드
+  - 라벨 (Labels): 브랜드 라벨, 케어 라벨, 사이즈 라벨
+  - 트림 (Trims): 레이스, 리본, 바인딩, 파이핑
+  - 고무줄 (Elastic): 폭, 신축성
+  - 실 (Thread): 색상, 재질 (폴리에스터/면)
+  - 안감 (Lining): 종류, 색상
+  - 심지 (Interlining): 타입 (접착/비접착), 두께
+  - 기타: 리벳, 스냅, 후크, 아일렛
+
+  ## 수량 계산 가이드
+
+  ### 원단 수량 계산
+  ```
+  필요 원단(m) = (1벌당 소요량 × 생산수량) × (1 + 로스율)
+  - 로스율: 일반적으로 5-10%
+  - 패턴 복잡도에 따라 조정
+  ```
+
+  ### 부자재 수량 계산
+  ```
+  필요 수량 = (1벌당 개수 × 생산수량) × (1 + 불량률)
+  - 불량률: 일반적으로 2-5%
+  ```
+
+  ## 품질 기준 명시
+  각 소재에 대해 다음을 명확히:
+  - 색상 (Pantone 또는 Lab 값)
+  - 규격 (폭, 길이, 두께 등)
+  - 물성 (신축성, 내구성 등)
+  - 인증 요구사항 (OEKO-TEX, GOTS 등)
+
+  ## 지속가능성 고려
+  {{#if sustainabilityRequired}}
+  - 친환경 인증 소재 우선 추천
+  - 재활용 소재 가능 여부
+  - 유해물질 테스트 필수
+  {{/if}}
+
+  ## 출력 형식
+  ```json
+  {
+    "materialBreakdown": [
+      {
+        "materialId": "MAT-001",
+        "category": "fabric",
+        "type": "Cotton 100%",
+        "specifications": {
+          "color": "Navy (Pantone 19-4028)",
+          "width": "148cm",
+          "weight": "180g/m²",
+          "finish": "Enzyme wash"
+        },
+        "qualityRequirements": {
+          "colorFastness": "Grade 4 이상",
+          "shrinkage": "3% 이내",
+          "certification": "OEKO-TEX Standard 100"
+        },
+        "quantityEstimate": {
+          "perUnit": "1.2m",
+          "productionQty": {{productionQuantity}},
+          "lossRate": 0.08,
+          "totalRequired": "{{계산 결과}}m"
+        },
+        "sustainability": {
+          "recyclable": true,
+          "certifications": ["OEKO-TEX", "BCI"],
+          "carbonFootprint": "low"
+        }
+      },
+      {
+        "materialId": "MAT-002",
+        "category": "zipper",
+        "type": "YKK Coil Zipper",
+        "specifications": {
+          "length": "20cm",
+          "type": "Close-end",
+          "color": "Navy",
+          "brand": "YKK"
+        },
+        "qualityRequirements": {
+          "durability": "5000 cycles 이상",
+          "colorMatch": "원단 색상 대비 허용 오차 ΔE < 1.0"
+        },
+        "quantityEstimate": {
+          "perUnit": 1,
+          "productionQty": {{productionQuantity}},
+          "defectRate": 0.03,
+          "totalRequired": "{{계산 결과}}개"
+        }
+      }
+    ],
+    "quantityEstimates": {
+      "summary": {
+        "totalMaterialTypes": 2,
+        "estimatedLeadTime": "14 days",
+        "complexityScore": 6.5
+      }
+    },
+    "qualitySpecs": {
+      "criticalSpecs": [
+        "색상 매칭 (원단-지퍼-실)",
+        "원단 수축률 테스트 필수"
+      ],
+      "testingRequired": [
+        "Color fastness test",
+        "Shrinkage test",
+        "Zipper durability test"
+      ]
+    }
+  }
+  ```
+
+  ## 주의사항
+  - 모든 수량은 여유분(로스율, 불량률) 포함하여 계산
+  - 색상 매칭이 필요한 소재는 반드시 명시
+  - 최소 주문 수량(MOQ) 고려 필요
+  - 리드타임이 긴 소재는 우선 조달 필요

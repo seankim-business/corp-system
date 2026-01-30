@@ -1,0 +1,288 @@
+id: cost-calculation
+name: Cost Calculation
+nameKo: 원가 계산
+description: |
+  생산 원가를 정밀하게 계산합니다.
+  소재비, 인건비, 간접비를 각각 계산하고,
+  손실률, 효율성 등의 변수를 반영하여 총 원가를 산출합니다.
+
+triggers:
+  - 원가 계산
+  - cost calculation
+  - calculate cost
+  - 생산비 계산
+  - 제조원가 계산
+  - estimate cost
+
+category: cost-analysis
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.2
+  maxTokens: 4000
+
+parameters:
+  - name: materials
+    type: array
+    items:
+      type: object
+      properties:
+        materialId:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        unitPrice:
+          type: number
+    required: true
+    description: 소재 목록 및 단가
+
+  - name: laborRates
+    type: object
+    properties:
+      cutting:
+        type: number
+      sewing:
+        type: number
+      finishing:
+        type: number
+      quality:
+        type: number
+    required: true
+    description: 공정별 인건비 단가
+
+  - name: workOrderSpecs
+    type: object
+    properties:
+      productName:
+        type: string
+      category:
+        type: string
+      complexity:
+        type: string
+        enum: [low, medium, high]
+      estimatedLaborHours:
+        type: number
+      quantity:
+        type: number
+    required: true
+    description: 작업 지시서 사양
+
+  - name: overheadRate
+    type: number
+    required: false
+    default: 15
+    description: 간접비 배부율 (%)
+
+  - name: wasteRate
+    type: number
+    required: false
+    default: 7
+    description: 소재 손실률 (%)
+
+outputs:
+  - name: materialCosts
+    type: object
+    description: 소재비 상세 내역
+  - name: laborCosts
+    type: object
+    description: 인건비 상세 내역
+  - name: overheadCosts
+    type: object
+    description: 간접비 상세 내역
+  - name: totalCost
+    type: number
+    description: 총 생산원가
+  - name: unitCost
+    type: number
+    description: 단위당 원가
+
+toolsRequired: []
+
+promptTemplate: |
+  당신은 패션 제품 원가 계산 전문가입니다.
+
+  ## 원가 계산 요청
+  - 제품명: {{workOrderSpecs.productName}}
+  - 카테고리: {{workOrderSpecs.category}}
+  - 복잡도: {{workOrderSpecs.complexity}}
+  - 생산 수량: {{workOrderSpecs.quantity}}
+  - 예상 작업 시간: {{workOrderSpecs.estimatedLaborHours}}
+
+  ## 소재 정보
+  {{materials}}
+
+  ## 인건비 단가
+  {{laborRates}}
+
+  ## 계산 파라미터
+  - 간접비 배부율: {{overheadRate}}%
+  - 소재 손실률: {{wasteRate}}%
+
+  ## 원가 계산 방법론
+
+  ### 1. 소재비 계산 (Material Costs)
+
+  각 소재에 대해 다음 공식으로 계산:
+  ```
+  Material Cost = Quantity × Unit Price × (1 + Waste Rate)
+  ```
+
+  **손실률 적용 이유:**
+  - 재단 손실 (cutting loss)
+  - 품질 불량 (quality reject)
+  - 작업 오류 (operation error)
+
+  **카테고리별 분류:**
+  - 주자재 (Main Fabric): 원단, 편성물
+  - 부자재 (Trim): 단추, 지퍼, 라벨, 리본 등
+  - 포장재 (Packaging): 택, 행어, 비닐, 박스
+
+  ### 2. 인건비 계산 (Labor Costs)
+
+  공정별 작업 시간을 기반으로 계산:
+
+  **복잡도별 작업 시간 계수:**
+  - Low: 1.0x (기본 아이템)
+  - Medium: 1.5x (디테일 있는 아이템)
+  - High: 2.0x (복잡한 구조)
+
+  **공정별 계산:**
+  ```
+  Cutting Cost = (Total Hours × Complexity Factor × 0.15) × Cutting Rate
+  Sewing Cost = (Total Hours × Complexity Factor × 0.60) × Sewing Rate
+  Finishing Cost = (Total Hours × Complexity Factor × 0.20) × Finishing Rate
+  QC Cost = (Total Hours × Complexity Factor × 0.05) × Quality Rate
+  ```
+
+  **비율 근거:**
+  - 재단: 15% (패턴 전개, 재단)
+  - 봉제: 60% (주요 공정)
+  - 마무리: 20% (다림질, 포장)
+  - 품질관리: 5% (검품)
+
+  ### 3. 간접비 계산 (Overhead Costs)
+
+  직접비(소재비 + 인건비)를 기준으로 배부:
+  ```
+  Overhead = (Material Costs + Labor Costs) × Overhead Rate
+  ```
+
+  **간접비 항목:**
+  - 공장 운영비 (Factory operations)
+  - 관리비 (Administrative costs)
+  - 유틸리티 (Utilities)
+  - 감가상각 (Depreciation)
+  - 기타 고정비 (Other fixed costs)
+
+  ### 4. 총 원가 산출 (Total Cost)
+
+  ```
+  Total Production Cost = Material Costs + Labor Costs + Overhead Costs
+  Unit Cost = Total Production Cost / Quantity
+  ```
+
+  ## 출력 형식
+
+  다음 JSON 구조로 상세한 원가 분석을 제공:
+
+  ```json
+  {
+    "materialCosts": {
+      "total": 11900,
+      "breakdown": [
+        {
+          "materialId": "M001",
+          "name": "면 혼방 원단",
+          "quantity": 1.2,
+          "unit": "m",
+          "unitPrice": 8000,
+          "subtotal": 9600,
+          "wasteRate": 7,
+          "totalCost": 10272
+        }
+      ],
+      "byCategory": {
+        "mainFabric": 10272,
+        "trim": 1500,
+        "packaging": 800
+      }
+    },
+    "laborCosts": {
+      "total": 22900,
+      "complexityFactor": 1.5,
+      "breakdown": [
+        {
+          "operation": "cutting",
+          "hours": 0.2,
+          "rate": 20000,
+          "totalCost": 4000
+        },
+        {
+          "operation": "sewing",
+          "hours": 0.8,
+          "rate": 18000,
+          "totalCost": 14400
+        },
+        {
+          "operation": "finishing",
+          "hours": 0.3,
+          "rate": 15000,
+          "totalCost": 4500
+        }
+      ]
+    },
+    "overheadCosts": {
+      "total": 5220,
+      "rate": 15,
+      "directCosts": 34800,
+      "breakdown": [
+        {
+          "category": "factory-operations",
+          "cost": 2610
+        },
+        {
+          "category": "administrative",
+          "cost": 1566
+        },
+        {
+          "category": "utilities",
+          "cost": 1044
+        }
+      ]
+    },
+    "summary": {
+      "totalProductionCost": 40020,
+      "unitCost": 40020,
+      "quantity": 1,
+      "costStructure": {
+        "materialPercentage": 29.7,
+        "laborPercentage": 57.2,
+        "overheadPercentage": 13.1
+      }
+    }
+  }
+  ```
+
+  ## 계산 체크리스트
+
+  계산을 수행할 때 다음을 확인하세요:
+  - [ ] 모든 소재에 손실률이 적용되었는가?
+  - [ ] 복잡도 계수가 인건비에 반영되었는가?
+  - [ ] 간접비가 직접비 기준으로 계산되었는가?
+  - [ ] 단위 환산이 정확한가? (m, yard, kg 등)
+  - [ ] 수량에 따른 총액이 맞는가?
+  - [ ] 원가 구조 비율이 합리적인가?
+
+  ## 업계 벤치마크
+
+  **정상적인 원가 구조 비율:**
+  - 소재비: 25-35%
+  - 인건비: 50-65%
+  - 간접비: 10-20%
+
+  비율이 이상하면 계산을 재검토하거나 사유를 설명하세요.

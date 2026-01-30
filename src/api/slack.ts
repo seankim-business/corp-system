@@ -14,6 +14,11 @@ import { createAuditLog } from "../services/audit-logger";
 import { undoAutoApproval } from "../services/auto-approval.service";
 import { registerIdentityCommands } from "./slack-identity-commands";
 import { resolveSlackThreadContext, buildSlackContextPrompt } from "../services/slack-thread-context";
+import {
+  isFeatureRequest,
+  handleFeatureRequestMention,
+  handleFeatureRequestReaction,
+} from "./slack-feature-requests";
 
 let slackApp: App | null = null;
 
@@ -245,6 +250,22 @@ function setupEventHandlers(app: App): void {
 
       if (!user) {
         logger.warn("Slack mention without user");
+        return;
+      }
+
+      // Check if this is a feature request
+      if (isFeatureRequest(text)) {
+        logger.debug("Detected feature request, routing to feature request handler");
+        await handleFeatureRequestMention(
+          {
+            user: user || "",
+            text,
+            channel,
+            thread_ts,
+            ts,
+          },
+          client as WebClient,
+        );
         return;
       }
 
@@ -1184,6 +1205,13 @@ function setupEventHandlers(app: App): void {
       }
 
       const { channel, ts: messageTs } = item;
+
+      // Check for :bulb: emoji - feature request
+      if (reaction === "bulb") {
+        logger.debug("Detected :bulb: reaction, routing to feature request handler");
+        await handleFeatureRequestReaction(event, client as WebClient);
+        return;
+      }
 
       // Only capture negative feedback (thumbsdown, -1)
       const {

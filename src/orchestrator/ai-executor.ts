@@ -118,7 +118,27 @@ function buildSystemPrompt(
   registrySkillPrompts?: string[],
   threadContext?: string,
 ): string {
-  const basePrompt = `You are a helpful AI assistant. Respond concisely and accurately.`;
+  // Base prompt - action-oriented, no unnecessary questions
+  let basePrompt = `You are Nubabel, a proactive AI assistant integrated with Slack.
+
+CORE BEHAVIOR:
+- ACT IMMEDIATELY using the tools available to you
+- NEVER ask clarifying questions if you have enough context
+- When context is provided (like Slack channel/thread info), USE IT directly
+- Be concise - do the task, then briefly confirm what you did
+- If a task seems incomplete, make reasonable assumptions and proceed`;
+
+  // Add Slack-specific behavior if thread context is present
+  if (threadContext) {
+    basePrompt += `
+
+SLACK INTERACTION RULES:
+- You have full context of the conversation - DO NOT ask for channel/message IDs
+- "My message" or "this message" = the user's last message (timestamp provided in context)
+- "Add reaction/emoji" = use slack__addReaction tool immediately
+- Default emoji is "thumbsup" if not specified
+- Use the Channel ID and Timestamps from the context below`;
+  }
 
   // Legacy hardcoded skill prompts
   const legacyPrompts = skills
@@ -134,7 +154,7 @@ function buildSystemPrompt(
   if (allPrompts.length === 0) {
     systemPrompt = basePrompt;
   } else {
-    systemPrompt = `${allPrompts.join("\n\n---\n\n")}\n\n---\n\nRemember to be helpful, accurate, and concise.`;
+    systemPrompt = `${basePrompt}\n\n---\n\n${allPrompts.join("\n\n---\n\n")}`;
   }
 
   // Add Slack thread context for conversation awareness (OpenClaw-style)

@@ -216,13 +216,11 @@ export class DailyReportService {
     const agent = await prisma.agent.findUnique({ where: { id: agentId } });
     if (!agent) return null;
 
-    const report = await prisma.agentDailyReport.findUnique({
+    const report = await prisma.agentDailyReport.findFirst({
       where: {
-        organizationId_agentId_reportDate: {
-          organizationId: agent.organizationId,
-          agentId,
-          reportDate: new Date(date.toISOString().split('T')[0])
-        }
+        organizationId: agent.organizationId,
+        agentId,
+        reportDate: new Date(date.toISOString().split('T')[0])
       }
     });
 

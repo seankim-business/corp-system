@@ -1,0 +1,249 @@
+id: work-instructions
+name: Work Instructions AI
+version: 1.0.0
+description: |
+  작업 주의사항 모듈.
+  디자인 명세서와 소재 정보를 기반으로
+  QC 노트, 작업 주의사항, 품질 체크포인트를 자동 생성합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - production
+  - qc
+  - quality-control
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: work-instructions
+  inputSchema:
+    type: object
+    properties:
+      workOrderArtifactId:
+        type: string
+        description: Reference to Work Order artifact
+      designSpecsArtifactId:
+        type: string
+        description: Reference to Design Automation artifact
+      materialInfoArtifactId:
+        type: string
+        description: Reference to Material Sourcing artifact
+      seasonCode:
+        type: string
+        description: Target season (e.g., 2026SS)
+      productionBatch:
+        type: object
+        properties:
+          batchId:
+            type: string
+            description: Production batch identifier
+          quantity:
+            type: number
+            description: Production quantity
+          factory:
+            type: string
+            description: Production factory name
+      qualityStandards:
+        type: object
+        properties:
+          gradeLevel:
+            type: string
+            enum: [premium, standard, basic]
+            description: Quality grade level
+          inspectionType:
+            type: string
+            enum: [full, sampling, final]
+            description: Inspection method
+          acceptableDefectRate:
+            type: number
+            description: Acceptable defect rate (%)
+    required:
+      - designSpecsArtifactId
+      - materialInfoArtifactId
+
+  outputSchema:
+    type: object
+    properties:
+      qcNotes:
+        type: array
+        items:
+          type: object
+          properties:
+            section:
+              type: string
+              enum: [cutting, sewing, finishing, inspection]
+              description: Production section
+            priority:
+              type: string
+              enum: [critical, high, medium, low]
+            note:
+              type: string
+              description: QC note content
+            checkpoints:
+              type: array
+              items:
+                type: string
+            relatedMaterials:
+              type: array
+              items:
+                type: string
+      warnings:
+        type: array
+        items:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [material, technique, measurement, finishing]
+            severity:
+              type: string
+              enum: [critical, warning, info]
+            title:
+              type: string
+            description:
+              type: string
+            preventiveMeasures:
+              type: array
+              items:
+                type: string
+      qualityCheckpoints:
+        type: array
+        items:
+          type: object
+          properties:
+            stage:
+              type: string
+              enum: [pre-production, in-process, post-production]
+            checkpoint:
+              type: string
+            criteria:
+              type: string
+            tolerance:
+              type: string
+            inspectionMethod:
+              type: string
+      materialHandling:
+        type: object
+        properties:
+          specialCare:
+            type: array
+            items:
+              type: string
+          storageConditions:
+            type: object
+            properties:
+              temperature:
+                type: string
+              humidity:
+                type: string
+              lightExposure:
+                type: string
+          handlingInstructions:
+            type: array
+            items:
+              type: string
+      techniqueGuidelines:
+        type: array
+        items:
+          type: object
+          properties:
+            technique:
+              type: string
+            description:
+              type: string
+            criticalPoints:
+              type: array
+              items:
+                type: string
+            visualReference:
+              type: string
+      measurementSpecs:
+        type: object
+        properties:
+          criticalMeasurements:
+            type: array
+            items:
+              type: object
+              properties:
+                point:
+                  type: string
+                specification:
+                  type: string
+                tolerance:
+                  type: string
+          sizingChart:
+            type: object
+          fitNotes:
+            type: array
+            items:
+              type: string
+
+  requiredInputs:
+    - design-auto  # Requires design specs
+    - material-sourcing  # Requires material information
+  optionalInputs:
+    - work-order  # May reference work order if available
+
+  executorConfig:
+    type: ai-agent
+    agentId: qc-note-generator
+    skillIds:
+      - qc-analysis
+      - warning-generation
+
+components:
+  agents:
+    - id: qc-note-generator
+      configPath: ./agents/qc-note-generator.yaml
+
+  skills:
+    - id: qc-analysis
+      configPath: ./skills/qc-analysis.yaml
+    - id: warning-generation
+      configPath: ./skills/warning-generation.yaml
+
+permissions:
+  - read:artifacts
+  - write:artifacts
+  - execute:workflows
+
+configSchema:
+  type: object
+  properties:
+    defaultQualityGrade:
+      type: string
+      description: Default quality grade level
+      default: standard
+    defaultInspectionRate:
+      type: number
+      description: Default inspection sampling rate (%)
+      default: 10
+    criticalDefectThreshold:
+      type: number
+      description: Critical defect threshold (%)
+      default: 0
+    majorDefectThreshold:
+      type: number
+      description: Major defect threshold (%)
+      default: 2.5
+    minorDefectThreshold:
+      type: number
+      description: Minor defect threshold (%)
+      default: 4.0
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

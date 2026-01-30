@@ -332,20 +332,28 @@ export async function resolveSlackThreadContext(
 export function buildSlackContextPrompt(context: SlackContext): string {
   const parts: string[] = [];
 
-  parts.push("## Current Slack Context");
+  parts.push("## SLACK CONTEXT - READ CAREFULLY");
+  parts.push("");
+  parts.push("You are responding to a Slack message. You have FULL CONTEXT of the conversation.");
   parts.push("");
 
+  // Explicit channel and message info for tools
+  parts.push("### Current Location (USE THESE VALUES FOR TOOLS)");
+  parts.push(`- Channel ID: ${context.channel}`);
   if (context.channelName) {
-    parts.push(`- Channel: #${context.channelName}`);
+    parts.push(`- Channel Name: #${context.channelName}`);
   }
-
-  if (context.userDisplayName || context.userName) {
-    parts.push(`- Current User: ${context.userDisplayName || context.userName} (ID: ${context.userId})`);
-  }
-
+  parts.push(`- Current Message Timestamp: ${context.messageTs}`);
   if (context.threadTs) {
-    parts.push(`- In Thread: Yes (thread_ts: ${context.threadTs})`);
+    parts.push(`- Thread Timestamp: ${context.threadTs}`);
   }
+
+  parts.push("");
+  parts.push("### User Information");
+  if (context.userDisplayName || context.userName) {
+    parts.push(`- User: ${context.userDisplayName || context.userName}`);
+  }
+  parts.push(`- User ID: ${context.userId}`);
 
   parts.push("");
 
@@ -356,6 +364,18 @@ export function buildSlackContextPrompt(context: SlackContext): string {
       maxLength: 3000,
     });
     parts.push(conversationText);
+
+    // Identify user's messages for "my message" references
+    const userMessages = context.threadContext.messages.filter(
+      (m) => m.user === context.userId && !m.isBot
+    );
+    if (userMessages.length > 0) {
+      const lastUserMsg = userMessages[userMessages.length - 1];
+      parts.push("");
+      parts.push(`### User's Last Message (for "my message" reference)`);
+      parts.push(`- Timestamp: ${lastUserMsg.ts}`);
+      parts.push(`- Text: "${lastUserMsg.text}"`);
+    }
   } else if (context.recentMessages && context.recentMessages.length > 0) {
     const conversationText = buildConversationContext(context.recentMessages, {
       maxMessages: 5,
@@ -363,10 +383,29 @@ export function buildSlackContextPrompt(context: SlackContext): string {
     });
     parts.push("### Recent Channel Messages");
     parts.push(conversationText);
+
+    // Identify user's messages
+    const userMessages = context.recentMessages.filter(
+      (m) => m.user === context.userId && !m.isBot
+    );
+    if (userMessages.length > 0) {
+      const lastUserMsg = userMessages[userMessages.length - 1];
+      parts.push("");
+      parts.push(`### User's Last Message (for "my message" reference)`);
+      parts.push(`- Timestamp: ${lastUserMsg.ts}`);
+      parts.push(`- Text: "${lastUserMsg.text}"`);
+    }
   }
 
   parts.push("");
-  parts.push("IMPORTANT: When the user refers to 'my message', 'that message', or similar, use the conversation history above to understand the context.");
+  parts.push("## CRITICAL INSTRUCTIONS - MUST FOLLOW");
+  parts.push("");
+  parts.push("1. **DO NOT ASK QUESTIONS** - You have all the context you need above.");
+  parts.push("2. **ACT IMMEDIATELY** - Use the tools provided to complete the task.");
+  parts.push("3. When user says 'my message' or 'this message' → Use the timestamp from 'User's Last Message' above.");
+  parts.push("4. When user says 'add emoji/reaction' → Use the slack__addReaction tool with channel and timestamp from above.");
+  parts.push("5. **NEVER** say 'I need more information' or 'please specify' - just use the context provided.");
+  parts.push("6. If user asks for emoji without specifying which → default to 'thumbsup' (👍)");
   parts.push("");
 
   return parts.join("\n");

@@ -1,0 +1,260 @@
+id: material-sourcing
+name: Material Sourcing Tips
+version: 1.0.0
+description: |
+  부자재 소싱 팁 모듈.
+  디자인 스펙을 기반으로 소재 리스트와 공급업체 추천,
+  원가 추정 및 리드타임 분석을 제공합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - sourcing
+  - materials
+  - suppliers
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: material-sourcing
+  inputSchema:
+    type: object
+    properties:
+      designArtifactId:
+        type: string
+        description: Reference to Design Automation artifact
+      designSpecifications:
+        type: object
+        properties:
+          materials:
+            type: array
+            items:
+              type: object
+              properties:
+                type:
+                  type: string
+                  description: Material type (e.g., cotton, polyester, wool)
+                quantity:
+                  type: number
+                  description: Required quantity
+                specifications:
+                  type: string
+                  description: Detailed material specs
+          components:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                category:
+                  type: string
+                  enum: [button, zipper, label, trim, elastic, thread]
+                specifications:
+                  type: string
+      targetBudget:
+        type: object
+        properties:
+          targetCost:
+            type: number
+            description: Target material cost per unit
+          currency:
+            type: string
+            default: KRW
+      constraints:
+        type: object
+        properties:
+          leadTimeMax:
+            type: number
+            description: Maximum acceptable lead time in days
+          sustainabilityRequired:
+            type: boolean
+            description: Require sustainable/certified materials
+          preferredSuppliers:
+            type: array
+            items:
+              type: string
+            description: List of preferred supplier IDs
+    required:
+      - designSpecifications
+
+  outputSchema:
+    type: object
+    properties:
+      materialList:
+        type: array
+        items:
+          type: object
+          properties:
+            materialId:
+              type: string
+            materialType:
+              type: string
+            specifications:
+              type: string
+            quantity:
+              type: number
+            unit:
+              type: string
+            recommendations:
+              type: array
+              items:
+                type: object
+                properties:
+                  supplierId:
+                    type: string
+                  supplierName:
+                    type: string
+                  pricePerUnit:
+                    type: number
+                  currency:
+                    type: string
+                  leadTime:
+                    type: number
+                    description: Lead time in days
+                  minimumOrder:
+                    type: number
+                  certifications:
+                    type: array
+                    items:
+                      type: string
+                      enum: [OEKO-TEX, GOTS, BCI, FSC, GRS]
+                  notes:
+                    type: string
+      costEstimate:
+        type: object
+        properties:
+          totalMaterialCost:
+            type: number
+          costBreakdown:
+            type: array
+            items:
+              type: object
+              properties:
+                materialType:
+                  type: string
+                cost:
+                  type: number
+                percentage:
+                  type: number
+          currency:
+            type: string
+          estimatedLeadTime:
+            type: number
+            description: Overall lead time in days
+      supplierSummary:
+        type: array
+        items:
+          type: object
+          properties:
+            supplierId:
+              type: string
+            supplierName:
+              type: string
+            totalValue:
+              type: number
+            reliability:
+              type: string
+              enum: [high, medium, low]
+            deliveryPerformance:
+              type: number
+              description: Historical on-time delivery percentage
+      alternatives:
+        type: array
+        items:
+          type: object
+          properties:
+            scenario:
+              type: string
+            description:
+              type: string
+            costImpact:
+              type: number
+            leadTimeImpact:
+              type: number
+            materialChanges:
+              type: array
+              items:
+                type: object
+      sustainability:
+        type: object
+        properties:
+          certifiedMaterialsPercentage:
+            type: number
+          sustainabilityScore:
+            type: number
+          recommendations:
+            type: array
+            items:
+              type: string
+
+  requiredInputs:
+    - design-auto  # Requires design specs from Design Automation
+  optionalInputs:
+    - work-order   # Can reference work order for quantity info
+
+  executorConfig:
+    type: ai-agent
+    agentId: sourcing-advisor
+    skillIds:
+      - material-analysis
+      - supplier-matching
+
+components:
+  agents:
+    - id: sourcing-advisor
+      configPath: ./agents/sourcing-advisor.yaml
+
+  skills:
+    - id: material-analysis
+      configPath: ./skills/material-analysis.yaml
+    - id: supplier-matching
+      configPath: ./skills/supplier-matching.yaml
+
+permissions:
+  - read:artifacts
+  - read:suppliers
+  - write:artifacts
+  - execute:workflows
+
+configSchema:
+  type: object
+  properties:
+    supplierDatabase:
+      type: object
+      description: Supplier database configuration
+      properties:
+        apiUrl:
+          type: string
+        apiKey:
+          type: string
+          secret: true
+    defaultLeadTimeBuffer:
+      type: number
+      description: Default safety buffer for lead times (days)
+      default: 7
+    costMarkupPercentage:
+      type: number
+      description: Default cost markup for estimation
+      default: 10
+    sustainabilityPriority:
+      type: string
+      enum: [high, medium, low]
+      default: medium
+      description: Default priority for sustainable sourcing
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

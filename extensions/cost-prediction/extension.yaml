@@ -1,0 +1,285 @@
+id: cost-prediction
+name: Cost Prediction AI
+version: 1.0.0
+description: |
+  생산비 예측 모듈.
+  소재비, 인건비, 부자재 등을 분석하여 생산 원가를 예측하고,
+  마진 분석 및 원가 최적화 방안을 제시합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - cost
+  - production
+  - estimation
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: cost-prediction
+  inputSchema:
+    type: object
+    properties:
+      workOrderId:
+        type: string
+        description: Reference to work order from Material Sourcing
+      materials:
+        type: array
+        items:
+          type: object
+          properties:
+            materialId:
+              type: string
+            name:
+              type: string
+            quantity:
+              type: number
+            unit:
+              type: string
+            unitPrice:
+              type: number
+            supplier:
+              type: string
+        description: List of materials required for production
+      laborRates:
+        type: object
+        properties:
+          cutting:
+            type: number
+            description: Labor cost per cutting operation (KRW)
+          sewing:
+            type: number
+            description: Labor cost per sewing operation (KRW)
+          finishing:
+            type: number
+            description: Labor cost per finishing operation (KRW)
+          quality:
+            type: number
+            description: Quality control cost per item (KRW)
+        description: Labor rates by operation type
+      workOrderSpecs:
+        type: object
+        properties:
+          productName:
+            type: string
+          category:
+            type: string
+          complexity:
+            type: string
+            enum: [low, medium, high]
+          estimatedLaborHours:
+            type: number
+          quantity:
+            type: number
+          targetPrice:
+            type: number
+        description: Work order specifications
+      overheadRate:
+        type: number
+        description: Factory overhead rate percentage (default 15%)
+        default: 15
+    required:
+      - materials
+      - laborRates
+      - workOrderSpecs
+
+  outputSchema:
+    type: object
+    properties:
+      costBreakdown:
+        type: object
+        properties:
+          materialCosts:
+            type: object
+            properties:
+              total:
+                type: number
+              breakdown:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    materialId:
+                      type: string
+                    name:
+                      type: string
+                    quantity:
+                      type: number
+                    unitPrice:
+                      type: number
+                    totalCost:
+                      type: number
+          laborCosts:
+            type: object
+            properties:
+              total:
+                type: number
+              breakdown:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    operation:
+                      type: string
+                    hours:
+                      type: number
+                    rate:
+                      type: number
+                    totalCost:
+                      type: number
+          overheadCosts:
+            type: object
+            properties:
+              total:
+                type: number
+              rate:
+                type: number
+              breakdown:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    category:
+                      type: string
+                    cost:
+                      type: number
+          totalProductionCost:
+            type: number
+          unitCost:
+            type: number
+      marginAnalysis:
+        type: object
+        properties:
+          targetPrice:
+            type: number
+          productionCost:
+            type: number
+          targetMargin:
+            type: number
+          actualMargin:
+            type: number
+          profitPerUnit:
+            type: number
+          breakEvenQuantity:
+            type: number
+          marginStatus:
+            type: string
+            enum: [above-target, at-target, below-target, loss]
+      costOptimization:
+        type: array
+        items:
+          type: object
+          properties:
+            category:
+              type: string
+              enum: [material, labor, overhead, design]
+            suggestion:
+              type: string
+            potentialSavings:
+              type: number
+            feasibility:
+              type: string
+              enum: [high, medium, low]
+            impact:
+              type: string
+              enum: [high, medium, low]
+      riskFactors:
+        type: array
+        items:
+          type: object
+          properties:
+            factor:
+              type: string
+            severity:
+              type: string
+              enum: [high, medium, low]
+            description:
+              type: string
+            mitigation:
+              type: string
+      recommendation:
+        type: object
+        properties:
+          decision:
+            type: string
+            enum: [proceed, revise-cost, revise-price, reject]
+          reasoning:
+            type: string
+          actionItems:
+            type: array
+            items:
+              type: string
+
+  requiredInputs:
+    - material-sourcing  # Requires work order and material data
+  optionalInputs:
+    - work-order  # Can use work order specs if available
+
+  executorConfig:
+    type: ai-agent
+    agentId: cost-estimator
+    skillIds:
+      - cost-calculation
+      - margin-analysis
+
+components:
+  agents:
+    - id: cost-estimator
+      configPath: ./agents/cost-estimator.yaml
+
+  skills:
+    - id: cost-calculation
+      configPath: ./skills/cost-calculation.yaml
+    - id: margin-analysis
+      configPath: ./skills/margin-analysis.yaml
+
+permissions:
+  - read:artifacts
+  - read:work-orders
+  - read:material-sourcing
+  - write:artifacts
+  - execute:workflows
+
+configSchema:
+  type: object
+  properties:
+    defaultOverheadRate:
+      type: number
+      description: Default factory overhead rate percentage
+      default: 15
+    defaultTargetMargin:
+      type: number
+      description: Default target margin percentage
+      default: 55
+    currencyCode:
+      type: string
+      description: Currency code for calculations
+      default: KRW
+      enum: [KRW, USD, EUR, CNY]
+    exchangeRates:
+      type: object
+      description: Exchange rates for multi-currency support
+    lowMarginThreshold:
+      type: number
+      description: Threshold for low margin warning
+      default: 45
+    costInflationRate:
+      type: number
+      description: Annual cost inflation rate for projections
+      default: 3.5
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

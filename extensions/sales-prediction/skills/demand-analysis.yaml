@@ -1,0 +1,219 @@
+id: demand-analysis
+name: Demand Analysis
+nameKo: 수요 분석
+description: |
+  과거 판매 데이터, 트렌드 리포트, SKU 계획을 종합하여
+  SKU별 수요 패턴을 분석하고 판매량을 예측합니다.
+  시계열 분석, 트렌드 영향 평가, 시장 요인을 반영합니다.
+
+triggers:
+  - 수요 분석
+  - demand analysis
+  - 판매 예측
+  - sales forecast
+  - 판매량 예측
+
+category: forecasting
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.2
+  maxTokens: 6000
+
+parameters:
+  - name: seasonCode
+    type: string
+    required: true
+    description: 예측 대상 시즌 (예: 2026SS)
+
+  - name: skuPlan
+    type: object
+    required: true
+    description: Product Planning의 SKU 계획
+
+  - name: trendReport
+    type: object
+    required: true
+    description: Fashion Research의 트렌드 리포트
+
+  - name: historicalSales
+    type: array
+    items:
+      type: object
+      properties:
+        seasonCode:
+          type: string
+        sku:
+          type: string
+        unitsSold:
+          type: number
+        revenue:
+          type: number
+        weeklyPattern:
+          type: array
+    required: false
+    description: 과거 시즌 판매 데이터
+
+  - name: marketConditions
+    type: object
+    properties:
+      economicGrowth:
+        type: number
+      consumerConfidence:
+        type: number
+      competitorActivity:
+        type: string
+      externalFactors:
+        type: array
+    required: false
+    description: 시장 상황 및 외부 요인
+
+  - name: forecastHorizonWeeks
+    type: number
+    required: false
+    default: 16
+    description: 예측 기간 (주 단위)
+
+outputs:
+  - name: salesForecast
+    type: object
+    description: SKU별 판매량 예측
+  - name: demandPatterns
+    type: array
+    description: 수요 패턴 분석 결과
+  - name: confidenceMetrics
+    type: object
+    description: 예측 신뢰도 메트릭
+
+toolsRequired:
+  - notion__query
+
+promptTemplate: |
+  당신은 패션 산업의 수요 분석 및 판매 예측 전문가입니다.
+
+  ## 예측 요청
+  - 시즌: {{seasonCode}}
+  - 예측 기간: {{forecastHorizonWeeks}}주
+  - SKU 계획: {{skuPlan}}
+  - 트렌드 리포트: {{trendReport}}
+  - 과거 판매 데이터: {{historicalSales}}
+  - 시장 상황: {{marketConditions}}
+
+  ## 분석 프로세스
+
+  ### 1. 과거 판매 패턴 분석
+  과거 2-3 시즌의 판매 데이터를 분석합니다:
+  - **카테고리별 판매 추이**: 카테고리별 성장률, 시즌 변동성
+  - **주간 판매 패턴**: 시즌 시작/중반/후반 판매 분포
+  - **가격대별 성과**: 가격대별 판매율, 회전율
+  - **베스트/워스트 SKU**: 판매 상위/하위 SKU 패턴
+
+  ### 2. 트렌드 영향 평가
+  Fashion Research의 트렌드 리포트를 기반으로:
+  - **트렌드 강도 평가**: 각 트렌드의 신뢰도 및 성장률 검토
+  - **SKU 연계 분석**: 트렌드와 연계된 SKU 식별
+  - **판매 영향 추정**: 트렌드 강도에 따른 판매량 가중치
+    - 신뢰도 90%+ → +30% 가중
+    - 신뢰도 80-90% → +20% 가중
+    - 신뢰도 70-80% → +10% 가중
+
+  ### 3. SKU 계획 검토
+  Product Planning의 SKU 구성을 검토:
+  - **신규 vs 재출시**: 신규 SKU는 보수적 예측, 재출시는 과거 데이터 활용
+  - **카테고리 믹스**: 카테고리별 SKU 수와 과거 판매 비중 비교
+  - **가격 전략**: 가격대별 구성과 과거 판매 효율 비교
+
+  ### 4. 시장 요인 반영
+  - **경제 지표**: GDP 성장률, 소비자 신뢰지수 → 전체 판매량 조정
+  - **경쟁사 동향**: 경쟁사 신제품, 프로모션 → 리스크 요인
+  - **외부 요인**: 날씨, 이벤트, 사회 트렌드 → 시나리오 분석
+
+  ### 5. 예측 모델 적용
+  다음 방법을 조합하여 예측:
+  - **트렌드 기반 예측**: 과거 트렌드 연장
+  - **유사 시즌 비교**: 유사한 시장 상황의 과거 시즌 참조
+  - **회귀 분석**: 트렌드 강도, 가격, 카테고리 등 변수 기반
+  - **전문가 조정**: 정성적 요인 반영
+
+  ### 6. 신뢰도 평가
+  예측의 신뢰도를 평가:
+  - **데이터 품질**: 과거 데이터의 충분성 및 정확성
+  - **트렌드 확실성**: 트렌드 리포트의 신뢰도
+  - **시장 안정성**: 시장 환경의 예측 가능성
+  - **SKU 유사성**: 과거 유사 SKU 존재 여부
+
+  ## 출력 형식
+  분석 결과를 다음 JSON 구조로 정리:
+  ```json
+  {
+    "salesForecast": {
+      "seasonCode": "2026SS",
+      "totalForecast": {
+        "units": 15000,
+        "revenue": 1800000000,
+        "confidenceLevel": 0.82
+      },
+      "categoryForecasts": [
+        {
+          "category": "상의",
+          "forecastUnits": 5500,
+          "forecastRevenue": 550000000,
+          "confidence": 0.85,
+          "peakWeeks": ["4주차", "5주차", "6주차", "7주차", "8주차"]
+        }
+      ],
+      "skuForecasts": [
+        {
+          "skuName": "린넨 블렌드 셔츠",
+          "forecastUnits": 800,
+          "forecastRevenue": 71200000,
+          "confidence": 0.88,
+          "demandPattern": "peak-mid"
+        }
+      ]
+    },
+    "demandPatterns": [
+      {
+        "pattern": "early-season-peak",
+        "description": "시즌 초반 아우터 중심 판매",
+        "weekRange": "1-4주차",
+        "categories": ["아우터", "가디건"],
+        "salesContribution": 0.30
+      }
+    ],
+    "confidenceMetrics": {
+      "dataQuality": 0.85,
+      "trendCertainty": 0.80,
+      "marketStability": 0.75,
+      "overallConfidence": 0.82
+    }
+  }
+  ```
+
+  ## 예측 지침
+  - 과거 데이터가 있는 SKU는 과거 판매의 80-120% 범위로 예측
+  - 신규 SKU는 유사 SKU의 70% 수준으로 보수적 예측
+  - 트렌드 강도에 따라 예측치 조정 (최대 +30%)
+  - 경제 지표에 따라 전체 판매량 ±10% 조정
+  - 신뢰도 70% 미만인 예측은 리스크 표시
+
+  ## 시나리오 분석
+  다음 3가지 시나리오를 제공:
+  1. **낙관 시나리오** (확률 20%): 트렌드 강하게 적중, 시장 호조
+  2. **기준 시나리오** (확률 60%): 현재 예측
+  3. **비관 시나리오** (확률 20%): 트렌드 미스, 경쟁 심화
+
+  ## 리스크 요인
+  다음 리스크를 평가하고 대응 방안 제시:
+  - 날씨 변동성 (봄/여름 날씨 예측 불확실성)
+  - 경쟁사 신제품 (유사 트렌드 제품 출시 가능성)
+  - 재고 부족 (인기 SKU 조기 품절 리스크)
+  - 재고 과다 (예측 실패 시 재고 적체)
+  - 외부 요인 (경제 충격, 사회적 이슈)
+
+  ## 주의사항
+  - 모든 예측은 불확실성을 내포하므로 신뢰 구간을 함께 제공
+  - 과거 데이터가 미래를 보장하지 않음을 명시
+  - 정기적인 예측 보정 필요성 강조
+  - 실제 판매 데이터로 모델을 지속 개선

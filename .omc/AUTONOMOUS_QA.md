@@ -27,20 +27,23 @@
 
 ## QA/QC Channels
 
-### 1. Browser Testing (Claude in Chrome - MUST USE)
+### 1. Browser Testing (Chrome DevTools MCP - PRIMARY)
 
-> **MANDATORY**: 브라우저 테스트는 무조건 Claude in Chrome 먼저 사용
+> **MANDATORY**: 브라우저 테스트 우선순위
 
-**Claude in Chrome 사용 (기본)**:
+**1순위: Chrome DevTools MCP (설정됨)**:
+- `~/.claude/settings.json`에 `chrome-devtools` MCP 설정됨
+- Node 20.19+ 필요 (`/usr/local/opt/node@20/bin`)
+- 26개 도구: click, fill, navigate, screenshot, network 등
+- 브라우저 자동 실행
 
+**2순위: Claude in Chrome 확장**:
+- `claude --chrome` 으로 실행
 - 유저의 실제 Chrome 프로필 사용
 - 로그인 상태, 쿠키, 세션 유지
-- 모든 브라우저 테스트에 사용
 
-**Playwright MCP 사용 조건**:
-
-- Claude in Chrome 사용 불가능할 때만
-- 또는 명시적으로 격리 환경 요청 시
+**3순위: Playwright MCP (fallback)**:
+- 위 옵션 모두 불가능할 때만 사용
 
 **Test Targets:**
 | URL | Purpose |

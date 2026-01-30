@@ -1,7 +1,7 @@
 /**
  * AR Templates Module
  *
- * Industry templates, team composition, and recommendation engine.
+ * Industry templates, team composition, recommendation engine, and import/export.
  */
 
 export {
@@ -31,3 +31,15 @@ export {
   type RecommendationContext,
   type RecommendationResult,
 } from './recommendation-engine.service';
+
+export {
+  TemplateImportExportService,
+  templateImportExportService,
+  exportTemplateToJson,
+  importTemplateFromJson,
+  type ExportedTemplate,
+  type ImportResult,
+  type ExportResult,
+  type ImportOptions,
+  type ExportOptions,
+} from './template-import-export.service';

@@ -1,0 +1,265 @@
+id: sales-prediction
+name: Sales Prediction AI
+version: 1.0.0
+description: |
+  판매량 예측 및 수요 분석 자동화 모듈.
+  트렌드 데이터와 과거 판매 이력을 분석하여
+  SKU별 수요를 예측하고 재고 계획을 최적화합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - sales
+  - prediction
+  - demand
+  - inventory
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: sales-prediction
+  inputSchema:
+    type: object
+    properties:
+      trendReportArtifactId:
+        type: string
+        description: Reference to Fashion Research artifact
+      skuPlanArtifactId:
+        type: string
+        description: Reference to Product Planning artifact
+      seasonCode:
+        type: string
+        description: Target season (e.g., 2026SS)
+      historicalData:
+        type: object
+        properties:
+          previousSeasons:
+            type: array
+            items:
+              type: string
+            description: Previous season codes to analyze
+          salesDataSource:
+            type: string
+            enum: [erp, notion, csv]
+            description: Source of historical sales data
+      marketConditions:
+        type: object
+        properties:
+          economicIndicators:
+            type: object
+            description: Economic indicators (GDP growth, consumer confidence)
+          competitorActivity:
+            type: object
+            description: Competitor activity data
+          externalFactors:
+            type: array
+            items:
+              type: string
+            description: External factors (weather, events, etc.)
+    required:
+      - seasonCode
+      - skuPlanArtifactId
+
+  outputSchema:
+    type: object
+    properties:
+      salesForecast:
+        type: object
+        properties:
+          seasonCode:
+            type: string
+          totalForecast:
+            type: object
+            properties:
+              units:
+                type: number
+              revenue:
+                type: number
+              confidenceLevel:
+                type: number
+          categoryForecasts:
+            type: array
+            items:
+              type: object
+              properties:
+                category:
+                  type: string
+                forecastUnits:
+                  type: number
+                forecastRevenue:
+                  type: number
+                confidence:
+                  type: number
+                peakWeeks:
+                  type: array
+                  items:
+                    type: string
+          skuForecasts:
+            type: array
+            items:
+              type: object
+              properties:
+                skuName:
+                  type: string
+                forecastUnits:
+                  type: number
+                forecastRevenue:
+                  type: number
+                confidence:
+                  type: number
+                demandPattern:
+                  type: string
+                  enum: [steady, peak-early, peak-mid, peak-late, volatile]
+      demandAnalysis:
+        type: object
+        properties:
+          trendImpact:
+            type: array
+            items:
+              type: object
+              properties:
+                trendName:
+                  type: string
+                expectedImpact:
+                  type: string
+                  enum: [high, medium, low]
+                affectedSKUs:
+                  type: array
+                  items:
+                    type: string
+          seasonalPatterns:
+            type: array
+            items:
+              type: object
+              properties:
+                pattern:
+                  type: string
+                weekRange:
+                  type: string
+                multiplier:
+                  type: number
+          riskFactors:
+            type: array
+            items:
+              type: object
+              properties:
+                factor:
+                  type: string
+                severity:
+                  type: string
+                  enum: [high, medium, low]
+                mitigation:
+                  type: string
+      inventoryRecommendations:
+        type: object
+        properties:
+          initialPurchase:
+            type: array
+            items:
+              type: object
+              properties:
+                skuName:
+                  type: string
+                recommendedQuantity:
+                  type: number
+                safetyStock:
+                  type: number
+                reorderPoint:
+                  type: number
+          replenishmentSchedule:
+            type: array
+            items:
+              type: object
+              properties:
+                week:
+                  type: string
+                skus:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      skuName:
+                        type: string
+                      quantity:
+                        type: number
+          warehouseAllocation:
+            type: array
+            items:
+              type: object
+              properties:
+                location:
+                  type: string
+                skus:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      skuName:
+                        type: string
+                      quantity:
+                        type: number
+
+  requiredInputs:
+    - fashion-research  # Requires trend report
+    - product-planning  # Requires SKU plan
+  optionalInputs: []
+
+  executorConfig:
+    type: ai-agent
+    agentId: demand-forecaster
+    skillIds:
+      - demand-analysis
+      - inventory-planning
+
+components:
+  agents:
+    - id: demand-forecaster
+      configPath: ./agents/demand-forecaster.yaml
+
+  skills:
+    - id: demand-analysis
+      configPath: ./skills/demand-analysis.yaml
+    - id: inventory-planning
+      configPath: ./skills/inventory-planning.yaml
+
+permissions:
+  - read:artifacts
+  - read:sales-data
+  - write:artifacts
+  - execute:workflows
+
+configSchema:
+  type: object
+  properties:
+    confidenceThreshold:
+      type: number
+      description: Minimum confidence level for forecasts
+      default: 0.70
+    historicalSeasonCount:
+      type: number
+      description: Number of past seasons to analyze
+      default: 3
+    safetyStockMultiplier:
+      type: number
+      description: Multiplier for safety stock calculation
+      default: 1.5
+    forecastHorizonWeeks:
+      type: number
+      description: Forecast horizon in weeks
+      default: 16
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

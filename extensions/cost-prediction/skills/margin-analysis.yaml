@@ -1,0 +1,327 @@
+id: margin-analysis
+name: Margin Analysis
+nameKo: 마진 분석
+description: |
+  생산원가와 목표가를 비교하여 수익성을 분석합니다.
+  마진율, 손익분기점, 리스크 요인을 평가하고
+  가격 조정 또는 원가 절감 방안을 제시합니다.
+
+triggers:
+  - 마진 분석
+  - margin analysis
+  - profitability analysis
+  - 수익성 분석
+  - 손익 분석
+  - break even
+
+category: cost-analysis
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.3
+  maxTokens: 4000
+
+parameters:
+  - name: productionCost
+    type: number
+    required: true
+    description: 단위당 생산원가
+
+  - name: targetPrice
+    type: number
+    required: true
+    description: 목표 판매가
+
+  - name: quantity
+    type: number
+    required: true
+    description: 생산 수량
+
+  - name: targetMargin
+    type: number
+    required: false
+    default: 55
+    description: 목표 마진율 (%)
+
+  - name: fixedCosts
+    type: number
+    required: false
+    default: 0
+    description: 고정비 (샘플 제작, 금형비 등)
+
+  - name: marketData
+    type: object
+    required: false
+    description: 시장 데이터 (경쟁사 가격, 시장 평균 등)
+
+outputs:
+  - name: marginAnalysis
+    type: object
+    description: 마진 분석 결과
+  - name: breakEvenAnalysis
+    type: object
+    description: 손익분기점 분석
+  - name: recommendations
+    type: array
+    description: 권장사항
+  - name: riskFactors
+    type: array
+    description: 리스크 요인
+
+toolsRequired: []
+
+promptTemplate: |
+  당신은 패션 제품 수익성 분석 전문가입니다.
+
+  ## 수익성 분석 요청
+  - 단위당 생산원가: {{productionCost}}원
+  - 목표 판매가: {{targetPrice}}원
+  - 생산 수량: {{quantity}}개
+  - 목표 마진율: {{targetMargin}}%
+  - 고정비: {{fixedCosts}}원
+
+  ## 시장 데이터
+  {{marketData}}
+
+  ## 마진 분석 방법론
+
+  ### 1. 기본 마진 계산
+
+  **마진율 (Margin %):**
+  ```
+  Margin % = (Target Price - Unit Cost) / Target Price × 100
+  ```
+
+  **단위당 이익 (Profit per Unit):**
+  ```
+  Profit per Unit = Target Price - Unit Cost
+  ```
+
+  **총 예상 이익 (Total Expected Profit):**
+  ```
+  Total Profit = (Target Price - Unit Cost) × Quantity - Fixed Costs
+  ```
+
+  ### 2. 마진 평가 등급
+
+  | 마진율 | 등급 | 상태 | 조치 |
+  |--------|------|------|------|
+  | 60% 이상 | S | 우수 | 진행 |
+  | 55-59% | A | 목표 달성 | 진행 |
+  | 50-54% | B | 양호 | 진행 (주의) |
+  | 45-49% | C | 낮음 | 검토 필요 |
+  | 40-44% | D | 매우 낮음 | 재검토 |
+  | 40% 미만 | F | 부적합 | 중단/재기획 |
+
+  ### 3. 손익분기점 분석 (Break-Even Analysis)
+
+  **손익분기 수량 (Break-Even Quantity):**
+  ```
+  BEQ = Fixed Costs / (Target Price - Variable Cost per Unit)
+  ```
+
+  **손익분기 가격 (Break-Even Price):**
+  ```
+  BEP = (Total Costs + Target Profit) / Quantity
+  ```
+
+  **안전마진 (Margin of Safety):**
+  ```
+  Safety Margin = (Actual Quantity - BEQ) / Actual Quantity × 100
+  ```
+
+  ### 4. 시나리오 분석
+
+  다음 세 가지 시나리오를 분석하세요:
+
+  **시나리오 A: 현재 가격 유지, 원가 절감**
+  - 필요 원가 절감률 계산
+  - 실현 가능성 평가
+
+  **시나리오 B: 원가 유지, 가격 인상**
+  - 목표 마진 달성 가격 계산
+  - 시장 수용성 평가
+
+  **시나리오 C: 혼합 전략**
+  - 원가 일부 절감 + 가격 소폭 인상
+  - 균형잡힌 접근
+
+  ### 5. 리스크 평가
+
+  다음 리스크를 평가하세요:
+
+  **수익성 리스크:**
+  - [ ] 마진율이 업계 평균(50-55%) 미달
+  - [ ] 손익분기 수량이 생산 수량의 80% 초과
+  - [ ] 고정비 회수 불가능
+  - [ ] 가격 경쟁력 부족
+
+  **시장 리스크:**
+  - [ ] 경쟁사 대비 가격이 20% 이상 높음
+  - [ ] 타겟 고객층의 가격 수용도 초과
+  - [ ] 시장 평균가 대비 비쌈
+
+  **운영 리스크:**
+  - [ ] 원가 상승 가능성 (원자재, 환율)
+  - [ ] 생산 효율 달성 불확실
+  - [ ] 품질 이슈로 인한 재작업 가능성
+
+  ## 출력 형식
+
+  다음 JSON 구조로 상세한 마진 분석을 제공:
+
+  ```json
+  {
+    "marginAnalysis": {
+      "targetPrice": 50000,
+      "productionCost": 40020,
+      "margin": 9980,
+      "marginPercentage": 19.96,
+      "grade": "F",
+      "status": "below-target",
+      "targetMargin": 55,
+      "marginGap": -35.04,
+      "profitPerUnit": 9980,
+      "totalProfit": 999800,
+      "profitMarginStatus": "CRITICAL - Below minimum threshold"
+    },
+    "breakEvenAnalysis": {
+      "breakEvenQuantity": 50,
+      "actualQuantity": 100,
+      "safetyMargin": 50,
+      "breakEvenPrice": 44022,
+      "targetMarginPrice": 88933,
+      "priceRange": {
+        "minimum": 44022,
+        "target": 88933,
+        "current": 50000
+      }
+    },
+    "scenarios": [
+      {
+        "name": "현재 가격 유지 + 원가 절감",
+        "targetPrice": 50000,
+        "requiredCost": 22500,
+        "costReduction": 17520,
+        "costReductionRate": 43.8,
+        "feasibility": "low",
+        "reasoning": "43.8% 원가 절감은 현실적으로 어려움"
+      },
+      {
+        "name": "원가 유지 + 가격 인상",
+        "requiredPrice": 88933,
+        "priceIncrease": 38933,
+        "priceIncreaseRate": 77.9,
+        "feasibility": "low",
+        "reasoning": "78% 가격 인상은 시장 수용 불가능"
+      },
+      {
+        "name": "혼합 전략 (권장)",
+        "targetPrice": 62000,
+        "targetCost": 32000,
+        "priceIncrease": 12000,
+        "costReduction": 8020,
+        "achievableMargin": 48.4,
+        "feasibility": "medium",
+        "reasoning": "24% 가격 인상 + 20% 원가 절감 시 약 48% 마진 가능"
+      }
+    ],
+    "recommendations": [
+      {
+        "priority": "high",
+        "action": "revise-cost",
+        "description": "원가 구조 재검토 및 최소 20% 절감 필요",
+        "expectedImpact": 8000,
+        "timeline": "2-3주"
+      },
+      {
+        "priority": "high",
+        "action": "revise-price",
+        "description": "목표가 조정 검토 (50,000원 → 62,000원)",
+        "expectedImpact": 12000,
+        "timeline": "즉시"
+      },
+      {
+        "priority": "medium",
+        "action": "increase-quantity",
+        "description": "생산 수량 확대로 고정비 분산",
+        "expectedImpact": "마진 2-3% 개선",
+        "timeline": "4주"
+      }
+    ],
+    "riskFactors": [
+      {
+        "factor": "매우 낮은 마진율",
+        "severity": "high",
+        "description": "현재 마진 19.96%는 업계 최소 기준 40% 미달",
+        "impact": "수익성 확보 불가능",
+        "mitigation": "가격 또는 원가 구조 전면 재검토 필수"
+      },
+      {
+        "factor": "가격 경쟁력 부족",
+        "severity": "medium",
+        "description": "목표 마진 달성 시 가격이 시장 평균 대비 높음",
+        "impact": "판매량 감소 우려",
+        "mitigation": "원가 절감 우선, 가격 인상 최소화"
+      },
+      {
+        "factor": "원가 상승 리스크",
+        "severity": "medium",
+        "description": "원자재 가격 변동 시 마진 추가 악화",
+        "impact": "손실 발생 가능성",
+        "mitigation": "소재 계약 단가 고정, 환율 헤지"
+      }
+    ],
+    "decision": {
+      "recommendation": "REVISE-COST-AND-PRICE",
+      "reasoning": "현재 마진 구조로는 수익성 확보 불가능. 원가 20% 절감과 가격 24% 인상을 병행하여 최소 마진 기준 달성 필요.",
+      "nextSteps": [
+        "소재 소싱팀과 원가 절감 방안 협의",
+        "MD팀과 가격 조정 타당성 검토",
+        "대체 디자인/공정 검토",
+        "경쟁사 가격 재조사"
+      ],
+      "approvalRequired": true,
+      "escalateTo": ["md-lead", "cfo"]
+    }
+  }
+  ```
+
+  ## 의사결정 로직
+
+  분석 결과를 기반으로 다음 권고를 제시:
+
+  ### PROCEED (진행)
+  - 마진율 ≥ 50%
+  - 손익분기 수량 < 생산 수량의 60%
+  - 리스크 낮음
+
+  ### REVISE-COST (원가 재검토)
+  - 40% ≤ 마진율 < 50%
+  - 원가 절감으로 목표 달성 가능
+  - 가격 경쟁력 유지 필요
+
+  ### REVISE-PRICE (가격 재설정)
+  - 40% ≤ 마진율 < 50%
+  - 시장이 가격 인상 수용 가능
+  - 브랜드 포지셔닝 일치
+
+  ### REJECT (거부)
+  - 마진율 < 40%
+  - 손익분기 수량 > 생산 수량
+  - 개선 방안 없음
+
+  ## 추가 분석
+
+  필요시 다음 분석도 포함하세요:
+
+  **민감도 분석 (Sensitivity Analysis):**
+  - 가격 ±10% 변동 시 마진 영향
+  - 원가 ±10% 변동 시 마진 영향
+  - 수량 ±20% 변동 시 손익 영향
+
+  **경쟁사 벤치마킹:**
+  - 유사 제품 가격대 비교
+  - 마진율 업계 평균과 비교
+  - 가격 포지셔닝 분석

@@ -3,6 +3,7 @@ import { db as prisma } from "../db/client";
 import { logger } from "./logger";
 import { startDailyBriefingJob, stopDailyBriefingJob } from "../jobs/daily-briefing.job";
 import { runFeedbackAnalysis } from "../jobs/feedback-analysis.job";
+import { arAutoEscalationJob } from "../ar/approval/ar-auto-escalation.job";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -21,6 +22,7 @@ export function startScheduledTasks() {
   scheduleApprovalExpiration();
   startDailyBriefingJob();
   scheduleFeedbackAnalysis();
+  arAutoEscalationJob.start();
   logger.info("Scheduled tasks started");
 }
 
@@ -38,6 +40,7 @@ export function stopScheduledTasks() {
     feedbackAnalysisTimer = null;
   }
   stopDailyBriefingJob();
+  arAutoEscalationJob.stop();
   logger.info("Scheduled tasks stopped");
 }
 

@@ -433,7 +433,7 @@ router.get(
         isActive?: boolean;
       } = { organizationId };
 
-      if (connectionId) where.connectionId = Array.isArray(connectionId) ? connectionId[0] : connectionId;
+      if (connectionId && typeof connectionId === 'string') where.connectionId = connectionId;
       if (type) where.internalType = type as InternalResourceType;
       if (active !== undefined) where.isActive = active === "true";
 
@@ -651,7 +651,7 @@ router.get(
       if (type || connectionId) {
         where.mapping = {};
         if (type) where.mapping.internalType = type;
-        if (connectionId) where.mapping.connectionId = connectionId;
+        if (connectionId) where.mapping.connectionId = Array.isArray(connectionId) ? connectionId[0] : connectionId;
       }
 
       if (cursor) {
@@ -699,7 +699,7 @@ router.get(
         cursor: filteredRecords.length > 0 ? filteredRecords[filteredRecords.length - 1].id : undefined,
       });
     } catch (error) {
-      logger.error("Failed to query resources", { organizationId: req.user?.organizationId }, error);
+      logger.error("Failed to query resources", { organizationId: req.user?.organizationId }, error instanceof Error ? error : undefined);
       return res.status(500).json({ error: "Failed to query resources" });
     }
   }
@@ -720,22 +720,22 @@ router.get(
       const { cursor, limit, status } = req.query;
 
       const mapping = await prisma.resourceMapping.findFirst({
-        where: { id, organizationId },
+        where: { id: id as string, organizationId },
       });
 
       if (!mapping) {
         return res.status(404).json({ error: "Mapping not found" });
       }
 
-      const result = await syncService.getLinkedRecords(id, {
-        cursor: cursor as string | undefined,
-        limit: limit ? parseInt(limit as string, 10) : undefined,
-        status: status as string | undefined,
+      const result = await syncService.getLinkedRecords(id as string, {
+        cursor: typeof cursor === 'string' ? cursor : undefined,
+        limit: limit && typeof limit === 'string' ? parseInt(limit, 10) : undefined,
+        status: typeof status === 'string' ? status : undefined,
       });
 
       return res.json(result);
     } catch (error) {
-      logger.error("Failed to get linked records", { mappingId: req.params.id }, error);
+      logger.error("Failed to get linked records", { mappingId: req.params.id }, error instanceof Error ? error : undefined);
       return res.status(500).json({ error: "Failed to get linked records" });
     }
   }
@@ -756,18 +756,18 @@ router.get(
       const { limit } = req.query;
 
       const mapping = await prisma.resourceMapping.findFirst({
-        where: { id, organizationId },
+        where: { id: id as string, organizationId },
       });
 
       if (!mapping) {
         return res.status(404).json({ error: "Mapping not found" });
       }
 
-      const history = await syncService.getSyncHistory(id, limit ? parseInt(limit as string, 10) : undefined);
+      const history = await syncService.getSyncHistory(id as string, limit && typeof limit === 'string' ? parseInt(limit, 10) : undefined);
 
       return res.json({ history });
     } catch (error) {
-      logger.error("Failed to get sync history", { mappingId: req.params.id }, error);
+      logger.error("Failed to get sync history", { mappingId: req.params.id }, error instanceof Error ? error : undefined);
       return res.status(500).json({ error: "Failed to get sync history" });
     }
   }

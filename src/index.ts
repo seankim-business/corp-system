@@ -84,6 +84,7 @@ import arAnalyticsRoutes from "./ar/api/ar-analytics";
 import identityRoutes from "./api/identity";
 import memberInviteRoutes from "./api/member-invite";
 import resourceRegistryRoutes from "./api/resource-registry";
+import featureRequestsRoutes from "./api/feature-requests";
 // import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
 // import onboardingRoutes from "./api/onboarding";
@@ -547,6 +548,7 @@ app.use("/api/ar/analytics", apiRateLimiter, authenticate, sentryUserContext, ar
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, identityRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memberInviteRoutes);
 app.use("/api/resource-registry", apiRateLimiter, authenticate, sentryUserContext, resourceRegistryRoutes);
+app.use("/api/feature-requests", apiRateLimiter, authenticate, sentryUserContext, featureRequestsRoutes);
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
 app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);

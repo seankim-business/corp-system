@@ -1,0 +1,240 @@
+id: design-auto
+name: Design Auto
+version: 1.0.0
+description: |
+  디자인 자동화 모듈.
+  SKU 계획과 트렌드 데이터를 기반으로
+  디자인 컨셉, 목업, 컬러웨이, 기술 사양을 자동 생성합니다.
+
+author:
+  name: Kyndof Corp
+  email: dev@kyndof.com
+  url: https://kyndof.com
+
+category: mega-app-module
+tags:
+  - fashion
+  - design
+  - automation
+  - mockup
+  - mega-app
+  - value-stream
+
+nubabelVersion: ">=2.0.0"
+
+# Mega App Module Configuration
+megaApp:
+  moduleId: design-auto
+  inputSchema:
+    type: object
+    properties:
+      skuPlanArtifactId:
+        type: string
+        description: Reference to Product Planning SKU plan artifact
+      trendReportArtifactId:
+        type: string
+        description: Reference to Fashion Research trend report artifact (optional)
+      seasonCode:
+        type: string
+        description: Target season (e.g., 2026SS)
+      designBrief:
+        type: object
+        properties:
+          theme:
+            type: string
+            description: Overall design theme
+          brandGuidelines:
+            type: object
+            description: Brand visual guidelines
+          constraints:
+            type: object
+            properties:
+              colorPalette:
+                type: array
+                items:
+                  type: string
+                description: Approved color palette
+              materials:
+                type: array
+                items:
+                  type: string
+                description: Available materials
+              productionLimits:
+                type: object
+                description: Production constraints
+    required:
+      - skuPlanArtifactId
+      - seasonCode
+
+  outputSchema:
+    type: object
+    properties:
+      designs:
+        type: array
+        items:
+          type: object
+          properties:
+            skuId:
+              type: string
+            designConcept:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                inspiration:
+                  type: array
+                  items:
+                    type: string
+                keyFeatures:
+                  type: array
+                  items:
+                    type: string
+            mockups:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [flat-lay, on-model, detail, 3d-render]
+                  url:
+                    type: string
+                  colorway:
+                    type: string
+            colorways:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  colors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        hex:
+                          type: string
+                        pantone:
+                          type: string
+                        placement:
+                          type: string
+            techSpecs:
+              type: object
+              properties:
+                measurements:
+                  type: object
+                  description: Size chart and measurements
+                materials:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      composition:
+                        type: string
+                      placement:
+                        type: string
+                construction:
+                  type: array
+                  items:
+                    type: string
+                  description: Construction details
+                embellishments:
+                  type: array
+                  items:
+                    type: string
+            techDrawings:
+              type: array
+              items:
+                type: object
+                properties:
+                  view:
+                    type: string
+                    enum: [front, back, side, detail]
+                  url:
+                    type: string
+                  annotations:
+                    type: array
+                    items:
+                      type: string
+      designSummary:
+        type: object
+        properties:
+          totalDesigns:
+            type: number
+          designsByCategory:
+            type: object
+          colorwayCount:
+            type: number
+          trendAlignmentScore:
+            type: number
+
+  requiredInputs:
+    - product-planning  # Requires SKU plan from Product Planning
+  optionalInputs:
+    - fashion-research  # Can use trend data for enhanced design
+
+  executorConfig:
+    type: ai-agent
+    agentId: design-generator
+    skillIds:
+      - concept-generation
+      - mockup-rendering
+
+components:
+  agents:
+    - id: design-generator
+      configPath: ./agents/design-generator.yaml
+
+  skills:
+    - id: concept-generation
+      configPath: ./skills/concept-generation.yaml
+    - id: mockup-rendering
+      configPath: ./skills/mockup-rendering.yaml
+
+permissions:
+  - read:artifacts
+  - write:artifacts
+  - execute:workflows
+  - generate:images
+
+configSchema:
+  type: object
+  properties:
+    renderQuality:
+      type: string
+      enum: [draft, preview, production]
+      description: Mockup rendering quality
+      default: preview
+    autoColorwayGeneration:
+      type: boolean
+      description: Automatically generate colorway variations
+      default: true
+    maxColorwaysPerDesign:
+      type: number
+      description: Maximum colorways to generate per design
+      default: 3
+    techDrawingDetail:
+      type: string
+      enum: [basic, detailed, production-ready]
+      description: Level of detail in tech drawings
+      default: detailed
+    imageGenerationProvider:
+      type: string
+      enum: [midjourney, dalle, stable-diffusion]
+      description: Image generation service to use
+      default: stable-diffusion
+
+icon: ./assets/icon.png
+
+i18n:
+  defaultLocale: ko
+  supportedLocales:
+    - ko
+    - en

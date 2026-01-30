@@ -1,0 +1,320 @@
+id: spec-extraction
+name: Specification Extraction
+nameKo: 스펙 추출
+description: |
+  디자인 파일로부터 의류 생산에 필요한 스펙을 자동 추출합니다.
+  치수 포인트, 자재 종류, 봉제 방법, 디테일 등을
+  AI 비전 분석을 통해 식별하고 구조화된 데이터로 변환합니다.
+
+triggers:
+  - 스펙 추출
+  - spec extraction
+  - 디자인 분석
+  - 치수 추출
+  - 자재 추출
+
+category: production
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  maxTokens: 4000
+
+parameters:
+  - name: designFiles
+    type: array
+    items:
+      type: object
+      properties:
+        fileId:
+          type: string
+        fileType:
+          type: string
+        url:
+          type: string
+    required: true
+    description: 분석할 디자인 파일 목록
+
+  - name: garmentType
+    type: string
+    required: false
+    description: 의류 타입 (미제공시 자동 식별)
+    enum:
+      - tops
+      - bottoms
+      - dress
+      - outerwear
+      - accessories
+
+  - name: extractionDepth
+    type: string
+    required: false
+    default: detailed
+    enum:
+      - basic
+      - detailed
+      - comprehensive
+    description: 추출 상세도
+
+outputs:
+  - name: garmentInfo
+    type: object
+    description: 의류 기본 정보 (타입, 카테고리, 주요 특징)
+  - name: measurementPoints
+    type: array
+    description: 측정 포인트 목록
+  - name: materials
+    type: array
+    description: 필요 자재 목록
+  - name: constructionDetails
+    type: object
+    description: 봉제 및 구성 디테일
+  - name: designFeatures
+    type: array
+    description: 주요 디자인 특징 및 디테일
+
+promptTemplate: |
+  당신은 의류 생산 스펙 추출 전문가입니다.
+
+  ## 분석 대상
+  {{#each designFiles}}
+  - File {{@index}}: {{this.fileType}} ({{this.url}})
+  {{/each}}
+
+  {{#if garmentType}}
+  ## 의류 타입: {{garmentType}}
+  {{else}}
+  ## 의류 타입: 자동 식별 필요
+  {{/if}}
+
+  ## 추출 지침
+
+  ### 1. 의류 정보 식별
+  - **Garment Category**: 상의/하의/아우터/원피스/액세서리
+  - **Specific Type**: 블라우스/팬츠/재킷/드레스 등 구체적 타입
+  - **Style Elements**:
+    - Collar Type (칼라 종류)
+    - Sleeve Type (소매 종류)
+    - Closure Method (여밈 방법)
+    - Silhouette (실루엣)
+    - Length (기장)
+  - **Design Features**: 특수 디테일, 장식 요소
+
+  ### 2. 측정 포인트 (POM) 추출
+  의류 타입별 표준 측정 포인트를 식별합니다:
+
+  **상의 (Tops):**
+  - Chest/Bust (가슴둘레)
+  - Length (총장)
+  - Shoulder (어깨)
+  - Sleeve Length (소매길이)
+  - Armhole (진동)
+  - Hem Width (밑단폭)
+  - Collar (칼라 관련 치수)
+  - Cuff (커프스 관련 치수)
+
+  **하의 (Bottoms):**
+  - Waist (허리둘레)
+  - Hip (엉덩이둘레)
+  - Rise (밑위)
+  - Inseam (안솔기)
+  - Outseam (바깥솔기)
+  - Thigh (허벅지둘레)
+  - Knee (무릎둘레)
+  - Leg Opening (밑단둘레)
+
+  **원피스 (Dress):**
+  - 상의 + 하의 측정 포인트 조합
+  - 추가: Waistline Position, Skirt Length
+
+  **아우터 (Outerwear):**
+  - 상의 측정 포인트 + 추가 항목
+  - Back Length (등길이)
+  - Coat Length (코트 길이)
+
+  각 측정 포인트에 대해:
+  - Point Name (측정 포인트명)
+  - Measurement Method (측정 방법)
+  - Critical Level (중요도: critical/important/standard)
+  - Recommended Tolerance (권장 허용오차)
+
+  ### 3. 자재 추출
+
+  **Main Fabric (주자재):**
+  - Fabric Type (직물 종류: woven/knit/non-woven)
+  - Suggested Composition (추정 조성: cotton/polyester/wool 등)
+  - Suggested Weight (추정 중량: g/m²)
+  - Estimated Consumption (추정 소요량)
+  - Special Properties (특수 기능: stretch/waterproof/breathable)
+
+  **Lining (안감):**
+  - Required/Not Required
+  - Lining Type
+  - Estimated Consumption
+
+  **Interlining (심지):**
+  - Required Areas (부착 위치: collar/cuff/placket 등)
+  - Type (soft/medium/hard)
+
+  **Trims & Hardware (부자재):**
+  - Buttons (단추): 개수, 크기, 타입
+  - Zippers (지퍼): 길이, 타입
+  - Elastic (고무줄): 폭, 길이
+  - Ribbons/Tapes (리본/테이프)
+  - Drawstrings (끈)
+  - Snaps/Hooks (스냅/호크)
+  - Labels/Tags (라벨/택)
+
+  ### 4. 봉제 구성 분석
+
+  **Seams & Stitches:**
+  - Main Seam Types (주요 봉제선 종류)
+  - Recommended Stitch Types (권장 스티치: 301/304/504 등)
+  - Special Stitching (특수 봉제: top stitch/blind stitch 등)
+
+  **Construction Method:**
+  - Assembly Sequence (조립 순서)
+  - Seam Allowance (시접: 일반 부위별)
+  - Hem Method (단처리 방법)
+  - Edge Finishing (가장자리 마감)
+
+  **Special Processes:**
+  - Embroidery (자수)
+  - Printing (프린팅)
+  - Washing (워싱)
+  - Pleating (플리츠)
+  - Smocking (스모킹)
+  - Quilting (퀼팅)
+
+  ### 5. 디자인 특징
+
+  **Key Features:**
+  - Unique Design Elements
+  - Decorative Details
+  - Functional Features
+  - Style Points
+
+  **Critical Details:**
+  - Pocket Type & Placement
+  - Panel Lines
+  - Dart Placement
+  - Gathers/Pleats
+
+  ## 추출 상세도: {{extractionDepth}}
+
+  - **basic**: 기본 정보 + 주요 측정 포인트 + 주자재
+  - **detailed**: basic + 부자재 + 봉제 방법
+  - **comprehensive**: detailed + 모든 디테일 + 특수 공정
+
+  ## 출력 형식
+
+  ```json
+  {
+    "garmentInfo": {
+      "category": "tops|bottoms|dress|outerwear|accessories",
+      "specificType": "구체적 타입",
+      "styleElements": {
+        "collar": "칼라 타입",
+        "sleeve": "소매 타입",
+        "closure": "여밈 방법",
+        "silhouette": "실루엣",
+        "length": "기장"
+      },
+      "complexity": "simple|moderate|complex"
+    },
+    "measurementPoints": [
+      {
+        "point": "측정 포인트명",
+        "pointEn": "영문명",
+        "method": "측정 방법",
+        "criticalLevel": "critical|important|standard",
+        "tolerance": "±0.5cm",
+        "notes": "특이사항"
+      }
+    ],
+    "materials": {
+      "mainFabric": {
+        "type": "woven|knit|non-woven",
+        "suggestedComposition": "조성",
+        "suggestedWeight": "중량 (g/m²)",
+        "estimatedConsumption": "소요량",
+        "properties": ["stretch", "waterproof"]
+      },
+      "lining": {
+        "required": true,
+        "type": "안감 종류",
+        "estimatedConsumption": "소요량"
+      },
+      "interlining": {
+        "required": true,
+        "areas": ["collar", "cuff"],
+        "type": "soft|medium|hard"
+      },
+      "trims": [
+        {
+          "item": "buttons",
+          "quantity": "7 pcs",
+          "size": "11mm",
+          "type": "2H shell"
+        }
+      ]
+    },
+    "constructionDetails": {
+      "seams": [
+        {
+          "location": "위치",
+          "stitchType": "301",
+          "description": "설명"
+        }
+      ],
+      "seamAllowance": {
+        "general": "1.0cm",
+        "hem": "1.5cm",
+        "armhole": "1.2cm"
+      },
+      "hemMethod": "단처리 방법",
+      "edgeFinishing": "가장자리 마감 방법",
+      "assemblySequence": [
+        "1단계",
+        "2단계"
+      ],
+      "specialProcesses": [
+        {
+          "process": "embroidery",
+          "location": "위치",
+          "details": "상세"
+        }
+      ]
+    },
+    "designFeatures": [
+      {
+        "feature": "주요 특징",
+        "location": "위치",
+        "description": "설명",
+        "critical": true
+      }
+    ],
+    "qualityPoints": [
+      {
+        "checkpoint": "검수 포인트",
+        "standard": "기준",
+        "tolerance": "허용 오차"
+      }
+    ],
+    "estimatedComplexity": {
+      "level": "simple|moderate|complex|very-complex",
+      "laborMinutes": "예상 작업시간 (분)",
+      "skillLevel": "required|standard|advanced"
+    }
+  }
+  ```
+
+  ## 중요 지침
+  - 보이는 디테일을 정확히 식별합니다
+  - 추정 값은 "estimated", "suggested"로 명시합니다
+  - 확신이 없는 부분은 여러 옵션을 제시합니다
+  - 생산 현장에서 실행 가능한 정보를 제공합니다
+  - 업계 표준 용어를 사용합니다 (영문 병기)
+
+  이제 디자인 파일을 분석하고 스펙을 추출해주세요.

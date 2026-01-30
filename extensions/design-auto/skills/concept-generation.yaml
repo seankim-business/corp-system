@@ -1,0 +1,195 @@
+id: concept-generation
+name: Concept Generation
+nameKo: 디자인 컨셉 생성
+description: |
+  SKU 계획과 트렌드 데이터를 기반으로
+  패션 디자인 컨셉을 자동으로 생성합니다.
+  각 SKU의 디자인 방향, 영감, 주요 특징을 정의합니다.
+
+triggers:
+  - 디자인 컨셉
+  - design concept
+  - 컨셉 생성
+  - concept generation
+  - 디자인 아이디어
+
+category: design
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.7
+  maxTokens: 6000
+
+parameters:
+  - name: skuPlan
+    type: object
+    required: true
+    description: Product Planning SKU 계획 데이터
+
+  - name: trendData
+    type: object
+    required: false
+    description: Fashion Research 트렌드 데이터
+
+  - name: designBrief
+    type: object
+    required: false
+    description: 디자인 브리프 (테마, 브랜드 가이드라인)
+    properties:
+      theme:
+        type: string
+      brandGuidelines:
+        type: object
+      constraints:
+        type: object
+
+  - name: targetSKUs
+    type: array
+    required: false
+    description: 특정 SKU만 선택 (없으면 전체)
+    items:
+      type: string
+
+outputs:
+  - name: concepts
+    type: array
+    description: 생성된 디자인 컨셉 목록
+  - name: conceptSummary
+    type: object
+    description: 컨셉 생성 요약
+
+promptTemplate: |
+  당신은 패션 디자인 컨셉 개발 전문가입니다.
+
+  ## 입력 데이터
+  - SKU 계획: {{skuPlan}}
+  - 트렌드 데이터: {{trendData}}
+  - 디자인 브리프: {{designBrief}}
+  - 대상 SKU: {{targetSKUs}}
+
+  ## 컨셉 생성 프레임워크
+
+  ### 1. 트렌드 매핑
+  각 SKU를 주요 트렌드와 연계:
+  - Quiet Luxury → 미니멀 디자인
+  - Elevated Athleisure → 기능성 캐주얼
+  - Heritage Modern → 클래식 재해석
+  - Y2K Revival → 레트로 감성
+  - Sustainable Chic → 친환경 소재
+
+  ### 2. 카테고리별 접근
+  - **상의**: 실루엣, 네크라인, 소매 디테일
+  - **하의**: 핏, 기장, 디테일
+  - **원피스**: 실루엣, 패턴, 디테일
+  - **아우터**: 구조, 소재, 기능성
+  - **악세서리**: 형태, 소재, 활용성
+
+  ### 3. 컨셉 요소
+  각 디자인 컨셉은 다음을 포함:
+  - **이름**: 디자인 네이밍 (영문/한글)
+  - **설명**: 디자인 컨셉 설명 (2-3문장)
+  - **영감**: 트렌드/문화적 영감 소스
+  - **주요 특징**: 핵심 디자인 요소 (3-5개)
+  - **타겟**: 목표 고객층
+  - **가격 포지셔닝**: 가격대 및 가치 제안
+
+  ### 4. 디자인 원칙
+  - **브랜드 일관성**: 브랜드 아이덴티티 반영
+  - **상업성**: 판매 가능한 디자인
+  - **생산성**: 제작 가능한 구조
+  - **차별화**: 경쟁사 대비 독특함
+  - **트렌드 적합성**: 시즌 트렌드 반영
+
+  ## 출력 형식
+  ```json
+  {
+    "concepts": [
+      {
+        "skuId": "2026SS-TOP-001",
+        "category": "상의",
+        "itemType": "티셔츠",
+        "concept": {
+          "name": "Minimal Relaxed Tee",
+          "nameKo": "미니멀 릴랙스드 티",
+          "description": "프리미엄 데일리 티셔츠로 Quiet Luxury 트렌드를 반영한 미니멀 디자인. 오버사이즈 실루엣과 드롭 숄더로 편안하면서도 세련된 느낌을 연출.",
+          "inspiration": [
+            "Quiet Luxury trend",
+            "Scandinavian minimalism",
+            "Contemporary art simplicity"
+          ],
+          "keyFeatures": [
+            "드롭 숄더 (Drop shoulder)",
+            "오버사이즈 핏 (Oversized fit)",
+            "프리미엄 코튼 소재 (Premium cotton)",
+            "미니멀 디테일 (Minimal detail)",
+            "유니크 네크라인 (Unique neckline)"
+          ],
+          "targetCustomer": {
+            "age": "25-35",
+            "gender": "여성",
+            "lifestyle": "도시적, 미니멀리스트",
+            "values": "품질, 편안함, 심플함"
+          },
+          "pricePositioning": {
+            "targetPrice": 39000,
+            "priceRange": "미드-프리미엄",
+            "valueProposition": "일상 속 럭셔리"
+          }
+        },
+        "trendAlignment": [
+          {
+            "trendName": "Quiet Luxury",
+            "relevance": "high",
+            "implementation": "미니멀 디자인, 고급 소재"
+          }
+        ],
+        "designDirection": {
+          "silhouette": "오버사이즈, 릴랙스드",
+          "details": "미니멀, 언더스테이티드",
+          "materials": "프리미엄 코튼, 내추럴 소재",
+          "colors": "뉴트럴 톤, 어스 컬러"
+        }
+      }
+    ],
+    "conceptSummary": {
+      "totalConcepts": 20,
+      "byCategory": {
+        "상의": 8,
+        "하의": 5,
+        "원피스": 4,
+        "아우터": 3
+      },
+      "trendCoverage": {
+        "Quiet Luxury": 8,
+        "Elevated Athleisure": 7,
+        "Heritage Modern": 3,
+        "Sustainable Chic": 2
+      },
+      "priceDistribution": {
+        "엔트리": 6,
+        "볼륨": 10,
+        "프리미엄": 4
+      }
+    }
+  }
+  ```
+
+  ## 컨셉 생성 가이드라인
+
+  ### 네이밍 규칙
+  - 영문: 형용사 + 명사 조합 (예: Minimal Relaxed Tee)
+  - 한글: 영문 의미 반영 + 아이템명
+
+  ### 설명 작성
+  - 2-3문장으로 간결하게
+  - 컨셉, 트렌드, 특징을 포함
+  - 고객 관점의 가치 제안
+
+  ### 특징 선정
+  - 3-5개의 핵심 디자인 요소
+  - 구체적이고 측정 가능한 특징
+  - 영문 용어 병기
+
+  이제 주어진 SKU 계획과 트렌드 데이터를 바탕으로
+  창의적이고 상업적으로 실현 가능한 디자인 컨셉을 생성하세요.

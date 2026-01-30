@@ -1,0 +1,477 @@
+id: techpack-creation
+name: Tech Pack Creation
+nameKo: 테크팩 생성
+description: |
+  추출된 스펙을 바탕으로 포괄적인 테크팩 문서를 생성합니다.
+  사이즈 차트, 자재 명세서(BOM), 봉제 사양, 품질 기준을 포함한
+  완전한 생산 지침서를 표준 템플릿에 따라 작성합니다.
+
+triggers:
+  - 테크팩 생성
+  - techpack creation
+  - 작업지시서 생성
+  - BOM 생성
+  - 치수표 생성
+
+category: production
+runtimeType: prompt
+
+runtimeConfig:
+  model: claude-sonnet-4-20250514
+  temperature: 0.2
+  maxTokens: 5000
+
+parameters:
+  - name: extractedSpecs
+    type: object
+    required: true
+    description: spec-extraction에서 추출된 스펙 데이터
+
+  - name: seasonCode
+    type: string
+    required: true
+    description: 시즌 코드 (예 2026SS)
+
+  - name: styleNumber
+    type: string
+    required: false
+    description: 스타일 번호 (미제공시 자동 생성)
+
+  - name: sizeRange
+    type: array
+    items:
+      type: string
+      enum: [XS, S, M, L, XL, XXL, FREE]
+    required: false
+    default: [S, M, L]
+    description: 생산할 사이즈 범위
+
+  - name: colorways
+    type: array
+    items:
+      type: string
+    required: false
+    default: []
+    description: 컬러 옵션
+
+  - name: targetPrice
+    type: number
+    required: false
+    description: 목표 소비자가 (KRW)
+
+  - name: materialDatabase
+    type: object
+    required: false
+    description: 자재 데이터베이스 참조 (공급업체, 단가 등)
+
+outputs:
+  - name: techPack
+    type: object
+    description: 완성된 테크팩 문서
+  - name: sizeChart
+    type: object
+    description: 사이즈별 치수표
+  - name: billOfMaterials
+    type: array
+    description: 자재 명세서 (BOM)
+  - name: costEstimate
+    type: object
+    description: 원가 추정
+
+promptTemplate: |
+  당신은 패션 생산 테크팩 작성 전문가입니다.
+
+  ## 입력 데이터
+
+  ### 추출된 스펙
+  ```json
+  {{json extractedSpecs}}
+  ```
+
+  ### 생산 정보
+  - Season: {{seasonCode}}
+  {{#if styleNumber}}
+  - Style Number: {{styleNumber}}
+  {{else}}
+  - Style Number: 자동 생성 필요
+  {{/if}}
+  - Size Range: {{sizeRange}}
+  {{#if colorways}}
+  - Colors: {{colorways}}
+  {{/if}}
+  {{#if targetPrice}}
+  - Target Price: {{targetPrice}} KRW
+  {{/if}}
+
+  ## 테크팩 생성 지침
+
+  ### SECTION 1: GENERAL INFORMATION
+
+  **Style Identification:**
+  - Style Number: {{styleNumber}} (또는 자동 생성: {{seasonCode}}-{{extractedSpecs.garmentInfo.category}}-XXX)
+  - Style Name: [의류명 영문/한글]
+  - Season: {{seasonCode}}
+  - Division: [Men/Women/Kids]
+  - Category: {{extractedSpecs.garmentInfo.category}}
+  - Type: {{extractedSpecs.garmentInfo.specificType}}
+
+  **Color Information:**
+  {{#if colorways}}
+  {{#each colorways}}
+  - Color {{@index}}: {{this}} (Color Code: [자동 생성])
+  {{/each}}
+  {{else}}
+  - To Be Determined
+  {{/if}}
+
+  **Target Market & Price:**
+  - Target Market: [시장]
+  {{#if targetPrice}}
+  - Target Retail Price: {{targetPrice}} KRW
+  - Target FOB: [역산 계산]
+  {{/if}}
+
+  ---
+
+  ### SECTION 2: DESIGN DETAILS
+
+  **Design Description:**
+  [extractedSpecs의 디자인 특징을 바탕으로 상세 설명 작성]
+
+  **Style Features:**
+  {{#with extractedSpecs.garmentInfo.styleElements}}
+  - Collar: {{collar}}
+  - Sleeve: {{sleeve}}
+  - Closure: {{closure}}
+  - Silhouette: {{silhouette}}
+  - Length: {{length}}
+  {{/with}}
+
+  **Key Design Points:**
+  {{#each extractedSpecs.designFeatures}}
+  - {{this.feature}}: {{this.description}}
+  {{/each}}
+
+  **Visual References:**
+  - Front View: [이미지 링크]
+  - Back View: [이미지 링크]
+  - Detail Views: [디테일 이미지들]
+
+  ---
+
+  ### SECTION 3: MEASUREMENTS & SIZE CHART
+
+  **Base Size:** M (모든 그레이딩의 기준)
+
+  **Points of Measure (POM):**
+
+  | POM Code | Measurement Point | How to Measure |
+  |----------|-------------------|----------------|
+  {{#each extractedSpecs.measurementPoints}}
+  | POM-{{@index}} | {{this.point}} | {{this.method}} |
+  {{/each}}
+
+  **Size Chart:**
+
+  사이즈 그레이딩 룰을 적용하여 {{sizeRange}}에 대한 치수표 생성:
+
+  | POM | {{#each sizeRange}}{{this}}{{#unless @last}} | {{/unless}}{{/each}} | Tolerance |
+  |-----|{{#each sizeRange}}-------{{#unless @last}}|{{/unless}}{{/each}}|-----------|
+  {{#each extractedSpecs.measurementPoints}}
+  | {{this.point}} | [그레이딩 적용] | {{this.tolerance}} |
+  {{/each}}
+
+  **Grading Rules:**
+  {{#with extractedSpecs.garmentInfo}}
+  {{#if (eq category "tops")}}
+  - Chest: ±2.0cm per size
+  - Length: ±1.5cm per size
+  - Shoulder: ±0.5cm per size
+  - Sleeve: ±1.0cm per size
+  {{else if (eq category "bottoms")}}
+  - Waist: ±2.5cm per size
+  - Hip: ±2.5cm per size
+  - Inseam: ±1.5cm per size
+  - Outseam: ±2.0cm per size
+  {{else if (eq category "dress")}}
+  - Bust: ±2.0cm per size
+  - Waist: ±2.0cm per size
+  - Hip: ±2.5cm per size
+  - Length: ±2.0cm per size
+  {{else}}
+  - [카테고리별 표준 그레이딩 적용]
+  {{/if}}
+  {{/with}}
+
+  **Measurement Diagram:**
+  [측정 포인트 표시 다이어그램 - 텍스트 설명]
+
+  ---
+
+  ### SECTION 4: MATERIALS SPECIFICATION (BOM)
+
+  **MAIN FABRIC:**
+
+  | Item | Description | Composition | Weight | Width | Color | Consumption per Size |
+  |------|-------------|-------------|--------|-------|-------|---------------------|
+  {{#with extractedSpecs.materials.mainFabric}}
+  | Main Fabric | {{type}} | {{suggestedComposition}} | {{suggestedWeight}} | [표준폭] | [컬러별] | {{#each ../sizeRange}}{{this}}: [계산]{{#unless @last}}, {{/unless}}{{/each}} |
+  {{/with}}
+
+  {{#if extractedSpecs.materials.lining.required}}
+  **LINING:**
+
+  | Item | Description | Composition | Consumption per Size |
+  |------|-------------|-------------|---------------------|
+  | Lining | {{extractedSpecs.materials.lining.type}} | [조성] | {{#each sizeRange}}{{this}}: [계산]{{#unless @last}}, {{/unless}}{{/each}} |
+  {{/if}}
+
+  {{#if extractedSpecs.materials.interlining.required}}
+  **INTERLINING:**
+
+  | Item | Application Area | Type | Size |
+  |------|-----------------|------|------|
+  {{#each extractedSpecs.materials.interlining.areas}}
+  | Interlining | {{this}} | {{../type}} | [크기] |
+  {{/each}}
+  {{/if}}
+
+  **TRIMS & HARDWARE:**
+
+  | Item | Specification | Color | Placement | Quantity per Piece |
+  |------|---------------|-------|-----------|-------------------|
+  {{#each extractedSpecs.materials.trims}}
+  | {{this.item}} | {{this.size}} {{this.type}} | [컬러] | [위치] | {{this.quantity}} |
+  {{/each}}
+
+  **LABELS & PACKAGING:**
+
+  | Item | Specification | Placement | Qty |
+  |------|---------------|-----------|-----|
+  | Main Label | [브랜드 라벨] | Center Back Neck | 1 |
+  | Care Label | [세탁 라벨] | Left Side Seam | 1 |
+  | Size Label | [사이즈 라벨] | [위치] | 1 |
+  | Hang Tag | [행택] | [위치] | 1 |
+  | Polybag | [폴리백 규격] | - | 1 |
+
+  {{#if materialDatabase}}
+  **SUPPLIER INFORMATION:**
+  [materialDatabase를 참조하여 공급업체, 단가 정보 매핑]
+  {{/if}}
+
+  ---
+
+  ### SECTION 5: CONSTRUCTION SPECIFICATION
+
+  **Stitch Types:**
+
+  | Stitch Code | Description | Application |
+  |-------------|-------------|-------------|
+  {{#each extractedSpecs.constructionDetails.seams}}
+  | {{this.stitchType}} | [스티치 설명] | {{this.location}} |
+  {{/each}}
+
+  **Seam Allowance:**
+
+  {{#with extractedSpecs.constructionDetails.seamAllowance}}
+  - General Seams: {{general}}
+  - Hem: {{hem}}
+  {{#if armhole}}
+  - Armhole: {{armhole}}
+  {{/if}}
+  {{/with}}
+
+  **Construction Sequence:**
+
+  {{#each extractedSpecs.constructionDetails.assemblySequence}}
+  {{add @index 1}}. {{this}}
+  {{/each}}
+
+  **Special Construction:**
+
+  {{#each extractedSpecs.constructionDetails.specialProcesses}}
+  - **{{this.process}}**: {{this.details}} at {{this.location}}
+  {{/each}}
+
+  **Hem & Edge Finishing:**
+
+  - Hem Method: {{extractedSpecs.constructionDetails.hemMethod}}
+  - Edge Finishing: {{extractedSpecs.constructionDetails.edgeFinishing}}
+
+  **Critical Construction Points:**
+
+  {{#each extractedSpecs.designFeatures}}
+  {{#if this.critical}}
+  - {{this.feature}} at {{this.location}}: {{this.description}}
+  {{/if}}
+  {{/each}}
+
+  ---
+
+  ### SECTION 6: QUALITY STANDARDS
+
+  **Inspection Points:**
+
+  | Checkpoint | Standard | Tolerance | Critical Level |
+  |------------|----------|-----------|---------------|
+  {{#each extractedSpecs.qualityPoints}}
+  | {{this.checkpoint}} | {{this.standard}} | {{this.tolerance}} | [레벨] |
+  {{/each}}
+
+  **Measurement Tolerance:**
+
+  {{#each extractedSpecs.measurementPoints}}
+  - {{this.point}}: {{this.tolerance}} ({{this.criticalLevel}})
+  {{/each}}
+
+  **Defect Classification:**
+
+  - **Critical Defects**: [리스트]
+    - 치수 오차 초과 (critical points)
+    - 봉제 풀림
+    - 주요 자재 불량
+    - [추가]
+
+  - **Major Defects**: [리스트]
+    - 치수 오차 초과 (important points)
+    - 봉제선 비틀림
+    - 단추 불량
+    - [추가]
+
+  - **Minor Defects**: [리스트]
+    - 실 끝 처리 불량
+    - 경미한 오염
+    - [추가]
+
+  **Acceptance Criteria:**
+  - Critical Defects: 0% allowed
+  - Major Defects: < 2.5% (AQL 2.5)
+  - Minor Defects: < 4.0% (AQL 4.0)
+
+  **Final Inspection:**
+  - 100% measurement check
+  - Visual inspection under standard light
+  - Functional test (buttons, zippers, etc.)
+
+  ---
+
+  ### SECTION 7: COSTING
+
+  **Material Cost Breakdown (Size M, per piece):**
+
+  | Item | Unit Price | Consumption | Total |
+  |------|-----------|-------------|-------|
+  | Main Fabric | [단가]/m | {{extractedSpecs.materials.mainFabric.estimatedConsumption}} | [계산] |
+  {{#if extractedSpecs.materials.lining.required}}
+  | Lining | [단가]/m | {{extractedSpecs.materials.lining.estimatedConsumption}} | [계산] |
+  {{/if}}
+  {{#each extractedSpecs.materials.trims}}
+  | {{this.item}} | [단가] | {{this.quantity}} | [계산] |
+  {{/each}}
+  | Labels & Packaging | - | - | [추정] |
+  | **Subtotal Materials** | | | **[합계]** |
+
+  **Labor Cost Estimate:**
+
+  {{#with extractedSpecs.estimatedComplexity}}
+  - Complexity Level: {{level}}
+  - Estimated Labor Minutes: {{laborMinutes}}
+  - Labor Rate: [공장별 분당 단가]
+  - **Labor Cost**: [계산]
+  {{/with}}
+
+  **Overhead & Margin:**
+
+  - Factory Overhead: [%]
+  - Agent Commission: [%]
+  - Shipping: [추정]
+  - **FOB Cost**: [합계]
+
+  {{#if targetPrice}}
+  **Retail Analysis:**
+
+  - FOB Cost: [계산된 FOB]
+  - Target Retail Price: {{targetPrice}} KRW
+  - Implied Margin: [계산]
+  - Margin %: [계산]
+  {{/if}}
+
+  **Cost Optimization Suggestions:**
+  [원가 절감 가능한 부분 제안]
+
+  ---
+
+  ### SECTION 8: PRODUCTION INFORMATION
+
+  **Lead Time Estimate:**
+
+  - Fabric Sourcing: 10-15 days
+  - Sample Development: 7-10 days
+  - Bulk Production: 25-30 days
+  - **Total Lead Time**: 42-55 days
+
+  **Production Capacity:**
+  - Recommended Factory Type: [공장 타입]
+  - Required Skill Level: {{extractedSpecs.estimatedComplexity.skillLevel}}
+
+  **Special Requirements:**
+  {{#each extractedSpecs.constructionDetails.specialProcesses}}
+  - {{this.process}} capability required
+  {{/each}}
+
+  ---
+
+  ## 출력 형식
+
+  위 템플릿을 바탕으로 완성된 테크팩을 JSON 형식으로 출력:
+
+  ```json
+  {
+    "techPackId": "생성된 ID",
+    "version": "1.0",
+    "styleNumber": "스타일 번호",
+    "seasonCode": "{{seasonCode}}",
+    "garmentName": "의류명",
+    "sections": {
+      "generalInfo": { ... },
+      "designDetails": { ... },
+      "measurements": {
+        "sizeChart": [ ... ],
+        "gradingRules": { ... },
+        "tolerances": { ... }
+      },
+      "materials": {
+        "bom": [ ... ],
+        "suppliers": [ ... ]
+      },
+      "construction": { ... },
+      "qualityStandards": { ... },
+      "costing": {
+        "materialCost": 0,
+        "laborCost": 0,
+        "totalFOB": 0,
+        "breakdown": [ ... ]
+      },
+      "production": { ... }
+    },
+    "attachments": {
+      "images": [ ... ],
+      "diagrams": [ ... ]
+    },
+    "metadata": {
+      "createdAt": "timestamp",
+      "createdBy": "techpack-generator",
+      "status": "draft|approved|in-production"
+    }
+  }
+  ```
+
+  ## 중요 지침
+  - 모든 측정 단위를 명시합니다 (cm, g/m², pcs)
+  - 허용 오차를 명확히 정의합니다
+  - 생산 현장에서 즉시 사용 가능한 수준으로 작성합니다
+  - 모호한 표현을 피하고 구체적으로 기술합니다
+  - 업계 표준 용어를 사용합니다
+  - 비용 추정은 보수적으로 접근합니다
+
+  이제 입력된 스펙을 바탕으로 완전한 테크팩을 생성해주세요.
