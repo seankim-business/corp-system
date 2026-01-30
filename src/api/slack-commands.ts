@@ -11,7 +11,7 @@ import {
   getMCPServer,
   getRecommendedMCPServers,
   getMCPRegistryClient,
-} from "../services/mcp-registry";
+} from "../services/mcp-registry/index";
 
 const router = Router();
 
@@ -185,6 +185,304 @@ async function handleMarketplaceApiKeyCommand(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: Handle MCP server commands
+// ---------------------------------------------------------------------------
+
+async function handleMCPCommand(
+  res: Response,
+  commandText: string,
+): Promise<Response> {
+  const parts = commandText.split(/\s+/);
+  // Format: "mcp <action> [args]"
+  const action = parts[1]?.toLowerCase();
+  const args = parts.slice(2);
+
+  // /nubabel mcp list
+  if (action === "list") {
+    try {
+      const recommended = getRecommendedMCPServers();
+
+      const blocks = [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "*🔌 Recommended MCP Servers*\n\nPopular servers you can install:",
+          },
+        },
+        {
+          type: "divider",
+        },
+      ];
+
+      const grouped: Record<string, typeof recommended> = {};
+      for (const server of recommended) {
+        if (!grouped[server.category]) {
+          grouped[server.category] = [];
+        }
+        grouped[server.category].push(server);
+      }
+
+      for (const [category, servers] of Object.entries(grouped)) {
+        const serverList = servers
+          .map((s: typeof recommended[number]) => `• \`${s.name}\`\n  _${s.description}_`)
+          .join("\n");
+
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*${category.toUpperCase()}*\n${serverList}`,
+          },
+        } as any);
+      }
+
+      blocks.push(
+        {
+          type: "divider",
+        } as any,
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: "Use `/nubabel mcp info <name>` for details • `/nubabel mcp search <query>` to search",
+            },
+          ],
+        } as any,
+      );
+
+      return res.status(200).json({
+        response_type: "ephemeral",
+        blocks,
+      });
+    } catch (error) {
+      logger.error("Failed to list MCP servers", {}, error as Error);
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "❌ Failed to fetch MCP servers. Please try again.",
+      });
+    }
+  }
+
+  // /nubabel mcp search <query>
+  if (action === "search") {
+    const query = args.join(" ");
+    if (!query) {
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Usage: `/nubabel mcp search <query>`\n\nExample: `/nubabel mcp search database`",
+      });
+    }
+
+    try {
+      const result = await searchMCPServers(query, { limit: 10 });
+
+      if (result.servers.length === 0) {
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: `🔍 No MCP servers found matching "${query}"\n\nTry a different search term or use \`/nubabel mcp list\` to see recommended servers.`,
+        });
+      }
+
+      const blocks = [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*🔍 Search Results for "${query}"*\n\nFound ${result.metadata.count} server(s):`,
+          },
+        },
+        {
+          type: "divider",
+        },
+      ];
+
+      for (const { server, _meta } of result.servers.slice(0, 5)) {
+        const description = server.description || "No description available";
+        const status = _meta.status === "active" ? "✅" : _meta.status === "deprecated" ? "⚠️" : "📦";
+
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `${status} *\`${server.name}\`* v${server.version}\n${description}`,
+          },
+        } as any);
+      }
+
+      if (result.servers.length > 5) {
+        blocks.push({
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: `Showing 5 of ${result.metadata.count} results`,
+            },
+          ],
+        } as any);
+      }
+
+      blocks.push(
+        {
+          type: "divider",
+        } as any,
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: "Use `/nubabel mcp info <name>` for installation details",
+            },
+          ],
+        } as any,
+      );
+
+      return res.status(200).json({
+        response_type: "ephemeral",
+        blocks,
+      });
+    } catch (error) {
+      logger.error("Failed to search MCP servers", { query }, error as Error);
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: `❌ Failed to search for "${query}". Please try again.`,
+      });
+    }
+  }
+
+  // /nubabel mcp info <name>
+  if (action === "info") {
+    const name = args.join(" ");
+    if (!name) {
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: "Usage: `/nubabel mcp info <name>`\n\nExample: `/nubabel mcp info @anthropic/mcp-server-git`",
+      });
+    }
+
+    try {
+      const result = await getMCPServer(name);
+
+      if (!result) {
+        return res.status(200).json({
+          response_type: "ephemeral",
+          text: `❌ Server "${name}" not found in registry.\n\nUse \`/nubabel mcp search <query>\` to find servers.`,
+        });
+      }
+
+      const { server, _meta } = result;
+      const client = getMCPRegistryClient();
+      const installCmd = client.generateInstallCommand(server);
+      const config = client.generateClaudeConfig(server);
+
+      const statusEmoji = _meta.status === "active" ? "✅" : _meta.status === "deprecated" ? "⚠️" : "📦";
+      const description = server.description || "No description available";
+
+      const blocks = [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `${statusEmoji} *\`${server.name}\`*\nVersion: ${server.version}\n\n${description}`,
+          },
+        },
+        {
+          type: "divider",
+        },
+      ];
+
+      // Repository link
+      if (server.repository) {
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*📦 Repository*\n<${server.repository}|${server.repository}>`,
+          },
+        } as any);
+      }
+
+      // Installation
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*🛠️ Installation*\n\`\`\`${installCmd}\`\`\``,
+        },
+      } as any);
+
+      // Claude Desktop config
+      if (Object.keys(config).length > 0) {
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*⚙️ Claude Desktop Config*\n\`\`\`json\n${JSON.stringify({ [server.name]: config }, null, 2)}\`\`\``,
+          },
+        } as any);
+      }
+
+      // Environment variables
+      const envVars = server.packages[0]?.environment_variables || [];
+      if (envVars.length > 0) {
+        const envList = envVars
+          .map((env: { name: string; description?: string; required?: boolean }) => {
+            const required = env.required ? " *(required)*" : " _(optional)_";
+            const desc = env.description ? `\n  ${env.description}` : "";
+            return `• \`${env.name}\`${required}${desc}`;
+          })
+          .join("\n");
+
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*🔐 Environment Variables*\n${envList}`,
+          },
+        } as any);
+      }
+
+      // Metadata
+      blocks.push(
+        {
+          type: "divider",
+        } as any,
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: `Status: ${_meta.status} • Updated: ${new Date(_meta.updatedAt).toLocaleDateString()}`,
+            },
+          ],
+        } as any,
+      );
+
+      return res.status(200).json({
+        response_type: "ephemeral",
+        blocks,
+      });
+    } catch (error) {
+      logger.error("Failed to get MCP server info", { name }, error as Error);
+      return res.status(200).json({
+        response_type: "ephemeral",
+        text: `❌ Failed to fetch info for "${name}". Please try again.`,
+      });
+    }
+  }
+
+  // Unknown action
+  return res.status(200).json({
+    response_type: "ephemeral",
+    text: `Unknown MCP command. Available actions:
+• \`/nubabel mcp list\` — Show recommended servers
+• \`/nubabel mcp search <query>\` — Search for servers
+• \`/nubabel mcp info <name>\` — Get server details`,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // POST /api/slack/commands  -  Slash command handler (/nubabel)
 // ---------------------------------------------------------------------------
 
@@ -276,6 +574,11 @@ router.post("/commands", async (req: Request, res: Response) => {
 • \`/nubabel status\` — Bot status & usage
 • \`/nubabel whoami\` — Your user info
 
+*MCP Servers:*
+• \`/nubabel mcp list\` — Show recommended servers
+• \`/nubabel mcp search <query>\` — Search for servers
+• \`/nubabel mcp info <name>\` — Get server details
+
 *Settings:*
 • \`/nubabel marketplace apikey list\` — List API keys
 • \`/nubabel marketplace apikey set <source> <key>\` — Set API key
@@ -299,6 +602,11 @@ Sources: smithery, civitai, langchain`,
 • \`/nubabel help\` — Show this help
 • \`/nubabel status\` — Bot status & usage
 • \`/nubabel whoami\` — Your user info
+
+*MCP Servers:*
+• \`/nubabel mcp list\` — Show recommended servers
+• \`/nubabel mcp search <query>\` — Search for servers
+• \`/nubabel mcp info <name>\` — Get server details
 
 *Settings:*
 • \`/nubabel marketplace apikey list\` — List API keys
@@ -383,6 +691,10 @@ scheduleMessage, createChannel, inviteToChannel, kickFromChannel, setChannelTopi
 
     if (trimmedCommand.startsWith("marketplace apikey")) {
       return handleMarketplaceApiKeyCommand(res, commandText.trim(), organizationId);
+    }
+
+    if (trimmedCommand.startsWith("mcp ")) {
+      return handleMCPCommand(res, commandText.trim());
     }
 
     const sessionId = crypto.randomUUID();

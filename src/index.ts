@@ -90,18 +90,18 @@ import featureRequestsRoutes from "./api/feature-requests";
 import { notionWebhooksRouter } from "./api/notion-webhooks";
 import codeOpsRoutes from "./api/code-ops";
 // import agentSessionsRoutes from "./api/agent-sessions";
-// import costsRoutes from "./api/costs";
+import costsRoutes from "./api/costs";
 // import onboardingRoutes from "./api/onboarding";
 // import errorManagementRoutes from "./api/error-management";
 // import agentAdminRoutes from "./api/agent-admin";
 // import optimizationRoutes from "./api/optimization";
-// import patternsRoutes from "./api/patterns";
-// import feedbackRoutes from "./api/feedback";
-// import memoryRoutes from "./api/memory";
-// import knowledgeGraphRoutes from "./api/knowledge-graph";
+import patternsRoutes from "./api/patterns";
+import feedbackRoutes from "./api/feedback";
+import memoryRoutes from "./api/memory";
+import knowledgeGraphRoutes from "./api/knowledge-graph";
 // import ragRoutes from "./api/rag";
 // import alertsRoutes from "./api/alerts";
-// import analyticsRoutes from "./api/analytics";
+import analyticsRoutes from "./api/analytics";
 // import metaAgentRoutes from "./api/meta-agent";
 // import billingRoutes from "./api/billing";
 // import stripeWebhookRoutes from "./api/stripe-webhook";
@@ -126,6 +126,7 @@ import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
 // import { createHealthDashboardRouter } from "./api/health-dashboard";
 import healthAnthropicRouter from "./api/health-anthropic";
+import mcpServersRouter from "./api/mcp-servers";
 
 logger.info("Initializing Nubabel Platform", {
   nodeVersion: process.version,
@@ -566,16 +567,16 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, claudeConnectRo
 // Public endpoint for receiving tokens from claude.ai (no auth required)
 app.use("/api", webhookRateLimiter, claudeConnectPublicRouter);
 // app.use("/api/admin/accounts", apiRateLimiter, authenticate, sentryUserContext, accountsRouter);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
 // app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, conversationsRouter);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, feedbackRoutes);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, patternsRoutes);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memoryRoutes);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, knowledgeGraphRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, feedbackRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, patternsRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memoryRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, knowledgeGraphRoutes);
 // app.use("/api/rag", apiRateLimiter, authenticate, sentryUserContext, ragRoutes);
 // app.use("/api/alerts", apiRateLimiter, authenticate, sentryUserContext, alertsRoutes);
-// app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, analyticsRoutes);
 // app.use("/api/meta-agent", apiRateLimiter, authenticate, sentryUserContext, metaAgentRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, onboardingRoutes);
 // app.use("/api/billing", apiRateLimiter, authenticate, sentryUserContext, billingRoutes);
@@ -587,6 +588,13 @@ app.use(
   authenticate,
   sentryUserContext,
   marketplaceHubRoutes,
+);
+app.use(
+  "/api/mcp",
+  apiRateLimiter,
+  authenticate,
+  sentryUserContext,
+  mcpServersRouter,
 );
 
 // Public API v1 (external developer access with API key auth)

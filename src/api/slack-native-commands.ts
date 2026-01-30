@@ -21,10 +21,11 @@ export interface CommandContext {
   userId: string;
   channelId: string;
   threadTs?: string;
-  organizationId: string;
-  sessionId: string;
+  organizationId?: string;  // Optional - not always available for native commands
+  sessionId?: string;       // Optional - not always available for native commands
   args: string[];
   client: WebClient;
+  say?: (msg: string | { text: string; thread_ts?: string }) => Promise<any>; // For responses
 }
 
 export interface CommandResponse {
@@ -83,8 +84,10 @@ const commands: NativeCommand[] = [
     description: "Show current session status",
     usage: "/nubabel status",
     handler: async (ctx) => {
-      const prefs = await getPreferences(ctx.sessionId);
-      const sessionData = await redis.get(`session:${ctx.sessionId}`);
+      // Use channelId as fallback session key when sessionId not available
+      const sessionKey = ctx.sessionId || ctx.channelId;
+      const prefs = await getPreferences(sessionKey);
+      const sessionData = await redis.get(`session:${sessionKey}`);
 
       let sessionInfo = "No active session";
       if (sessionData) {
@@ -95,9 +98,13 @@ const commands: NativeCommand[] = [
         } catch {}
       }
 
+      const sessionIdDisplay = ctx.sessionId
+        ? `\`${ctx.sessionId.substring(0, 12)}...\``
+        : "_Not yet assigned_";
+
       return {
         text: `*Session Status* 📊\n\n` +
-          `*Session ID:* \`${ctx.sessionId.substring(0, 12)}...\`\n` +
+          `*Session ID:* ${sessionIdDisplay}\n` +
           `*Channel:* <#${ctx.channelId}>\n` +
           `*Thinking Level:* ${prefs.thinkingLevel}\n` +
           `*Verbose Mode:* ${prefs.verboseMode ? "On" : "Off"}\n\n` +
@@ -112,9 +119,12 @@ const commands: NativeCommand[] = [
     description: "Start a new conversation",
     usage: "/nubabel reset",
     handler: async (ctx) => {
+      // Use channelId as fallback session key
+      const sessionKey = ctx.sessionId || ctx.channelId;
+
       // Clear session data
-      await redis.del(`session:${ctx.sessionId}`);
-      await redis.del(`session:state:${ctx.sessionId}`);
+      await redis.del(`session:${sessionKey}`);
+      await redis.del(`session:state:${sessionKey}`);
 
       return {
         text: `✨ *Conversation reset!*\n\nStarting fresh. How can I help you?`,
@@ -130,9 +140,10 @@ const commands: NativeCommand[] = [
     handler: async (ctx) => {
       const level = ctx.args[0]?.toLowerCase();
       const validLevels = ["brief", "normal", "detailed"];
+      const sessionKey = ctx.sessionId || ctx.channelId;
 
       if (!level || !validLevels.includes(level)) {
-        const prefs = await getPreferences(ctx.sessionId);
+        const prefs = await getPreferences(sessionKey);
         return {
           text: `*Current thinking level:* ${prefs.thinkingLevel}\n\n` +
             `Usage: \`/nubabel think [brief|normal|detailed]\`\n\n` +
@@ -143,7 +154,7 @@ const commands: NativeCommand[] = [
         };
       }
 
-      await setPreferences(ctx.sessionId, {
+      await setPreferences(sessionKey, {
         thinkingLevel: level as "brief" | "normal" | "detailed"
       });
 
@@ -161,7 +172,8 @@ const commands: NativeCommand[] = [
     usage: "/nubabel verbose [on|off]",
     handler: async (ctx) => {
       const arg = ctx.args[0]?.toLowerCase();
-      const prefs = await getPreferences(ctx.sessionId);
+      const sessionKey = ctx.sessionId || ctx.channelId;
+      const prefs = await getPreferences(sessionKey);
 
       let newValue: boolean;
       if (arg === "on" || arg === "true" || arg === "1") {
@@ -173,7 +185,7 @@ const commands: NativeCommand[] = [
         newValue = !prefs.verboseMode;
       }
 
-      await setPreferences(ctx.sessionId, { verboseMode: newValue });
+      await setPreferences(sessionKey, { verboseMode: newValue });
 
       return {
         text: `🔧 Verbose mode is now *${newValue ? "ON" : "OFF"}*`,
@@ -187,8 +199,10 @@ const commands: NativeCommand[] = [
     description: "Show token usage for current session",
     usage: "/nubabel usage",
     handler: async (ctx) => {
+      // Use channelId as fallback session key
+      const sessionKey = ctx.sessionId || ctx.channelId;
       // Get usage data from Redis or database
-      const usageKey = `usage:session:${ctx.sessionId}`;
+      const usageKey = `usage:session:${sessionKey}`;
       const usageData = await redis.get(usageKey);
 
       let usage = { inputTokens: 0, outputTokens: 0, cost: 0, requests: 0 };
