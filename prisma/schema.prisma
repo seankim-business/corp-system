@@ -1245,6 +1245,7 @@ model MarketplaceExtension {
   dependencies  String[] @default([]) @db.VarChar(100)
   toolsRequired String[] @default([]) @map("tools_required") @db.VarChar(100)
   mcpProviders  String[] @default([]) @map("mcp_providers") @db.VarChar(50)
+  megaAppConfig Json?    @map("mega_app_config") @db.JsonB // MegaApp module configuration
 
   publisherId String? @map("publisher_id") @db.Uuid
   isPublic    Boolean @default(false) @map("is_public")
@@ -3431,11 +3432,27 @@ model FeatureRequest {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  embedding    FeatureRequestEmbedding?
 
   @@index([organizationId, status])
   @@index([organizationId, priority])
   @@index([relatedModules])
   @@map("feature_requests")
+}
+
+/// Feature Request Embeddings (Vector embeddings for semantic similarity)
+model FeatureRequestEmbedding {
+  id               String   @id @default(uuid()) @db.Uuid
+  featureRequestId String   @unique @map("feature_request_id") @db.Uuid
+  embedding        Float[]  // Vector embedding array
+  contentHash      String   @map("content_hash") @db.VarChar(50)
+  generatedAt      DateTime @default(now()) @map("generated_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  featureRequest FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+
+  @@index([generatedAt])
+  @@map("feature_request_embeddings")
 }
 
 /// Mega App Agent Teams (Hierarchical agent organization - different from core Team)

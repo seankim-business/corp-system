@@ -9,6 +9,8 @@ import { emitJobProgress, PROGRESS_STAGES, PROGRESS_PERCENTAGES } from "../event
 import { runWithContext } from "../utils/async-context";
 import { markMessageComplete } from "../api/slack";
 import { prepareSlackMessages } from "../utils/slack-format";
+import { clearAgentStatus } from "../utils/slack-agent-status";
+import { appendFeedbackBlocks } from "../utils/slack-feedback-blocks";
 
 export class NotificationWorker extends BaseWorker<NotificationData> {
   constructor() {
@@ -81,6 +83,13 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
       // Get the progress message timestamp if it exists
       const { redis } = await import("../db/redis");
       const progressTs = await redis.get(`slack:progress:${eventId}`);
+      const indicatorType = await redis.get(`slack:indicator_type:${eventId}`);
+      const threadTsForStatus = await redis.get(`slack:thread_ts:${eventId}`);
+
+      // Clear agent status if it was used (Slack auto-clears on message, but explicit is safer)
+      if (indicatorType === "agent-status" && threadTsForStatus) {
+        await clearAgentStatus(slackClient, channel, threadTsForStatus);
+      }
 
       // Prepare chunked messages
       const messages = prepareSlackMessages(text, {
@@ -89,6 +98,7 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
       });
 
       let firstMessageTs: string | undefined;
+      let lastMessageTs: string | undefined;
 
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i];
@@ -103,6 +113,7 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
               blocks: msg.blocks,
             });
             firstMessageTs = updateResult.ts;
+            lastMessageTs = updateResult.ts;
 
             // Delete progress key since we've updated it
             await redis.del(`slack:progress:${eventId}`);
@@ -118,6 +129,7 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
               blocks: msg.blocks,
             });
             firstMessageTs = postResult.ts;
+            lastMessageTs = postResult.ts;
           }
         } else {
           // Post subsequent chunks or first message if no progress message
@@ -131,6 +143,33 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
           if (i === 0) {
             firstMessageTs = result.ts;
           }
+          lastMessageTs = result.ts;
+        }
+      }
+
+      // Add feedback buttons to the last message (after all chunks sent)
+      if (lastMessageTs && messages.length > 0) {
+        try {
+          // Create blocks with feedback buttons appended
+          const lastMsg = messages[messages.length - 1];
+          const blocksWithFeedback = appendFeedbackBlocks(
+            lastMsg.blocks,
+            eventId,
+            "minimal",
+          );
+
+          // Update the last message to include feedback buttons
+          await slackClient.chat.update({
+            channel,
+            ts: lastMessageTs,
+            text: lastMsg.text,
+            blocks: blocksWithFeedback as any,
+          });
+        } catch (feedbackError) {
+          // Don't fail the notification if feedback buttons fail
+          logger.debug("Could not add feedback buttons", {
+            error: feedbackError instanceof Error ? feedbackError.message : String(feedbackError),
+          });
         }
       }
 
@@ -147,6 +186,10 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
           await redis.del(`slack:original_ts:${eventId}`);
         }
       }
+
+      // Clean up indicator type Redis keys
+      await redis.del(`slack:indicator_type:${eventId}`);
+      await redis.del(`slack:thread_ts:${eventId}`);
 
       await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);
       await emitJobProgress(

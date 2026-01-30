@@ -94,14 +94,14 @@ describe('slack-format utilities', () => {
 
   describe('markdownToSlackMrkdwn', () => {
     it('should convert bold markdown to Slack format', () => {
-      // Note: Current implementation has bug where **bold** -> *bold* -> _bold_
-      // This test documents current behavior, not desired behavior
-      expect(markdownToSlackMrkdwn('**bold**')).toBe('_bold_');
-      expect(markdownToSlackMrkdwn('__bold__')).toBe('_bold_');
+      expect(markdownToSlackMrkdwn('**bold**')).toBe('*bold*');
+      expect(markdownToSlackMrkdwn('__bold__')).toBe('*bold*');
     });
 
-    it('should convert italic markdown to Slack format', () => {
-      expect(markdownToSlackMrkdwn('*italic*')).toBe('_italic_');
+    it('should preserve single asterisks as Slack bold', () => {
+      // Note: Single asterisks *text* are left as-is, which is Slack's bold format
+      // Markdown italic is not supported - use _text_ for Slack italic if needed
+      expect(markdownToSlackMrkdwn('*italic*')).toBe('*italic*');
     });
 
     it('should convert strikethrough', () => {
@@ -119,8 +119,7 @@ describe('slack-format utilities', () => {
     it('should preserve Slack mentions', () => {
       const text = 'Hello <@U12345> and <#C12345>';
       const result = markdownToSlackMrkdwn(text);
-      // Note: Current implementation leaves placeholders - bug
-      expect(result).toMatch(/_SLACK_TOKEN_\d+_/);
+      expect(result).toBe('Hello <@U12345> and <#C12345>');
     });
 
     it('should handle code blocks', () => {
@@ -135,16 +134,16 @@ describe('slack-format utilities', () => {
     it('should handle complex markdown', () => {
       const md = '**Bold** and ~~strike~~ with [link](https://example.com)';
       const result = markdownToSlackMrkdwn(md);
-      expect(result).toContain('_Bold_'); // Bug: **text** becomes _text_
+      expect(result).toContain('*Bold*');
       expect(result).toContain('~strike~');
       expect(result).toContain('<https://example.com|link>');
     });
 
-    it('should handle mixed bold and italic', () => {
-      const md = '**bold** and *italic*';
+    it('should handle mixed bold formats', () => {
+      const md = '**bold** and *also-bold*';
       const result = markdownToSlackMrkdwn(md);
-      expect(result).toContain('_bold_'); // Bug: **bold** becomes _bold_
-      expect(result).toContain('_italic_');
+      expect(result).toContain('*bold*');
+      expect(result).toContain('*also-bold*');
     });
 
     it('should escape angle brackets that are not Slack tokens', () => {
@@ -157,21 +156,20 @@ describe('slack-format utilities', () => {
     it('should preserve Slack channel mentions', () => {
       const text = '<#C12345|general>';
       const result = markdownToSlackMrkdwn(text);
-      // Note: Current implementation has token restoration bug
-      expect(result).toMatch(/_SLACK_TOKEN_\d+_/);
+      expect(result).toBe('<#C12345|general>');
     });
 
     it('should preserve Slack special link format', () => {
       const text = '<!here> and <!everyone>';
       const result = markdownToSlackMrkdwn(text);
-      // Note: Current implementation has token restoration bug
-      expect(result).toMatch(/_SLACK_TOKEN_\d+_/);
+      expect(result).toBe('<!here> and <!everyone>');
     });
 
     it('should handle nested formatting', () => {
-      const md = '**bold with *italic* inside**';
+      const md = '**bold with *inner* inside**';
       const result = markdownToSlackMrkdwn(md);
-      expect(result).toBe('_bold with _italic_ inside_'); // Bug: **text** becomes _text_
+      // Both ** and * convert to Slack bold *text*
+      expect(result).toBe('*bold with *inner* inside*');
     });
 
     it('should handle multiple links', () => {
@@ -221,7 +219,7 @@ describe('slack-format utilities', () => {
 
     it('should convert markdown in blocks', () => {
       const blocks = formatResponseBlocks('**bold** text');
-      expect(blocks[0].text.text).toContain('_bold_'); // Bug: **text** becomes _text_
+      expect(blocks[0].text.text).toContain('*bold*');
     });
 
     it('should handle text exactly at 3000 char boundary', () => {
@@ -269,7 +267,9 @@ describe('slack-format utilities', () => {
 
     it('should handle empty text', () => {
       const messages = prepareSlackMessages('', { channel: 'C123' });
-      expect(messages).toHaveLength(0);
+      expect(messages).toHaveLength(1);
+      expect(messages[0].channel).toBe('C123');
+      expect(messages[0].text).toBe('');
     });
 
     it('should include blocks in each message', () => {
@@ -280,7 +280,7 @@ describe('slack-format utilities', () => {
 
     it('should convert markdown in messages', () => {
       const messages = prepareSlackMessages('**bold**', { channel: 'C123' });
-      expect(messages[0].text).toContain('_bold_'); // Bug: **text** becomes _text_
+      expect(messages[0].text).toContain('*bold*');
     });
 
     it('should set channel for all chunks', () => {
@@ -343,9 +343,8 @@ describe('slack-format utilities', () => {
       const messages = prepareSlackMessages(text, { channel: 'C123' });
 
       expect(messages).toHaveLength(1);
-      // Note: Token restoration bug - placeholders remain
-      expect(messages[0].text).toMatch(/_SLACK_TOKEN_\d+_/);
-      expect(messages[0].text).toContain('_this_'); // Bug: **text** becomes _text_
+      expect(messages[0].text).toContain('<@U12345>');
+      expect(messages[0].text).toContain('*this*');
       expect(messages[0].text).toContain('~soon~');
       expect(messages[0].text).toContain('<https://example.com|link>');
     });
@@ -426,8 +425,8 @@ describe('slack-format utilities', () => {
     it('should handle multiple consecutive formatting markers', () => {
       const text = '**bold** **another bold** ~~strike~~ ~~another~~';
       const result = markdownToSlackMrkdwn(text);
-      expect(result).toContain('_bold_'); // Bug: **text** becomes _text_
-      expect(result).toContain('_another bold_'); // Bug: **text** becomes _text_
+      expect(result).toContain('*bold*');
+      expect(result).toContain('*another bold*');
       expect(result).toContain('~strike~');
       expect(result).toContain('~another~');
     });

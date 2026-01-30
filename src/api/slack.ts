@@ -19,6 +19,7 @@ import {
   handleFeatureRequestMention,
   handleFeatureRequestReaction,
 } from "./slack-feature-requests";
+import { setProcessingIndicator } from "../utils/slack-agent-status";
 
 let slackApp: App | null = null;
 
@@ -348,6 +349,21 @@ function setupEventHandlers(app: App): void {
       // Store original message ts for ack reaction completion
       await redis.set(`slack:original_ts:${eventId}`, ts, 600);
 
+      // Set agent status indicator (shows "Nubabel is thinking..." under profile)
+      // This replaces the "🤔 Processing..." message for better UX
+      const indicatorType = await setProcessingIndicator(
+        client as WebClient,
+        channel,
+        messageTs,  // thread context
+        ts,         // message for reaction fallback
+        "thinking",
+        "en",
+      );
+
+      // Store the indicator type so worker knows how to clear it
+      await redis.set(`slack:indicator_type:${eventId}`, indicatorType, 600);
+      await redis.set(`slack:thread_ts:${eventId}`, messageTs, 600);
+
       await slackEventQueue.enqueueEvent({
         type: "app_mention",
         channel,
@@ -361,15 +377,7 @@ function setupEventHandlers(app: App): void {
         threadContext: threadContextPrompt,
       });
 
-      const progressMessage = await say({
-        text: `🤔 Processing your request...`,
-        thread_ts: messageTs,
-      });
-
-      // Store the progress message timestamp for updates
-      if (progressMessage?.ts) {
-        await redis.set(`slack:progress:${eventId}`, progressMessage.ts, 600);
-      }
+      // No more "Processing..." message - agent status handles this!
 
       logger.info("Slack event enqueued", {
         eventId,
@@ -475,6 +483,21 @@ function setupEventHandlers(app: App): void {
         // Store original message ts for ack reaction completion
         await redis.set(`slack:original_ts:${eventId}`, msg.ts, 600);
 
+        // Set agent status indicator (shows "Nubabel is thinking..." under profile)
+        // This replaces the "🤔 Processing..." message for better UX
+        const indicatorType = await setProcessingIndicator(
+          client as WebClient,
+          msg.channel,
+          msg.ts,     // DM context (no separate thread_ts)
+          msg.ts,     // message for reaction fallback
+          "thinking",
+          "en",
+        );
+
+        // Store the indicator type so worker knows how to clear it
+        await redis.set(`slack:indicator_type:${eventId}`, indicatorType, 600);
+        await redis.set(`slack:thread_ts:${eventId}`, msg.ts, 600);
+
         await slackEventQueue.enqueueEvent({
           type: "direct_message",
           channel: msg.channel,
@@ -488,12 +511,7 @@ function setupEventHandlers(app: App): void {
           threadContext: threadContextPrompt,
         });
 
-        const progressMessage = await say(`🤔 Processing your message...`);
-
-        // Store the progress message timestamp for updates
-        if (progressMessage?.ts) {
-          await redis.set(`slack:progress:${eventId}`, progressMessage.ts, 600);
-        }
+        // No more "Processing..." message - agent status handles this!
       } catch (error: unknown) {
         await redis.del(dedupeKey);
         const errorMessage = error instanceof Error ? error.message : String(error);

@@ -83,11 +83,11 @@ export default function MarketplaceHubPage() {
 
   const fetchInstalled = useCallback(async () => {
     try {
-      const result = await request<{ items: InstalledExtension[] }>({
+      const result = await request<{ success: boolean; data: { items: InstalledExtension[] } }>({
         url: "/api/marketplace-hub/installed",
         method: "GET",
       });
-      setInstalled(result.items || []);
+      setInstalled(result.data?.items || []);
     } catch (err) {
       console.error("Failed to fetch installed:", err);
     }
@@ -113,12 +113,12 @@ export default function MarketplaceHubPage() {
       }
       params.set("limit", "30");
 
-      const result = await request<{ items: ExternalSourceItem[] }>({
+      const result = await request<{ success: boolean; data: { items: ExternalSourceItem[] } }>({
         url: `/api/marketplace-hub/search?${params.toString()}`,
         method: "GET",
       });
 
-      setResults(result.items || []);
+      setResults(result.data?.items || []);
     } catch (err) {
       setError("Search failed. Please try again.");
       console.error("Search failed:", err);
@@ -171,13 +171,13 @@ export default function MarketplaceHubPage() {
     setError(null);
 
     try {
-      const result = await request<{ recommendations: ToolRecommendation[] }>({
+      const result = await request<{ success: boolean; data: { recommendations: ToolRecommendation[] } }>({
         url: "/api/marketplace-hub/recommend",
         method: "POST",
         data: { request: recommendQuery },
       });
 
-      setRecommendations(result.recommendations || []);
+      setRecommendations(result.data?.recommendations || []);
     } catch (err) {
       setError("Recommendation failed. Please try again.");
       console.error("Recommend failed:", err);

@@ -59,6 +59,7 @@ export interface Extension extends ExtensionDefinition {
   rating: number | null;
   ratingCount: number;
   status: string;
+  megaAppConfig?: MegaAppModuleConfig;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,4 +80,16 @@ export interface ListOptions {
 
 export interface SearchOptions extends ListOptions {
   includeGlobal?: boolean;
+}
+
+// MegaApp Module Configuration
+export interface MegaAppModuleConfig {
+  moduleId: string;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  requiredInputs?: string[];
+  optionalInputs?: string[];
+  executorType: 'ai-agent' | 'workflow' | 'mcp-tool' | 'hybrid';
+  dashboardComponent?: string;
+  settingsComponent?: string;
 }
