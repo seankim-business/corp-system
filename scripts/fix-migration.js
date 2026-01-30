@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 const { PrismaClient } = require("@prisma/client");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   const prisma = new PrismaClient();
@@ -25,11 +27,8 @@ async function main() {
       WHERE finished_at IS NULL
     `;
 
-    if (failedMigrations.length === 0) {
-      console.log("   ✓ No failed migrations found");
-    } else {
+    if (failedMigrations.length > 0) {
       console.log(`   Found ${failedMigrations.length} failed migration(s)`);
-
       for (const { migration_name } of failedMigrations) {
         await prisma.$executeRawUnsafe(
           `
@@ -40,6 +39,36 @@ async function main() {
           migration_name,
         );
         console.log(`   ✓ ${migration_name} marked as applied`);
+      }
+    }
+
+    console.log("3. Ensuring all migrations are registered...");
+    const migrationsDir = path.join(__dirname, "../prisma/migrations");
+    const migrationFolders = fs
+      .readdirSync(migrationsDir)
+      .filter(
+        (f) =>
+          f !== "migration_lock.toml" && fs.statSync(path.join(migrationsDir, f)).isDirectory(),
+      )
+      .sort();
+
+    for (const migrationName of migrationFolders) {
+      const exists = await prisma.$queryRaw`
+        SELECT 1 FROM _prisma_migrations WHERE migration_name = ${migrationName}
+      `;
+
+      if (exists.length === 0) {
+        const checksum = require("crypto").createHash("sha256").update(migrationName).digest("hex");
+
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO _prisma_migrations (id, checksum, migration_name, finished_at, started_at, applied_steps_count)
+          VALUES (gen_random_uuid(), $1, $2, NOW(), NOW(), 1)
+        `,
+          checksum,
+          migrationName,
+        );
+        console.log(`   ✓ ${migrationName} registered as applied`);
       }
     }
 
