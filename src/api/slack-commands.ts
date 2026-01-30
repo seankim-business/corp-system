@@ -6,6 +6,12 @@ import { orchestrationQueue } from "../queue/orchestration.queue";
 import { getUserBySlackId, getOrganizationBySlackWorkspace } from "../services/slack-service";
 import { encrypt } from "../utils/encryption";
 import { getMarketplaceApiKeys } from "./marketplace-hub";
+import {
+  searchMCPServers,
+  getMCPServer,
+  getRecommendedMCPServers,
+  getMCPRegistryClient,
+} from "../services/mcp-registry";
 
 const router = Router();
 

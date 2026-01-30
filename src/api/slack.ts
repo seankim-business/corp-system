@@ -36,33 +36,6 @@ const ACK_EMOJI = "eyes"; // 👀 - processing
 const DONE_EMOJI = "white_check_mark"; // ✅ - completed
 
 /**
- * Add an acknowledgment reaction to show we're processing
- */
-async function addAckReaction(
-  client: WebClient,
-  channel: string,
-  timestamp: string,
-): Promise<void> {
-  try {
-    await client.reactions.add({
-      channel,
-      timestamp,
-      name: ACK_EMOJI,
-    });
-    logger.debug("Added ack reaction", { channel, timestamp, emoji: ACK_EMOJI });
-  } catch (error: any) {
-    // Ignore "already_reacted" errors
-    if (error.data?.error !== "already_reacted") {
-      logger.warn("Failed to add ack reaction", {
-        channel,
-        timestamp,
-        error: error.message,
-      });
-    }
-  }
-}
-
-/**
  * Remove the ack reaction and add completion reaction
  * Exported for use by notification worker when response is sent
  */
@@ -389,7 +362,7 @@ function setupEventHandlers(app: App): void {
         try {
           await executeNativeCommand(text, {
             client: client as WebClient,
-            channel,
+            channelId: channel,
             threadTs: thread_ts || ts,
             userId: user,
             say,
@@ -602,7 +575,7 @@ function setupEventHandlers(app: App): void {
           try {
             await executeNativeCommand(msg.text, {
               client: client as WebClient,
-              channel: msg.channel,
+              channelId: msg.channel,
               threadTs: msg.ts,
               userId: msg.user,
               say,
