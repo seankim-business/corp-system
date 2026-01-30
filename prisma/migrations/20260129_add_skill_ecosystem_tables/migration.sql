@@ -229,6 +229,5 @@ ALTER TABLE "extension_usage_logs" ADD CONSTRAINT "extension_usage_logs_organiza
 
 ALTER TABLE "skill_learning_patterns" ADD CONSTRAINT "skill_learning_patterns_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE "agent_skill_assignments" ADD CONSTRAINT "agent_skill_assignments_agent_id_fkey" FOREIGN KEY ("agent_id") REFERENCES "agents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "agent_skill_assignments" ADD CONSTRAINT "agent_skill_assignments_extension_id_fkey" FOREIGN KEY ("extension_id") REFERENCES "marketplace_extensions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "agent_skill_assignments" ADD CONSTRAINT "agent_skill_assignments_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
