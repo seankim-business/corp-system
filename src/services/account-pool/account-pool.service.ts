@@ -59,9 +59,14 @@ export class AccountPoolService {
         return null;
       }
 
-      // Filter out cooling-down accounts
+      // Filter out cooling-down accounts and apply allowedAccountIds restriction
       const available: ClaudeAccount[] = [];
       for (const account of accounts) {
+        // Skip if not in allowed list (when provided)
+        if (criteria.allowedAccountIds && !criteria.allowedAccountIds.includes(account.id)) {
+          continue;
+        }
+
         const isCoolingDown = await this.isAccountCoolingDown(account.id);
         if (!isCoolingDown) {
           available.push(account);

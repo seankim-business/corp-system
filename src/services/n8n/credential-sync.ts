@@ -1,5 +1,8 @@
 import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
+import { decrypt } from "../../utils/encryption";
+import { getAccessTokenFromConfig } from "../mcp-registry";
+import { createN8nClient, N8nApiClient } from "./n8n-api-client";
 
 // Mapping from MCP provider to n8n credential type
 const CREDENTIAL_TYPE_MAP: Record<string, string> = {
@@ -21,19 +24,25 @@ export interface CredentialSyncResult {
   errors: string[];
 }
 
-interface MCPConnectionData {
+type SyncOutcome = "created" | "updated" | "skipped";
+
+type N8nInstanceRecord = {
+  id: string;
+  organizationId: string;
+  containerUrl: string;
+  apiKey: string;
+  status: string;
+};
+
+type MCPConnectionRecord = {
   id: string;
   provider: string;
   name: string;
-  credentials: Record<string, unknown>;
+  config: Record<string, unknown>;
+  refreshToken: string | null;
+  expiresAt: Date | null;
   organizationId: string;
-}
-
-interface InstanceData {
-  id: string;
-  containerUrl: string;
-  apiKey: string;
-}
+};
 
 export class CredentialSyncService {
   /**
@@ -52,12 +61,20 @@ export class CredentialSyncService {
     };
 
     try {
-      const instance = await db.n8nInstance.findUnique({
-        where: { id: instanceId },
+      // Get n8n instance (tenant-isolated)
+      const instance = await db.n8nInstance.findFirst({
+        where: { id: instanceId, organizationId },
+        select: {
+          id: true,
+          organizationId: true,
+          containerUrl: true,
+          apiKey: true,
+          status: true,
+        },
       });
 
       if (!instance || instance.status !== "active") {
-        result.errors.push("Instance not active");
+        result.errors.push("Instance not active or not found");
         return result;
       }
 
@@ -67,27 +84,28 @@ export class CredentialSyncService {
           organizationId,
           enabled: true,
         },
+        select: {
+          id: true,
+          provider: true,
+          name: true,
+          config: true,
+          refreshToken: true,
+          expiresAt: true,
+          organizationId: true,
+        },
       });
 
+      // Sync each connection
       for (const mcpConn of mcpConnections) {
         try {
-          const mcpData: MCPConnectionData = {
-            id: mcpConn.id,
-            provider: mcpConn.provider,
-            name: mcpConn.name,
-            credentials: mcpConn.config as Record<string, unknown>,
-            organizationId: mcpConn.organizationId,
+          const normalized: MCPConnectionRecord = {
+            ...mcpConn,
+            config: this.normalizeConfig(mcpConn.config),
           };
-
-          const instanceData: InstanceData = {
-            id: instance.id,
-            containerUrl: instance.containerUrl,
-            apiKey: instance.apiKey,
-          };
-
-          await this.syncCredential(mcpData, instanceData);
-          result.synced++;
-          result.created++;
+          const outcome = await this.syncCredential(normalized, instance);
+          if (outcome === "created") result.created++;
+          if (outcome === "updated") result.updated++;
+          if (outcome !== "skipped") result.synced++;
         } catch (error) {
           result.failed++;
           result.errors.push(
@@ -108,16 +126,24 @@ export class CredentialSyncService {
   /**
    * Sync a single MCP connection to n8n credential
    */
-  async syncCredential(mcpConnection: MCPConnectionData, instance: InstanceData): Promise<void> {
+  async syncCredential(
+    mcpConnection: MCPConnectionRecord,
+    instance: N8nInstanceRecord,
+  ): Promise<SyncOutcome> {
+    if (mcpConnection.organizationId !== instance.organizationId) {
+      throw new Error("Organization mismatch between MCP connection and n8n instance");
+    }
+
     const n8nCredentialType = CREDENTIAL_TYPE_MAP[mcpConnection.provider];
 
     if (!n8nCredentialType) {
       logger.warn("No n8n credential type mapping for provider", {
         provider: mcpConnection.provider,
       });
-      return;
+      return "skipped";
     }
 
+    // Check if credential already exists
     const existing = await db.n8nCredential.findFirst({
       where: {
         instanceId: instance.id,
@@ -126,54 +152,111 @@ export class CredentialSyncService {
     });
 
     if (existing) {
+      // Update existing credential mapping
       await db.n8nCredential.update({
         where: { id: existing.id },
         data: {
           name: mcpConnection.name,
+          credentialType: n8nCredentialType,
           syncedAt: new Date(),
         },
       });
-    } else {
-      const n8nCredentialId = `cred_${Date.now()}_${mcpConnection.provider}`;
 
-      await db.n8nCredential.create({
-        data: {
-          organizationId: mcpConnection.organizationId,
-          instanceId: instance.id,
-          n8nCredentialId,
-          mcpConnectionId: mcpConnection.id,
-          credentialType: n8nCredentialType,
-          name: mcpConnection.name,
-        },
-      });
+      // Note: In real implementation, would also update the credential in n8n
+      // via API call: client.updateCredential(existing.n8nCredentialId, ...)
+      return "updated";
     }
+
+    // Transform credentials to n8n format (in-memory only)
+    const n8nCredentialData = this.transformCredentials(mcpConnection.provider, mcpConnection);
+
+    // Create new credential in n8n, then map it locally
+    const client = this.createClient(instance);
+    const created = await client.createCredential({
+      name: mcpConnection.name,
+      type: n8nCredentialType,
+      data: n8nCredentialData,
+    });
+
+    await db.n8nCredential.create({
+      data: {
+        organizationId: mcpConnection.organizationId,
+        instanceId: instance.id,
+        n8nCredentialId: created.id,
+        mcpConnectionId: mcpConnection.id,
+        credentialType: n8nCredentialType,
+        name: mcpConnection.name,
+      },
+    });
+
+    return "created";
   }
 
   /**
    * Transform MCP credentials to n8n format
    */
-  transformCredentials(
+  private transformCredentials(
     provider: string,
-    mcpCredentials: Record<string, unknown>,
+    mcpConnection: MCPConnectionRecord,
   ): Record<string, unknown> {
+    const accessToken = getAccessTokenFromConfig(mcpConnection.config);
+    const requireAccessToken = (label: string): string => {
+      if (!accessToken) {
+        throw new Error(`Missing access token for ${label} MCP connection ${mcpConnection.id}`);
+      }
+      return accessToken;
+    };
+
+    // Each provider has different credential schema
     switch (provider) {
       case "slack":
-        return { accessToken: mcpCredentials.accessToken };
-      case "notion":
-        return { apiKey: mcpCredentials.accessToken };
-      case "linear":
-        return { apiKey: mcpCredentials.accessToken };
-      case "github":
-        return { accessToken: mcpCredentials.accessToken };
-      case "google-drive":
-      case "google-calendar":
         return {
-          access_token: mcpCredentials.accessToken,
-          refresh_token: mcpCredentials.refreshToken,
-          expiry_date: mcpCredentials.expiresAt,
+          accessToken: requireAccessToken("slack"),
         };
+
+      case "notion":
+        return {
+          apiKey: requireAccessToken("notion"),
+        };
+
+      case "linear":
+        return {
+          apiKey: requireAccessToken("linear"),
+        };
+
+      case "github":
+        return {
+          accessToken: requireAccessToken("github"),
+        };
+
+      case "jira":
+        return {
+          accessToken: requireAccessToken("jira"),
+        };
+
+      case "asana":
+        return {
+          accessToken: requireAccessToken("asana"),
+        };
+
+      case "google-drive":
+      case "google-calendar": {
+        const refreshToken = this.getRefreshToken(mcpConnection);
+        if (!refreshToken) {
+          throw new Error(
+            `Missing refresh token for ${provider} MCP connection ${mcpConnection.id}`,
+          );
+        }
+        return {
+          access_token: requireAccessToken("google"),
+          refresh_token: refreshToken,
+          expiry_date: mcpConnection.expiresAt ? mcpConnection.expiresAt.getTime() : null,
+        };
+      }
+
       default:
-        return mcpCredentials;
+        // Generic passthrough for unknown providers
+        return mcpConnection.config;
     }
   }
 
@@ -181,14 +264,22 @@ export class CredentialSyncService {
    * Delete credential when MCP connection is removed
    */
   async deleteCredential(mcpConnectionId: string): Promise<void> {
-    await db.n8nCredential.deleteMany({
+    const credentials = await db.n8nCredential.findMany({
       where: { mcpConnectionId },
     });
+
+    for (const cred of credentials) {
+      // In real implementation, would also delete from n8n via API
+      await db.n8nCredential.delete({
+        where: { id: cred.id },
+      });
+    }
+
     logger.info("Credentials deleted for MCP connection", { mcpConnectionId });
   }
 
   /**
-   * Get available credentials for an organization
+   * Get credentials for a workflow (to show which integrations are available)
    */
   async getAvailableCredentials(
     organizationId: string,
@@ -210,30 +301,63 @@ export class CredentialSyncService {
   }
 
   /**
-   * Validate workflow credentials
+   * Check if required credentials exist for a workflow
    */
   async validateWorkflowCredentials(
     organizationId: string,
     workflowJson: { nodes: Array<{ credentials?: Record<string, { name: string }> }> },
   ): Promise<{ valid: boolean; missing: string[] }> {
-    const available = await this.getAvailableCredentials(organizationId);
-    const availableTypes = new Set(available.map((c) => c.type));
+    const availableTypes = new Set(
+      (await this.getAvailableCredentials(organizationId)).map((c) => c.type),
+    );
 
     const requiredTypes = new Set<string>();
+
     for (const node of workflowJson.nodes) {
       if (node.credentials) {
-        for (const type of Object.keys(node.credentials)) {
+        for (const [type] of Object.entries(node.credentials)) {
           requiredTypes.add(type);
         }
       }
     }
 
-    const missing = Array.from(requiredTypes).filter((t) => !availableTypes.has(t));
+    const missing: string[] = [];
+    for (const type of requiredTypes) {
+      if (!availableTypes.has(type)) {
+        missing.push(type);
+      }
+    }
 
     return {
       valid: missing.length === 0,
       missing,
     };
+  }
+
+  private createClient(instance: N8nInstanceRecord): N8nApiClient {
+    const apiKey = decrypt(instance.apiKey);
+    return createN8nClient(instance.containerUrl, apiKey);
+  }
+
+  private normalizeConfig(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return {};
+    }
+    return value as Record<string, unknown>;
+  }
+
+  private getRefreshToken(connection: MCPConnectionRecord): string | null {
+    const refreshFromConfig =
+      typeof connection.config["refreshToken"] === "string"
+        ? (connection.config["refreshToken"] as string)
+        : typeof connection.config["refresh_token"] === "string"
+          ? (connection.config["refresh_token"] as string)
+          : null;
+    const rawToken = connection.refreshToken ?? refreshFromConfig;
+    if (!rawToken) {
+      return null;
+    }
+    return decrypt(rawToken);
   }
 }
 

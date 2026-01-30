@@ -3,7 +3,6 @@
  * Groups similar natural language requests using embeddings and clustering
  */
 
-// @ts-expect-error uuid provides its own types but TS can't find them
 import { v4 as uuidv4 } from "uuid";
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../../utils/logger";

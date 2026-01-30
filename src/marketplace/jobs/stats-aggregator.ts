@@ -47,7 +47,6 @@ export async function aggregateStats(): Promise<void> {
   */
 }
 
-// TODO: Will be used when marketplace tables are implemented
 export async function aggregateExtensionStats(_extensionId: string): Promise<void> {
   // TODO: Implement once tables are created via Prisma migration
   logger.warn("aggregateExtensionStats skipped - tables not yet created", { extensionId: _extensionId });

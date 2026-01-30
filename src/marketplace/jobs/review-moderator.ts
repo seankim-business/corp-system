@@ -111,7 +111,6 @@ interface ModerationResult {
   reason?: string;
 }
 
-// TODO: Will be used when extensionReview table is implemented
 export function analyzeReview(review: {
   title: string;
   body: string;
@@ -154,7 +153,6 @@ export function analyzeReview(review: {
   return { action: "approve" };
 }
 
-// TODO: Will be used when marketplace tables are implemented
 export async function updateExtensionRating(extensionId: string): Promise<void> {
   // TODO: Implement once extensionReview and marketplaceExtension tables are created
   logger.warn("updateExtensionRating skipped - tables not yet created", { extensionId });

@@ -377,6 +377,364 @@ function setupEventHandlers(app: App): void {
     }
   });
 
+  app.command("/schedule", async ({ command, ack, say, client }) => {
+    await ack();
+
+    const dedupeKey = `slack:dedupe:slash_command:schedule:${command.team_id}:${command.channel_id}:${command.trigger_id}`;
+    const alreadyProcessed = await redis.exists(dedupeKey);
+    if (alreadyProcessed) {
+      logger.debug("Duplicate /schedule command skipped", {
+        teamId: command.team_id,
+        channelId: command.channel_id,
+      });
+      return;
+    }
+
+    await redis.set(dedupeKey, "1", 300);
+
+    try {
+      const { user_id, text, team_id } = command;
+
+      const nubabelUser = await getUserBySlackId(user_id, client as WebClient);
+      if (!nubabelUser) {
+        await say("Please login at https://nubabel.com first!");
+        return;
+      }
+
+      const organization = await getOrganizationBySlackWorkspace(team_id);
+      if (!organization) {
+        await say("Organization not found. Please connect your Slack workspace in Settings.");
+        return;
+      }
+
+      // Parse command: /schedule [cron] [agent] [prompt]
+      const parts = text.trim().match(/^"([^"]+)"|\S+/g) || [];
+      if (parts.length < 3) {
+        await say({
+          text: "Invalid syntax. Usage: `/schedule [cron] [agent] [prompt]`",
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: "*Invalid syntax*\n\nUsage: `/schedule [cron] [agent] [prompt]`\n\nExamples:\n• `/schedule \"0 9 * * *\" task-agent \"summarize yesterday's tasks\"`\n• `/schedule daily report-agent \"generate daily report\"`\n• `/schedule hourly data-agent \"check system metrics\"`",
+              },
+            },
+          ],
+        });
+        return;
+      }
+
+      const cronInput = (parts[0] ?? "").replace(/^"|"$/g, "");
+      const agentName = (parts[1] ?? "").replace(/^"|"$/g, "");
+      const prompt = parts
+        .slice(2)
+        .join(" ")
+        .replace(/^"|"$/g, "");
+
+      // Import dependencies
+      const parser = await import("cron-parser");
+      const { createScheduledTask } = await import("../services/scheduled-tasks");
+      const { agentRegistry } = await import("../orchestrator/agent-registry");
+
+      // Parse cron expression (support shortcuts)
+      let cronExpression: string;
+      const shortcuts: Record<string, string> = {
+        hourly: "0 * * * *",
+        daily: "0 9 * * *",
+        weekly: "0 9 * * 1",
+        monthly: "0 9 1 * *",
+      };
+
+      cronExpression = shortcuts[cronInput.toLowerCase()] || cronInput;
+
+      // Validate cron expression
+      try {
+        parser.parseExpression(cronExpression);
+      } catch (error) {
+        await say({
+          text: `Invalid cron expression: ${cronExpression}`,
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `*Invalid cron expression:* \`${cronExpression}\`\n\n*Shortcuts:*\n• \`hourly\` - Every hour at minute 0\n• \`daily\` - Every day at 9:00 AM\n• \`weekly\` - Every Monday at 9:00 AM\n• \`monthly\` - First day of month at 9:00 AM\n\n*Custom format:* \`minute hour day month day-of-week\`\nExample: \`0 9 * * *\` = Every day at 9:00 AM`,
+              },
+            },
+          ],
+        });
+        return;
+      }
+
+      // Validate agent name
+      const allAgents = agentRegistry.getAllAgents();
+      const agent = allAgents.find((a) => a.id === agentName || a.name.toLowerCase() === agentName.toLowerCase());
+      if (!agent) {
+        const agentList = allAgents.map((a) => `• \`${a.id}\` - ${a.name} ${a.emoji}`).join("\n");
+        await say({
+          text: `Agent not found: ${agentName}`,
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `*Agent not found:* \`${agentName}\`\n\n*Available agents:*\n${agentList}`,
+              },
+            },
+          ],
+        });
+        return;
+      }
+
+      // Create scheduled task
+      const scheduledTask = await createScheduledTask(organization.id, {
+        name: `Slack: ${prompt.substring(0, 50)}`,
+        description: `Scheduled via Slack /schedule command by ${nubabelUser.displayName || nubabelUser.email}`,
+        taskType: "custom",
+        config: {
+          frequency: "custom",
+          cronExpression,
+          timezone: "UTC",
+        },
+        payload: {
+          agent: agent.id,
+          prompt,
+          slackUserId: user_id,
+        },
+        enabled: true,
+        createdBy: nubabelUser.id,
+      });
+
+      // Calculate next run time
+      const interval = parser.parseExpression(cronExpression);
+      const nextRun = interval.next().toDate();
+
+      // Post confirmation
+      await say({
+        text: `✅ Schedule created successfully`,
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*✅ Schedule created successfully*\n\n*Agent:* ${agent.emoji} ${agent.name}\n*Task:* ${prompt}\n*Schedule:* \`${cronExpression}\`\n*Next run:* <!date^${Math.floor(nextRun.getTime() / 1000)}^{date_short_pretty} at {time}|${nextRun.toISOString()}>\n*Schedule ID:* \`${scheduledTask.id}\``,
+            },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: "Manage your schedules at https://nubabel.com/schedules",
+              },
+            ],
+          },
+        ],
+      });
+
+      metrics.increment("slack.schedule.created", { agent: agent.id });
+      logger.info("Schedule created via Slack", {
+        scheduleId: scheduledTask.id,
+        organizationId: organization.id,
+        userId: nubabelUser.id,
+        agent: agent.id,
+        cronExpression,
+      });
+    } catch (error: unknown) {
+      await redis.del(dedupeKey);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("Slack /schedule command error", { error: errorMessage });
+      await say({
+        text: `❌ Error: ${errorMessage}`,
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*❌ Error creating schedule*\n\n\`${errorMessage}\``,
+            },
+          },
+        ],
+      });
+    }
+  });
+
+  app.command("/task", async ({ command, ack, say, client }) => {
+    await ack();
+
+    const dedupeKey = `slack:dedupe:task_command:${command.team_id}:${command.channel_id}:${command.trigger_id}`;
+    const alreadyProcessed = await redis.exists(dedupeKey);
+    if (alreadyProcessed) {
+      logger.debug("Duplicate /task slash command skipped", {
+        teamId: command.team_id,
+        channelId: command.channel_id,
+      });
+      return;
+    }
+
+    await redis.set(dedupeKey, "1", 300);
+
+    try {
+      const { user_id, text, team_id } = command;
+
+      // Detect user's preferred language
+      const { getUserLanguagePreference, getLocalizedResponse } = await import("../orchestrator/language-detector");
+
+      // Get Slack user info for locale detection
+      let slackUserInfo;
+      try {
+        const userInfo = await client.users.info({ user: user_id });
+        slackUserInfo = {
+          locale: userInfo.user?.locale,
+          tz: userInfo.user?.tz,
+        };
+      } catch (error) {
+        logger.warn("Failed to get Slack user info for language detection", { error });
+        slackUserInfo = undefined;
+      }
+
+      const userLang = getUserLanguagePreference(slackUserInfo, text);
+
+      const nubabelUser = await getUserBySlackId(user_id, client as WebClient);
+      if (!nubabelUser) {
+        const loginUrl = "https://nubabel.com";
+        const message = getLocalizedResponse("task_login_required", userLang);
+        await say(userLang === "ko"
+          ? `${message}: ${loginUrl}`
+          : `${message} at ${loginUrl}`);
+        await redis.del(dedupeKey);
+        return;
+      }
+
+      const organization = await getOrganizationBySlackWorkspace(team_id);
+      if (!organization) {
+        const message = getLocalizedResponse("task_org_not_found", userLang);
+        const settingsHint = userLang === "ko"
+          ? "설정에서 Slack 워크스페이스를 연결해주세요."
+          : "Please connect your Slack workspace in Settings.";
+        await say(`${message}. ${settingsHint}`);
+        await redis.del(dedupeKey);
+        return;
+      }
+
+      // Parse the command text: "/task create Fix the login bug" or "/task Fix the login bug"
+      const trimmedText = text.trim();
+      let subcommand = "create";
+      let taskTitle = trimmedText;
+
+      const firstSpace = trimmedText.indexOf(" ");
+      if (firstSpace > 0) {
+        const potentialSubcommand = trimmedText.substring(0, firstSpace).toLowerCase();
+        if (["create", "list", "update", "delete"].includes(potentialSubcommand)) {
+          subcommand = potentialSubcommand;
+          taskTitle = trimmedText.substring(firstSpace + 1).trim();
+        }
+      }
+
+      if (subcommand === "create") {
+        if (!taskTitle) {
+          const message = getLocalizedResponse("task_invalid_syntax", userLang);
+          const usage = userLang === "ko"
+            ? "사용법: `/task create <제목>`"
+            : "Usage: `/task create <title>`";
+          await say(`${message}. ${usage}`);
+          await redis.del(dedupeKey);
+          return;
+        }
+
+        // Get Notion connection and database ID
+        const notionConnection = await prisma.notionConnection.findUnique({
+          where: { organizationId: organization.id },
+        });
+
+        if (!notionConnection || (!notionConnection.accessToken && !notionConnection.apiKey)) {
+          const message = getLocalizedResponse("task_notion_not_connected", userLang);
+          const settingsUrl = "https://nubabel.com/settings/notion";
+          const hint = userLang === "ko"
+            ? "설정에서 Notion을 연결해주세요"
+            : "Please connect Notion in Settings";
+          await say(`${message}. ${hint}: ${settingsUrl}`);
+          await redis.del(dedupeKey);
+          return;
+        }
+
+        const databaseId = notionConnection.defaultDatabaseId;
+        if (!databaseId) {
+          const message = getLocalizedResponse("task_no_default_database", userLang);
+          const hint = userLang === "ko"
+            ? "설정에서 기본 데이터베이스를 지정해주세요."
+            : "Please set a default database in Settings.";
+          await say(`${message}. ${hint}`);
+          await redis.del(dedupeKey);
+          return;
+        }
+
+        // Create the task via Notion provider
+        const { executeProviderTool } = await import("../mcp/providers/index");
+
+        const result = await executeProviderTool(
+          "notion_create_task",
+          {
+            databaseId,
+            title: taskTitle,
+          },
+          {
+            organizationId: organization.id,
+            userId: nubabelUser.id,
+            agentId: "slack-task-command",
+          },
+        );
+
+        if (result.success && result.data) {
+          const task = (result.data as { task?: { id?: string; url?: string } }).task;
+          const taskUrl = task?.url || `https://notion.so/${task?.id?.replace(/-/g, "")}`;
+
+          const successMessage = getLocalizedResponse("task_created", userLang);
+          const viewLinkText = getLocalizedResponse("task_view_in_notion", userLang);
+          const titleLabel = userLang === "ko" ? "제목" : "Title";
+
+          await say({
+            text: successMessage,
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `${successMessage}\n\n*${titleLabel}:* ${taskTitle}\n<${taskUrl}|${viewLinkText}>`,
+                },
+              },
+            ],
+          });
+
+          metrics.increment("slack.task.created");
+          logger.info("Task created via Slack /task command", {
+            organizationId: organization.id,
+            userId: nubabelUser.id,
+            taskTitle,
+            language: userLang,
+          });
+        } else {
+          const errorMsg = result.error?.message || "Unknown error";
+          const failedMessage = getLocalizedResponse("task_creation_failed", userLang);
+          await say(`${failedMessage}: ${errorMsg}`);
+          metrics.increment("slack.task.error");
+        }
+      } else {
+        const notImplemented = userLang === "ko"
+          ? `❌ "${subcommand}" 명령어는 아직 구현되지 않았습니다. \`/task create <제목>\`을 시도해보세요.`
+          : `❌ Subcommand "${subcommand}" is not yet implemented. Try \`/task create <title>\``;
+        await say(notImplemented);
+      }
+    } catch (error: unknown) {
+      await redis.del(dedupeKey);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("/task command error", { error: errorMessage });
+      await say(`❌ Error: ${errorMessage}`);
+      metrics.increment("slack.task.error");
+    }
+  });
+
   app.action(/^approve_/, async ({ action, ack, body, client }) => {
     await ack();
 

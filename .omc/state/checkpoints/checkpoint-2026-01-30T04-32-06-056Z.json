@@ -1,0 +1,15 @@
+{
+  "created_at": "2026-01-30T04:32:06.055Z",
+  "trigger": "auto",
+  "active_modes": {
+    "ultrawork": {
+      "original_prompt": "ulw 구현 시작하고 니가 브라우저 직접들어가서 테스트하면서 수정하면서 배포도 하고 해"
+    }
+  },
+  "todo_summary": {
+    "pending": 0,
+    "in_progress": 0,
+    "completed": 0
+  },
+  "wisdom_exported": false
+}

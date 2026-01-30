@@ -1,0 +1,12 @@
+{
+  "session_id": "adf5d67e-c577-497d-8b02-bda678744804",
+  "started_at": "2026-01-29T02:24:53.307Z",
+  "ended_at": "2026-01-30T03:47:51.860Z",
+  "reason": "prompt_input_exit",
+  "agents_spawned": 18,
+  "agents_completed": 0,
+  "modes_used": [
+    "ultrawork"
+  ],
+  "duration_ms": 91378553
+}

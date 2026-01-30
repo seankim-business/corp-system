@@ -1,0 +1,77 @@
+# Prometheus Configuration for Nubabel Platform
+
+global:
+  scrape_interval: 15s # Default scrape interval
+  evaluation_interval: 15s # How frequently to evaluate rules
+  external_labels:
+    cluster: 'nubabel-prod'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load rules once and evaluate them according to the global 'evaluation_interval'
+rule_files:
+  # - "alerts/*.yml"
+
+# Scrape configuration
+scrape_configs:
+  # ============================================================================
+  # Prometheus itself
+  # ============================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # ============================================================================
+  # Nubabel Application Metrics
+  # ============================================================================
+  - job_name: 'nubabel-app'
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['app:3000']
+        labels:
+          service: 'nubabel'
+          component: 'app'
+    # Relabel to add instance information
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'nubabel-app'
+
+  # ============================================================================
+  # PostgreSQL Exporter (if using postgres_exporter)
+  # ============================================================================
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'postgres'
+  #         component: 'database'
+
+  # ============================================================================
+  # Redis Exporter (if using redis_exporter)
+  # ============================================================================
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #       labels:
+  #         service: 'redis'
+  #         component: 'cache'
+
+  # ============================================================================
+  # Node Exporter (for system metrics, if deployed)
+  # ============================================================================
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #       labels:
+  #         service: 'system'
+  #         component: 'host'

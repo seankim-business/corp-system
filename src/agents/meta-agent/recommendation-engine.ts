@@ -336,7 +336,7 @@ export class RecommendationEngine {
     }
 
     // Analyze cost by agent
-    // TODO: agentCostRecord table doesn't exist yet - stub with empty array
+    // NOTE: Requires AgentCostRecord table in Prisma schema
     const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     let costByAgent: { agentId: string; _sum: { costCents: number | null }; _count: number }[] = [];
     try {

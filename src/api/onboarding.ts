@@ -1,7 +1,7 @@
 /**
  * Onboarding API Routes (Stub)
  *
- * TODO: Implement when onboarding tables are properly added to Prisma schema
+ * NOTE: Requires onboarding tables in Prisma schema (OnboardingStep, Checklist, etc.)
  */
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.middleware";

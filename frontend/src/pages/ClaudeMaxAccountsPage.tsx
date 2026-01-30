@@ -9,7 +9,10 @@ import {
   CheckCircle,
   Clock,
   Zap,
+  HelpCircle,
+  ExternalLink,
 } from "lucide-react";
+import { api } from "../api/client";
 
 interface ClaudeMaxAccount {
   id: string;
@@ -44,8 +47,6 @@ interface AccountFormData {
   sessionToken?: string;
   cookieData?: string;
 }
-
-const API_BASE = import.meta.env.VITE_API_URL || "https://auth.nubabel.com";
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
@@ -120,6 +121,7 @@ function AccountModal({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -207,31 +209,67 @@ function AccountModal({
           </div>
 
           <div className="border-t pt-4">
-            <p className="text-sm text-gray-500 mb-3">
-              Credentials (optional - for automated login)
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-gray-500">Session Credentials</p>
+              <button
+                type="button"
+                onClick={() => setShowGuide(!showGuide)}
+                className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                <HelpCircle className="w-4 h-4" />
+                How to get credentials
+              </button>
+            </div>
+
+            {showGuide && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm">
+                <p className="font-medium text-blue-800 mb-2">How to extract Claude session:</p>
+                <ol className="list-decimal list-inside text-blue-700 space-y-1">
+                  <li>
+                    Open{" "}
+                    <a
+                      href="https://claude.ai"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline inline-flex items-center gap-1"
+                    >
+                      claude.ai
+                      <ExternalLink className="w-3 h-3" />
+                    </a>{" "}
+                    and log in
+                  </li>
+                  <li>Open DevTools (F12) → Application → Cookies</li>
+                  <li>
+                    Copy the <code className="bg-blue-100 px-1 rounded">sessionKey</code> value
+                  </li>
+                  <li>Paste it in the Session Token field below</li>
+                </ol>
+              </div>
+            )}
 
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Session Token
+                  Session Token (sessionKey)
                 </label>
                 <input
                   type="password"
                   value={formData.sessionToken}
                   onChange={(e) => setFormData({ ...formData, sessionToken: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Leave empty to keep existing"
+                  placeholder="sk-ant-sid01-..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cookie Data</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cookie Data (optional, full cookie string)
+                </label>
                 <textarea
                   value={formData.cookieData}
                   onChange={(e) => setFormData({ ...formData, cookieData: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Leave empty to keep existing"
+                  placeholder="Only needed for advanced setups"
                   rows={2}
                 />
               </div>
@@ -270,9 +308,9 @@ export default function ClaudeMaxAccountsPage() {
 
   const fetchAccounts = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/claude-max-accounts`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch accounts");
-      const data = await res.json();
+      const { data } = await api.get<{ accounts: ClaudeMaxAccount[]; summary: PoolSummary }>(
+        "/api/claude-max-accounts",
+      );
       setAccounts(data.accounts);
       setSummary(data.summary);
       setError(null);
@@ -290,72 +328,46 @@ export default function ClaudeMaxAccountsPage() {
   }, [fetchAccounts]);
 
   const handleCreate = async (data: AccountFormData) => {
-    const res = await fetch(`${API_BASE}/api/claude-max-accounts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        nickname: data.nickname,
-        email: data.email,
-        priority: data.priority,
-        credentials:
-          data.sessionToken || data.cookieData
-            ? {
-                sessionToken: data.sessionToken || undefined,
-                cookieData: data.cookieData || undefined,
-              }
-            : undefined,
-      }),
+    await api.post("/api/claude-max-accounts", {
+      nickname: data.nickname,
+      email: data.email,
+      priority: data.priority,
+      credentials:
+        data.sessionToken || data.cookieData
+          ? {
+              sessionToken: data.sessionToken || undefined,
+              cookieData: data.cookieData || undefined,
+            }
+          : undefined,
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Failed to create account");
-    }
     await fetchAccounts();
   };
 
   const handleUpdate = async (data: AccountFormData) => {
     if (!editingAccount) return;
-    const res = await fetch(`${API_BASE}/api/claude-max-accounts/${editingAccount.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        nickname: data.nickname,
-        email: data.email,
-        priority: data.priority,
-        credentials:
-          data.sessionToken || data.cookieData
-            ? {
-                sessionToken: data.sessionToken || undefined,
-                cookieData: data.cookieData || undefined,
-              }
-            : undefined,
-      }),
+    await api.patch(`/api/claude-max-accounts/${editingAccount.id}`, {
+      nickname: data.nickname,
+      email: data.email,
+      priority: data.priority,
+      credentials:
+        data.sessionToken || data.cookieData
+          ? {
+              sessionToken: data.sessionToken || undefined,
+              cookieData: data.cookieData || undefined,
+            }
+          : undefined,
     });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Failed to update account");
-    }
     await fetchAccounts();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this account?")) return;
-    const res = await fetch(`${API_BASE}/api/claude-max-accounts/${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to delete account");
+    await api.delete(`/api/claude-max-accounts/${id}`);
     await fetchAccounts();
   };
 
   const handleResetStatus = async (id: string) => {
-    const res = await fetch(`${API_BASE}/api/claude-max-accounts/${id}/reset-status`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (!res.ok) throw new Error("Failed to reset status");
+    await api.post(`/api/claude-max-accounts/${id}/reset-status`);
     await fetchAccounts();
   };
 

@@ -111,7 +111,7 @@ export class AgentAnalyzer {
     });
 
     // Get cost data
-    // TODO: agentCostRecord table doesn't exist yet - stub with empty array
+    // NOTE: Requires AgentCostRecord table in Prisma schema
     const costRecords: { costCents: number }[] = [];
     try {
       const records = await (prisma as any).agentCostRecord?.findMany({

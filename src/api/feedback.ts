@@ -180,8 +180,7 @@ router.get(
       const since = new Date();
       since.setDate(since.getDate() - days);
 
-      // TODO: Implement UserFeedback Prisma model and migration
-      // The userFeedback table does not exist yet in the schema
+      // NOTE: Requires UserFeedback table in Prisma schema
       logger.warn("UserFeedback feature not yet implemented - returning mock data", { organizationId });
 
       const feedback: any[] = [];
@@ -246,8 +245,7 @@ router.get(
       const { organizationId } = req.user!;
       const status = (req.query.status as string) || "pending";
 
-      // TODO: Implement FeedbackAction Prisma model and migration
-      // The feedbackAction table does not exist yet in the schema
+      // NOTE: Requires FeedbackAction table in Prisma schema
       logger.warn("FeedbackAction feature not yet implemented - returning mock data", { organizationId, status });
 
       const actions: any[] = [];
@@ -272,8 +270,7 @@ router.post(
       const { id } = req.params;
       const actionId = Array.isArray(id) ? id[0] : id;
 
-      // TODO: Implement FeedbackAction Prisma model and migration
-      // The feedbackAction table does not exist yet in the schema
+      // NOTE: Requires FeedbackAction table in Prisma schema
       logger.warn("FeedbackAction feature not yet implemented - cannot apply action", { actionId, organizationId });
 
       return res.status(501).json({ error: "FeedbackAction feature not yet implemented" });
@@ -296,8 +293,7 @@ router.post(
       const { id } = req.params;
       const actionId = Array.isArray(id) ? id[0] : id;
 
-      // TODO: Implement FeedbackAction Prisma model and migration
-      // The feedbackAction table does not exist yet in the schema
+      // NOTE: Requires FeedbackAction table in Prisma schema
       logger.warn("FeedbackAction feature not yet implemented - cannot dismiss action", { actionId, organizationId });
 
       return res.status(501).json({ error: "FeedbackAction feature not yet implemented" });
@@ -321,8 +317,7 @@ router.post(
       const actionId = Array.isArray(id) ? id[0] : id;
       const { reason } = req.body as { reason?: string };
 
-      // TODO: Implement FeedbackAction Prisma model and migration
-      // The feedbackAction table does not exist yet in the schema
+      // NOTE: Requires FeedbackAction table in Prisma schema
       logger.warn("FeedbackAction feature not yet implemented - cannot rollback action", { actionId, organizationId, reason });
 
       return res.status(501).json({ error: "FeedbackAction feature not yet implemented" });

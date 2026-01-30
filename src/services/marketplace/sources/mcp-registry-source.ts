@@ -152,8 +152,6 @@ export class MCPRegistrySource implements SkillSource {
   }
 
   async getVersions(ref: ExternalSkillRef): Promise<string[]> {
-    const { identifier } = ref;
-
     try {
       return [ref.version || "latest"];
     } catch {

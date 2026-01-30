@@ -8,6 +8,36 @@ import {
 
 describe("Request Analyzer - Enhanced NLP Capabilities", () => {
   describe("Task Creation Intent", () => {
+    it("should detect explicit task creation with colon separator", async () => {
+      const result = await analyzeRequestEnhanced("create a task: fix the bug");
+      expect(result.intent).toBe("create_task");
+      expect(result.intentConfidence).toBeGreaterThanOrEqual(0.9);
+      expect(result.extractedEntities?.taskTitle?.value).toBe("fix the bug");
+      expect(result.extractedEntities?.taskTitle?.confidence).toBeGreaterThan(0.8);
+    });
+
+    it("should detect Korean task creation with colon separator", async () => {
+      const result = await analyzeRequestEnhanced("노션에 태스크 만들어줘: 버그 수정");
+      expect(result.intent).toBe("create_task");
+      expect(result.intentConfidence).toBeGreaterThanOrEqual(0.9);
+      expect(result.extractedEntities?.taskTitle?.value).toBe("버그 수정");
+      expect(result.entities?.target).toBe("notion");
+    });
+
+    it("should detect task creation with 'for' pattern", async () => {
+      const result = await analyzeRequestEnhanced("add task for bug fixing");
+      expect(result.intent).toBe("create_task");
+      expect(result.intentConfidence).toBeGreaterThanOrEqual(0.9);
+      expect(result.extractedEntities?.taskTitle?.value).toBe("bug fixing");
+    });
+
+    it("should detect task creation with 'about' pattern", async () => {
+      const result = await analyzeRequestEnhanced("make a task about documentation");
+      expect(result.intent).toBe("create_task");
+      expect(result.intentConfidence).toBeGreaterThanOrEqual(0.9);
+      expect(result.extractedEntities?.taskTitle?.value).toBe("documentation");
+    });
+
     it("should detect task creation with 'create task for' pattern", async () => {
       const result = await analyzeRequestEnhanced(
         "create task for john to review the document by friday",
@@ -51,6 +81,25 @@ describe("Request Analyzer - Enhanced NLP Capabilities", () => {
     it("should extract project name", async () => {
       const result = await analyzeRequestEnhanced("create task in ProjectAlpha for john");
       expect(result.extractedEntities?.project?.value).toBe("ProjectAlpha");
+    });
+
+    it("should extract task title with target platform", async () => {
+      const result = await analyzeRequestEnhanced("create a task in notion: write API docs");
+      expect(result.intent).toBe("create_task");
+      expect(result.extractedEntities?.target?.value).toBe("notion");
+      expect(result.extractedEntities?.taskTitle?.value).toBe("write API docs");
+    });
+
+    it("should handle Korean task creation without separator", async () => {
+      const result = await analyzeRequestEnhanced("태스크 생성해줘");
+      expect(result.intent).toBe("create_task");
+      expect(result.intentConfidence).toBeGreaterThanOrEqual(0.9);
+    });
+
+    it("should handle mixed Korean-English task creation", async () => {
+      const result = await analyzeRequestEnhanced("노션에 create task: 문서 작성");
+      expect(result.intent).toBe("create_task");
+      expect(result.entities?.target).toBe("notion");
     });
   });
 

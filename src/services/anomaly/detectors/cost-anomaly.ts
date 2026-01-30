@@ -3,8 +3,11 @@
  *
  * Detects unexpected cost changes and budget anomalies.
  *
- * TODO: This detector uses Prisma tables (AgentCostRecord) that don't exist yet.
- * All detection methods are stubbed until schema migration is complete.
+ * BLOCKED: Requires Prisma schema migration to add:
+ * - AgentCostRecord table (or cost tracking on OrchestratorExecution)
+ * - Cost aggregation by agent, model, and time period
+ *
+ * All detection methods return stubs until cost tracking exists.
  */
 
 // import { db as prisma } from "../../../db/client";
@@ -32,7 +35,7 @@ const DEFAULT_CONFIG: CostConfig = {
 // const BASELINE_CACHE_PREFIX = "anomaly:cost:baseline:";
 // const BASELINE_CACHE_TTL = 3600; // 1 hour
 
-// TODO: Uncomment when implementing
+// Cost statistics interface - uncomment when implementing
 // interface CostStats {
 //   totalCostCents: number;
 //   costPerHour: number;
@@ -57,7 +60,6 @@ export class CostAnomalyDetector implements AnomalyDetector {
 
   /**
    * Detect cost anomalies for an organization
-   * TODO: Implement when AgentCostRecord table exists in schema
    */
   async detect(_organizationId: string): Promise<DetectorResult[]> {
     if (!this.config.enabled) {
@@ -68,10 +70,9 @@ export class CostAnomalyDetector implements AnomalyDetector {
     return [];
   }
 
-  // TODO: Uncomment when implementing
+  // Get cost statistics for a time window - uncomment when implementing
   // /**
   //  * Get cost statistics for a time window
-  //  * TODO: Implement when AgentCostRecord table exists in schema
   //  */
   // private async getCostStats(
   //   _organizationId: string,
@@ -89,10 +90,9 @@ export class CostAnomalyDetector implements AnomalyDetector {
   //   };
   // }
 
-  // TODO: Uncomment when implementing
+  // Get baseline cost statistics - uncomment when implementing
   // /**
   //  * Get baseline cost statistics
-  //  * TODO: Implement when AgentCostRecord table exists in schema
   //  */
   // private async getBaselineStats(
   //   _organizationId: string,
@@ -110,7 +110,7 @@ export class CostAnomalyDetector implements AnomalyDetector {
   //   };
   // }
 
-  // TODO: Uncomment when implementing
+  // Detect spending spikes - uncomment when implementing
   // private detectSpendSpike(
   //   current: CostStats,
   //   baseline: CostStats,
@@ -143,10 +143,10 @@ export class CostAnomalyDetector implements AnomalyDetector {
   //   return { isAnomaly: false, severity: "warning", deviation: ratio };
   // }
 
-  // TODO: Uncomment when implementing
+  // Detect budget anomalies - uncomment when implementing
+  // Note: Organization.monthlyBudgetCents and currentMonthSpendCents already exist in schema
   // /**
   //  * Detect budget anomalies
-  //  * TODO: Implement when Organization.monthlyBudgetCents and currentMonthSpendCents fields exist
   //  */
   // private async detectBudgetAnomaly(
   //   _organizationId: string,
@@ -156,7 +156,7 @@ export class CostAnomalyDetector implements AnomalyDetector {
   //   return null;
   // }
 
-  // TODO: Uncomment when implementing
+  // Detect expensive agents - uncomment when implementing
   // private detectExpensiveAgent(
   //   organizationId: string,
   //   current: CostStats,
@@ -208,7 +208,7 @@ export class CostAnomalyDetector implements AnomalyDetector {
   //   return null;
   // }
 
-  // TODO: Uncomment when implementing
+  // Build spike description - uncomment when implementing
   // private buildSpikeDescription(current: CostStats, baseline: CostStats): string {
   //   const currentDollars = (current.costPerHour / 100).toFixed(2);
   //   const baselineDollars = (baseline.costPerHour / 100).toFixed(2);
@@ -221,7 +221,7 @@ export class CostAnomalyDetector implements AnomalyDetector {
   //   );
   // }
 
-  // TODO: Uncomment when implementing
+  // Get spike suggested actions - uncomment when implementing
   // private getSpikeSuggestedActions(stats: CostStats): string[] {
   //   const actions: string[] = [
   //     "Review recent high-cost operations",
@@ -243,7 +243,7 @@ export class CostAnomalyDetector implements AnomalyDetector {
   //   return actions;
   // }
 
-  // TODO: Uncomment when implementing
+  // Get top entries - uncomment when implementing
   // private getTopEntries(
   //   map: Record<string, number>,
   //   count: number,

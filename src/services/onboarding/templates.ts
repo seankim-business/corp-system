@@ -1,7 +1,7 @@
 /**
  * Onboarding Templates Service (Stub)
  *
- * TODO: Implement when onboarding tables are properly added to Prisma schema
+ * NOTE: Requires onboarding tables in Prisma schema (Template, etc.)
  */
 
 import { logger } from "../../utils/logger";

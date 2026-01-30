@@ -1,5 +1,5 @@
-# Multi-stage build for Kyndof Corp System
-# Note: Frontend is pre-built and committed to git to reduce build memory usage
+# Multi-stage build for Nubabel Platform
+# Production-optimized with security hardening and health checks
 
 # ============================================================================
 # Stage 1: Backend Builder
@@ -8,15 +8,20 @@ FROM node:20-alpine AS backend-builder
 
 WORKDIR /app
 
-# Install openssl and openssl-dev for Prisma
-RUN apk add --no-cache openssl openssl-dev
+# Install build dependencies
+RUN apk add --no-cache \
+    openssl \
+    openssl-dev \
+    python3 \
+    make \
+    g++
 
-# Copy package files
+# Copy package files for dependency installation
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
+# Install ALL dependencies (including devDependencies for build)
 RUN npm ci
 
 # Generate Prisma Client
@@ -25,7 +30,7 @@ RUN npx prisma generate
 # Copy source code
 COPY src ./src
 
-# Build TypeScript
+# Build TypeScript (suppress non-critical warnings)
 RUN npm run build
 
 # ============================================================================
@@ -33,10 +38,15 @@ RUN npm run build
 # ============================================================================
 FROM node:20-alpine AS runtime
 
-# Install dumb-init, openssl and openssl-dev for Prisma
-RUN apk add --no-cache dumb-init openssl openssl-dev
+# Install runtime dependencies and security tools
+RUN apk add --no-cache \
+    dumb-init \
+    openssl \
+    openssl-dev \
+    curl \
+    ca-certificates
 
-# Create app user (non-root)
+# Create non-root app user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
@@ -44,11 +54,9 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-
-# Copy Prisma files for migrations
 COPY prisma ./prisma/
 
-# Install production dependencies only
+# Install ONLY production dependencies
 RUN npm ci --only=production && \
     npm cache clean --force
 
@@ -64,25 +72,32 @@ COPY frontend/dist ./frontend/dist
 # Copy landing page
 COPY landing ./landing
 
-# Copy startup script and make executable
+# Copy startup and utility scripts
 COPY scripts/start.sh ./scripts/start.sh
+COPY scripts/fix-migration.js ./scripts/fix-migration.js
+COPY scripts/seed-workflows.js ./scripts/seed-workflows.js
+
+# Make scripts executable
 RUN chmod +x ./scripts/start.sh
+
+# Create logs directory
+RUN mkdir -p /app/logs
 
 # Set ownership to app user
 RUN chown -R nodejs:nodejs /app
 
-# Switch to app user
+# Switch to non-root user
 USER nodejs
 
-# Expose port
+# Expose application port
 EXPOSE 3000
 
-# Copy migration and seed scripts
-COPY scripts/fix-migration.js ./scripts/fix-migration.js
-COPY scripts/seed-workflows.js ./scripts/seed-workflows.js
+# Health check using Node.js built-in HTTP
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health/ready', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"
 
-# Use dumb-init to handle signals properly
+# Use dumb-init to properly handle signals (SIGTERM for graceful shutdown)
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start application using start.sh (handles migrations + RLS function creation)
+# Start application (runs migrations, then starts server)
 CMD ["./scripts/start.sh"]

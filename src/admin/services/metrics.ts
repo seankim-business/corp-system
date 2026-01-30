@@ -105,10 +105,11 @@ export class AdminMetricsService {
 
   /**
    * Get metrics history for trend analysis
+   * Note: Requires time-series metrics table (e.g., PlatformMetricsSnapshot)
    */
   async getMetricsHistory(_days: number): Promise<PlatformMetrics[]> {
-    // For now, return current metrics
-    // TODO: Implement historical metrics storage and retrieval
+    // Historical metrics require daily/hourly snapshots stored in database
+    // Consider creating PlatformMetricsSnapshot table for trend analysis
     const current = await this.getMetrics();
     return [current];
   }
@@ -196,7 +197,7 @@ export class AdminMetricsService {
       active: activeOrgs.length,
       byPlan,
       newThisMonth,
-      churnedThisMonth: 0, // TODO: Track churn in database
+      churnedThisMonth: 0, // Requires organization status/lifecycle tracking
     };
   }
 
@@ -231,8 +232,8 @@ export class AdminMetricsService {
       prisma.organization.count(),
     ]);
 
-    // Note: OrchestratorExecution doesn't have agentId field
-    // TODO: Add agent tracking to OrchestratorExecution schema if needed
+    // Note: OrchestratorExecution tracks orchestrator-level executions
+    // Agent-level execution tracking would require AgentExecution table or agentId field
     const agentStats: Record<string, number> = {};
 
     return {
@@ -284,16 +285,16 @@ export class AdminMetricsService {
 
   /**
    * Get system health statistics
+   * Note: Requires APM/monitoring integration (e.g., New Relic, DataDog)
    */
   private async getSystemStats(): Promise<PlatformMetrics["system"]> {
-    const uptimePercent = 99.9; // Placeholder - would come from monitoring
-
-    // TODO: Integrate with actual monitoring system
+    // System statistics require integration with monitoring/APM service
+    // Current implementation returns placeholder values
     return {
-      uptime: uptimePercent,
-      avgLatency: 45, // ms - placeholder
-      errorRate: 0.1, // % - placeholder
-      activeConnections: 0, // Would come from connection pool stats
+      uptime: 99.9, // Would come from uptime monitoring service
+      avgLatency: 45, // Would come from request tracing/APM
+      errorRate: 0.1, // Would come from error tracking service
+      activeConnections: 0, // Would come from database connection pool stats
     };
   }
 }

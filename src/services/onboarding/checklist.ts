@@ -1,7 +1,7 @@
 /**
  * Onboarding Checklist Service (Stub)
  *
- * TODO: Implement when onboarding tables are properly added to Prisma schema
+ * NOTE: Requires onboarding tables in Prisma schema (ChecklistItem, etc.)
  */
 
 import { logger } from "../../utils/logger";

@@ -1,7 +1,7 @@
 /**
  * Limit Enforcement Service (Stub)
  *
- * TODO: Implement when billing tables are properly added to Prisma schema
+ * NOTE: Requires billing tables in Prisma schema (Subscription, UsageRecord, etc.)
  */
 
 import { Request, Response, NextFunction } from "express";

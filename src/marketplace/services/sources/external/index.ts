@@ -38,8 +38,8 @@ export function createAllSources(config?: SourceConfig): BaseExternalSource[] {
     new MCPRegistrySource(),
     new GlamaSource(),
     new ComfyUISource(),
-    new CivitAISource(config?.civitaiApiKey),
-    new LangChainHubSource(config?.langchainApiKey),
+    new CivitAISource({ apiKey: config?.civitaiApiKey }),
+    new LangChainHubSource({ apiKey: config?.langchainApiKey }),
   ];
 }
 

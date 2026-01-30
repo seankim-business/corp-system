@@ -1,0 +1,217 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: nubabel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nubabel}
+      POSTGRES_USER: ${POSTGRES_USER:-nubabel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?PostgreSQL password is required}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nubabel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - nubabel-network
+
+  # ============================================================================
+  # Redis Cache & Queue
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: nubabel-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - nubabel-network
+
+  # ============================================================================
+  # Application Server
+  # ============================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: nubabel-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Application
+      NODE_ENV: production
+      PORT: 3000
+      BASE_URL: ${BASE_URL:?Base URL is required}
+      FRONTEND_URL: ${FRONTEND_URL:?Frontend URL is required}
+      BASE_DOMAIN: ${BASE_DOMAIN:?Base domain is required}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:?Cookie domain is required}
+
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nubabel}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nubabel}?schema=public
+
+      # Redis
+      REDIS_URL: redis://redis:6379
+      BULLMQ_REDIS_URL: redis://redis:6379
+
+      # Security
+      JWT_SECRET: ${JWT_SECRET:?JWT secret is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Encryption key is required}
+      ENCRYPTION_SECRET: ${ENCRYPTION_SECRET:?Encryption secret is required}
+
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Google Client ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Google Client Secret is required}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?Google Redirect URI is required}
+
+      # AI Providers
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      USE_BUILTIN_AI: ${USE_BUILTIN_AI:-true}
+
+      # Monitoring
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # Slack (optional)
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      SLACK_SOCKET_MODE: ${SLACK_SOCKET_MODE:-true}
+      SLACK_ALERT_CHANNEL: ${SLACK_ALERT_CHANNEL:-#eng-alerts}
+
+      # Queue Configuration
+      QUEUE_SLACK_CONCURRENCY: ${QUEUE_SLACK_CONCURRENCY:-5}
+      QUEUE_ORCHESTRATION_CONCURRENCY: ${QUEUE_ORCHESTRATION_CONCURRENCY:-3}
+      QUEUE_NOTIFICATION_CONCURRENCY: ${QUEUE_NOTIFICATION_CONCURRENCY:-10}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - app-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health/ready', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - nubabel-network
+    labels:
+      - "com.nubabel.service=app"
+      - "com.nubabel.version=${APP_VERSION:-latest}"
+
+  # ============================================================================
+  # Prometheus Metrics
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nubabel-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - nubabel-network
+    depends_on:
+      - app
+
+  # ============================================================================
+  # Grafana Dashboards
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nubabel-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Grafana admin password is required}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_INSTALL_PLUGINS: ${GRAFANA_PLUGINS:-}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - nubabel-network
+    depends_on:
+      - prometheus
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  postgres-data:
+    driver: local
+    labels:
+      - "com.nubabel.volume=postgres"
+  redis-data:
+    driver: local
+    labels:
+      - "com.nubabel.volume=redis"
+  app-logs:
+    driver: local
+    labels:
+      - "com.nubabel.volume=logs"
+  prometheus-data:
+    driver: local
+    labels:
+      - "com.nubabel.volume=prometheus"
+  grafana-data:
+    driver: local
+    labels:
+      - "com.nubabel.volume=grafana"
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  nubabel-network:
+    driver: bridge
+    labels:
+      - "com.nubabel.network=main"

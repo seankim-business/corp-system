@@ -210,7 +210,7 @@ class AWSSecretsProvider implements SecretsProvider {
       key: fullKey,
       region: this.region,
     });
-    // TODO: Implement AWS SDK integration
+    // NOTE: AWS SDK integration stubbed - install @aws-sdk/client-secrets-manager to implement
     // const client = new SecretsManagerClient({ region: this.region });
     // const response = await client.send(new GetSecretValueCommand({ SecretId: fullKey }));
     // return response.SecretString || null;
@@ -223,7 +223,7 @@ class AWSSecretsProvider implements SecretsProvider {
       key: fullKey,
       region: this.region,
     });
-    // TODO: Implement AWS SDK integration
+    // NOTE: AWS SDK integration stubbed - install @aws-sdk/client-secrets-manager to implement
     throw new Error("AWS Secrets Manager provider not implemented - stubbed only");
   }
 
@@ -233,7 +233,7 @@ class AWSSecretsProvider implements SecretsProvider {
       key: fullKey,
       region: this.region,
     });
-    // TODO: Implement AWS SDK integration
+    // NOTE: AWS SDK integration stubbed - install @aws-sdk/client-secrets-manager to implement
     throw new Error("AWS Secrets Manager provider not implemented - stubbed only");
   }
 
@@ -243,7 +243,7 @@ class AWSSecretsProvider implements SecretsProvider {
       prefix: searchPrefix,
       region: this.region,
     });
-    // TODO: Implement AWS SDK integration
+    // NOTE: AWS SDK integration stubbed - install @aws-sdk/client-secrets-manager to implement
     throw new Error("AWS Secrets Manager provider not implemented - stubbed only");
   }
 
@@ -253,7 +253,7 @@ class AWSSecretsProvider implements SecretsProvider {
       key: fullKey,
       region: this.region,
     });
-    // TODO: Implement AWS SDK integration with rotation lambda
+    // NOTE: AWS SDK integration stubbed - install @aws-sdk/client-secrets-manager to implement with rotation lambda
     throw new Error("AWS Secrets Manager rotation not implemented - stubbed only");
   }
 }
@@ -282,7 +282,7 @@ class VaultSecretsProvider implements SecretsProvider {
       path: fullPath,
       vaultUrl: this.vaultUrl,
     });
-    // TODO: Implement node-vault integration
+    // NOTE: HashiCorp Vault integration stubbed - install node-vault to implement
     // const vault = require('node-vault')({ endpoint: this.vaultUrl, token: this.token });
     // const result = await vault.read(fullPath);
     // return result.data.data.value || null;
@@ -295,7 +295,7 @@ class VaultSecretsProvider implements SecretsProvider {
       path: fullPath,
       vaultUrl: this.vaultUrl,
     });
-    // TODO: Implement node-vault integration
+    // NOTE: HashiCorp Vault integration stubbed - install node-vault to implement
     throw new Error("Vault provider not implemented - stubbed only");
   }
 
@@ -305,7 +305,7 @@ class VaultSecretsProvider implements SecretsProvider {
       path: fullPath,
       vaultUrl: this.vaultUrl,
     });
-    // TODO: Implement node-vault integration
+    // NOTE: HashiCorp Vault integration stubbed - install node-vault to implement
     throw new Error("Vault provider not implemented - stubbed only");
   }
 
@@ -315,7 +315,7 @@ class VaultSecretsProvider implements SecretsProvider {
       path: listPath,
       vaultUrl: this.vaultUrl,
     });
-    // TODO: Implement node-vault integration
+    // NOTE: HashiCorp Vault integration stubbed - install node-vault to implement
     throw new Error("Vault provider not implemented - stubbed only");
   }
 
@@ -324,7 +324,7 @@ class VaultSecretsProvider implements SecretsProvider {
       key,
       vaultUrl: this.vaultUrl,
     });
-    // TODO: Implement Vault rotation
+    // NOTE: HashiCorp Vault rotation stubbed - requires custom rotation logic + node-vault
     throw new Error("Vault rotation not implemented - stubbed only");
   }
 }

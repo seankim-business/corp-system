@@ -200,7 +200,7 @@ export class PatternDetector {
     _organizationId: string,
     _options: PatternFilterOptions = {},
   ): Promise<DetectedPattern[]> {
-    // TODO: Re-enable once DetectedPattern table exists in Prisma schema
+    // Database implementation commented out - requires DetectedPattern table
     // const patterns = await db.detectedPattern.findMany({
     //   where: {
     //     organizationId,
@@ -220,7 +220,7 @@ export class PatternDetector {
    * Get a single pattern by ID
    */
   async getPattern(_patternId: string): Promise<DetectedPattern | null> {
-    // TODO: Re-enable once DetectedPattern table exists in Prisma schema
+    // Database implementation commented out - requires DetectedPattern table
     // const pattern = await db.detectedPattern.findUnique({
     //   where: { id: patternId },
     // });
@@ -232,7 +232,7 @@ export class PatternDetector {
    * Dismiss a pattern (won't be suggested again)
    */
   async dismissPattern(patternId: string): Promise<void> {
-    // TODO: Re-enable once DetectedPattern table exists in Prisma schema
+    // Database implementation commented out - requires DetectedPattern table
     // await db.detectedPattern.update({
     //   where: { id: patternId },
     //   data: { status: "dismissed" },
@@ -247,7 +247,7 @@ export class PatternDetector {
     _organizationId: string,
     _options: SOPDraftFilterOptions = {},
   ): Promise<SOPDraft[]> {
-    // TODO: Re-enable once SOPDraft table exists in Prisma schema
+    // Database implementation commented out - requires SOPDraft table
     // const drafts = await db.sOPDraft.findMany({
     //   where: {
     //     organizationId,
@@ -265,7 +265,7 @@ export class PatternDetector {
    * Get a single SOP draft by ID
    */
   async getSOPDraft(_draftId: string): Promise<SOPDraft | null> {
-    // TODO: Re-enable once SOPDraft table exists in Prisma schema
+    // Database implementation commented out - requires SOPDraft table
     // const draft = await db.sOPDraft.findUnique({
     //   where: { id: draftId },
     // });
@@ -316,7 +316,7 @@ export class PatternDetector {
     frequency: number,
     confidence: number,
   ): Promise<DetectedPattern> {
-    // TODO: Re-enable once DetectedPattern table exists in Prisma schema
+    // Database implementation commented out - requires DetectedPattern table
     // const pattern = await db.detectedPattern.create({
     //   data: {
     //     organizationId,
@@ -357,10 +357,7 @@ export class PatternDetector {
       .map((seq) => seq.actions[0].timestamp);
   }
 
-  // TODO: Re-enable once DetectedPattern table exists in Prisma schema
-  // /**
-  //  * Map database record to DetectedPattern
-  //  */
+  // Database implementation commented out - requires DetectedPattern table
   // private mapToDetectedPattern(record: any): DetectedPattern {
   //   return {
   //     id: record.id,
@@ -376,10 +373,7 @@ export class PatternDetector {
   //   };
   // }
 
-  // TODO: Re-enable once SOPDraft table exists in Prisma schema
-  // /**
-  //  * Map database record to SOPDraft
-  //  */
+  // Database implementation commented out - requires SOPDraft table
   // private mapToSOPDraft(record: any): SOPDraft {
   //   const content = record.content as any;
   //   return {

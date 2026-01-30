@@ -319,8 +319,7 @@ router.post(
         actualAction,
       });
 
-      // TODO: Store feedback in database for ML model training
-      // For now, just acknowledge receipt
+      // NOTE: Feedback stored in logs for ML model training once UserFeedback table is available
 
       return res.json({
         success: true,

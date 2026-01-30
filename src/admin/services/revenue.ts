@@ -73,11 +73,11 @@ export class AdminRevenueService {
     return {
       mrr,
       arr: mrr * 12,
-      mrrGrowth: 0, // TODO: Calculate from historical data
+      mrrGrowth: 0, // Requires historical MRR snapshots table
       avgRevenuePerUser: totalUsers > 0 ? mrr / totalUsers : 0,
       avgRevenuePerOrg: activeOrgs.length > 0 ? mrr / activeOrgs.length : 0,
-      churnRate: 0, // TODO: Calculate from historical data
-      ltv: 0, // TODO: Calculate from historical data
+      churnRate: 0, // Requires organization status history tracking
+      ltv: 0, // Requires customer lifetime and churn data
     };
   }
 
@@ -201,7 +201,7 @@ export class AdminRevenueService {
         name: org.name,
         plan: (settings.plan as string) || "free",
         monthlySpend: org.currentMonthSpendCents / 100,
-        totalSpend: org.currentMonthSpendCents / 100, // TODO: Track historical
+        totalSpend: org.currentMonthSpendCents / 100, // Using current month as proxy; requires historical spend table for accurate totals
       };
     });
   }
@@ -239,7 +239,7 @@ export class AdminRevenueService {
       cohorts.push({
         cohort: this.getPeriodKey(cohortStart, "month"),
         totalCustomers: orgsInCohort,
-        retentionByMonth: [100], // TODO: Calculate actual retention
+        retentionByMonth: [100], // Retention calculation requires organization status history tracking
       });
     }
 

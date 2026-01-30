@@ -1,5 +1,6 @@
-// import { db } from "../../db/client"; // Disabled until Prisma tables exist
+import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
+import { mapExtensionToDto } from "./catalog";
 import {
   Publisher,
   PublisherRegistration,
@@ -9,105 +10,250 @@ import {
   MarketplaceExtension,
 } from "../types";
 
-// TODO: Will be used when marketplace tables are implemented
-export function mapPublisherToDto(_pub: any): Publisher {
-  // TODO: Implement once publisher table is created via Prisma migration
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+// Map Prisma model to DTO
+// Note: ExtensionPublisher schema has: id, organizationId, name, slug, description, website, verified, createdAt, updatedAt
+export function mapPublisherToDto(pub: {
+  id: string;
+  organizationId: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  website: string | null;
+  verified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}): Publisher {
+  return {
+    id: pub.id,
+    userId: pub.organizationId || "",
+    name: pub.name,
+    slug: pub.slug,
+    email: "", // Not in schema - would need to join with Organization or User
+    website: pub.website ?? undefined,
+    description: pub.description ?? undefined,
+    logoUrl: undefined, // Not in schema
+    verified: pub.verified,
+    verifiedAt: undefined, // Not in schema
+    stripeAccountId: undefined, // Not in schema
+    payoutEnabled: false, // Not in schema - would need to check if payouts exist
+    createdAt: pub.createdAt,
+    updatedAt: pub.updatedAt,
+  };
 }
 
 export async function registerPublisher(
   userId: string,
   data: PublisherRegistration,
 ): Promise<Publisher> {
-  // TODO: Implement once publisher table is created via Prisma migration
-  logger.warn("registerPublisher not implemented - tables not yet created", { userId, data });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+  // Note: email, stripeAccountId, payoutEnabled are not in the schema
+  // They would need to be tracked separately or schema needs migration
+  const publisher = await db.extensionPublisher.create({
+    data: {
+      organizationId: userId,
+      name: data.name,
+      slug: data.slug,
+      website: data.website ?? null,
+      description: data.description ?? null,
+      verified: false,
+    },
+  });
+
+  logger.info("Publisher registered", { publisherId: publisher.id, userId });
+  return mapPublisherToDto(publisher);
 }
 
 export async function getPublisher(idOrSlug: string): Promise<Publisher | null> {
-  // TODO: Implement once publisher table is created via Prisma migration
-  logger.warn("getPublisher returning null - tables not yet created", { idOrSlug });
-  return null;
+  const publisher = await db.extensionPublisher.findFirst({
+    where: {
+      OR: [{ id: idOrSlug }, { slug: idOrSlug }],
+    },
+  });
+
+  return publisher ? mapPublisherToDto(publisher) : null;
 }
 
 export async function getPublisherByUserId(userId: string): Promise<Publisher | null> {
-  // TODO: Implement once publisher table is created via Prisma migration
-  logger.warn("getPublisherByUserId returning null - tables not yet created", { userId });
-  return null;
+  const publisher = await db.extensionPublisher.findFirst({
+    where: {
+      organizationId: userId,
+    },
+  });
+
+  return publisher ? mapPublisherToDto(publisher) : null;
 }
 
 export async function updatePublisher(
   publisherId: string,
   data: Partial<PublisherRegistration>,
 ): Promise<Publisher> {
-  // TODO: Implement once publisher table is created via Prisma migration
-  logger.warn("updatePublisher not implemented - tables not yet created", { publisherId, data });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+  const publisher = await db.extensionPublisher.update({
+    where: { id: publisherId },
+    data: {
+      name: data.name,
+      website: data.website ?? undefined,
+      description: data.description ?? undefined,
+    },
+  });
+
+  logger.info("Publisher updated", { publisherId });
+  return mapPublisherToDto(publisher);
 }
 
 export async function submitExtension(
   publisherId: string,
   submission: ExtensionSubmission,
-  packageUrl: string,
-  manifest: any,
+  _packageUrl: string,
+  manifest: Record<string, unknown>,
 ): Promise<{ extensionId: string; versionId: string }> {
-  // TODO: Implement once marketplace tables are created via Prisma migration
-  logger.warn("submitExtension not implemented - tables not yet created", {
-    publisherId,
-    submission,
-    packageUrl,
-    manifest,
+  // Create extension with "draft" status for review
+  const extension = await db.marketplaceExtension.create({
+    data: {
+      publisherId,
+      name: submission.name,
+      slug: submission.slug,
+      description: submission.description,
+      version: (manifest.version as string) || "1.0.0",
+      category: submission.category,
+      tags: submission.tags,
+      manifest: {
+        ...manifest,
+        metadata: {
+          longDescription: submission.longDescription,
+          pricing: submission.pricing,
+          priceAmount: submission.priceAmount,
+          priceCurrency: submission.priceCurrency,
+          priceInterval: submission.priceInterval,
+          icon: submission.icon,
+          screenshots: submission.screenshots,
+          demoUrl: submission.demoUrl,
+          repositoryUrl: submission.repositoryUrl,
+          documentationUrl: submission.documentationUrl,
+        },
+      },
+      isPublic: false, // Not public until reviewed
+      status: "draft",
+      enabled: false,
+    },
   });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+
+  // Create initial version
+  const version = await db.extensionVersion.create({
+    data: {
+      extensionId: extension.id,
+      version: (manifest.version as string) || "1.0.0",
+      manifest: manifest as any,
+      changelog: "Initial release",
+    },
+  });
+
+  logger.info("Extension submitted for review", {
+    publisherId,
+    extensionId: extension.id,
+    versionId: version.id,
+  });
+
+  return { extensionId: extension.id, versionId: version.id };
 }
 
-export async function publishExtension(
-  extensionId: string,
-  versionId: string,
-): Promise<void> {
-  // TODO: Implement once marketplace tables are created via Prisma migration
-  logger.warn("publishExtension not implemented - tables not yet created", { extensionId, versionId });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+export async function publishExtension(extensionId: string, _versionId: string): Promise<void> {
+  await db.marketplaceExtension.update({
+    where: { id: extensionId },
+    data: {
+      status: "active",
+      isPublic: true,
+      enabled: true,
+    },
+  });
+
+  logger.info("Extension published", { extensionId });
 }
 
-export async function rejectExtension(
-  extensionId: string,
-  reason: string,
-): Promise<void> {
-  // TODO: Implement once marketplaceExtension table is created via Prisma migration
-  logger.warn("rejectExtension not implemented - tables not yet created", { extensionId, reason });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+export async function rejectExtension(extensionId: string, reason: string): Promise<void> {
+  await db.marketplaceExtension.update({
+    where: { id: extensionId },
+    data: {
+      status: "rejected",
+      manifest: {
+        rejectionReason: reason,
+        rejectedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  logger.info("Extension rejected", { extensionId, reason });
 }
 
-export async function getPublisherExtensions(
-  publisherId: string,
-): Promise<MarketplaceExtension[]> {
-  // TODO: Implement once marketplace tables are created via Prisma migration
-  logger.warn("getPublisherExtensions returning empty array - tables not yet created", { publisherId });
-  return [];
+export async function getPublisherExtensions(publisherId: string): Promise<MarketplaceExtension[]> {
+  const extensions = await db.marketplaceExtension.findMany({
+    where: { publisherId },
+    include: {
+      publisher: {
+        select: { name: true, verified: true },
+      },
+      versions: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return extensions.map((ext) => mapExtensionToDto(ext as any));
 }
 
 export async function getPublisherAnalytics(
   publisherId: string,
   period: "7d" | "30d" | "90d" | "1y" = "30d",
 ): Promise<PublisherAnalytics> {
-  // TODO: Implement once marketplace tables are created via Prisma migration
-  logger.warn("getPublisherAnalytics returning empty data - tables not yet created", { publisherId, period });
+  const days = period === "7d" ? 7 : period === "30d" ? 30 : period === "90d" ? 90 : 365;
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  // Get all extensions for this publisher
+  const extensions = await db.marketplaceExtension.findMany({
+    where: { publisherId },
+    include: {
+      installations: {
+        where: {
+          installedAt: { gte: startDate },
+        },
+      },
+    },
+  });
+
+  // Calculate totals
+  let totalDownloads = 0;
+  let totalInstalls = 0;
+  const extensionStats = extensions.map((ext) => {
+    totalDownloads += ext.downloads;
+    totalInstalls += ext.installations.length;
+    return {
+      extensionId: ext.id,
+      name: ext.name,
+      downloads: ext.downloads,
+      installs: ext.installations.length,
+      revenue: 0, // No purchase tracking in current schema
+      rating: ext.rating || 0,
+    };
+  });
+
+  // Generate download trend (using installation dates as proxy)
+  const allInstallDates = extensions.flatMap((ext) =>
+    ext.installations.map((i) => i.installedAt),
+  );
+  const downloadTrend = generateTrend(allInstallDates, days);
+
   return {
-    totalDownloads: 0,
-    totalRevenue: 0,
-    totalInstalls: 0,
-    extensionStats: [],
-    downloadTrend: [],
-    revenueTrend: [],
+    totalDownloads,
+    totalRevenue: 0, // No purchase tracking
+    totalInstalls,
+    extensionStats,
+    downloadTrend,
+    revenueTrend: [], // No revenue tracking
   };
 }
 
-// TODO: Will be used when marketplace tables are implemented
-export function generateTrend(
-  dates: Date[],
-  days: number,
-): { date: string; count: number }[] {
+export function generateTrend(dates: Date[], days: number): { date: string; count: number }[] {
   const byDate: Record<string, number> = {};
   for (const date of dates) {
     const dateStr = date.toISOString().split("T")[0];
@@ -130,7 +276,6 @@ export function generateTrend(
   return result;
 }
 
-// TODO: Will be used when marketplace tables are implemented
 export function generateRevenueTrend(
   data: { date: Date; amount: number }[],
   days: number,
@@ -157,25 +302,44 @@ export function generateRevenueTrend(
   return result;
 }
 
-export async function getPayoutHistory(
-  publisherId: string,
-): Promise<PublisherPayout[]> {
-  // TODO: Implement once publisherPayout table is created via Prisma migration
-  logger.warn("getPayoutHistory returning empty array - tables not yet created", { publisherId });
-  return [];
+export async function getPayoutHistory(publisherId: string): Promise<PublisherPayout[]> {
+  const payouts = await db.publisherPayout.findMany({
+    where: { publisherId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return payouts.map((payout) => ({
+    id: payout.id,
+    publisherId: payout.publisherId,
+    amount: payout.amount,
+    currency: payout.currency,
+    periodStart: payout.periodStart || payout.createdAt,
+    periodEnd: payout.periodEnd || payout.createdAt,
+    stripeTransferId: payout.transactionId ?? undefined,
+    status: payout.status as "pending" | "processing" | "completed" | "failed",
+    paidAt: payout.processedAt ?? undefined,
+    createdAt: payout.createdAt,
+  }));
 }
 
 export async function verifyPublisher(publisherId: string): Promise<void> {
-  // TODO: Implement once publisher table is created via Prisma migration
-  logger.warn("verifyPublisher not implemented - tables not yet created", { publisherId });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+  await db.extensionPublisher.update({
+    where: { id: publisherId },
+    data: {
+      verified: true,
+      // verifiedAt not in schema
+    },
+  });
+
+  logger.info("Publisher verified", { publisherId });
 }
 
 export async function setStripeAccount(
-  publisherId: string,
-  stripeAccountId: string,
+  _publisherId: string,
+  _stripeAccountId: string,
 ): Promise<void> {
-  // TODO: Implement once publisher table is created via Prisma migration
-  logger.warn("setStripeAccount not implemented - tables not yet created", { publisherId, stripeAccountId });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
+  // Note: stripeAccountId and payoutEnabled are not in the ExtensionPublisher schema
+  // This would require a schema migration to add these fields
+  logger.warn("setStripeAccount: stripeAccountId field not in schema - requires migration");
+  throw new Error("Stripe account linking requires schema migration");
 }

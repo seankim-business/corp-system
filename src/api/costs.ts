@@ -100,8 +100,8 @@ router.get(
     try {
       const { organizationId } = req.user!;
       const agentId = req.params.agentId as string;
-      // TODO: Add period support to getAgentCosts
-      periodSchema.parse(req.query.period); // Validate but ignore for now
+      // NOTE: Period parameter validated but not yet used - requires getAgentCosts() refactor
+      periodSchema.parse(req.query.period);
 
       const agentCosts: AgentCostSummary = await getAgentCosts(organizationId, agentId);
 

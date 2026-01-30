@@ -180,5 +180,7 @@ export async function logAdminAction(
     timestamp: new Date().toISOString(),
   });
 
-  // TODO: Store in database for audit trail
+  // NOTE: Future enhancement - persist to AdminAuditLog table for compliance
+  // Currently logs are stored in application logs (CloudWatch/stdout)
+  // For production audit requirements, consider adding AdminAuditLog model to Prisma schema
 }

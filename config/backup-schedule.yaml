@@ -1,0 +1,101 @@
+# Nubabel Backup Schedule Configuration
+# Used by cron scheduler and S3 lifecycle management
+
+backup:
+  postgresql:
+    enabled: true
+
+    # Full backup schedule (daily at 2 AM UTC)
+    full:
+      cron: "0 2 * * *"
+      retention_days: 30
+      storage_class: STANDARD_IA
+
+    # Incremental backup schedule (every 6 hours)
+    incremental:
+      cron: "0 */6 * * *"
+      retention_days: 7
+      storage_class: STANDARD
+
+    # Options
+    options:
+      compression: gzip
+      compression_level: 9
+      parallel_jobs: 4
+      exclude_tables:
+        - "_prisma_migrations"
+        - "audit_logs"  # Backed up separately
+
+  redis:
+    enabled: true
+
+    # RDB snapshot schedule
+    rdb:
+      cron: "0 3 * * *"
+      retention_days: 14
+
+    # AOF backup (if enabled)
+    aof:
+      cron: "0 */12 * * *"
+      retention_days: 3
+
+# S3 Lifecycle Rules
+s3_lifecycle:
+  bucket: "${AWS_S3_BACKUP_BUCKET}"
+
+  rules:
+    - id: postgresql-full-lifecycle
+      prefix: postgresql/
+      transitions:
+        - days: 30
+          storage_class: GLACIER
+        - days: 90
+          storage_class: DEEP_ARCHIVE
+      expiration:
+        days: 365
+
+    - id: postgresql-incremental-lifecycle
+      prefix: postgresql/incremental/
+      expiration:
+        days: 7
+
+    - id: redis-lifecycle
+      prefix: redis/
+      transitions:
+        - days: 14
+          storage_class: GLACIER
+      expiration:
+        days: 90
+
+# Notification settings
+notifications:
+  on_success: false
+  on_failure: true
+  channels:
+    - type: slack
+      webhook_url: "${SLACK_BACKUP_WEBHOOK_URL}"
+    - type: email
+      recipients:
+        - ops@example.com
+
+# Monitoring
+monitoring:
+  metrics:
+    - backup_duration_seconds
+    - backup_size_bytes
+    - backup_success_total
+    - backup_failure_total
+  alerts:
+    backup_failed:
+      severity: critical
+      threshold: 1
+    backup_size_anomaly:
+      severity: warning
+      threshold_percent: 50  # Alert if size changes by more than 50%
+
+# Verification settings
+verification:
+  enabled: true
+  sample_restore: false  # Full restore test on schedule
+  sample_restore_cron: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+  checksum_validation: true

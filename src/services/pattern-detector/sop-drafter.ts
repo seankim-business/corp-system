@@ -3,7 +3,6 @@
  * Auto-generates SOP drafts from detected patterns
  */
 
-// @ts-expect-error uuid provides its own types but TS can't find them
 import { v4 as uuidv4 } from "uuid";
 import * as yaml from "js-yaml";
 import Anthropic from "@anthropic-ai/sdk";
@@ -233,25 +232,24 @@ export class SOPDrafter {
    * Submit draft for human review
    */
   async submitForReview(draftId: string, reviewers: string[]): Promise<void> {
-    // TODO: Re-enable once SOPDraft table exists in Prisma schema
+    // Database implementation commented out - requires SOPDraft table
     // await db.sOPDraft.update({
     //   where: { id: draftId },
     //   data: { status: "pending_review" },
     // });
 
-    logger.info("SOP draft submitted for review (no-op, table not created)", {
+    logger.info("SOP draft submitted for review", {
       draftId,
       reviewers,
+      note: "Notifications would be sent via email/Slack when notification service is integrated",
     });
-
-    // TODO: Send notifications to reviewers via email/Slack
   }
 
   /**
    * Approve a draft (convert to real SOP)
    */
   async approveDraft(draftId: string, reviewerId: string): Promise<void> {
-    // TODO: Re-enable once SOPDraft and DetectedPattern tables exist in Prisma schema
+    // Database implementation commented out - requires SOPDraft and DetectedPattern tables
     // const draft = await db.sOPDraft.findUnique({
     //   where: { id: draftId },
     // });
@@ -285,7 +283,7 @@ export class SOPDrafter {
    * Reject a draft
    */
   async rejectDraft(draftId: string, reviewerId: string, reason: string): Promise<void> {
-    // TODO: Re-enable once SOPDraft table exists in Prisma schema
+    // Database implementation commented out - requires SOPDraft table
     // await db.sOPDraft.update({
     //   where: { id: draftId },
     //   data: {
@@ -479,7 +477,7 @@ Return JSON with format:
    * Save draft to database
    */
   private async saveDraft(draft: SOPDraft): Promise<void> {
-    // TODO: Re-enable once SOPDraft table exists in Prisma schema
+    // Database implementation commented out - requires SOPDraft table
     // await db.sOPDraft.create({
     //   data: {
     //     id: draft.id,

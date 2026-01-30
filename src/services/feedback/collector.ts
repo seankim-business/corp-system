@@ -1,4 +1,12 @@
-// import { db } from "../../db/client"; // TODO: Uncomment when userFeedback table exists
+/**
+ * Feedback Collector
+ * Collects user feedback from various sources (ratings, reactions, corrections)
+ *
+ * NOTE: Requires userFeedback table in Prisma schema. Currently returns stub data.
+ * Uncomment db imports and implementations when schema is ready.
+ */
+
+// import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
 
 export interface ImplicitSignal {
@@ -29,7 +37,7 @@ export interface CollectFeedbackParams {
 }
 
 export async function collectFeedback(params: CollectFeedbackParams): Promise<string> {
-  // TODO: Implement when userFeedback table exists in Prisma schema
+  // Database implementation commented out - requires userFeedback table
   // const feedback = await db.userFeedback.create({
   //   data: {
   //     organizationId: params.organizationId,
@@ -119,7 +127,7 @@ export async function recordImplicitSignal(
   executionId: string,
   signal: ImplicitSignal
 ): Promise<void> {
-  // TODO: Implement when userFeedback table exists in Prisma schema
+  // Database implementation commented out - requires userFeedback table
   // await db.userFeedback.updateMany({
   //   where: { executionId },
   //   data: {
@@ -152,7 +160,7 @@ export async function handleSlackReaction(
     return;
   }
 
-  // TODO: Implement when userFeedback table exists in Prisma schema
+  // Database implementation commented out - requires userFeedback table
   // Find the execution associated with this message
   // const execution = await db.orchestratorExecution.findFirst({
   //   where: {

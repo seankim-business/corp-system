@@ -1164,6 +1164,7 @@ model ExtensionPublisher {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   extensions MarketplaceExtension[]
+  payouts    PublisherPayout[]
 
   @@index([organizationId])
   @@map("extension_publishers")
@@ -1276,6 +1277,93 @@ model AgentSkillAssignment {
   @@index([organizationId])
   @@index([agentId])
   @@map("agent_skill_assignments")
+}
+
+/// MarketplaceCategory - Extension categories and subcategories
+model MarketplaceCategory {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @db.VarChar(100)
+  slug        String  @unique @db.VarChar(100)
+  description String? @db.Text
+  icon        String? @db.VarChar(100) // Icon name or emoji
+  parentId    String? @map("parent_id") @db.Uuid // Self-reference for subcategories
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent        MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  subcategories MarketplaceCategory[] @relation("CategoryHierarchy")
+
+  @@index([parentId])
+  @@index([sortOrder])
+  @@map("marketplace_categories")
+}
+
+/// ExtensionReview - User reviews for marketplace extensions
+model ExtensionReview {
+  id          String  @id @default(uuid()) @db.Uuid
+  extensionId String  @map("extension_id") @db.Uuid
+  userId      String  @map("user_id") @db.Uuid
+  rating      Int // 1-5 stars
+  title       String? @db.VarChar(255)
+  content     String? @db.Text
+  isVerified  Boolean @default(false) @map("is_verified") // Verified purchase
+
+  helpfulCount   Int @default(0) @map("helpful_count")
+  unhelpfulCount Int @default(0) @map("unhelpful_count")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  helpfulVotes ReviewHelpfulVote[]
+
+  @@unique([extensionId, userId]) // One review per user per extension
+  @@index([extensionId])
+  @@index([userId])
+  @@index([rating])
+  @@map("extension_reviews")
+}
+
+/// ReviewHelpfulVote - Votes on extension reviews
+model ReviewHelpfulVote {
+  id        String  @id @default(uuid()) @db.Uuid
+  reviewId  String  @map("review_id") @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  isHelpful Boolean @map("is_helpful") // true = helpful, false = not helpful
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  review ExtensionReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, userId]) // One vote per user per review
+  @@index([reviewId])
+  @@map("review_helpful_votes")
+}
+
+/// PublisherPayout - Payment records for extension publishers
+model PublisherPayout {
+  id            String    @id @default(uuid()) @db.Uuid
+  publisherId   String    @map("publisher_id") @db.Uuid
+  amount        Int // Amount in cents
+  currency      String    @default("usd") @db.VarChar(10)
+  status        String    @default("pending") @db.VarChar(50) // pending, processing, completed, failed, cancelled
+  paymentMethod String?   @map("payment_method") @db.VarChar(50) // stripe, paypal, bank_transfer
+  transactionId String?   @map("transaction_id") @db.VarChar(255) // External payment reference
+  periodStart   DateTime? @map("period_start") @db.Timestamptz(6) // Payout period
+  periodEnd     DateTime? @map("period_end") @db.Timestamptz(6)
+  processedAt   DateTime? @map("processed_at") @db.Timestamptz(6)
+  failureReason String?   @map("failure_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  publisher ExtensionPublisher @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+
+  @@index([publisherId])
+  @@index([status])
+  @@index([processedAt])
+  @@map("publisher_payouts")
 }
 
 // ============================================================================
@@ -1401,15 +1489,15 @@ model OnboardingChecklistItem {
 model APIKey {
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid // Owner of this API key
   name           String    @db.VarChar(255)
   keyHash        String    @unique @map("key_hash") @db.VarChar(64) // SHA-256 hash of the key
   keyPrefix      String    @map("key_prefix") @db.VarChar(10) // First 8 chars for identification
   scopes         String[]  @default([]) @db.VarChar(100)
-  rateLimit      Int       @default(1000) @map("rate_limit") // requests per hour
+  rateLimitTier  String    @default("standard") @map("rate_limit_tier") @db.VarChar(50) // free, standard, premium, unlimited
+  isActive       Boolean   @default(true) @map("is_active")
   expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
   lastUsedAt     DateTime? @map("last_used_at") @db.Timestamptz(6)
-  enabled        Boolean   @default(true)
-  createdBy      String    @map("created_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -1826,8 +1914,8 @@ model N8nWorkflowPermission {
 /// KnowledgeNode - Nodes in the knowledge graph
 /// Represents entities, concepts, documents, or any knowledge unit
 model KnowledgeNode {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
 
   type        String  @db.VarChar(100) // entity, concept, document, task, person, etc.
   name        String  @db.VarChar(500)
@@ -1840,9 +1928,9 @@ model KnowledgeNode {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  outgoingEdges  KnowledgeEdge[]   @relation("SourceNode")
-  incomingEdges  KnowledgeEdge[]   @relation("TargetNode")
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outgoingEdges KnowledgeEdge[] @relation("SourceNode")
+  incomingEdges KnowledgeEdge[] @relation("TargetNode")
 
   @@index([organizationId, type])
   @@index([organizationId, name])
@@ -1852,8 +1940,8 @@ model KnowledgeNode {
 /// KnowledgeEdge - Relationships between nodes
 /// Weighted, typed edges connecting knowledge nodes
 model KnowledgeEdge {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
 
   sourceNodeId String @map("source_node_id") @db.Uuid
   targetNodeId String @map("target_node_id") @db.Uuid
@@ -1864,9 +1952,9 @@ model KnowledgeEdge {
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sourceNode   KnowledgeNode  @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
-  targetNode   KnowledgeNode  @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceNode   KnowledgeNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode   KnowledgeNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
 
   @@unique([sourceNodeId, targetNodeId, relationshipType])
   @@index([organizationId])
@@ -1879,11 +1967,11 @@ model KnowledgeEdge {
 /// KnowledgeCluster - Groups of related nodes
 /// For organizing and navigating the knowledge graph
 model KnowledgeCluster {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
 
-  name        String  @db.VarChar(255)
-  description String? @db.Text
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
   nodeIds     String[] @map("node_ids") @db.Uuid // Array of node IDs in this cluster
 
   // Centroid vector for the cluster (averaged embeddings)
@@ -1901,8 +1989,8 @@ model KnowledgeCluster {
 /// EntityMemory - Memory about specific entities
 /// Short-term, context-specific memory for entities
 model EntityMemory {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
 
   entityType String @map("entity_type") @db.VarChar(100) // agent, user, project, task, etc.
   entityId   String @map("entity_id") @db.Uuid
@@ -1924,19 +2012,19 @@ model EntityMemory {
 /// Memory - Long-term memory storage
 /// Episodic, semantic, and procedural memory for the system
 model Memory {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  userId         String?  @map("user_id") @db.Uuid // Optional: memory specific to a user
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  userId         String? @map("user_id") @db.Uuid // Optional: memory specific to a user
 
   type String @db.VarChar(50) // episodic (events), semantic (facts), procedural (how-tos)
 
-  content    String @db.Text
-  embedding  Json?  @db.JsonB // [0.1, 0.2, ...] float vector for semantic search
+  content   String @db.Text
+  embedding Json?  @db.JsonB // [0.1, 0.2, ...] float vector for semantic search
 
   // Memory strength metrics
-  importance      Float    @default(0.5) @db.Real // 0.0-1.0
-  accessCount     Int      @default(0) @map("access_count")
-  lastAccessedAt  DateTime @default(now()) @map("last_accessed_at") @db.Timestamptz(6)
+  importance     Float    @default(0.5) @db.Real // 0.0-1.0
+  accessCount    Int      @default(0) @map("access_count")
+  lastAccessedAt DateTime @default(now()) @map("last_accessed_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 

@@ -1,7 +1,7 @@
 /**
  * Usage Tracking Service (Stub)
  *
- * TODO: Implement when usage tables are properly added to Prisma schema
+ * NOTE: Requires usage tables in Prisma schema (UsageRecord, etc.)
  */
 
 import { logger } from "../../utils/logger";

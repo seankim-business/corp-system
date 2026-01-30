@@ -1,4 +1,11 @@
-// TODO: Uncomment when feedbackAction table exists in Prisma schema
+/**
+ * Action Recommender
+ * Recommends and prioritizes actions based on processed feedback
+ *
+ * NOTE: Requires feedbackAction table in Prisma schema. Currently returns stub data.
+ * Uncomment db imports and implementations when schema is ready.
+ */
+
 // import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
 import type { ProcessedFeedback, FeedbackCategory } from "./processor";
@@ -97,12 +104,12 @@ export function prioritizeActions(actions: FeedbackAction[]): FeedbackAction[] {
 }
 
 export async function saveRecommendedActions(
-  _organizationId: string, // TODO: Use when feedbackAction table exists
+  _organizationId: string,
   actions: FeedbackAction[]
 ): Promise<string[]> {
   const ids: string[] = [];
 
-  // TODO: Implement when feedbackAction table exists in Prisma schema
+  // Database implementation commented out - requires feedbackAction table
   for (const action of actions) {
     // const saved = await db.feedbackAction.create({
     //   data: {

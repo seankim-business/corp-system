@@ -106,9 +106,7 @@ export function regionMiddleware(options: RegionMiddlewareOptions = {}) {
           });
         }
 
-        // TODO: Implement getFailoverRegion in regionRouter
-        // Attempt failover
-        // const fallbackRegion = await regionRouter.getFailoverRegion(region.id);
+        // Attempt failover using configured failover region
         const fallbackRegion = region.failoverRegion ? getRegionById(region.failoverRegion) : null;
         if (fallbackRegion) {
           logger.info("Using failover region", {
@@ -128,12 +126,10 @@ export function regionMiddleware(options: RegionMiddlewareOptions = {}) {
         req.region = region;
       }
 
-      // TODO: Fix lazy connection initialization - getters cannot be async
-      // For now, use eager connection initialization
+      // NOTE: Lazy connection initialization disabled - JavaScript getters cannot be async
       // Attach connections (lazy or eager)
       if (opts.lazyConnections) {
         // Lazy connections not yet implemented due to async getter limitation
-        // Define getters that lazily initialize connections
         // Object.defineProperty(req, "regionDb", {
         //   get: async function () {
         //     if (!this._regionDb) {

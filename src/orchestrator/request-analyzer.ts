@@ -62,6 +62,7 @@ export interface EnhancedRequestAnalysis extends RequestAnalysis {
     dueDate?: ExtractedEntity;
     priority?: ExtractedEntity;
     project?: ExtractedEntity;
+    taskTitle?: ExtractedEntity;
   };
   ambiguity?: {
     isAmbiguous: boolean;
@@ -537,7 +538,29 @@ function classifyIntent(
     sessionMetadata?: Record<string, any>;
   },
 ): IntentClassification {
-  // Check for follow-up context first
+  // Check for explicit task creation intent FIRST (highest priority)
+  const explicitTaskCreationPatterns = [
+    // English patterns
+    /\b(create|add|make)\s+a?\s*task\s*(for|:|about)?/i,
+    /\btask\s*(creation|create|add|make)/i,
+    /\b(new|create|add)\s+task\b/i,
+    // Korean patterns
+    /태스크\s*(생성|만들|추가|작성)/,
+    /(생성|만들|추가|작성).*태스크/,
+    /태스크.*?(해|줘|주세요|for)/i,
+    /작업\s*(생성|만들|추가)/,
+    /(생성|만들|추가).*작업/,
+    // Mixed patterns
+    /\b(create|add|make)\s+태스크/i,
+  ];
+
+  for (const pattern of explicitTaskCreationPatterns) {
+    if (pattern.test(text)) {
+      return { intent: "create_task", confidence: 0.95, category: "task_creation" };
+    }
+  }
+
+  // Check for follow-up context
   if (context?.previousMessages && context.previousMessages.length > 0) {
     const lastMessage = context.previousMessages[context.previousMessages.length - 1];
 
@@ -553,28 +576,29 @@ function classifyIntent(
     }
   }
 
-  // Task creation patterns
+  // General task creation patterns (lower confidence than explicit)
   const taskCreationPatterns = [
     /\b(create|add|make|new|assign|allocate|schedule)\s+(task|job|work|assignment)/i,
     /\b(create|add|make)\s+\w+\s+(for|to)\s+@?\w+/i,
-    /\b(create task for|assign to|allocate to)\s+/i,
+    /\b(assign|allocate)\s+(this|that|it|work)\s+to\s+/i,
     /(생성|만들|추가|작성|할당)\s+(태스크|작업|이슈)/,
   ];
 
-  // Search/query patterns
-  const searchPatterns = [
-    /\b(search|find|look for|show|list|get|retrieve|query|what|where|which)\b/i,
-    /\b(show|list|display)\s+(my|all|the)\s+(tasks|work|items|requests)/i,
-    /\b(what'?s|what is)\s+(on|in)\s+(my|the)\s+(plate|list|queue)/i,
-    /(조회|확인|보여|찾|검색|알려|리스트)/,
-  ];
-
-  // Report/analytics patterns
+  // Report/analytics patterns (check BEFORE search patterns to prioritize report intent)
   const reportPatterns = [
     /\b(generate|create|make|show|display)\s+(report|summary|overview|analytics|stats|statistics)/i,
     /\b(report|analytics|summary)\s+(on|about|for)\s+/i,
     /\b(how many|count|total|statistics)\s+/i,
     /(리포트|보고서|분석|통계|요약)/,
+  ];
+
+  // Search/query patterns
+  const searchPatterns = [
+    /\b(show|list|display)\s+(my|all|the)\s+(tasks|work|items|requests)/i,
+    /\b(show|display)\s+(tasks|work|items)/i,
+    /\b(search|find|look for|get|retrieve|query)\b/i,
+    /\b(what'?s|what is)\s+(on|in)\s+(my|the)\s+(plate|list|queue)/i,
+    /(조회|확인|보여|찾|검색|알려|리스트)/,
   ];
 
   // Approval/decision patterns
@@ -585,11 +609,11 @@ function classifyIntent(
     /(승인|거절|거부|수락|확인)/,
   ];
 
-  // Score each category
+  // Score each category (order matters - report before search to prioritize report intent)
   const scores = {
     task_creation: scorePatterns(text, taskCreationPatterns),
-    search: scorePatterns(text, searchPatterns),
     report: scorePatterns(text, reportPatterns),
+    search: scorePatterns(text, searchPatterns),
     approval: scorePatterns(text, approvalPatterns),
   };
 
@@ -626,7 +650,10 @@ function scorePatterns(text: string, patterns: RegExp[]): number {
   let score = 0;
   for (const pattern of patterns) {
     if (pattern.test(text)) {
-      score += 0.4;
+      // Give higher score for more specific patterns (longer regex = more specific)
+      const patternLength = pattern.source.length;
+      const patternScore = patternLength > 50 ? 0.6 : patternLength > 30 ? 0.5 : 0.4;
+      score += patternScore;
     }
   }
   return Math.min(score, 1.0);
@@ -707,6 +734,66 @@ function extractEntities(
   return entities;
 }
 
+/**
+ * Extract task title from text.
+ * Supports patterns like:
+ * - "create a task: Fix the bug"
+ * - "add task for bug fixing"
+ * - "태스크 만들어줘: 버그 수정"
+ * - "노션에 태스크 생성해줘: 문서 작성"
+ */
+function extractTaskTitle(text: string): ExtractedEntity | undefined {
+  // English patterns with colon separator (with optional "in [platform]" before colon)
+  const colonPattern = /(?:create|add|make)\s+(?:a\s+)?task(?:\s+in\s+\w+)?\s*:\s*(.+)/i;
+  const colonMatch = text.match(colonPattern);
+  if (colonMatch && colonMatch[1]) {
+    return {
+      type: "taskTitle",
+      value: colonMatch[1].trim(),
+      confidence: 0.9,
+      position: colonMatch.index,
+    };
+  }
+
+  // Korean patterns with colon separator
+  const koreanColonPattern = /태스크\s*(?:생성|만들|추가).*?:\s*(.+)/;
+  const koreanColonMatch = text.match(koreanColonPattern);
+  if (koreanColonMatch && koreanColonMatch[1]) {
+    return {
+      type: "taskTitle",
+      value: koreanColonMatch[1].trim(),
+      confidence: 0.9,
+      position: koreanColonMatch.index,
+    };
+  }
+
+  // English patterns with "for" or "about"
+  const forPattern = /(?:create|add|make)\s+(?:a\s+)?task\s+(?:for|about)\s+(.+?)(?:\s+to\s+|\s+by\s+|$)/i;
+  const forMatch = text.match(forPattern);
+  if (forMatch && forMatch[1]) {
+    return {
+      type: "taskTitle",
+      value: forMatch[1].trim(),
+      confidence: 0.85,
+      position: forMatch.index,
+    };
+  }
+
+  // Korean patterns without separator
+  const koreanPattern = /(?:태스크|작업)\s*(?:생성|만들|추가).*?(?:해줘|주세요)\s*(.+)/;
+  const koreanMatch = text.match(koreanPattern);
+  if (koreanMatch && koreanMatch[1]) {
+    return {
+      type: "taskTitle",
+      value: koreanMatch[1].trim(),
+      confidence: 0.75,
+      position: koreanMatch.index,
+    };
+  }
+
+  return undefined;
+}
+
 function extractEntitiesEnhanced(text: string): {
   target?: ExtractedEntity;
   action?: ExtractedEntity;
@@ -715,6 +802,7 @@ function extractEntitiesEnhanced(text: string): {
   dueDate?: ExtractedEntity;
   priority?: ExtractedEntity;
   project?: ExtractedEntity;
+  taskTitle?: ExtractedEntity;
 } {
   const entities: any = {};
 
@@ -815,18 +903,19 @@ function extractEntitiesEnhanced(text: string): {
   }
 
   const projectPatterns = [
-    /(?:project|in|for)\s+["']?([A-Z][A-Za-z0-9\s-]+)["']?/,
-    /\b(project|프로젝트)\s+(\w+)/i,
+    /\b(?:in|for|project)\s+["']?([A-Z][A-Za-z0-9-]+(?:\s+[A-Z][A-Za-z0-9-]+)*)["']?(?:\s+(?:for|to|by|with|and)\s|$)/,
+    /\bproject\s+["']?([A-Z][A-Za-z0-9-]+)["']?/,
+    /\b(프로젝트)\s+(\w+)/i,
   ];
 
   for (const pattern of projectPatterns) {
     const match = text.match(pattern);
     if (match) {
-      const projectName = match[match.length - 1];
-      if (projectName && projectName.length > 1) {
+      const projectName = pattern.toString().includes('프로젝트') ? match[2] : match[1];
+      if (projectName && projectName.length > 1 && !['for', 'to', 'by', 'with', 'and'].includes(projectName.toLowerCase())) {
         entities.project = {
           type: "project",
-          value: projectName,
+          value: projectName.trim(),
           confidence: 0.75,
           position: match.index,
         };
@@ -871,6 +960,12 @@ function extractEntitiesEnhanced(text: string): {
       };
       break;
     }
+  }
+
+  // Extract task title if this is a task creation request
+  const taskTitle = extractTaskTitle(text);
+  if (taskTitle) {
+    entities.taskTitle = taskTitle;
   }
 
   return entities;
@@ -949,7 +1044,8 @@ function detectAmbiguity(
   const ambiguousTerms: string[] = [];
   const clarifyingQuestions: string[] = [];
 
-  if (!entities.assignee && /\b(for|to|assign|allocate)\b/i.test(text)) {
+  // Check for ambiguous assignee (priority: check "for" with task creation context)
+  if (!entities.assignee && /\b(for|to|assign|allocate)\b/i.test(text) && /\b(task|create|make|add)\b/i.test(text)) {
     ambiguousTerms.push("assignee");
     clarifyingQuestions.push("Who should this be assigned to?");
   }
@@ -964,7 +1060,8 @@ function detectAmbiguity(
     clarifyingQuestions.push("What priority level should this have?");
   }
 
-  if (!entities.project && /\b(project|in|for)\b/i.test(text)) {
+  // Check for ambiguous project (only if "project" or "in" is explicitly mentioned)
+  if (!entities.project && (/\bproject\b/i.test(text) || /\bin\s+[A-Z]/i.test(text))) {
     ambiguousTerms.push("project");
     clarifyingQuestions.push("Which project is this for?");
   }

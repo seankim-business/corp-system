@@ -1,7 +1,7 @@
 /**
  * Onboarding Wizard Service (Stub)
  *
- * TODO: Implement when onboarding tables are properly added to Prisma schema
+ * NOTE: Requires onboarding tables in Prisma schema (WizardStep, etc.)
  */
 
 import { logger } from "../../utils/logger";

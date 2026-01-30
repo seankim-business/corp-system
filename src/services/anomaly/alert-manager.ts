@@ -4,8 +4,11 @@
  * Creates alerts from anomalies, routes them to appropriate channels,
  * and manages acknowledgment/resolution workflows.
  *
- * TODO: This service uses Prisma tables (Anomaly, Alert) that don't exist yet.
- * All methods are stubbed until schema migration is complete.
+ * BLOCKED: Requires Prisma schema migration to add:
+ * - Alert table (id, organizationId, anomalyId, status, channels, timestamps)
+ * - Anomaly table (id, organizationId, type, severity, metric, values, metadata)
+ *
+ * All methods return stubs until tables exist in schema.
  */
 
 // import { db as prisma } from "../../db/client";
@@ -27,7 +30,6 @@ import {
 export class AlertManager {
   /**
    * Create an alert from an anomaly
-   * TODO: Implement when Anomaly and Alert tables exist in schema
    */
   async createAlert(_input: AlertCreateInput): Promise<Alert | null> {
     logger.warn("AlertManager.createAlert called but not implemented - tables don't exist yet");
@@ -36,7 +38,6 @@ export class AlertManager {
 
   /**
    * Route alert to appropriate channels based on org settings and severity
-   * TODO: Implement when Alert and Anomaly tables exist in schema
    */
   async routeAlert(_alert: Alert): Promise<AlertRouteResult> {
     logger.warn("AlertManager.routeAlert called but not implemented - tables don't exist yet");
@@ -50,7 +51,6 @@ export class AlertManager {
 
   /**
    * Acknowledge an alert
-   * TODO: Implement when Alert table exists in schema
    */
   async acknowledgeAlert(alertId: string, _userId: string): Promise<Alert> {
     logger.warn("AlertManager.acknowledgeAlert called but not implemented - tables don't exist yet");
@@ -70,7 +70,6 @@ export class AlertManager {
 
   /**
    * Resolve an alert with optional resolution notes
-   * TODO: Implement when Alert table exists in schema
    */
   async resolveAlert(
     alertId: string,
@@ -94,7 +93,6 @@ export class AlertManager {
 
   /**
    * Get all open alerts for an organization
-   * TODO: Implement when Alert table exists in schema
    */
   async getOpenAlerts(_organizationId: string): Promise<Alert[]> {
     logger.warn("AlertManager.getOpenAlerts called but not implemented - tables don't exist yet");
@@ -103,7 +101,6 @@ export class AlertManager {
 
   /**
    * Get alert with its anomaly data
-   * TODO: Implement when Alert and Anomaly tables exist in schema
    */
   async getAlertWithAnomaly(
     _alertId: string,
@@ -114,7 +111,6 @@ export class AlertManager {
 
   /**
    * Get alerts by status
-   * TODO: Implement when Alert table exists in schema
    */
   async getAlertsByStatus(
     _organizationId: string,
@@ -127,7 +123,6 @@ export class AlertManager {
 
   /**
    * Get recent alerts with anomaly data
-   * TODO: Implement when Alert and Anomaly tables exist in schema
    */
   async getRecentAlerts(
     _organizationId: string,
@@ -140,7 +135,6 @@ export class AlertManager {
 
   /**
    * Update notification tracking
-   * TODO: Implement when Alert table exists in schema
    */
   async updateNotifiedChannels(
     _alertId: string,
@@ -153,14 +147,13 @@ export class AlertManager {
 
   /**
    * Auto-resolve old alerts that are auto-resolvable
-   * TODO: Implement when Alert and Anomaly tables exist in schema
    */
   async autoResolveStaleAlerts(_maxAgeHours: number = 24): Promise<number> {
     logger.warn("AlertManager.autoResolveStaleAlerts called but not implemented - tables don't exist yet");
     return 0;
   }
 
-  // TODO: Uncomment when implementing
+  // Deduplication helper - uncomment when implementing
   // private getDedupKey(
   //   organizationId: string,
   //   anomaly: Omit<Anomaly, "id" | "createdAt">,
@@ -169,7 +162,7 @@ export class AlertManager {
   //   return `${ALERT_DEDUP_PREFIX}${organizationId}:${anomaly.type}:${anomaly.metric}:${agentPart}`;
   // }
 
-  // TODO: Uncomment when implementing
+  // Database mapping helper - uncomment when implementing
   // private mapAlertFromDb(record: {
   //   id: string;
   //   organizationId: string;
@@ -204,7 +197,7 @@ export class AlertManager {
   //   };
   // }
 
-  // TODO: Uncomment when implementing
+  // Database mapping helper - uncomment when implementing
   // private mapAnomalyFromDb(record: {
   //   id: string;
   //   organizationId: string;

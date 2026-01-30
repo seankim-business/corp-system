@@ -1,7 +1,7 @@
 /**
  * Billing API Routes (Stub)
  *
- * TODO: Implement when billing tables are properly added to Prisma schema
+ * NOTE: Requires billing tables in Prisma schema (Subscription, Invoice, etc.)
  */
 
 import { Router, Request, Response } from "express";

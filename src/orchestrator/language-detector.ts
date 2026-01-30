@@ -189,7 +189,16 @@ type ResponseKey =
   | "failed"
   | "not_found"
   | "unauthorized"
-  | "rate_limited";
+  | "rate_limited"
+  | "task_created"
+  | "task_created_title"
+  | "task_view_in_notion"
+  | "task_login_required"
+  | "task_org_not_found"
+  | "task_notion_not_connected"
+  | "task_invalid_syntax"
+  | "task_no_default_database"
+  | "task_creation_failed";
 
 const LOCALIZED_RESPONSES: Record<ResponseKey, Record<"ko" | "en", string>> = {
   processing: {
@@ -216,6 +225,42 @@ const LOCALIZED_RESPONSES: Record<ResponseKey, Record<"ko" | "en", string>> = {
     ko: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
     en: "Too many requests. Please try again later.",
   },
+  task_created: {
+    ko: "✅ Notion에 태스크가 생성되었습니다!",
+    en: "✅ Task created in Notion!",
+  },
+  task_created_title: {
+    ko: "Notion에 태스크가 생성되었습니다!",
+    en: "Task created in Notion!",
+  },
+  task_view_in_notion: {
+    ko: "Notion에서 보기",
+    en: "View in Notion",
+  },
+  task_login_required: {
+    ko: "❌ 먼저 로그인해주세요",
+    en: "❌ Please login first",
+  },
+  task_org_not_found: {
+    ko: "❌ 조직을 찾을 수 없습니다",
+    en: "❌ Organization not found",
+  },
+  task_notion_not_connected: {
+    ko: "❌ Notion이 연결되지 않았습니다",
+    en: "❌ Notion not connected",
+  },
+  task_invalid_syntax: {
+    ko: "❌ 잘못된 형식입니다",
+    en: "❌ Invalid syntax",
+  },
+  task_no_default_database: {
+    ko: "❌ 기본 Notion 데이터베이스가 설정되지 않았습니다",
+    en: "❌ No default Notion database configured",
+  },
+  task_creation_failed: {
+    ko: "❌ 태스크 생성 실패",
+    en: "❌ Failed to create task",
+  },
 };
 
 export function getLocalizedResponse(
@@ -232,4 +277,44 @@ export function getLocalizedResponse(
   // For "mixed", default to Korean since the user has demonstrated Korean usage
   const effectiveLang: "ko" | "en" = lang === "en" ? "en" : "ko";
   return entry[effectiveLang];
+}
+
+// ---------------------------------------------------------------------------
+// 5. getUserLanguagePreference
+// ---------------------------------------------------------------------------
+
+export interface SlackUserInfo {
+  locale?: string;
+  tz?: string;
+}
+
+/**
+ * Determines user's preferred language from Slack user info or organization settings.
+ * Priority: 1) Slack user locale, 2) Text detection, 3) Default to English
+ */
+export function getUserLanguagePreference(
+  slackUserInfo?: SlackUserInfo,
+  textSample?: string,
+): DetectedLanguage {
+  // 1. Check Slack user locale
+  if (slackUserInfo?.locale) {
+    const locale = slackUserInfo.locale.toLowerCase();
+    if (locale.startsWith("ko")) {
+      return "ko";
+    }
+    if (locale.startsWith("en")) {
+      return "en";
+    }
+  }
+
+  // 2. Detect from text sample if provided
+  if (textSample) {
+    const detected = detectLanguage(textSample);
+    if (detected.confidence > 0.5) {
+      return detected.language;
+    }
+  }
+
+  // 3. Default to English
+  return "en";
 }

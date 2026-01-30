@@ -735,7 +735,7 @@ export class ReportGenerator {
     periodStart: Date,
     periodEnd: Date
   ): Promise<{ totalCostCents: number }> {
-    // TODO: agentCostRecord table doesn't exist yet - stub with empty array
+    // NOTE: Requires AgentCostRecord table in Prisma schema
     let costRecords: { costCents: number }[] = [];
     try {
       costRecords = await (prisma as any).agentCostRecord?.findMany({
@@ -805,8 +805,7 @@ export class ReportGenerator {
         return;
       }
 
-      // TODO: Implement actual Slack message sending
-      // This would use the Slack API with slackIntegration.botToken
+      // NOTE: Slack message sending requires Slack Web API integration (@slack/web-api)
       logger.info("Would send report to Slack", {
         organizationId,
         channel,

@@ -1,7 +1,7 @@
-// import { db } from "../../db/client"; // Disabled until Prisma tables exist
+import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
 import { ExtensionInstall } from "../types";
-// import { updateActiveInstalls, incrementDownload } from "./catalog"; // Disabled until Prisma tables exist
+import { incrementDownload, updateActiveInstalls } from "./catalog";
 
 export async function installExtension(
   extensionId: string,
@@ -9,29 +9,18 @@ export async function installExtension(
   userId: string,
   versionId?: string,
 ): Promise<ExtensionInstall> {
-  // TODO: Implement once marketplace tables are created via Prisma migration
-  logger.warn("installExtension not implemented - tables not yet created", {
-    extensionId,
-    organizationId,
-    userId,
-    versionId,
-  });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
   // Get extension and latest version
   const extension = await db.marketplaceExtension.findUnique({
     where: { id: extensionId },
     include: {
       versions: {
-        where: { status: "published" },
         orderBy: { createdAt: "desc" },
         take: 1,
       },
     },
   });
 
-  if (!extension || extension.status !== "published") {
+  if (!extension || extension.status !== "active") {
     throw new Error("Extension not found or not available");
   }
 
@@ -40,11 +29,11 @@ export async function installExtension(
     : extension.versions[0];
 
   if (!targetVersion) {
-    throw new Error("No published version available");
+    throw new Error("No version available");
   }
 
   // Check if already installed
-  const existing = await db.extensionInstall.findFirst({
+  const existing = await db.extensionInstallation.findFirst({
     where: {
       extensionId,
       organizationId,
@@ -56,30 +45,15 @@ export async function installExtension(
     throw new Error("Extension is already installed");
   }
 
-  // Check if paid extension requires purchase
-  if (extension.pricing === "paid") {
-    const purchase = await db.extensionPurchase.findFirst({
-      where: {
-        extensionId,
-        organizationId,
-        status: "active",
-      },
-    });
-
-    if (!purchase) {
-      throw new Error("Please purchase this extension before installing");
-    }
-  }
-
   // Create install record
-  const install = await db.extensionInstall.create({
+  const install = await db.extensionInstallation.create({
     data: {
       extensionId,
-      versionId: targetVersion.id,
       organizationId,
+      version: targetVersion.version,
       installedBy: userId,
       status: "active",
-      installedAt: new Date(),
+      autoUpdate: true,
     },
   });
 
@@ -99,15 +73,14 @@ export async function installExtension(
   return {
     id: install.id,
     extensionId: install.extensionId,
-    versionId: install.versionId,
+    versionId: targetVersion.id,
     organizationId: install.organizationId,
     installedBy: install.installedBy,
     status: install.status as "active" | "uninstalled",
     installedAt: install.installedAt,
-    uninstalledAt: install.uninstalledAt || undefined,
-    lastUsedAt: install.lastUsedAt || undefined,
+    uninstalledAt: undefined,
+    lastUsedAt: undefined,
   };
-  */
 }
 
 export async function uninstallExtension(
@@ -115,16 +88,7 @@ export async function uninstallExtension(
   organizationId: string,
   userId: string,
 ): Promise<void> {
-  // TODO: Implement once extensionInstall table is created via Prisma migration
-  logger.warn("uninstallExtension not implemented - tables not yet created", {
-    extensionId,
-    organizationId,
-    userId,
-  });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
-  const install = await db.extensionInstall.findFirst({
+  const install = await db.extensionInstallation.findFirst({
     where: {
       extensionId,
       organizationId,
@@ -136,11 +100,10 @@ export async function uninstallExtension(
     throw new Error("Extension is not installed");
   }
 
-  await db.extensionInstall.update({
+  await db.extensionInstallation.update({
     where: { id: install.id },
     data: {
       status: "uninstalled",
-      uninstalledAt: new Date(),
     },
   });
 
@@ -152,7 +115,6 @@ export async function uninstallExtension(
     organizationId,
     userId,
   });
-  */
 }
 
 export async function updateExtensionVersion(
@@ -161,17 +123,7 @@ export async function updateExtensionVersion(
   userId: string,
   newVersionId: string,
 ): Promise<ExtensionInstall> {
-  // TODO: Implement once marketplace tables are created via Prisma migration
-  logger.warn("updateExtensionVersion not implemented - tables not yet created", {
-    extensionId,
-    organizationId,
-    userId,
-    newVersionId,
-  });
-  throw new Error("Marketplace functionality not yet available - database tables need to be created");
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
-  const install = await db.extensionInstall.findFirst({
+  const install = await db.extensionInstallation.findFirst({
     where: {
       extensionId,
       organizationId,
@@ -187,14 +139,14 @@ export async function updateExtensionVersion(
     where: { id: newVersionId },
   });
 
-  if (!newVersion || newVersion.status !== "published") {
-    throw new Error("Version not found or not available");
+  if (!newVersion) {
+    throw new Error("Version not found");
   }
 
-  const updated = await db.extensionInstall.update({
+  const updated = await db.extensionInstallation.update({
     where: { id: install.id },
     data: {
-      versionId: newVersionId,
+      version: newVersion.version,
     },
   });
 
@@ -204,23 +156,22 @@ export async function updateExtensionVersion(
   logger.info("Extension updated", {
     extensionId,
     organizationId,
-    oldVersion: install.versionId,
-    newVersion: newVersionId,
+    oldVersion: install.version,
+    newVersion: newVersion.version,
     userId,
   });
 
   return {
     id: updated.id,
     extensionId: updated.extensionId,
-    versionId: updated.versionId,
+    versionId: newVersionId,
     organizationId: updated.organizationId,
     installedBy: updated.installedBy,
     status: updated.status as "active" | "uninstalled",
     installedAt: updated.installedAt,
-    uninstalledAt: updated.uninstalledAt || undefined,
-    lastUsedAt: updated.lastUsedAt || undefined,
+    uninstalledAt: undefined,
+    lastUsedAt: undefined,
   };
-  */
 }
 
 export async function getInstalledExtensions(
@@ -232,55 +183,51 @@ export async function getInstalledExtensions(
     version: { version: string };
   }[]
 > {
-  // TODO: Implement once extensionInstall table is created via Prisma migration
-  logger.warn("getInstalledExtensions returning empty array - tables not yet created", { organizationId });
-  return [];
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
-  const installs = await db.extensionInstall.findMany({
+  const installs = await db.extensionInstallation.findMany({
     where: {
       organizationId,
       status: "active",
     },
     include: {
       extension: {
-        select: { id: true, name: true, slug: true, icon: true },
-      },
-      version: {
-        select: { version: true },
+        select: { id: true, name: true, slug: true, manifest: true },
       },
     },
     orderBy: { installedAt: "desc" },
   });
 
-  return installs.map((i) => ({
-    install: {
-      id: i.id,
-      extensionId: i.extensionId,
-      versionId: i.versionId,
-      organizationId: i.organizationId,
-      installedBy: i.installedBy,
-      status: i.status as "active" | "uninstalled",
-      installedAt: i.installedAt,
-      uninstalledAt: i.uninstalledAt || undefined,
-      lastUsedAt: i.lastUsedAt || undefined,
-    },
-    extension: i.extension,
-    version: i.version,
-  }));
-  */
+  return installs.map((i) => {
+    const manifest = i.extension.manifest as Record<string, unknown> | null;
+    const metadata = (manifest?.metadata as Record<string, unknown>) || {};
+
+    return {
+      install: {
+        id: i.id,
+        extensionId: i.extensionId,
+        versionId: "", // Not stored directly in ExtensionInstallation
+        organizationId: i.organizationId,
+        installedBy: i.installedBy,
+        status: i.status as "active" | "uninstalled",
+        installedAt: i.installedAt,
+        uninstalledAt: undefined,
+        lastUsedAt: undefined,
+      },
+      extension: {
+        id: i.extension.id,
+        name: i.extension.name,
+        slug: i.extension.slug,
+        icon: (metadata.icon as string) || null,
+      },
+      version: { version: i.version },
+    };
+  });
 }
 
 export async function isExtensionInstalled(
   extensionId: string,
   organizationId: string,
 ): Promise<boolean> {
-  // TODO: Implement once extensionInstall table is created via Prisma migration
-  logger.warn("isExtensionInstalled returning false - tables not yet created", { extensionId, organizationId });
-  return false;
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
-  const install = await db.extensionInstall.findFirst({
+  const install = await db.extensionInstallation.findFirst({
     where: {
       extensionId,
       organizationId,
@@ -289,19 +236,13 @@ export async function isExtensionInstalled(
   });
 
   return !!install;
-  */
 }
 
 export async function getInstallInfo(
   extensionId: string,
   organizationId: string,
 ): Promise<ExtensionInstall | null> {
-  // TODO: Implement once extensionInstall table is created via Prisma migration
-  logger.warn("getInstallInfo returning null - tables not yet created", { extensionId, organizationId });
-  return null;
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
-  const install = await db.extensionInstall.findFirst({
+  const install = await db.extensionInstallation.findFirst({
     where: {
       extensionId,
       organizationId,
@@ -314,52 +255,30 @@ export async function getInstallInfo(
   return {
     id: install.id,
     extensionId: install.extensionId,
-    versionId: install.versionId,
+    versionId: "", // Not stored directly
     organizationId: install.organizationId,
     installedBy: install.installedBy,
     status: install.status as "active" | "uninstalled",
     installedAt: install.installedAt,
-    uninstalledAt: install.uninstalledAt || undefined,
-    lastUsedAt: install.lastUsedAt || undefined,
+    uninstalledAt: undefined,
+    lastUsedAt: undefined,
   };
-  */
 }
 
-export async function recordUsage(
-  extensionId: string,
-  organizationId: string,
-): Promise<void> {
-  // TODO: Implement once extensionInstall table is created via Prisma migration
-  logger.warn("recordUsage skipped - tables not yet created", { extensionId, organizationId });
-  return;
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
-  await db.extensionInstall.updateMany({
-    where: {
-      extensionId,
-      organizationId,
-      status: "active",
-    },
-    data: {
-      lastUsedAt: new Date(),
-    },
-  });
-  */
+export async function recordUsage(extensionId: string, organizationId: string): Promise<void> {
+  // ExtensionInstallation doesn't have lastUsedAt field
+  // We can log usage via ExtensionUsageLog instead
+  logger.info("Extension usage recorded", { extensionId, organizationId });
 }
 
 export async function getDownloadStats(
   extensionId: string,
   days: number = 30,
 ): Promise<{ date: string; count: number }[]> {
-  // TODO: Implement once extensionInstall table is created via Prisma migration
-  logger.warn("getDownloadStats returning empty array - tables not yet created", { extensionId, days });
-  return [];
-
-  /* ORIGINAL IMPLEMENTATION - Restore after Prisma migration:
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  const installs = await db.extensionInstall.findMany({
+  const installs = await db.extensionInstallation.findMany({
     where: {
       extensionId,
       installedAt: { gte: startDate },
@@ -390,5 +309,4 @@ export async function getDownloadStats(
   }
 
   return result;
-  */
 }

@@ -104,8 +104,7 @@ router.post("/memory/user", requireAuth, async (req: Request, res: Response) => 
  */
 router.delete("/memory/user/:id", requireAuth, async (_req: Request, res: Response) => {
   try {
-    // TODO: Implement memory table migration (prisma/migrations/20260128_add_memory_tables/)
-    // The db.memory table does not exist yet in the Prisma schema
+    // NOTE: Requires Memory table in Prisma schema (see prisma/migrations/20260128_add_memory_tables/)
     logger.warn("Memory deletion endpoint called but memory table not yet implemented");
 
     return res.status(501).json({

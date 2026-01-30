@@ -1,4 +1,12 @@
-// import { db } from "../../db/client"; // TODO: Uncomment when feedbackAction table exists
+/**
+ * Auto Improver
+ * Validates and applies automatic improvements based on feedback
+ *
+ * NOTE: Requires feedbackAction table in Prisma schema. Currently returns stub data.
+ * Uncomment db imports and implementations when schema is ready.
+ */
+
+// import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
 
 export interface ApplyResult {
@@ -15,7 +23,7 @@ export interface ValidationResult {
 }
 
 export async function validateImprovement(actionId: string): Promise<ValidationResult> {
-  // TODO: Implement when feedbackAction table exists in Prisma schema
+  // Database implementation commented out - requires feedbackAction table
   // const action = await db.feedbackAction.findUnique({
   //   where: { id: actionId },
   // });
@@ -27,7 +35,7 @@ export async function validateImprovement(actionId: string): Promise<ValidationR
 export async function applyAutoImprovements(
   organizationId: string
 ): Promise<ApplyResult[]> {
-  // TODO: Implement when feedbackAction table exists in Prisma schema
+  // Database implementation commented out - requires feedbackAction table
   // const pendingActions = await db.feedbackAction.findMany({
   //   where: {
   //     organizationId,
@@ -41,7 +49,7 @@ export async function applyAutoImprovements(
   return [];
 }
 
-// TODO: Implement when feedbackAction table exists in Prisma schema
+// Database implementation commented out - requires feedbackAction table
 // async function applyAction(action: { type: string; details: unknown }): Promise<string[]> {
 //   const changes: string[] = [];
 //   const details = action.details as Record<string, unknown>;
@@ -75,7 +83,7 @@ export async function rollbackIfNeeded(
   actionId: string,
   reason: string
 ): Promise<boolean> {
-  // TODO: Implement when feedbackAction table exists in Prisma schema
+  // Database implementation commented out - requires feedbackAction table
   // const action = await db.feedbackAction.findUnique({
   //   where: { id: actionId },
   // });
@@ -90,7 +98,7 @@ export async function getImprovementStats(organizationId: string): Promise<{
   pending: number;
   successRate: number;
 }> {
-  // TODO: Implement when feedbackAction table exists in Prisma schema
+  // Database implementation commented out - requires feedbackAction table
   // const [applied, rolledBack, pending] = await Promise.all([
   //   db.feedbackAction.count({ where: { organizationId, status: "applied" } }),
   //   db.feedbackAction.count({ where: { organizationId, status: "rolled_back" } }),

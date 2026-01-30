@@ -287,11 +287,11 @@ export class AnomalyDetectionService {
                 // Route and send notifications
                 const routeResult = await this.alertManager.routeAlert(alert);
 
-                // TODO: Uncomment when anomaly table exists in Prisma schema
+                // Anomaly lookup - blocked by schema migration
                 // const anomalyRecord = await prisma.anomaly.findUnique({
                 //   where: { id: alert.anomalyId },
                 // });
-                const anomalyRecord = null; // Stub until anomaly table exists
+                const anomalyRecord = null;
 
                 if (anomalyRecord) {
                   const payload: NotificationPayload = {

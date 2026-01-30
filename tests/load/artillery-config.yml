@@ -1,0 +1,176 @@
+# Artillery Load Testing Configuration for Nubabel
+# Run with: npx artillery run tests/load/artillery-config.yml
+# Report: npx artillery run --output report.json tests/load/artillery-config.yml && npx artillery report report.json
+
+config:
+  target: "{{ $processEnvironment.BASE_URL || 'http://localhost:3001' }}"
+  phases:
+    - name: "Warm up"
+      duration: 60
+      arrivalRate: 5
+    - name: "Ramp up"
+      duration: 120
+      arrivalRate: 5
+      rampTo: 50
+    - name: "Sustained load"
+      duration: 300
+      arrivalRate: 50
+    - name: "Spike"
+      duration: 60
+      arrivalRate: 100
+    - name: "Cool down"
+      duration: 60
+      arrivalRate: 10
+      rampTo: 0
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ $processEnvironment.API_TOKEN }}"
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint: {}
+
+  apdex:
+    threshold: 500
+
+  ensure:
+    maxErrorRate: 1
+    p95: 500
+    p99: 1000
+
+scenarios:
+  - name: "Health Check"
+    weight: 10
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+            - hasProperty: "status"
+
+  - name: "API Authentication Flow"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "testpassword"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+  - name: "Session Management"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/sessions"
+          json:
+            name: "Artillery Test Session {{ $randomString() }}"
+          capture:
+            - json: "$.id"
+              as: "sessionId"
+          expect:
+            - statusCode:
+                - 200
+                - 201
+      - get:
+          url: "/api/sessions/{{ sessionId }}"
+          ifTrue: "sessionId"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/api/sessions"
+          expect:
+            - statusCode: 200
+
+  - name: "Orchestration Request"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/orchestrate"
+          json:
+            userRequest: "Test orchestration request {{ $randomNumber(1, 10000) }}"
+            sessionId: "artillery-{{ $uuid }}"
+          expect:
+            - statusCode:
+                - 200
+                - 202
+                - 429
+          timeout: 30
+
+  - name: "SSE Polling"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/events/poll?since=0-0"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+  - name: "Slack Webhook Simulation"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/slack/events"
+          headers:
+            X-Slack-Signature: "v0=test"
+            X-Slack-Request-Timestamp: "{{ $timestamp }}"
+          json:
+            type: "event_callback"
+            event:
+              type: "app_mention"
+              user: "U{{ $randomString(8) }}"
+              text: "<@U87654321> artillery test"
+              channel: "C{{ $randomString(8) }}"
+              ts: "{{ $timestamp }}"
+            team_id: "T{{ $randomString(8) }}"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+                - 403
+
+---
+# Soak test configuration (long duration)
+# Run with: npx artillery run --config tests/load/artillery-config.yml:soak
+
+config:
+  target: "{{ $processEnvironment.BASE_URL || 'http://localhost:3001' }}"
+  phases:
+    - name: "Soak test"
+      duration: 3600  # 1 hour
+      arrivalRate: 20
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ $processEnvironment.API_TOKEN }}"
+
+  ensure:
+    maxErrorRate: 0.5
+    p95: 1000
+
+scenarios:
+  - name: "Soak - Mixed Traffic"
+    flow:
+      - get:
+          url: "/health"
+      - think: 1
+      - post:
+          url: "/api/orchestrate"
+          json:
+            userRequest: "Soak test request"
+            sessionId: "soak-{{ $uuid }}"
+          timeout: 30
+      - think: 2
+      - get:
+          url: "/api/sessions"
+      - think: 1

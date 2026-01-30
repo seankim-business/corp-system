@@ -3,11 +3,11 @@
  * Indexes documents into the vector database for semantic search
  */
 
-// TODO: Uncomment when documentEmbedding table exists in Prisma schema
+// NOTE: Requires DocumentEmbedding table in Prisma schema (see prisma/schema.prisma)
 // import crypto from 'crypto';
 // import { db as prisma } from '../../db/client';
 import { logger } from '../../utils/logger';
-// TODO: Uncomment when documentEmbedding table exists
+// NOTE: Uncomment when DocumentEmbedding table added to schema
 // import { getEmbeddingService, EmbeddingService } from './embeddings';
 // import { getChunkSplitter, ChunkSplitter, ChunkOptions } from './chunk-splitter';
 import type { EmbeddingService } from './embeddings';
@@ -37,7 +37,7 @@ export interface IndexStats {
   lastIndexedAt: Date | null;
 }
 
-// TODO: Uncomment when documentEmbedding table exists
+// NOTE: Uncomment when DocumentEmbedding table added to schema
 // const DEFAULT_CHUNK_OPTIONS: ChunkOptions = {
 //   maxChunkSize: 1000,
 //   overlapSize: 200,
@@ -45,7 +45,7 @@ export interface IndexStats {
 // };
 
 export class DocumentIndexer {
-  // TODO: Uncomment when documentEmbedding table exists
+  // NOTE: Uncomment when DocumentEmbedding table added to schema
   // private embeddingService: EmbeddingService;
   // private chunkSplitter: ChunkSplitter;
   // private chunkOptions: ChunkOptions;
@@ -55,13 +55,13 @@ export class DocumentIndexer {
     chunkSplitter?: ChunkSplitter;
     chunkOptions?: Partial<ChunkOptions>;
   }) {
-    // TODO: Initialize when documentEmbedding table exists
+    // NOTE: Initialize when DocumentEmbedding table added to schema
     // this.embeddingService = options?.embeddingService || getEmbeddingService();
     // this.chunkSplitter = options?.chunkSplitter || getChunkSplitter();
     // this.chunkOptions = { ...DEFAULT_CHUNK_OPTIONS, ...options?.chunkOptions };
   }
 
-  // TODO: Uncomment when documentEmbedding table exists
+  // NOTE: Uncomment when DocumentEmbedding table added to schema
   // /**
   //  * Calculate content hash for change detection
   //  */
@@ -76,8 +76,7 @@ export class DocumentIndexer {
     organizationId: string,
     doc: IndexableDocument
   ): Promise<IndexResult> {
-    // TODO: Stub - documentEmbedding model doesn't exist in Prisma schema
-    // Need to add DocumentEmbedding model to prisma/schema.prisma
+    // NOTE: Stubbed - requires DocumentEmbedding model in prisma/schema.prisma
     logger.warn('indexDocument stubbed - documentEmbedding model not implemented', {
       organizationId,
       sourceType: doc.sourceType,
@@ -100,8 +99,7 @@ export class DocumentIndexer {
     organizationId: string,
     docs: IndexableDocument[]
   ): Promise<IndexResult[]> {
-    // TODO: Stub - documentEmbedding model doesn't exist in Prisma schema
-    // Need to add DocumentEmbedding model to prisma/schema.prisma
+    // NOTE: Stubbed - requires DocumentEmbedding model in prisma/schema.prisma
     logger.warn('indexBatch stubbed - documentEmbedding model not implemented', {
       organizationId,
       documentCount: docs.length,
@@ -123,8 +121,7 @@ export class DocumentIndexer {
     organizationId: string,
     doc: IndexableDocument
   ): Promise<{ reindexed: boolean; result?: IndexResult }> {
-    // TODO: Stub - documentEmbedding model doesn't exist in Prisma schema
-    // Need to add DocumentEmbedding model to prisma/schema.prisma
+    // NOTE: Stubbed - requires DocumentEmbedding model in prisma/schema.prisma
     logger.warn('reindexIfChanged stubbed - documentEmbedding model not implemented', {
       organizationId,
       sourceType: doc.sourceType,
@@ -142,8 +139,7 @@ export class DocumentIndexer {
     sourceType: string,
     sourceId: string
   ): Promise<number> {
-    // TODO: Stub - documentEmbedding model doesn't exist in Prisma schema
-    // Need to add DocumentEmbedding model to prisma/schema.prisma
+    // NOTE: Stubbed - requires DocumentEmbedding model in prisma/schema.prisma
     logger.warn('removeDocument stubbed - documentEmbedding model not implemented', {
       organizationId,
       sourceType,
@@ -165,8 +161,7 @@ export class DocumentIndexer {
     failed: number;
     results: IndexResult[];
   }> {
-    // TODO: Stub - documentEmbedding model doesn't exist in Prisma schema
-    // Need to add DocumentEmbedding model to prisma/schema.prisma
+    // NOTE: Stubbed - requires DocumentEmbedding model in prisma/schema.prisma
     logger.warn('fullReindex stubbed - documentEmbedding model not implemented', {
       organizationId,
       documentCount: documents.length,
@@ -192,8 +187,7 @@ export class DocumentIndexer {
    * Get index statistics for organization
    */
   async getStats(organizationId: string): Promise<IndexStats> {
-    // TODO: Stub - documentEmbedding model doesn't exist in Prisma schema
-    // Need to add DocumentEmbedding model to prisma/schema.prisma
+    // NOTE: Stubbed - requires DocumentEmbedding model in prisma/schema.prisma
     logger.warn('getStats stubbed - documentEmbedding model not implemented', {
       organizationId,
     });

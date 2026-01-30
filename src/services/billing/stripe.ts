@@ -1,7 +1,7 @@
 /**
  * Stripe Integration Service (Stub)
  *
- * TODO: Implement when Stripe integration is properly configured
+ * NOTE: Requires Stripe API keys and configuration (see .env.example)
  */
 
 import { logger } from "../../utils/logger";

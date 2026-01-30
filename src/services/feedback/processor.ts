@@ -1,7 +1,16 @@
-// import { db } from "../../db/client"; // TODO: Uncomment when userFeedback table exists
+/**
+ * Feedback Processor
+ * Processes and analyzes user feedback for continuous improvement
+ *
+ * NOTE: Requires userFeedback table in Prisma schema. Currently returns stub data.
+ * Uncomment db imports and implementations when schema is ready.
+ */
+
+// import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
-// import { categorizeFeedback } from "./categorizer"; // TODO: Uncomment when categorizer exists
-// import { recommendActions } from "./action-recommender"; // TODO: Uncomment when action-recommender exists
+// Future imports for when categorizer and action-recommender are implemented:
+// import { categorizeFeedback } from "./categorizer";
+// import { recommendActions } from "./action-recommender";
 
 export type FeedbackCategory =
   | "wrong_agent"
@@ -37,7 +46,7 @@ export interface FeedbackPattern {
 }
 
 export async function processFeedback(feedbackId: string): Promise<ProcessedFeedback> {
-  // TODO: Implement when userFeedback table exists in Prisma schema
+  // Database implementation commented out - requires userFeedback table
   // const feedback = await db.userFeedback.findUnique({
   //   where: { id: feedbackId },
   // });
@@ -55,7 +64,7 @@ export async function processFeedback(feedbackId: string): Promise<ProcessedFeed
 }
 
 export async function batchProcess(organizationId: string): Promise<ProcessedFeedback[]> {
-  // TODO: Implement when userFeedback table exists in Prisma schema
+  // Database implementation commented out - requires userFeedback table
   // const unprocessed = await db.userFeedback.findMany({
   //   where: {
   //     organizationId,
@@ -73,7 +82,7 @@ export async function identifyPatterns(
   agentId: string,
   days: number = 30
 ): Promise<FeedbackPattern[]> {
-  // TODO: Implement when userFeedback table exists in Prisma schema
+  // Database implementation commented out - requires userFeedback table
   // const since = new Date();
   // since.setDate(since.getDate() - days);
   //

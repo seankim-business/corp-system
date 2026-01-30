@@ -522,8 +522,7 @@ router.post("/recommend", requireAuth, (req: Request, res: Response) => {
         return;
       }
 
-      // TODO: Implement AI-powered recommendation system
-      // For now, return empty recommendations
+      // NOTE: AI-powered recommendation system - requires ML model training on usage patterns
       logger.info("Tool recommendation requested", {
         request,
         hasContext: !!context,

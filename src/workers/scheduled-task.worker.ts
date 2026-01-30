@@ -304,7 +304,35 @@ export class ScheduledTaskWorker extends BaseWorker<ScheduledTaskData> {
   ): Promise<void> {
     const customAction = payload.action as string;
     const customParams = payload.params as Record<string, unknown>;
+    const agent = payload.agent as string | undefined;
+    const prompt = payload.prompt as string | undefined;
+    const slackUserId = payload.slackUserId as string | undefined;
 
+    // Handle Slack /schedule command format
+    if (agent && prompt) {
+      logger.info("Executing scheduled agent task from Slack", {
+        organizationId,
+        agent,
+        prompt: prompt.substring(0, 100),
+      });
+
+      const eventId = `sched_agent_${Date.now()}`;
+      const userId = slackUserId || "";
+
+      await orchestrationQueue.enqueueOrchestration({
+        userRequest: `[Scheduled ${agent}] ${prompt}`,
+        sessionId: `sched_agent_${Date.now()}`,
+        organizationId,
+        userId,
+        eventId,
+        slackChannel: "",
+        slackThreadTs: "",
+      });
+
+      return;
+    }
+
+    // Legacy custom task format
     logger.info("Executing custom scheduled task", {
       organizationId,
       action: customAction,

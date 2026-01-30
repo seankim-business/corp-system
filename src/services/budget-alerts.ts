@@ -245,8 +245,9 @@ async function sendEmailAlert(
       select: { name: true },
     });
 
-    // TODO: Integrate with your email service (SendGrid, SES, etc.)
-    // For now, just log the intent
+    // NOTE: Email integration point - connect to SendGrid/SES/Resend
+    // Currently logs alert intent for debugging
+    // Production: Replace with actual email send via configured email provider
     for (const membership of memberships) {
       logger.info("Email budget alert would be sent", {
         organizationId,

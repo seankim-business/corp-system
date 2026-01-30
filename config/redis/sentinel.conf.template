@@ -1,0 +1,65 @@
+# Redis Sentinel Configuration Template
+# Replace placeholders with actual values before deployment
+
+# Sentinel runs on a specific port
+port ${SENTINEL_PORT:-26379}
+
+# Daemonize
+daemonize no
+
+# PID file
+pidfile /var/run/redis-sentinel.pid
+
+# Log file
+logfile ""
+
+# Directory for temporary files
+dir /tmp
+
+# Monitor the master Redis instance
+# sentinel monitor <master-name> <ip> <port> <quorum>
+# Quorum: number of sentinels that need to agree about the fact the master is not reachable
+sentinel monitor ${MASTER_NAME:-mymaster} ${MASTER_HOST:-127.0.0.1} ${MASTER_PORT:-6379} ${QUORUM:-2}
+
+# Authentication
+# If the master requires a password, configure it here
+sentinel auth-pass ${MASTER_NAME:-mymaster} ${REDIS_PASSWORD}
+
+# Sentinel password (optional)
+# requirepass ${SENTINEL_PASSWORD}
+
+# Time in milliseconds an instance should be unreachable for a Sentinel to start a failover
+# Default: 30000 (30 seconds)
+sentinel down-after-milliseconds ${MASTER_NAME:-mymaster} ${DOWN_AFTER_MS:-30000}
+
+# Timeout for a failover operation
+# Default: 180000 (3 minutes)
+sentinel failover-timeout ${MASTER_NAME:-mymaster} ${FAILOVER_TIMEOUT_MS:-180000}
+
+# Number of replicas that can be reconfigured in parallel during a failover
+# Use 1 to reconfigure replicas one at a time for minimal disruption
+sentinel parallel-syncs ${MASTER_NAME:-mymaster} ${PARALLEL_SYNCS:-1}
+
+# Notification script (optional)
+# sentinel notification-script ${MASTER_NAME:-mymaster} /path/to/notification-script.sh
+
+# Client reconfig script (optional)
+# sentinel client-reconfig-script ${MASTER_NAME:-mymaster} /path/to/reconfig-script.sh
+
+# Deny dangerous commands
+# sentinel deny-scripts-reconfig yes
+
+# Announce IP and port (useful in Docker/NAT environments)
+# sentinel announce-ip ${SENTINEL_ANNOUNCE_IP}
+# sentinel announce-port ${SENTINEL_ANNOUNCE_PORT}
+
+# Protected mode
+protected-mode no
+
+# Replica priority
+# Lower numbers indicate higher priority for promotion to master
+sentinel replica-priority 100
+
+# Minimum number of good replicas to accept writes
+# sentinel min-replicas-to-write 1
+# sentinel min-replicas-max-lag 10

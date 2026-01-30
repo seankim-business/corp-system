@@ -1,15 +1,14 @@
 /**
  * Short-term Memory Service
  *
- * Uses Redis to store session-scoped memory with 24-hour TTL.
+ * Uses Redis to store session-scoped memory with configurable TTL.
  * Provides fast access to current conversation context.
  *
- * TODO: Upgrade Redis client to support hash operations (HSET, HGET, HGETALL, HDEL, HLEN)
- * TODO: Consider using ioredis or redis v4+ which supports hash commands
- * CURRENT: Redis client does not support hash operations - all methods stubbed out
+ * Implementation uses Redis hash operations for efficient storage
+ * of multiple key-value pairs per session.
  */
 
-import { redis } from "../../db/redis";
+import { redis, withQueueConnection } from "../../db/redis";
 import { logger } from "../../utils/logger";
 
 const SESSION_MEMORY_PREFIX = "memory:session:";
@@ -24,20 +23,16 @@ export class ShortTermMemory {
 
   /**
    * Store a key-value pair in session memory
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async remember(sessionId: string, key: string, value: string): Promise<void> {
-    logger.warn("ShortTermMemory.remember not implemented - Redis client does not support HSET", {
-      sessionId,
-      key,
-    });
+    const redisKey = this.getRedisKey(sessionId);
 
-    // TODO: Replace with redis.hset(redisKey, { [key]: value }) when client supports it
-    // Temporary workaround: store as individual keys
-    const redisKey = `${this.getRedisKey(sessionId)}:${key}`;
     try {
-      await redis.set(redisKey, value, this.ttl);
-      logger.debug("Short-term memory stored (workaround)", { sessionId, key });
+      await withQueueConnection(async (client) => {
+        await client.hset(redisKey, key, value);
+        await client.expire(redisKey, this.ttl);
+      });
+      logger.debug("Short-term memory stored", { sessionId, key });
     } catch (error) {
       logger.error("Failed to store short-term memory", {
         sessionId,
@@ -50,24 +45,22 @@ export class ShortTermMemory {
 
   /**
    * Store multiple key-value pairs at once
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async rememberMany(sessionId: string, memories: Record<string, string>): Promise<void> {
     if (Object.keys(memories).length === 0) return;
 
-    logger.warn("ShortTermMemory.rememberMany not fully implemented - using individual SET operations", {
-      sessionId,
-      count: Object.keys(memories).length,
-    });
+    const redisKey = this.getRedisKey(sessionId);
 
-    // TODO: Replace with redis.hset(redisKey, memories) when client supports it
-    // Temporary workaround: store as individual keys
     try {
-      for (const [key, value] of Object.entries(memories)) {
-        const redisKey = `${this.getRedisKey(sessionId)}:${key}`;
-        await redis.set(redisKey, value, this.ttl);
-      }
-      logger.debug("Short-term memories stored (workaround)", { sessionId, count: Object.keys(memories).length });
+      await withQueueConnection(async (client) => {
+        // Use hmset for multiple fields
+        await client.hmset(redisKey, memories);
+        await client.expire(redisKey, this.ttl);
+      });
+      logger.debug("Short-term memories stored", {
+        sessionId,
+        count: Object.keys(memories).length,
+      });
     } catch (error) {
       logger.error("Failed to store short-term memories", {
         sessionId,
@@ -79,18 +72,14 @@ export class ShortTermMemory {
 
   /**
    * Recall a specific key from session memory
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async recall(sessionId: string, key: string): Promise<string | null> {
-    logger.warn("ShortTermMemory.recall not fully implemented - using individual GET operation", {
-      sessionId,
-      key,
-    });
+    const redisKey = this.getRedisKey(sessionId);
 
-    // TODO: Replace with redis.hget(redisKey, key) when client supports it
-    const redisKey = `${this.getRedisKey(sessionId)}:${key}`;
     try {
-      const value = await redis.get(redisKey);
+      const value = await withQueueConnection((client) =>
+        client.hget(redisKey, key),
+      );
       return value;
     } catch (error) {
       logger.error("Failed to recall short-term memory", {
@@ -104,33 +93,31 @@ export class ShortTermMemory {
 
   /**
    * Get all memories for a session
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async getSessionContext(sessionId: string): Promise<Record<string, string>> {
-    logger.warn("ShortTermMemory.getSessionContext not implemented - Redis client does not support HGETALL", {
-      sessionId,
-    });
+    const redisKey = this.getRedisKey(sessionId);
 
-    // TODO: Replace with redis.hgetall(redisKey) when client supports it
-    // Cannot implement without KEYS or SCAN support
-    return {};
+    try {
+      const result = await redis.hgetall(redisKey);
+      return result || {};
+    } catch (error) {
+      logger.error("Failed to get session context", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
   }
 
   /**
    * Remove a specific key from session memory
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async forget(sessionId: string, key: string): Promise<void> {
-    logger.warn("ShortTermMemory.forget not fully implemented - using individual DEL operation", {
-      sessionId,
-      key,
-    });
+    const redisKey = this.getRedisKey(sessionId);
 
-    // TODO: Replace with redis.hdel(redisKey, key) when client supports it
-    const redisKey = `${this.getRedisKey(sessionId)}:${key}`;
     try {
-      await redis.del(redisKey);
-      logger.debug("Short-term memory removed (workaround)", { sessionId, key });
+      await withQueueConnection((client) => client.hdel(redisKey, key));
+      logger.debug("Short-term memory removed", { sessionId, key });
     } catch (error) {
       logger.error("Failed to forget short-term memory", {
         sessionId,
@@ -141,55 +128,192 @@ export class ShortTermMemory {
   }
 
   /**
+   * Remove multiple keys from session memory
+   */
+  async forgetMany(sessionId: string, keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+
+    const redisKey = this.getRedisKey(sessionId);
+
+    try {
+      await withQueueConnection((client) => client.hdel(redisKey, ...keys));
+      logger.debug("Short-term memories removed", { sessionId, count: keys.length });
+    } catch (error) {
+      logger.error("Failed to forget short-term memories", {
+        sessionId,
+        keys,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
    * Clear all memories for a session
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async clearSession(sessionId: string): Promise<void> {
-    logger.warn("ShortTermMemory.clearSession not fully implemented - cannot delete hash", {
-      sessionId,
-    });
+    const redisKey = this.getRedisKey(sessionId);
 
-    // TODO: Replace with redis.del(redisKey) when using hash storage
-    // Cannot implement without KEYS or SCAN support to find all keys for session
+    try {
+      await redis.del(redisKey);
+      logger.debug("Session memory cleared", { sessionId });
+    } catch (error) {
+      logger.error("Failed to clear session memory", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**
    * Check if a session has any memories
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async hasMemories(sessionId: string): Promise<boolean> {
-    logger.warn("ShortTermMemory.hasMemories not implemented - Redis client does not support HLEN", {
-      sessionId,
-    });
-
-    // TODO: Replace with redis.hlen(redisKey) when client supports it
-    return false;
+    const count = await this.getMemoryCount(sessionId);
+    return count > 0;
   }
 
   /**
    * Get the count of memories in a session
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async getMemoryCount(sessionId: string): Promise<number> {
-    logger.warn("ShortTermMemory.getMemoryCount not implemented - Redis client does not support HLEN", {
-      sessionId,
-    });
+    const redisKey = this.getRedisKey(sessionId);
 
-    // TODO: Replace with redis.hlen(redisKey) when client supports it
-    return 0;
+    try {
+      const count = await withQueueConnection((client) => client.hlen(redisKey));
+      return count;
+    } catch (error) {
+      logger.error("Failed to get memory count", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
   }
 
   /**
    * Extend the TTL for a session
-   * TODO: Implement with Redis hash operations once client is upgraded
    */
   async extendTTL(sessionId: string, additionalSeconds?: number): Promise<void> {
-    logger.warn("ShortTermMemory.extendTTL not implemented - cannot extend TTL for hash", {
-      sessionId,
-      additionalSeconds,
-    });
+    const redisKey = this.getRedisKey(sessionId);
+    const newTTL = additionalSeconds || this.ttl;
 
-    // TODO: Replace with redis.expire(redisKey, ttl) when using hash storage
+    try {
+      const success = await redis.expire(redisKey, newTTL);
+      if (success) {
+        logger.debug("Session TTL extended", { sessionId, newTTL });
+      }
+    } catch (error) {
+      logger.error("Failed to extend session TTL", {
+        sessionId,
+        additionalSeconds,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Get remaining TTL for a session
+   */
+  async getTTL(sessionId: string): Promise<number> {
+    const redisKey = this.getRedisKey(sessionId);
+
+    try {
+      return await redis.ttl(redisKey);
+    } catch (error) {
+      logger.error("Failed to get session TTL", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return -1;
+    }
+  }
+
+  /**
+   * Check if a specific key exists in session memory
+   */
+  async exists(sessionId: string, key: string): Promise<boolean> {
+    const redisKey = this.getRedisKey(sessionId);
+
+    try {
+      const exists = await withQueueConnection((client) =>
+        client.hexists(redisKey, key),
+      );
+      return exists === 1;
+    } catch (error) {
+      logger.error("Failed to check key existence", {
+        sessionId,
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Get all keys in a session (without values)
+   */
+  async getKeys(sessionId: string): Promise<string[]> {
+    const redisKey = this.getRedisKey(sessionId);
+
+    try {
+      const keys = await withQueueConnection((client) => client.hkeys(redisKey));
+      return keys;
+    } catch (error) {
+      logger.error("Failed to get session keys", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Increment a numeric value in session memory
+   * Returns the new value after incrementing
+   */
+  async increment(sessionId: string, key: string, by: number = 1): Promise<number> {
+    const redisKey = this.getRedisKey(sessionId);
+
+    try {
+      const newValue = await redis.hincrby(redisKey, key, by);
+      return newValue;
+    } catch (error) {
+      logger.error("Failed to increment session value", {
+        sessionId,
+        key,
+        by,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * Set a value only if the key doesn't already exist
+   * Returns true if the value was set, false if key already existed
+   */
+  async setIfNotExists(sessionId: string, key: string, value: string): Promise<boolean> {
+    const redisKey = this.getRedisKey(sessionId);
+
+    try {
+      const result = await withQueueConnection((client) =>
+        client.hsetnx(redisKey, key, value),
+      );
+
+      if (result === 1) {
+        // Also set TTL if this is a new key
+        await redis.expire(redisKey, this.ttl);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      logger.error("Failed to set if not exists", {
+        sessionId,
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
   }
 
   private getRedisKey(sessionId: string): string {

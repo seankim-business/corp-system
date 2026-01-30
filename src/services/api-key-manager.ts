@@ -3,7 +3,7 @@
  * Secure API key generation, validation, and rotation
  */
 
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { db } from "../db/client";
 import { redis } from "../db/redis";
 import { logger } from "../utils/logger";
@@ -15,22 +15,23 @@ const KEY_CACHE_TTL = 300; // 5 minutes
 interface ApiKeyMetadata {
   id: string;
   organizationId: string;
+  userId: string;
   name: string;
   keyPrefix: string;
   scopes: string[];
-  rateLimit?: number;
+  rateLimitTier: string;
   expiresAt?: Date;
   lastUsedAt?: Date;
   createdAt: Date;
-  enabled: boolean;
+  isActive: boolean;
 }
 
 interface CreateApiKeyOptions {
   organizationId: string;
+  userId: string;
   name: string;
-  createdBy: string;
   scopes?: string[];
-  rateLimit?: number;
+  rateLimitTier?: string;
   expiresInDays?: number;
 }
 
@@ -56,7 +57,7 @@ export async function createApiKey(options: CreateApiKeyOptions): Promise<{
   key: string;
   metadata: ApiKeyMetadata;
 }> {
-  const { organizationId, name, createdBy, scopes = ["read"], rateLimit = 100, expiresInDays } = options;
+  const { organizationId, userId, name, scopes = ["read"], rateLimitTier = "standard", expiresInDays } = options;
 
   const keyId = generateKeyId();
   const secretPart = generateSecureKey();
@@ -69,35 +70,35 @@ export async function createApiKey(options: CreateApiKeyOptions): Promise<{
     : null;
 
   // Store in database
-  await db.aPIKey.create({
+  const createdKey = await db.aPIKey.create({
     data: {
-      id: keyId,
       organizationId,
+      userId,
       name,
       keyHash,
       keyPrefix,
       scopes,
-      rateLimit,
+      rateLimitTier,
       expiresAt,
-      createdBy,
-      enabled: true,
+      isActive: true,
     },
   });
 
   const metadata: ApiKeyMetadata = {
-    id: keyId,
+    id: createdKey.id,
     organizationId,
+    userId,
     name,
     keyPrefix,
     scopes,
-    rateLimit,
+    rateLimitTier,
     expiresAt: expiresAt ?? undefined,
-    createdAt: new Date(),
-    enabled: true,
+    createdAt: createdKey.createdAt,
+    isActive: true,
   };
 
   logger.info("API key created", {
-    keyId,
+    keyId: createdKey.id,
     organizationId,
     name,
     scopes,
@@ -120,8 +121,8 @@ export async function validateApiKey(key: string): Promise<ValidatedKey> {
   if (cached) {
     const metadata = JSON.parse(cached) as ApiKeyMetadata;
 
-    // Check enabled
-    if (!metadata.enabled) {
+    // Check isActive
+    if (!metadata.isActive) {
       return { valid: false, error: "Key disabled" };
     }
 
@@ -145,7 +146,7 @@ export async function validateApiKey(key: string): Promise<ValidatedKey> {
     return { valid: false, error: "Key not found" };
   }
 
-  if (!apiKey.enabled) {
+  if (!apiKey.isActive) {
     return { valid: false, error: "Key disabled" };
   }
 
@@ -156,14 +157,15 @@ export async function validateApiKey(key: string): Promise<ValidatedKey> {
   const metadata: ApiKeyMetadata = {
     id: apiKey.id,
     organizationId: apiKey.organizationId,
+    userId: apiKey.userId,
     name: apiKey.name,
     keyPrefix: apiKey.keyPrefix,
     scopes: apiKey.scopes,
-    rateLimit: apiKey.rateLimit ?? undefined,
+    rateLimitTier: apiKey.rateLimitTier,
     expiresAt: apiKey.expiresAt ?? undefined,
     lastUsedAt: apiKey.lastUsedAt ?? undefined,
     createdAt: apiKey.createdAt,
-    enabled: apiKey.enabled,
+    isActive: apiKey.isActive,
   };
 
   // Cache the key
@@ -203,7 +205,7 @@ export async function revokeApiKey(
 
   await db.aPIKey.update({
     where: { id: keyId },
-    data: { enabled: false },
+    data: { isActive: false },
   });
 
   // Invalidate cache
@@ -215,7 +217,7 @@ export async function revokeApiKey(
 export async function rotateApiKey(
   keyId: string,
   organizationId: string,
-  createdBy: string
+  userId: string
 ): Promise<{ key: string; metadata: ApiKeyMetadata }> {
   const existingKey = await db.aPIKey.findFirst({
     where: { id: keyId, organizationId },
@@ -228,10 +230,10 @@ export async function rotateApiKey(
   // Create new key with same settings
   const result = await createApiKey({
     organizationId,
+    userId,
     name: `${existingKey.name} (rotated)`,
-    createdBy,
     scopes: existingKey.scopes,
-    rateLimit: existingKey.rateLimit ?? undefined,
+    rateLimitTier: existingKey.rateLimitTier,
   });
 
   // Revoke old key after grace period (keep active for 24 hours)
@@ -252,7 +254,7 @@ export async function listApiKeys(organizationId: string): Promise<ApiKeyMetadat
   const keys = await db.aPIKey.findMany({
     where: {
       organizationId,
-      enabled: true,
+      isActive: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -260,14 +262,15 @@ export async function listApiKeys(organizationId: string): Promise<ApiKeyMetadat
   return keys.map((key) => ({
     id: key.id,
     organizationId: key.organizationId,
+    userId: key.userId,
     name: key.name,
     keyPrefix: key.keyPrefix,
     scopes: key.scopes,
-    rateLimit: key.rateLimit ?? undefined,
+    rateLimitTier: key.rateLimitTier,
     expiresAt: key.expiresAt ?? undefined,
     lastUsedAt: key.lastUsedAt ?? undefined,
     createdAt: key.createdAt,
-    enabled: key.enabled,
+    isActive: key.isActive,
   }));
 }
 

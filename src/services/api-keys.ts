@@ -9,10 +9,9 @@
  */
 
 import { randomBytes, createHash } from "crypto";
-// import { db as prisma } from "../db/client"; // TODO: Uncomment when aPIKey table exists
+import { db } from "../db/client";
 import { redis } from "../db/redis";
 import { logger } from "../utils/logger";
-// import { createAuditLog } from "./audit-logger"; // TODO: Uncomment when aPIKey table exists
 
 // =============================================================================
 // TYPES
@@ -65,7 +64,7 @@ export interface CreateAPIKeyResult {
 
 const KEY_PREFIX = "nbl_";
 const KEY_LENGTH = 32;
-// const CACHE_TTL_SECONDS = 300; // TODO: Uncomment when aPIKey table exists
+const CACHE_TTL_SECONDS = 300;
 const CACHE_PREFIX = "apikey";
 
 export const RATE_LIMITS: Record<RateLimitTier, { perMinute: number; perDay: number }> = {
@@ -102,25 +101,40 @@ function extractKeyPrefix(key: string): string {
   return key.substring(0, 12);
 }
 
-// TODO: Uncomment when aPIKey table exists
-// function mapPrismaToAPIKey(data: any): APIKey {
-//   return {
-//     id: data.id,
-//     organizationId: data.organizationId,
-//     name: data.name,
-//     keyPrefix: data.keyPrefix,
-//     scopes: data.scopes as APIScope[],
-//     rateLimitTier: data.rateLimitTier as RateLimitTier,
-//     requestsPerMinute: data.requestsPerMinute,
-//     requestsPerDay: data.requestsPerDay,
-//     lastUsedAt: data.lastUsedAt || undefined,
-//     totalRequests: data.totalRequests,
-//     status: data.status as "active" | "revoked",
-//     expiresAt: data.expiresAt || undefined,
-//     createdAt: data.createdAt,
-//     createdBy: data.createdBy,
-//   };
-// }
+// Maps Prisma APIKey record to APIKey interface
+function mapPrismaToAPIKey(data: {
+  id: string;
+  organizationId: string;
+  userId: string;
+  name: string;
+  keyPrefix: string;
+  scopes: string[];
+  rateLimitTier: string;
+  isActive: boolean;
+  lastUsedAt: Date | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+}): APIKey {
+  const tier = (data.rateLimitTier as RateLimitTier) || "free";
+  const limits = RATE_LIMITS[tier];
+
+  return {
+    id: data.id,
+    organizationId: data.organizationId,
+    name: data.name,
+    keyPrefix: data.keyPrefix,
+    scopes: data.scopes as APIScope[],
+    rateLimitTier: tier,
+    requestsPerMinute: limits.perMinute,
+    requestsPerDay: limits.perDay,
+    lastUsedAt: data.lastUsedAt || undefined,
+    totalRequests: 0, // This would come from Redis tracking
+    status: data.isActive ? "active" : "revoked",
+    expiresAt: data.expiresAt || undefined,
+    createdAt: data.createdAt,
+    createdBy: data.userId,
+  };
+}
 
 // =============================================================================
 // API KEY SERVICE
@@ -133,42 +147,42 @@ export class APIKeyService {
    */
   async create(
     organizationId: string,
-    _userId: string, // Prefixed with _ to indicate intentionally unused (TODO: use when aPIKey table exists)
+    userId: string,
     input: CreateAPIKeyInput,
   ): Promise<CreateAPIKeyResult> {
     const tier = input.rateLimitTier || "free";
     const limits = RATE_LIMITS[tier];
 
     const plainKey = generateApiKey();
-    // const keyHash = hashApiKey(plainKey); // TODO: Uncomment when aPIKey table exists
+    const keyHash = hashApiKey(plainKey);
     const keyPrefix = extractKeyPrefix(plainKey);
 
-    // TODO: Implement when aPIKey table exists in Prisma schema
-    // const apiKeyRecord = await prisma.aPIKey.create({
-    //   data: {
-    //     organizationId,
-    //     name: input.name,
-    //     keyHash,
-    //     keyPrefix,
-    //     scopes: input.scopes,
-    //     rateLimitTier: tier,
-    //     requestsPerMinute: limits.perMinute,
-    //     requestsPerDay: limits.perDay,
-    //     totalRequests: 0,
-    //     status: "active",
-    //     expiresAt: input.expiresAt,
-    //     createdBy: userId,
-    //   },
-    // });
+    const apiKeyRecord = await db.aPIKey.create({
+      data: {
+        organizationId,
+        userId,
+        name: input.name,
+        keyHash,
+        keyPrefix,
+        scopes: input.scopes,
+        rateLimitTier: tier,
+        isActive: true,
+        expiresAt: input.expiresAt,
+      },
+    });
 
-    logger.warn("create: aPIKey table not yet implemented", { organizationId, name: input.name });
-
-    // Return stub data
-    const apiKey: APIKey = {
-      id: `stub-${Date.now()}`,
+    logger.info("API key created", {
+      keyId: apiKeyRecord.id,
       organizationId,
       name: input.name,
-      keyPrefix,
+      scopes: input.scopes,
+    });
+
+    const apiKey: APIKey = {
+      id: apiKeyRecord.id,
+      organizationId: apiKeyRecord.organizationId,
+      name: apiKeyRecord.name,
+      keyPrefix: apiKeyRecord.keyPrefix,
       scopes: input.scopes,
       rateLimitTier: tier,
       requestsPerMinute: limits.perMinute,
@@ -176,8 +190,8 @@ export class APIKeyService {
       totalRequests: 0,
       status: "active",
       expiresAt: input.expiresAt,
-      createdAt: new Date(),
-      createdBy: _userId,
+      createdAt: apiKeyRecord.createdAt,
+      createdBy: userId,
     };
 
     return { key: plainKey, apiKey };
@@ -214,14 +228,36 @@ export class APIKeyService {
       return apiKey;
     }
 
-    // TODO: Implement when aPIKey table exists in Prisma schema
     // Database lookup
-    // const apiKeyRecord = await prisma.aPIKey.findUnique({
-    //   where: { keyHash },
-    // });
+    const apiKeyRecord = await db.aPIKey.findUnique({
+      where: { keyHash },
+    });
 
-    logger.warn("validate: aPIKey table not yet implemented", { keyHash: keyHash.substring(0, 8) });
-    return null;
+    if (!apiKeyRecord) {
+      return null;
+    }
+
+    // Check if expired
+    if (apiKeyRecord.expiresAt && apiKeyRecord.expiresAt < new Date()) {
+      return null;
+    }
+
+    // Check if active
+    if (!apiKeyRecord.isActive) {
+      return null;
+    }
+
+    const apiKey = mapPrismaToAPIKey(apiKeyRecord);
+
+    // Cache for future requests
+    await redis.set(cacheKey, JSON.stringify(apiKey), CACHE_TTL_SECONDS);
+
+    // Update last used timestamp asynchronously (don't await)
+    this.trackUsage(apiKey.id).catch((err) => {
+      logger.error("Failed to track API key usage", { keyId: apiKey.id, error: err });
+    });
+
+    return apiKey;
   }
 
   /**
@@ -230,24 +266,27 @@ export class APIKeyService {
   async revoke(
     keyId: string,
     organizationId: string,
-    _userId: string, // Prefixed with _ to indicate intentionally unused (TODO: use when aPIKey table exists)
+    userId: string,
     reason?: string,
   ): Promise<void> {
-    // TODO: Implement when aPIKey table exists in Prisma schema
-    // const apiKeyRecord = await prisma.aPIKey.findFirst({
-    //   where: { id: keyId, organizationId },
-    // });
+    const apiKeyRecord = await db.aPIKey.findFirst({
+      where: { id: keyId, organizationId },
+    });
 
-    // if (!apiKeyRecord) {
-    //   throw new Error("API key not found");
-    // }
+    if (!apiKeyRecord) {
+      throw new Error("API key not found");
+    }
 
-    // await prisma.aPIKey.update({
-    //   where: { id: keyId },
-    //   data: { status: "revoked" },
-    // });
+    await db.aPIKey.update({
+      where: { id: keyId },
+      data: { isActive: false },
+    });
 
-    logger.warn("revoke: aPIKey table not yet implemented", { keyId, organizationId, reason });
+    // Clear cache
+    const cacheKey = `${CACHE_PREFIX}:${apiKeyRecord.keyHash}`;
+    await redis.del(cacheKey);
+
+    logger.info("API key revoked", { keyId, organizationId, userId, reason });
   }
 
   /**
@@ -255,27 +294,27 @@ export class APIKeyService {
    * Does not return the actual key values.
    */
   async list(organizationId: string): Promise<APIKey[]> {
-    // TODO: Implement when aPIKey table exists in Prisma schema
-    // const apiKeyRecords = await prisma.aPIKey.findMany({
-    //   where: { organizationId },
-    //   orderBy: { createdAt: "desc" },
-    // });
+    const apiKeyRecords = await db.aPIKey.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: "desc" },
+    });
 
-    logger.warn("list: aPIKey table not yet implemented", { organizationId });
-    return [];
+    return apiKeyRecords.map(mapPrismaToAPIKey);
   }
 
   /**
    * Get a specific API key by ID.
    */
   async get(keyId: string, organizationId: string): Promise<APIKey | null> {
-    // TODO: Implement when aPIKey table exists in Prisma schema
-    // const apiKeyRecord = await prisma.aPIKey.findFirst({
-    //   where: { id: keyId, organizationId },
-    // });
+    const apiKeyRecord = await db.aPIKey.findFirst({
+      where: { id: keyId, organizationId },
+    });
 
-    logger.warn("get: aPIKey table not yet implemented", { keyId, organizationId });
-    return null;
+    if (!apiKeyRecord) {
+      return null;
+    }
+
+    return mapPrismaToAPIKey(apiKeyRecord);
   }
 
   /**
@@ -284,16 +323,35 @@ export class APIKeyService {
   async update(
     keyId: string,
     organizationId: string,
-    _userId: string, // Prefixed with _ to indicate intentionally unused (TODO: use when aPIKey table exists)
-    _data: Partial<Pick<APIKey, "name" | "scopes" | "rateLimitTier" | "expiresAt">>, // Prefixed with _ to indicate intentionally unused (TODO: use when aPIKey table exists)
+    userId: string,
+    data: Partial<Pick<APIKey, "name" | "scopes" | "rateLimitTier" | "expiresAt">>,
   ): Promise<APIKey> {
-    // TODO: Implement when aPIKey table exists in Prisma schema
-    // const existing = await prisma.aPIKey.findFirst({
-    //   where: { id: keyId, organizationId },
-    // });
+    const existing = await db.aPIKey.findFirst({
+      where: { id: keyId, organizationId },
+    });
 
-    logger.warn("update: aPIKey table not yet implemented", { keyId, organizationId });
-    throw new Error("API key not found");
+    if (!existing) {
+      throw new Error("API key not found");
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.scopes !== undefined) updateData.scopes = data.scopes;
+    if (data.rateLimitTier !== undefined) updateData.rateLimitTier = data.rateLimitTier;
+    if (data.expiresAt !== undefined) updateData.expiresAt = data.expiresAt;
+
+    const updated = await db.aPIKey.update({
+      where: { id: keyId },
+      data: updateData,
+    });
+
+    // Clear cache
+    const cacheKey = `${CACHE_PREFIX}:${updated.keyHash}`;
+    await redis.del(cacheKey);
+
+    logger.info("API key updated", { keyId, organizationId, userId, changes: Object.keys(updateData) });
+
+    return mapPrismaToAPIKey(updated);
   }
 
   /**
@@ -301,16 +359,12 @@ export class APIKeyService {
    * Updates lastUsedAt and increments totalRequests.
    */
   async trackUsage(keyId: string): Promise<void> {
-    // TODO: Implement when aPIKey table exists in Prisma schema
-    // await prisma.aPIKey.update({
-    //   where: { id: keyId },
-    //   data: {
-    //     lastUsedAt: new Date(),
-    //     totalRequests: { increment: 1 },
-    //   },
-    // });
-
-    logger.warn("trackUsage: aPIKey table not yet implemented", { keyId });
+    await db.aPIKey.update({
+      where: { id: keyId },
+      data: {
+        lastUsedAt: new Date(),
+      },
+    });
   }
 
   /**
@@ -321,16 +375,13 @@ export class APIKeyService {
     dayCount: number;
     totalRequests: number;
   }> {
-    // TODO: Implement when aPIKey table exists in Prisma schema
-    // const apiKeyRecord = await prisma.aPIKey.findUnique({
-    //   where: { id: keyId },
-    // });
+    const apiKeyRecord = await db.aPIKey.findUnique({
+      where: { id: keyId },
+    });
 
-    // if (!apiKeyRecord) {
-    //   throw new Error("API key not found");
-    // }
-
-    logger.warn("getUsageStats: aPIKey table not yet implemented", { keyId });
+    if (!apiKeyRecord) {
+      throw new Error("API key not found");
+    }
 
     const redisKey = `ratelimit:${keyId}`;
     const [minuteCount, dayCount] = await Promise.all([
@@ -341,7 +392,7 @@ export class APIKeyService {
     return {
       minuteCount: parseInt(minuteCount || "0", 10),
       dayCount: parseInt(dayCount || "0", 10),
-      totalRequests: 0,
+      totalRequests: 0, // This would require additional tracking if needed
     };
   }
 

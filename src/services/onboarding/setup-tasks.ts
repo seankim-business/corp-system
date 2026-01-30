@@ -1,7 +1,7 @@
 /**
  * Onboarding Setup Tasks Service (Stub)
  *
- * TODO: Implement when onboarding tables are properly added to Prisma schema
+ * NOTE: Requires onboarding tables in Prisma schema (SetupTask, etc.)
  */
 
 import { logger } from "../../utils/logger";

@@ -32,7 +32,10 @@ export type AuditAction =
   | "delegation.expired"
   | "agent.permission_denied"
   | "agent.approval_required"
-  | "workflow.exception";
+  | "workflow.exception"
+  | "schedule.created"
+  | "schedule.updated"
+  | "schedule.deleted";
 
 export interface AuditLogEntry {
   id?: string;

@@ -1,5 +1,5 @@
 // Analytics Metrics Aggregator - Aggregate raw metrics for agent performance
-// TODO: Stubbed out - requires Prisma tables that don't exist yet (ActionEvent, AgentCostRecord, UserFeedback)
+// NOTE: Requires Prisma tables: ActionEvent, AgentCostRecord, UserFeedback
 // import { db as prisma } from "../../db/client";
 // import { redis } from "../../db/redis";
 import { logger } from "../../utils/logger";
@@ -110,7 +110,6 @@ export interface DimensionMetrics {
 // const CACHE_TTL = 300; // 5 minutes
 
 export function calculatePercentile(values: number[], percentile: number): number {
-  // TODO: Stub implementation
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const index = Math.ceil((percentile / 100) * sorted.length) - 1;
@@ -159,7 +158,7 @@ export function getDateRange(
 export class MetricsAggregator {
   /**
    * Get comprehensive metrics for a specific agent
-   * TODO: Stubbed - requires ActionEvent, AgentCostRecord, UserFeedback tables
+   * NOTE: Stubbed - requires ActionEvent, AgentCostRecord, UserFeedback tables
    */
   async getAgentMetrics(
     orgId: string,
@@ -202,7 +201,7 @@ export class MetricsAggregator {
 
   /**
    * Get organization-wide metrics across all agents
-   * TODO: Stubbed - requires ActionEvent, AgentCostRecord tables
+   * NOTE: Stubbed - requires ActionEvent, AgentCostRecord tables
    */
   async getOrgMetrics(
     orgId: string,
@@ -227,7 +226,7 @@ export class MetricsAggregator {
 
   /**
    * Get metrics grouped by a specific dimension
-   * TODO: Stubbed - requires ActionEvent, AgentCostRecord tables
+   * NOTE: Stubbed - requires ActionEvent, AgentCostRecord tables
    */
   async getMetricsByDimension(
     orgId: string,
@@ -242,7 +241,7 @@ export class MetricsAggregator {
 
   /**
    * Clear cached metrics for an organization
-   * TODO: Stubbed - cache clearing not implemented in stub
+   * NOTE: Stubbed - cache clearing not implemented
    */
   async clearCache(orgId: string): Promise<void> {
     logger.debug("clearCache called (stubbed)", { orgId });

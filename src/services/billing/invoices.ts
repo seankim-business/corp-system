@@ -1,7 +1,7 @@
 /**
  * Invoice Service (Stub)
  *
- * TODO: Implement when billing tables are properly added to Prisma schema
+ * NOTE: Requires billing tables in Prisma schema (Invoice, LineItem, etc.)
  */
 
 import { logger } from "../../utils/logger";

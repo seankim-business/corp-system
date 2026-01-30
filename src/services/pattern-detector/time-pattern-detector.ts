@@ -3,7 +3,6 @@
  * Detects recurring time-based patterns in user actions
  */
 
-// @ts-expect-error uuid provides its own types but TS can't find them
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "../../utils/logger";
 import type { SequencePattern, TimePattern, TimePatternOptions } from "./types";

@@ -197,6 +197,33 @@ export class KnowledgeGraphService {
     return this.queryEngine.getStats();
   }
 
+  /**
+   * Get node centrality metrics
+   */
+  async getNodeCentrality(limit?: number): Promise<Array<{ nodeId: string; degree: number }>> {
+    return this.queryEngine.getNodeCentrality(limit);
+  }
+
+  /**
+   * Find semantically similar nodes using embeddings
+   */
+  async findSimilar(
+    text: string,
+    options?: { nodeTypes?: NodeType[]; limit?: number; threshold?: number }
+  ): Promise<Array<{ node: GraphNode; similarity: number }>> {
+    return this.queryEngine.findSimilar(text, options);
+  }
+
+  /**
+   * Perform DFS traversal from a starting node
+   */
+  async dfs(
+    startNodeId: string,
+    options?: { maxDepth?: number; nodeTypes?: NodeType[]; edgeTypes?: string[] }
+  ): Promise<GraphNode[]> {
+    return this.queryEngine.dfs(startNodeId, options);
+  }
+
   // ============================================================================
   // Visualization Operations
   // ============================================================================

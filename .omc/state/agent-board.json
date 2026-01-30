@@ -1,0 +1,29 @@
+{
+  "lastUpdated": "2026-01-30T10:35:00+09:00",
+  "activeAgents": [],
+  "fileLocks": {},
+  "recentlyCompleted": [
+    {
+      "agentId": "sisyphus-main",
+      "task": "Slack credentials 테스트 환경 설정",
+      "filesModified": [".env", ".env.slack.local", ".env.example"],
+      "completedAt": "2026-01-30T10:35:00+09:00"
+    }
+  ],
+  "schema": {
+    "activeAgent": {
+      "agentId": "string (unique identifier)",
+      "task": "string (brief description)",
+      "filesBeingModified": "string[] (file paths)",
+      "status": "enum: working | blocked | waiting",
+      "startedAt": "ISO 8601 datetime",
+      "lastHeartbeat": "ISO 8601 datetime"
+    },
+    "fileLock": {
+      "lockedBy": "string (agentId)",
+      "reason": "string",
+      "lockedAt": "ISO 8601 datetime",
+      "expiresAt": "ISO 8601 datetime (optional)"
+    }
+  }
+}

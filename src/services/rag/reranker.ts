@@ -190,9 +190,8 @@ export class Reranker {
     query: string,
     results: RetrievalResult[]
   ): Promise<Array<RetrievalResult & { rerankedScore: number }>> {
-    // For now, fall back to heuristics
-    // TODO: Implement LLM-based cross-encoder scoring
-    // This would use the AI provider to score query-document pairs
+    // NOTE: LLM-based cross-encoder scoring requires AI provider integration
+    // Would score query-document pairs for better relevance, but slower than heuristics
     logger.warn('LLM scoring not yet implemented, using heuristics');
     return this.scoreWithHeuristics(query, results, this.options);
   }

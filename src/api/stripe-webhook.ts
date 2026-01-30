@@ -1,7 +1,7 @@
 /**
  * Stripe Webhook API Routes (Stub)
  *
- * TODO: Implement when Stripe integration is properly configured
+ * NOTE: Requires Stripe API keys and webhook configuration (see .env.example)
  */
 
 import { Router, Request, Response } from "express";

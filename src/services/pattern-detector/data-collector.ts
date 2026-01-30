@@ -1,19 +1,22 @@
 /**
  * Action Data Collector
  * Collects and stores user action events for pattern analysis
+ *
+ * NOTE: Requires actionEvent table in Prisma schema. Currently returns stub data.
+ * Uncomment db imports and implementations when schema is ready.
  */
 
-// import { db } from "../../db/client"; // TODO: Uncomment when actionEvent table exists
+// import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
 import type { ActionEvent, ActionSequence, CreateActionEventInput } from "./types";
-// import type { ActionType } from "./types"; // TODO: Uncomment when actionEvent table exists
+// import type { ActionType } from "./types";
 
 export class ActionDataCollector {
   /**
    * Record a new action event for pattern analysis
    */
   async recordAction(input: CreateActionEventInput): Promise<ActionEvent> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // try {
     //   const event = await db.actionEvent.create({
     //     data: {
@@ -65,7 +68,7 @@ export class ActionDataCollector {
     organizationId: string,
     days: number,
   ): Promise<ActionEvent[]> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // const since = new Date();
     // since.setDate(since.getDate() - days);
 
@@ -86,7 +89,7 @@ export class ActionDataCollector {
    * Get actions for an entire organization within a time range
    */
   async getActionsForOrg(organizationId: string, days: number): Promise<ActionEvent[]> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // const since = new Date();
     // since.setDate(since.getDate() - days);
 
@@ -110,7 +113,7 @@ export class ActionDataCollector {
     minLength: number,
     days: number,
   ): Promise<ActionSequence[]> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // const since = new Date();
     // since.setDate(since.getDate() - days);
 
@@ -134,7 +137,7 @@ export class ActionDataCollector {
     sessionId: string,
     organizationId: string,
   ): Promise<ActionEvent | null> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // const event = await db.actionEvent.findFirst({
     //   where: {
     //     sessionId,
@@ -154,7 +157,7 @@ export class ActionDataCollector {
     organizationId: string,
     days: number,
   ): Promise<{ actionType: string; count: number }[]> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // const since = new Date();
     // since.setDate(since.getDate() - days);
 
@@ -175,7 +178,7 @@ export class ActionDataCollector {
    * Get unique sessions count for an organization
    */
   async getUniqueSessionsCount(organizationId: string, days: number): Promise<number> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // const since = new Date();
     // since.setDate(since.getDate() - days);
 
@@ -195,7 +198,7 @@ export class ActionDataCollector {
    * Clean up old action events (for data retention)
    */
   async cleanupOldEvents(retentionDays: number): Promise<number> {
-    // TODO: Implement when actionEvent table exists in Prisma schema
+    // Database implementation commented out - requires actionEvent table
     // const cutoff = new Date();
     // cutoff.setDate(cutoff.getDate() - retentionDays);
 
@@ -209,10 +212,7 @@ export class ActionDataCollector {
     return 0;
   }
 
-  // TODO: Uncomment when actionEvent table exists in Prisma schema
-  // /**
-  //  * Map database record to ActionEvent type
-  //  */
+  // Database implementation commented out - requires actionEvent table
   // private mapToActionEvent(record: any): ActionEvent {
   //   return {
   //     id: record.id,

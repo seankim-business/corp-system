@@ -1,0 +1,14 @@
+{
+  "active": true,
+  "mode": "ralph-ulw-autopilot",
+  "started_at": "2026-01-30T04:25:00.000Z",
+  "plan_path": ".omc/plans/nubabel-next-phase.md",
+  "current_phase": "A",
+  "yolo_mode": true,
+  "qa_config": {
+    "browser": "claude-in-chrome",
+    "slack_channel": "#it-test",
+    "slack_bot": "Nubabel",
+    "build_monitor": "railway-cli"
+  }
+}

@@ -171,6 +171,8 @@ export interface BudgetStatus {
   spentCents: number;
   remainingCents: number;
   percentUsed: number;
+  usedPercent: number;
+  status: "ok" | "warning" | "critical" | "exceeded";
   warningThreshold: boolean;
   criticalThreshold: boolean;
 }
@@ -264,12 +266,23 @@ export async function checkBudget(organizationId: string): Promise<BudgetStatus>
   const remainingCents = Math.max(0, budgetCents - spentCents);
   const percentUsed = budgetCents > 0 ? (spentCents / budgetCents) * 100 : 0;
 
+  let status: "ok" | "warning" | "critical" | "exceeded" = "ok";
+  if (percentUsed >= 100) {
+    status = "exceeded";
+  } else if (percentUsed >= 95) {
+    status = "critical";
+  } else if (percentUsed >= 80) {
+    status = "warning";
+  }
+
   return {
     withinBudget: budgetCents === 0 || spentCents < budgetCents,
     budgetCents,
     spentCents,
     remainingCents,
     percentUsed,
+    usedPercent: percentUsed,
+    status,
     warningThreshold: percentUsed >= 80,
     criticalThreshold: percentUsed >= 95,
   };

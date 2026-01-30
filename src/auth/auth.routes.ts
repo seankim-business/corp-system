@@ -23,10 +23,12 @@ function getCookieDomain(): string | undefined {
   if (baseUrl) {
     try {
       const url = new URL(baseUrl);
-      const hostParts = url.hostname.split('.');
+      const hostParts = url.hostname.split(".");
       if (hostParts.length >= 2) {
-        const rootDomain = hostParts.slice(-2).join('.');
-        logger.warn("COOKIE_DOMAIN not set, using extracted domain", { extractedDomain: `.${rootDomain}` });
+        const rootDomain = hostParts.slice(-2).join(".");
+        logger.warn("COOKIE_DOMAIN not set, using extracted domain", {
+          extractedDomain: `.${rootDomain}`,
+        });
         return `.${rootDomain}`;
       }
     } catch {
@@ -161,8 +163,32 @@ router.get("/google/callback", async (req: Request, res: Response) => {
     const redirectUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL}/dashboard`;
     return res.redirect(redirectUrl);
   } catch (error) {
-    logger.error("Google OAuth error", { error });
-    return res.status(500).send("Authentication failed");
+    const err = error as Error & { response?: { data?: unknown } };
+    const errorMessage = err.message || "Unknown error";
+    const errorDetails = err.response?.data || err.stack;
+
+    logger.error("Google OAuth error", {
+      error: errorMessage,
+      details: errorDetails,
+      state,
+      hasCode: !!code,
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "https://nubabel.com";
+
+    if (errorMessage.includes("redirect_uri_mismatch")) {
+      return res.redirect(`${frontendUrl}/login?error=redirect_uri_mismatch`);
+    }
+    if (errorMessage.includes("Unable to determine organization")) {
+      return res.redirect(`${frontendUrl}/login?error=no_organization`);
+    }
+    if (errorMessage.includes("invalid_grant")) {
+      return res.redirect(`${frontendUrl}/login?error=code_expired`);
+    }
+
+    return res.redirect(
+      `${frontendUrl}/login?error=auth_failed&message=${encodeURIComponent(errorMessage)}`,
+    );
   }
 });
 

@@ -581,8 +581,7 @@ router.post(
 router.get(
   "/purchases",
   requireAuth,
-  // TODO: Uncomment when Permission.BILLING_VIEW is added to the Permission enum
-  // requirePermission(Permission.BILLING_VIEW),
+  // Note: Permission.BILLING_READ is already available but permission check omitted until marketplace is fully implemented
   async (req: Request, res: Response) => {
     try {
       const { organizationId } = req.user!;

@@ -33,6 +33,7 @@ import ExtensionDetailPage from "./pages/ExtensionDetailPage";
 import FeedbackInsightsPage from "./pages/FeedbackInsightsPage";
 import KnowledgeGraphPage from "./pages/KnowledgeGraphPage";
 import MarketplacePage from "./pages/MarketplacePage";
+import MarketplaceHubPage from "./pages/MarketplaceHubPage";
 import OnboardingWizardPage from "./pages/OnboardingWizardPage";
 import OrgChangeWizardPage from "./pages/OrgChangeWizardPage";
 import PatternInsightsPage from "./pages/PatternInsightsPage";
@@ -356,6 +357,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <MarketplacePage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/marketplace-hub"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <MarketplaceHubPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

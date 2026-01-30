@@ -130,7 +130,7 @@ export class KnowledgeAnalyzer {
     }
 
     // Check for repetitive patterns that could become SOPs
-    // TODO: detectedPattern table doesn't exist yet - stub with empty array
+    // NOTE: Requires DetectedPattern table in Prisma schema
     let patterns: { id: string; frequency: number; confidence: number; type: string }[] = [];
     try {
       patterns = await (prisma as any).detectedPattern?.findMany({
