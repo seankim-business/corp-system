@@ -43,6 +43,7 @@ import SOPEditorPage from "./pages/SOPEditorPage";
 import SystemHealthPage from "./pages/SystemHealthPage";
 import AgentOptimizationPage from "./pages/AgentOptimizationPage";
 import ClaudeMaxAccountsPage from "./pages/ClaudeMaxAccountsPage";
+import N8nWorkflowsPage from "./pages/N8nWorkflowsPage";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -437,6 +438,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <OrgChangeWizardPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/n8n/workflows"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <N8nWorkflowsPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

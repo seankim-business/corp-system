@@ -1,5 +1,7 @@
-import { Skill } from "./types";
+import { Skill, asSkillId } from "./types";
 import { logger } from "../utils/logger";
+
+const N8N_WORKFLOW_SKILL = asSkillId("n8n-workflow");
 
 export interface SkillScore {
   skill: Skill;
@@ -93,6 +95,21 @@ const SKILL_KEYWORDS: Record<Skill, string[]> = {
     "responsive",
     "반응형",
   ],
+  [N8N_WORKFLOW_SKILL]: [
+    "workflow",
+    "워크플로우",
+    "n8n",
+    "automation",
+    "자동화",
+    "execute",
+    "실행",
+    "trigger",
+    "트리거",
+    "run workflow",
+    "start workflow",
+    "워크플로우 실행",
+    "워크플로우 시작",
+  ],
 };
 
 const SKILL_DEPENDENCIES: Record<Skill, Skill[]> = {
@@ -100,12 +117,14 @@ const SKILL_DEPENDENCIES: Record<Skill, Skill[]> = {
   playwright: [],
   "git-master": [],
   "mcp-integration": [],
+  [N8N_WORKFLOW_SKILL]: [],
 };
 
 const SKILL_CONFLICTS: [Skill, Skill, string][] = [];
 
 const SKILL_PRIORITY: Record<Skill, number> = {
   "git-master": 100,
+  [N8N_WORKFLOW_SKILL]: 90,
   "mcp-integration": 80,
   "frontend-ui-ux": 60,
   playwright: 40,

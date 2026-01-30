@@ -4,6 +4,70 @@
 
 ---
 
+## [CRITICAL] MANDATORY RULES - 반드시 따를 것
+
+### 0. Context Research (BEFORE ANY WORK)
+
+```
+작업 시작 전 반드시 다음을 파악:
+
+[과거]
+- 기획문서 (docs/, research/, *.md)
+- 기존 커밋 히스토리 (git log)
+- 아키텍처 결정 사항
+
+[현재]
+- 코드베이스 구조 및 패턴
+- 다른 에이전트 작업 현황 (.omc/AGENT_BOARD.md)
+- 서버 구현 상태
+- 서버 현재 상황 (railway status, logs)
+
+[미래]
+- 계획된 변경사항
+- 의존성 영향 분석
+
+→ 과거-현재-미래 정합성 유지 필수
+→ 기존 패턴/구조와 일관성 유지
+
+[문서 동기화 - 작업 완료 후]
+- 변경사항 → 관련 문서 업데이트
+- 새 패턴/구조 → AGENTS.md 반영
+- 작업 현황 → AGENT_BOARD.md 갱신
+- 아키텍처 변경 → docs/ 업데이트
+
+→ 모든 에이전트가 동일한 이해도 유지
+→ 문서 ↔ 코드 항상 일치
+```
+
+### 1. 작업 시작 전 (REQUIRED)
+
+```bash
+cat .omc/AGENT_BOARD.md   # 다른 에이전트 현황 확인
+```
+
+### 2. Browser Testing (MUST)
+
+```
+Claude in Chrome 사용 (유저 프로필)
+Playwright MCP는 Claude in Chrome 불가 시에만
+```
+
+### 3. 인증/연동 작업 (MUST)
+
+```
+Claude Max, Slack, Notion, Google, GitHub 연동 시:
+→ Claude in Chrome 사용 (유저 로그인 세션 활용)
+```
+
+### 4. Railway 배포 실패 (MANDATORY)
+
+```
+Deploy 실패 → ralph 모드 → 성공까지 무제한 retry
+절대 포기 금지
+```
+
+---
+
 ## Multi-Agent Coordination (REQUIRED)
 
 **여러 에이전트가 동시 작업 중일 수 있습니다. 반드시 확인하세요!**

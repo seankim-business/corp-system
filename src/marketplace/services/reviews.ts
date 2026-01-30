@@ -1,6 +1,7 @@
 import { db } from "../../db/client";
 import { logger } from "../../utils/logger";
 import { Review, PaginatedResult, RatingSummary } from "../types";
+import type { ExtensionReview } from "@prisma/client";
 
 export function mapReviewToDto(review: any): Review {
   return {
@@ -101,7 +102,7 @@ export async function listReviews(
   ]);
 
   return {
-    items: reviews.map((r) => mapReviewToDto({ ...r, organizationId: "" })),
+    items: reviews.map((r: ExtensionReview) => mapReviewToDto({ ...r, organizationId: "" })),
     total,
     page,
     limit,

@@ -1,6 +1,6 @@
 # Agent Coordination Board
 
-> **Last Updated**: 2026-01-30 17:12 KST
+> **Last Updated**: 2026-01-30 17:16 KST
 > **Purpose**: 멀티 에이전트 작업 현황 추적 및 충돌 방지
 
 ---
@@ -12,6 +12,8 @@
 | `sisyphus-n8n-01` | Add n8n instance provisioning service | `src/services/n8n/instance-provisioner.ts`, `src/services/n8n/index.ts`, `src/services/encryption.service.ts` | **WORKING** | 14:20   |
 | `sisyphus-n8n-02` | Add n8n credential sync service       | `src/services/n8n/credential-sync.ts`                                                                         | **WORKING** | 14:50   |
 | `sisyphus-n8n-03` | Add n8n workflow generator service    | `src/services/n8n/workflow-generator.ts`, `src/api/n8n.ts`                                                    | **WORKING** | 17:12   |
+| `sisyphus-sop-01` | Add SOP ↔ n8n converter               | `src/services/n8n/sop-converter.ts`, `src/services/n8n/index.ts`                                              | **WORKING** | 17:13   |
+| `sisyphus-n8n-04` | Add n8n skill adapter + API endpoints | `src/services/n8n/skill-adapter.ts`, `src/services/n8n/index.ts`, `src/api/n8n.ts`                            | **WORKING** | 17:14   |
 
 ---
 
@@ -24,11 +26,13 @@
 | `.env`                                     | -                 | -                         | -     |
 | `src/api/slack*.ts`                        | -                 | -                         | -     |
 | `src/services/n8n/instance-provisioner.ts` | `sisyphus-n8n-01` | n8n instance provisioning | 15:20 |
-| `src/services/n8n/index.ts`                | `sisyphus-n8n-01` | n8n instance provisioning | 15:20 |
+| `src/services/n8n/index.ts`                | `sisyphus-n8n-04` | n8n skill adapter export  | 18:30 |
 | `src/services/encryption.service.ts`       | `sisyphus-n8n-01` | n8n instance provisioning | 15:20 |
 | `src/services/n8n/credential-sync.ts`      | `sisyphus-n8n-02` | n8n credential sync       | 15:50 |
 | `src/services/n8n/workflow-generator.ts`   | `sisyphus-n8n-03` | workflow generator        | 18:12 |
-| `src/api/n8n.ts`                           | `sisyphus-n8n-03` | workflow generator API    | 18:12 |
+| `src/api/n8n.ts`                           | `sisyphus-n8n-04` | n8n skill endpoints       | 18:30 |
+| `src/services/n8n/sop-converter.ts`        | `sisyphus-sop-01` | SOP converter             | 18:13 |
+| `src/services/n8n/skill-adapter.ts`        | `sisyphus-n8n-04` | n8n skill adapter         | 18:30 |
 
 ---
 

@@ -40,7 +40,7 @@ import {
 import authRoutes from "./auth/auth.routes";
 import workflowRoutes from "./api/workflows";
 import notionRoutes from "./api/notion";
-import n8nRoutes from "./api/n8n";
+// import n8nRoutes from "./api/n8n"; // TODO: Fix TypeScript errors in n8n.ts
 import { slackOAuthRouter, slackIntegrationRouter } from "./api/slack-integration";
 import { googleAiOAuthRouter } from "./api/google-ai-oauth";
 import notionOAuthRoutes from "./api/notion-oauth";
@@ -493,7 +493,7 @@ app.use("/api", apiRateLimiter, notionOAuthRoutes);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, providersRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, workflowRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, notionRoutes);
-app.use("/api/n8n", apiRateLimiter, authenticate, sentryUserContext, n8nRoutes);
+// app.use("/api/n8n", apiRateLimiter, authenticate, sentryUserContext, n8nRoutes);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, slackIntegrationRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, featureFlagsRouter);
 app.use(
