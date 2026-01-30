@@ -38,6 +38,9 @@ model Organization {
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  // Marketplace Hub settings
+  installationMode String @default("recommend") @map("installation_mode") @db.VarChar(20) // recommend, auto, manual
+
   // Relations
   workspaceDomains       WorkspaceDomain[]
   memberships            Membership[]
@@ -65,6 +68,16 @@ model Organization {
   agentSkillAssignments  AgentSkillAssignment[]
   extensionUsageLogs     ExtensionUsageLog[]
   slackWorkspaces        SlackWorkspace[]
+  externalCredentials    ExternalMarketplaceCredential[]
+  installationQueue      InstallationQueue[]
+  n8nInstances           N8nInstance[]
+  n8nWorkflows           N8nWorkflow[]
+  n8nCredentials         N8nCredential[]
+  knowledgeNodes         KnowledgeNode[]
+  knowledgeEdges         KnowledgeEdge[]
+  knowledgeClusters      KnowledgeCluster[]
+  entityMemories         EntityMemory[]
+  memories               Memory[]
 
   @@map("organizations")
 }
@@ -1584,4 +1597,354 @@ model SlackWorkspace {
   @@index([organizationId])
   @@index([status])
   @@map("slack_workspaces")
+}
+
+// ============================================================================
+// MARKETPLACE HUB TABLES (External marketplace integrations)
+// ============================================================================
+
+/// ExternalMarketplaceCredential - Store API keys for external marketplaces
+/// Supports: Smithery, LangChain Hub, Civitai, ComfyUI, etc.
+model ExternalMarketplaceCredential {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  source       String    @db.VarChar(50) // smithery, langchain-hub, civitai, comfyui, etc.
+  apiKey       String?   @map("api_key") @db.Text // Encrypted
+  accessToken  String?   @map("access_token") @db.Text // Encrypted
+  refreshToken String?   @map("refresh_token") @db.Text // Encrypted
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz(6)
+
+  enabled  Boolean @default(true)
+  metadata Json    @default("{}") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, source])
+  @@index([organizationId])
+  @@index([source])
+  @@map("external_marketplace_credentials")
+}
+
+/// InstallationQueue - Track installation requests from external marketplaces
+/// Supports: Smithery, ComfyUI, LangChain Hub, etc.
+model InstallationQueue {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  source   String @db.VarChar(50) // smithery, comfyui, langchain-hub, etc.
+  itemId   String @map("item_id") @db.VarChar(255)
+  itemName String @map("item_name") @db.VarChar(255)
+  itemType String @map("item_type") @db.VarChar(50) // mcp_server, workflow, prompt, node, etc.
+
+  status String  @default("pending") @db.VarChar(50) // pending, installing, completed, failed, cancelled
+  config Json?   @db.JsonB
+  error  String? @db.Text
+  result Json?   @db.JsonB // Installation result data
+
+  // Who requested
+  requestedBy String   @map("requested_by") @db.Uuid // User or Agent ID
+  requestedAt DateTime @default(now()) @map("requested_at") @db.Timestamptz(6)
+
+  // Approval workflow (for recommend mode)
+  requiresApproval Boolean   @default(false) @map("requires_approval")
+  approvedBy       String?   @map("approved_by") @db.Uuid
+  approvedAt       DateTime? @map("approved_at") @db.Timestamptz(6)
+  rejectedBy       String?   @map("rejected_by") @db.Uuid
+  rejectedAt       DateTime? @map("rejected_at") @db.Timestamptz(6)
+  rejectionReason  String?   @map("rejection_reason") @db.Text
+
+  // Completion
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  extensionId String?   @map("extension_id") @db.Uuid // Created extension ID
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([requestedBy])
+  @@map("installation_queue")
+}
+
+// ============================================================================
+// N8N WORKFLOW AUTOMATION INTEGRATION TABLES
+// ============================================================================
+
+/// N8nInstance - Per-tenant n8n container
+/// Each organization gets its own isolated n8n instance
+model N8nInstance {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  containerUrl   String @map("container_url") @db.Text // e.g., https://org-slug.workflows.nubabel.com
+  apiKey         String @map("api_key") @db.Text // Encrypted n8n API key
+  encryptionKey  String @map("encryption_key") @db.Text // N8N_ENCRYPTION_KEY (unique per tenant)
+  webhookBaseUrl String @map("webhook_base_url") @db.Text // Webhook URL base
+
+  status String @default("provisioning") @map("status") @db.VarChar(50) // provisioning, active, stopped, failed
+  config Json   @default("{}") @map("config") @db.JsonB // Additional config
+
+  lastHealthCheck DateTime? @map("last_health_check") @db.Timestamptz(6)
+  errorMessage    String?   @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workflows    N8nWorkflow[]
+  credentials  N8nCredential[]
+
+  @@unique([organizationId])
+  @@index([status])
+  @@map("n8n_instances")
+}
+
+/// N8nWorkflow - Workflow references with categorization
+/// Synced from n8n instance, can be registered as orchestrator skills
+model N8nWorkflow {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  instanceId     String @map("instance_id") @db.Uuid
+
+  n8nWorkflowId String   @map("n8n_workflow_id") @db.VarChar(255) // ID in n8n's database
+  name          String   @db.VarChar(255)
+  description   String?  @db.Text
+  category      String   @default("uncategorized") @map("category") @db.VarChar(50) // automation, notification, data-sync, etc.
+  tags          String[] @default([]) @db.VarChar(100)
+
+  workflowJson Json    @map("workflow_json") @db.JsonB // Full n8n workflow JSON (synced)
+  isActive     Boolean @default(false) @map("is_active")
+  isSkill      Boolean @default(false) @map("is_skill") // Registered as orchestrator skill
+
+  sopId String? @map("sop_id") @db.Uuid // Link to source SOP if converted
+
+  syncedAt  DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  instance     N8nInstance             @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  executions   N8nExecution[]
+  permissions  N8nWorkflowPermission[]
+
+  @@unique([instanceId, n8nWorkflowId])
+  @@index([organizationId, category])
+  @@index([isSkill])
+  @@map("n8n_workflows")
+}
+
+/// N8nExecution - Execution tracking
+/// Records each workflow execution with status and results
+model N8nExecution {
+  id         String @id @default(uuid()) @db.Uuid
+  workflowId String @map("workflow_id") @db.Uuid
+
+  n8nExecutionId String @map("n8n_execution_id") @db.VarChar(255) // ID in n8n's database
+  status         String @db.VarChar(50) // waiting, running, success, error, canceled
+  mode           String @db.VarChar(50) // manual, trigger, webhook, retry
+
+  startedAt   DateTime  @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  inputData    Json?   @map("input_data") @db.JsonB // Summary only
+  outputData   Json?   @map("output_data") @db.JsonB // Summary only
+  errorMessage String? @map("error_message") @db.Text
+
+  retryOf    String? @map("retry_of") @db.Uuid // If this is a retry, link to original
+  retryCount Int     @default(0) @map("retry_count")
+
+  triggeredBy String? @map("triggered_by") @db.VarChar(255) // userId or "system" or "webhook"
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workflow N8nWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, status])
+  @@index([startedAt])
+  @@map("n8n_executions")
+}
+
+/// N8nCredential - Credential mapping
+/// Maps n8n credentials to MCP connections for unified access control
+model N8nCredential {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  instanceId     String @map("instance_id") @db.Uuid
+
+  n8nCredentialId String  @map("n8n_credential_id") @db.VarChar(255) // ID in n8n's database
+  mcpConnectionId String? @map("mcp_connection_id") @db.Uuid // Link to MCPConnection if mapped
+
+  credentialType String @map("credential_type") @db.VarChar(100) // e.g., "slackApi", "notionApi", "httpHeaderAuth"
+  name           String @db.VarChar(255) // Display name
+
+  syncedAt  DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  instance     N8nInstance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([instanceId, n8nCredentialId])
+  @@index([organizationId])
+  @@map("n8n_credentials")
+}
+
+/// N8nWorkflowPermission - Agent-based access control
+/// Controls which agents can view/execute/edit workflows
+model N8nWorkflowPermission {
+  id         String @id @default(uuid()) @db.Uuid
+  workflowId String @map("workflow_id") @db.Uuid
+
+  agentId String? @map("agent_id") @db.Uuid // If assigned to specific agent
+  roleId  String? @map("role_id") @db.VarChar(50) // If assigned to role (admin, member, viewer)
+
+  canView    Boolean @default(true) @map("can_view")
+  canExecute Boolean @default(false) @map("can_execute")
+  canEdit    Boolean @default(false) @map("can_edit")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workflow N8nWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, agentId])
+  @@unique([workflowId, roleId])
+  @@map("n8n_workflow_permissions")
+}
+
+// ============================================================================
+// KNOWLEDGE GRAPH & MEMORY SYSTEM
+// ============================================================================
+
+/// KnowledgeNode - Nodes in the knowledge graph
+/// Represents entities, concepts, documents, or any knowledge unit
+model KnowledgeNode {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+
+  type        String  @db.VarChar(100) // entity, concept, document, task, person, etc.
+  name        String  @db.VarChar(500)
+  description String? @db.Text
+  metadata    Json    @default("{}") @db.JsonB // Flexible additional data
+
+  // Vector embedding for semantic search (stored as JSON array of floats)
+  embedding Json? @db.JsonB // [0.1, 0.2, ...] float vector
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outgoingEdges  KnowledgeEdge[]   @relation("SourceNode")
+  incomingEdges  KnowledgeEdge[]   @relation("TargetNode")
+
+  @@index([organizationId, type])
+  @@index([organizationId, name])
+  @@map("knowledge_nodes")
+}
+
+/// KnowledgeEdge - Relationships between nodes
+/// Weighted, typed edges connecting knowledge nodes
+model KnowledgeEdge {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+
+  sourceNodeId String @map("source_node_id") @db.Uuid
+  targetNodeId String @map("target_node_id") @db.Uuid
+
+  relationshipType String @map("relationship_type") @db.VarChar(100) // related_to, parent_of, depends_on, mentions, etc.
+  weight           Float  @default(1.0) @db.Real // Strength of relationship (0.0-1.0)
+  metadata         Json   @default("{}") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceNode   KnowledgeNode  @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode   KnowledgeNode  @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNodeId, targetNodeId, relationshipType])
+  @@index([organizationId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+  @@index([relationshipType])
+  @@map("knowledge_edges")
+}
+
+/// KnowledgeCluster - Groups of related nodes
+/// For organizing and navigating the knowledge graph
+model KnowledgeCluster {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+  nodeIds     String[] @map("node_ids") @db.Uuid // Array of node IDs in this cluster
+
+  // Centroid vector for the cluster (averaged embeddings)
+  centroid Json? @db.JsonB // [0.1, 0.2, ...] float vector
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("knowledge_clusters")
+}
+
+/// EntityMemory - Memory about specific entities
+/// Short-term, context-specific memory for entities
+model EntityMemory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+
+  entityType String @map("entity_type") @db.VarChar(100) // agent, user, project, task, etc.
+  entityId   String @map("entity_id") @db.Uuid
+
+  memoryType String @map("memory_type") @db.VarChar(100) // preference, context, state, note, etc.
+  content    String @db.Text
+  metadata   Json   @default("{}") @db.JsonB
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(6) // Optional expiration
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, entityType, entityId])
+  @@index([expiresAt]) // For cleanup of expired memories
+  @@map("entity_memories")
+}
+
+/// Memory - Long-term memory storage
+/// Episodic, semantic, and procedural memory for the system
+model Memory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid // Optional: memory specific to a user
+
+  type String @db.VarChar(50) // episodic (events), semantic (facts), procedural (how-tos)
+
+  content    String @db.Text
+  embedding  Json?  @db.JsonB // [0.1, 0.2, ...] float vector for semantic search
+
+  // Memory strength metrics
+  importance      Float    @default(0.5) @db.Real // 0.0-1.0
+  accessCount     Int      @default(0) @map("access_count")
+  lastAccessedAt  DateTime @default(now()) @map("last_accessed_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, type])
+  @@index([organizationId, userId])
+  @@index([importance])
+  @@index([lastAccessedAt])
+  @@map("memories")
 }
