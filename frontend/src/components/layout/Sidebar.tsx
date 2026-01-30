@@ -51,6 +51,7 @@ const adminNavItems: NavItem[] = [
   { name: "Admin Dashboard", path: "/admin", icon: "🔧" },
   { name: "Agents", path: "/admin/agents", icon: "🤖" },
   { name: "Skills", path: "/admin/skills", icon: "⚡" },
+  { name: "Claude Max", path: "/admin/claude-max-accounts", icon: "🧠" },
   { name: "Optimization", path: "/admin/optimization", icon: "🔬" },
   { name: "Organizations", path: "/admin/organizations", icon: "🏢" },
   { name: "Billing", path: "/billing", icon: "💳" },
@@ -80,29 +81,43 @@ export default function Sidebar() {
     <aside className="w-64 bg-gray-50 fixed left-0 top-16 bottom-0 border-r border-gray-200 overflow-y-auto">
       <nav className="p-4">
         <div className="space-y-6">
-          <div><ul className="space-y-2">{renderNavItems(mainNavItems)}</ul></div>
           <div>
-            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Organization</h3>
+            <ul className="space-y-2">{renderNavItems(mainNavItems)}</ul>
+          </div>
+          <div>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Organization
+            </h3>
             <ul className="space-y-2">{renderNavItems(organizationNavItems)}</ul>
           </div>
           <div>
-            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Integrations</h3>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Integrations
+            </h3>
             <ul className="space-y-2">{renderNavItems(integrationNavItems)}</ul>
           </div>
           <div>
-            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Analytics</h3>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Analytics
+            </h3>
             <ul className="space-y-2">{renderNavItems(analyticsNavItems)}</ul>
           </div>
           <div>
-            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Knowledge</h3>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Knowledge
+            </h3>
             <ul className="space-y-2">{renderNavItems(knowledgeNavItems)}</ul>
           </div>
           <div>
-            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Marketplace</h3>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Marketplace
+            </h3>
             <ul className="space-y-2">{renderNavItems(marketplaceNavItems)}</ul>
           </div>
           <div>
-            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Admin</h3>
+            <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Admin
+            </h3>
             <ul className="space-y-2">{renderNavItems(adminNavItems)}</ul>
           </div>
         </div>

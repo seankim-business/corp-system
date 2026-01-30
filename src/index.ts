@@ -102,6 +102,7 @@ import { shutdownOpenTelemetry } from "./instrumentation";
 import { logger } from "./utils/logger";
 import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
 import { adminRouter } from "./admin";
+import { claudeMaxAccountsRouter } from "./api/claude-max-accounts";
 // import accountsRouter from "./api/routes/accounts.routes"; // TODO: File not found
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
@@ -525,6 +526,7 @@ app.use("/api/regions", apiRateLimiter, authenticate, sentryUserContext, regions
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
 app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, claudeMaxAccountsRouter);
 // app.use("/api/admin/accounts", apiRateLimiter, authenticate, sentryUserContext, accountsRouter);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
 // app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);
