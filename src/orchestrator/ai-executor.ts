@@ -19,6 +19,7 @@ import {
 } from "../services/mcp-registry";
 import { applyPatternContext } from "../services/pattern-optimizer";
 import { slackStatusUpdater } from "../services/slack-status-updater";
+import { slackThinkingService } from "../services/slack-thinking-message";
 
 export interface AIExecutionParams {
   category: Category;
@@ -1151,6 +1152,10 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
               // Check if we need to execute tools
               if (result.stop_reason !== "tool_use") {
                 // No more tool calls, we're done
+                // Clear thinking message if any
+                if (params.eventId) {
+                  await slackThinkingService.clearThinking(params.eventId);
+                }
                 break;
               }
 
@@ -1161,6 +1166,34 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
 
               if (toolUseBlocks.length === 0) {
                 break;
+              }
+
+              // Extract Claude's reasoning text (text blocks before tool_use)
+              // This shows the AI's actual thinking process
+              const textBlocks = result.content.filter(
+                (block): block is Anthropic.Messages.TextBlock => block.type === "text"
+              );
+              const reasoningText = textBlocks.map(b => b.text).join(" ").trim();
+
+              // Show Claude's reasoning as a thinking message
+              if (params.eventId && reasoningText) {
+                // Truncate if too long (max ~200 chars for readability)
+                const truncatedReasoning = reasoningText.length > 200
+                  ? reasoningText.substring(0, 197) + "..."
+                  : reasoningText;
+
+                // Determine stage from first tool being called
+                const firstTool = toolUseBlocks[0];
+                const parsed = parseNamespacedToolName(firstTool.name);
+                const stage = parsed.namespace
+                  ? `Working with ${parsed.namespace}`
+                  : "Processing";
+
+                await slackThinkingService.updateThinking(
+                  params.eventId,
+                  truncatedReasoning,
+                  stage,
+                );
               }
 
               // Add assistant's response to messages
@@ -1185,7 +1218,8 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
                     // Find provider from connection or infer from namespace
                     const conn = orgConnections.find(c => c.namespace === parsed.namespace);
                     const provider = conn?.provider || parsed.namespace;
-                    await slackStatusUpdater.updateMcpToolStatus(params.eventId, provider, parsed.localName);
+                    // Use thinking messages for better UX - shows rotating context
+                    await slackStatusUpdater.updateMcpStatusWithThinking(params.eventId, provider);
                   }
                 }
 
@@ -1367,6 +1401,11 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
 
         span.setStatus({ code: SpanStatusCode.OK });
 
+        // Clear thinking message on successful completion
+        if (params.eventId) {
+          await slackThinkingService.clearThinking(params.eventId);
+        }
+
         const executionResult: AIExecutionResult = {
           output,
           status: "success",
@@ -1447,6 +1486,11 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
           accountName,
           isRateLimited,
         });
+
+        // Clear thinking message on error
+        if (params.eventId) {
+          await slackThinkingService.clearThinking(params.eventId);
+        }
 
         return {
           output: `AI execution failed: ${errorMessage}`,

@@ -49,6 +49,22 @@ export interface MarketplaceExtension {
     permissions: string[];
   };
 
+  megaAppConfig?: {
+    moduleId?: string;
+    isModule?: boolean;
+    parentModuleId?: string;
+    valueStreamConfig?: {
+      position: number;
+      inputTypes: string[];
+      outputTypes: string[];
+    };
+    agentConfig?: {
+      defaultAgentType: string;
+      maxConcurrent: number;
+      evolutionEnabled: boolean;
+    };
+  };
+
   // Status
   status: "draft" | "review" | "published" | "rejected";
   featured: boolean;

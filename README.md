@@ -5,8 +5,9 @@
 Multi-tenant B2B SaaS framework that enables companies to automate their workflows with AI agents.
 
 [![License](https://img.shields.io/badge/license-Proprietary-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Alpha-orange.svg)](PROJECT_IDENTITY.md)
+[![Status](https://img.shields.io/badge/status-Alpha-orange.svg)](docs/PROJECT_IDENTITY.md)
 [![Domain](https://img.shields.io/badge/domain-nubabel.com-green.svg)](https://nubabel.com)
+[![Updated](https://img.shields.io/badge/updated-Jan%202026-brightgreen.svg)]()
 
 ---
 
@@ -29,7 +30,7 @@ Evolve: Framework for any company
 Future: B2B SaaS with AI-powered automation
 ```
 
-**Read more**: [PROJECT_IDENTITY.md](PROJECT_IDENTITY.md)
+**Read more**: [docs/PROJECT_IDENTITY.md](docs/PROJECT_IDENTITY.md)
 
 ---
 
@@ -163,15 +164,19 @@ Future: B2B SaaS with AI-powered automation
 
 **See**: `COMPLETION_REPORT.md` for full implementation details
 
-### 🚧 In Progress (v0.2 - Deployment Phase)
+### ✅ Completed (v0.3 - Phase 3) - 2026-01-30
 
-**Deployment Verification** - Ready for Production
+**Claude Max Integration**
+- ✅ Subscription-based AI execution (Claude Max OAuth)
+- ✅ Slack status sync with AI agent state
+- ✅ Marketplace Hub MCP server
 
-- [ ] Railway deployment health check (pending: DATABASE_URL, REDIS_URL configuration)
-- [ ] Run database migration (pending: database connection)
-- [ ] Slack Bot production testing (pending: Slack app credentials)
+**AI Orchestration Enhancements**
+- ✅ Improved agent status tracking
+- ✅ Real-time Slack notifications
+- ✅ Extension marketplace foundation
 
-### 📋 Planned (v0.3+ - Q2 2026)
+### 📋 Planned (v0.4+ - Q2 2026)
 
 **AI Agent System**
 
@@ -284,12 +289,10 @@ cd opencode-sidecar
 
 ### Deploy to Railway
 
-Follow our comprehensive deployment guide:
+Follow our deployment guides:
 
-- **[RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)** - Step-by-step (English)
-- **[QUICK_DEPLOY.md](QUICK_DEPLOY.md)** - Quick guide (Korean)
-
-**Estimated time**: 40-50 minutes
+- **[RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)** - Complete Railway deployment guide
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - General deployment overview
 
 ---
 
@@ -352,14 +355,14 @@ nubabel/
 | MCP System                   | ✅ Complete | 100%     |
 | Slack Bot                    | ✅ Complete | 100%     |
 | Orchestrator                 | ✅ Complete | 100%     |
-| **Research Phase**           | ✅ Complete | 100%     |
-| **Implementation (Wk 9-12)** | ✅ Complete | 100%     |
-| Railway Deployment           | 🚧 Pending  | 95%      |
-| AI Multi-Agent               | 📋 Planned  | 0%       |
+| Railway Deployment           | ✅ Complete | 100%     |
+| Claude Max Integration       | ✅ Complete | 100%     |
+| Marketplace Hub              | 🚧 Active   | 70%      |
+| AI Multi-Agent               | 📋 Planned  | 20%      |
 
-**Overall Progress**: **~95%** (Phase 2 Week 1-12 완료 ✅ - Ready for deployment)
+**Overall Progress**: Phase 3 진행중 - Production 운영중
 
-**🌐 Production URL**: https://auth.nubabel.com
+**🌐 Production URL**: https://nubabel.com
 
 ---
 
@@ -401,7 +404,7 @@ nubabel/
 - [ ] Predictive automation
 - [ ] Continuous improvement loop
 
-**Details**: See [PROJECT_IDENTITY.md](PROJECT_IDENTITY.md) for full roadmap
+**Details**: See [docs/PROJECT_IDENTITY.md](docs/PROJECT_IDENTITY.md) for full roadmap
 
 ---
 
@@ -446,71 +449,39 @@ nubabel/
 
 ## 📖 Documentation
 
-### Getting Started
+### Architecture & Technical
 
-- [PROJECT_IDENTITY.md](PROJECT_IDENTITY.md) - **Start here** - Project vision & strategy
-- [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) - Deployment guide
-- [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) - Current deployment status
+| Document | Description |
+|----------|-------------|
+| [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) | System architecture |
+| [docs/architecture/API.md](docs/architecture/API.md) | REST API reference |
+| [docs/architecture/AUTH_SYSTEM.md](docs/architecture/AUTH_SYSTEM.md) | Authentication design |
+| [docs/architecture/DATABASE_SCHEMA.md](docs/architecture/DATABASE_SCHEMA.md) | Prisma schema & models |
 
-### Technical
+### Deployment
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture (UPDATED with BullMQ, MCP, Session patterns)
-- [AUTH_SYSTEM.md](AUTH_SYSTEM.md) - Authentication design
-- **[Phase 2 Technical Spec](docs/PHASE2_TECHNICAL_SPEC.md)** ⭐ Week 9-12 - Slack Bot + Orchestrator
-- **[OhMyOpenCode Integration](docs/core/06-ohmyopencode-integration.md)** ⭐ Agent orchestration system
-- **[Slack + Orchestrator](docs/core/07-slack-orchestrator-implementation.md)** ⭐ Implementation details
+| Document | Description |
+|----------|-------------|
+| [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) | Deployment overview |
+| [docs/deployment/RAILWAY_DEPLOYMENT.md](docs/deployment/RAILWAY_DEPLOYMENT.md) | Railway-specific guide |
 
-### Research Documentation (NEW - 2026-01-26)
+### Documentation Structure
 
-- **[Research Complete Summary](research/RESEARCH_COMPLETE.md)** ⭐⭐⭐ MUST READ - Executive summary of all findings
-- **[Research Index](research/INDEX.md)** ⭐ Complete document index with research→code mapping
-- **[Research Structure](research/README.md)** - Research methodology and organization
-- **Architecture Analysis**:
-  - [Current Architecture Analysis](research/architecture/00-current-architecture-analysis.md) - Complete codebase analysis
-  - [Synthesis & Decisions](research/architecture/01-synthesis-and-decisions.md) - Final technology stack decisions
-- **Technical Deep-Dive Guides** (9 documents):
-  - [01 - Orchestrator Architecture](research/technical-deep-dive/01-orchestrator-architecture.md)
-  - [02 - Category System](research/technical-deep-dive/02-category-system-deep-dive.md) - Cost analysis & optimization
-  - [03 - Skill System](research/technical-deep-dive/03-skill-system-architecture.md) - 4 built-in skills
-  - [04 - Slack Integration](research/technical-deep-dive/04-slack-integration-patterns.md) - Multi-tenant patterns
-  - [05 - MCP SDK Production](research/technical-deep-dive/05-mcp-sdk-production-patterns.md) - Multi-tenant MCP servers
-  - [06 - LangGraph vs Custom Router](research/technical-deep-dive/06-langgraph-vs-custom-router.md) - Decision framework
-  - [07 - Redis Production Config](research/technical-deep-dive/07-redis-production-config.md) - Production settings
-  - [08 - AI Error Handling](research/technical-deep-dive/08-ai-error-handling-guide.md) - Retry, circuit breaker, cost
-  - [09 - Multi-Tenant Security](research/technical-deep-dive/09-multi-tenant-security-checklist.md) - RLS, RBAC, compliance
-- **Integration Patterns**:
-  - [SSE Patterns](research/integration/real-time/01-sse-patterns.md) - Server-Sent Events for multi-tenant SaaS
-- **Security & Performance**:
-  - [OAuth 2.1 Security](research/security/authentication/01-oauth-2.1-security.md) - OAuth patterns
-  - [Database Query Optimization](research/performance/optimization/01-database-query-optimization.md) - Prisma + RLS
-  - [Load Testing](research/performance/load-testing/01-tools-and-patterns.md) - k6 & Artillery
-- **Production & Compliance**:
-  - [APM Patterns](research/production/monitoring/01-apm-patterns.md) - OpenTelemetry setup
-  - [Zero-Downtime Deployment](research/production/deployment/01-zero-downtime-deployment.md) - CI/CD
-  - [GDPR Compliance](research/production/compliance/01-gdpr-compliance.md) - GDPR roadmap
-- **UX & Design**:
-  - [Slack Bot UX](research/usability/slack-bot-patterns/01-conversation-design.md) - Conversation design
-  - [SaaS Onboarding](research/usability/onboarding/01-saas-onboarding-flows.md) - Onboarding flows
-  - [Error UX](research/usability/error-ux/01-error-message-patterns.md) - Error message patterns
-
-### Implementation Documentation (NEW - 2026-01-26)
-
-- **[Implementation Status](docs/IMPLEMENTATION_STATUS.md)** ⭐ Complete production implementation summary
-  - OpenTelemetry instrumentation
-  - Health check endpoints
-  - OrchestratorExecution model
-  - Feature flags system
-  - Generic webhooks
-  - SSE production enhancements
-  - Sidecar resilience patterns
-  - Environment variables reference
-  - Deployment checklist
+| Directory | Contents |
+|-----------|----------|
+| [docs/architecture/](docs/architecture/) | System architecture & API docs |
+| [docs/deployment/](docs/deployment/) | Deployment guides |
+| [docs/design/](docs/design/) | UX/UI patterns and guides |
+| [docs/core/](docs/core/) | Integration deep-dives |
+| [docs/testing/](docs/testing/) | Testing strategies |
+| [plan/](plan/) | Strategic planning documents |
+| [research/](research/) | Technical research & findings |
+| [.omc/](/.omc/) | AI agent context & task tracking |
 
 ### Development
 
-- [frontend/FRONTEND_README.md](frontend/FRONTEND_README.md) - Frontend setup guide
-- Extension development guide (TBD)
-- Tenant separation guide (TBD)
+- [frontend/README.md](frontend/README.md) - Frontend setup guide
+- [docs/frontend/](docs/frontend/) - Frontend documentation
 
 ---
 
@@ -659,6 +630,6 @@ Built with:
 
 **Built with ❤️ by the Kyndof team**
 
-[Website](https://nubabel.com) • [Documentation](docs/) • [Deployment Guide](RAILWAY_DEPLOYMENT.md)
+[Website](https://nubabel.com) • [Documentation](docs/) • [Architecture](docs/architecture/ARCHITECTURE.md)
 
 </div>

@@ -14,6 +14,9 @@ import {
   clearAgentStatus,
   formatMcpToolStatus,
   getStageStatus,
+  getStageThinkingMessages,
+  getMcpThinkingMessages,
+  setAgentStatusWithLoadingMessages,
 } from "../utils/slack-agent-status";
 
 export type ProcessingStage =
@@ -183,6 +186,50 @@ class SlackStatusUpdater {
   }
 
   /**
+   * Update status with rotating thinking messages for a processing stage.
+   * This shows the main status plus rotating "thinking" messages below.
+   */
+  async updateStageStatusWithThinking(
+    eventId: string,
+    stage: ProcessingStage,
+  ): Promise<boolean> {
+    const supported = await this.isStatusSupported(eventId);
+    if (supported === false) {
+      return false;
+    }
+
+    const slackContext = await this.getContext(eventId);
+    if (!slackContext) {
+      return false;
+    }
+
+    const client = await this.getClient(slackContext.organizationId);
+    if (!client) {
+      return false;
+    }
+
+    const locale = slackContext.locale || "en";
+    const thinkingMessages = getStageThinkingMessages(stage, locale);
+
+    const success = await setAgentStatusWithLoadingMessages(
+      client,
+      slackContext.channelId,
+      slackContext.threadTs,
+      thinkingMessages,
+    );
+
+    if (supported === null) {
+      await redis.set(
+        REDIS_KEYS.statusSupported(eventId),
+        success ? "true" : "false",
+        CONTEXT_TTL,
+      );
+    }
+
+    return success;
+  }
+
+  /**
    * Update status for MCP tool execution.
    */
   async updateMcpToolStatus(
@@ -194,6 +241,50 @@ class SlackStatusUpdater {
     const locale = slackContext?.locale || "en";
     const status = formatMcpToolStatus(provider, toolName, locale);
     return this.updateStatus(eventId, status);
+  }
+
+  /**
+   * Update status with rotating thinking messages for MCP provider.
+   * Shows provider-specific "thinking" messages that rotate automatically.
+   */
+  async updateMcpStatusWithThinking(
+    eventId: string,
+    provider: string,
+  ): Promise<boolean> {
+    const supported = await this.isStatusSupported(eventId);
+    if (supported === false) {
+      return false;
+    }
+
+    const slackContext = await this.getContext(eventId);
+    if (!slackContext) {
+      return false;
+    }
+
+    const client = await this.getClient(slackContext.organizationId);
+    if (!client) {
+      return false;
+    }
+
+    const locale = slackContext.locale || "en";
+    const thinkingMessages = getMcpThinkingMessages(provider, locale);
+
+    const success = await setAgentStatusWithLoadingMessages(
+      client,
+      slackContext.channelId,
+      slackContext.threadTs,
+      thinkingMessages,
+    );
+
+    if (supported === null) {
+      await redis.set(
+        REDIS_KEYS.statusSupported(eventId),
+        success ? "true" : "false",
+        CONTEXT_TTL,
+      );
+    }
+
+    return success;
   }
 
   /**

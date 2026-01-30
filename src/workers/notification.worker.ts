@@ -12,6 +12,7 @@ import { prepareSlackMessages } from "../utils/slack-format";
 import { clearAgentStatus } from "../utils/slack-agent-status";
 import { appendFeedbackBlocks } from "../utils/slack-feedback-blocks";
 import { getAgentIdentity } from "../config/agent-identities";
+import { getCompletion, getErrorMessage } from "../config/bot-personality";
 
 export class NotificationWorker extends BaseWorker<NotificationData> {
   constructor() {
@@ -212,10 +213,13 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
         },
       );
 
-      logger.info(`Notification sent for event ${eventId}`);
+      logger.info(getCompletion(), { eventId });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to send notification for event ${eventId}:`, { error: errorMessage });
+      logger.error(getErrorMessage("generic"), {
+        error: errorMessage,
+        eventId,
+      });
 
       await emitJobProgress(job.id || "", PROGRESS_STAGES.FAILED, 0, {
         eventId,

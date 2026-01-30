@@ -22,6 +22,9 @@ import {
 import { setProcessingIndicator } from "../utils/slack-agent-status";
 import { createFeedbackReceivedBlock } from "../utils/slack-feedback-blocks";
 import { slackStatusUpdater } from "../services/slack-status-updater";
+import { codeOperationQueue } from "../queue/code-operation.queue";
+import { isNativeCommand, executeNativeCommand } from "./slack-native-commands";
+import { createReactionSequence } from "../utils/slack-reaction-manager";
 
 let slackApp: App | null = null;
 
@@ -241,6 +244,24 @@ async function handleFeedbackAction(
       },
     });
 
+    // Add reaction to show feedback was received
+    if (messageTs && channelId) {
+      const reactionEmoji = sentiment === "positive" ? "+1" : "-1";
+      try {
+        await client.reactions.add({
+          channel: channelId,
+          timestamp: messageTs,
+          name: reactionEmoji,
+        });
+        logger.debug("Added feedback reaction", { channel: channelId, timestamp: messageTs, emoji: reactionEmoji });
+      } catch (reactionError: any) {
+        // Ignore "already_reacted" error
+        if (reactionError.data?.error !== "already_reacted") {
+          logger.debug("Could not add feedback reaction", { error: reactionError.message });
+        }
+      }
+    }
+
     // Update the message to show feedback was received
     if (messageTs && channelId) {
       try {
@@ -328,8 +349,9 @@ function setupEventHandlers(app: App): void {
     try {
       const { user, text, channel, thread_ts, ts } = event;
 
-      // Add ack reaction immediately for instant feedback
-      await addAckReaction(client as WebClient, channel, ts);
+      // Create reaction sequence for better feedback
+      const sequence = createReactionSequence(client as WebClient, channel, ts);
+      await sequence.start();
 
       // messageTs is for thread context (reply in same thread)
       const messageTs = thread_ts || ts;
@@ -357,7 +379,28 @@ function setupEventHandlers(app: App): void {
 
       if (!user) {
         logger.warn("Slack mention without user");
+        await sequence.error();
         return;
+      }
+
+      // Check for native commands BEFORE processing
+      if (isNativeCommand(text)) {
+        logger.debug("Detected native command, executing directly");
+        try {
+          await executeNativeCommand(text, {
+            client: client as WebClient,
+            channel,
+            threadTs: thread_ts || ts,
+            userId: user,
+            say,
+          });
+          await sequence.complete();
+          return;
+        } catch (error) {
+          logger.error("Native command execution failed", {}, error instanceof Error ? error : new Error(String(error)));
+          await sequence.error();
+          return;
+        }
       }
 
       // Check if this is a feature request
@@ -373,6 +416,7 @@ function setupEventHandlers(app: App): void {
           },
           client as WebClient,
         );
+        await sequence.complete();
         return;
       }
 
@@ -387,6 +431,7 @@ function setupEventHandlers(app: App): void {
           text: "❌ Nubabel user not found. Please login first at https://nubabel.com",
           thread_ts: thread_ts || ts,
         });
+        await sequence.error();
         return;
       }
 
@@ -398,6 +443,7 @@ function setupEventHandlers(app: App): void {
           text: "❌ Failed to get Slack workspace info",
           thread_ts: thread_ts || ts,
         });
+        await sequence.error();
         return;
       }
 
@@ -408,6 +454,7 @@ function setupEventHandlers(app: App): void {
           text: "❌ Organization not found. Please connect your Slack workspace in Settings.",
           thread_ts: thread_ts || ts,
         });
+        await sequence.error();
         return;
       }
 
@@ -513,6 +560,12 @@ function setupEventHandlers(app: App): void {
 
       metrics.increment("slack.error.handler_failed");
 
+      // Mark reaction sequence as error
+      try {
+        const errorSequence = createReactionSequence(client as WebClient, event.channel, event.ts);
+        await errorSequence.error();
+      } catch {}
+
       await say({
         text: `❌ Error: ${errorMessage}`,
         thread_ts: event.thread_ts || event.ts,
@@ -526,8 +579,9 @@ function setupEventHandlers(app: App): void {
 
       if (!msg.user || !msg.text) return;
 
-      // Add ack reaction immediately for instant feedback
-      await addAckReaction(client as WebClient, msg.channel, msg.ts);
+      // Create reaction sequence for better feedback
+      const sequence = createReactionSequence(client as WebClient, msg.channel, msg.ts);
+      await sequence.start();
 
       const dedupeKey = `slack:dedupe:direct_message:${msg.channel}:${msg.ts}`;
       const alreadyProcessed = await redis.exists(dedupeKey);
@@ -542,9 +596,30 @@ function setupEventHandlers(app: App): void {
       await redis.set(dedupeKey, "1", 300);
 
       try {
+        // Check for native commands BEFORE processing
+        if (isNativeCommand(msg.text)) {
+          logger.debug("Detected native command in DM, executing directly");
+          try {
+            await executeNativeCommand(msg.text, {
+              client: client as WebClient,
+              channel: msg.channel,
+              threadTs: msg.ts,
+              userId: msg.user,
+              say,
+            });
+            await sequence.complete();
+            return;
+          } catch (error) {
+            logger.error("Native command execution failed in DM", {}, error instanceof Error ? error : new Error(String(error)));
+            await sequence.error();
+            return;
+          }
+        }
+
         const nubabelUser = await getUserBySlackId(msg.user, client as WebClient);
         if (!nubabelUser) {
           await say("Please login at https://nubabel.com first!");
+          await sequence.error();
           return;
         }
 
@@ -553,12 +628,14 @@ function setupEventHandlers(app: App): void {
 
         if (!workspaceId) {
           await say("Failed to get workspace info");
+          await sequence.error();
           return;
         }
 
         const organization = await getOrganizationBySlackWorkspace(workspaceId);
         if (!organization) {
           await say("Organization not found. Please connect your Slack workspace in Settings.");
+          await sequence.error();
           return;
         }
 
@@ -638,6 +715,12 @@ function setupEventHandlers(app: App): void {
         await redis.del(dedupeKey);
         const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error("DM handler error", { error: errorMessage });
+
+        // Mark reaction sequence as error
+        try {
+          await sequence.error();
+        } catch {}
+
         await say(`Error: ${errorMessage}`);
       }
     }
@@ -1068,6 +1151,253 @@ function setupEventHandlers(app: App): void {
       logger.error("/task command error", { error: errorMessage });
       await say(`❌ Error: ${errorMessage}`);
       metrics.increment("slack.task.error");
+    }
+  });
+
+  // /debug - Queue a debug operation to fix errors
+  app.command("/debug", async ({ command, ack, say, client }) => {
+    await ack();
+
+    const dedupeKey = `slack:dedupe:debug_command:${command.team_id}:${command.channel_id}:${command.trigger_id}`;
+    const alreadyProcessed = await redis.exists(dedupeKey);
+    if (alreadyProcessed) {
+      logger.debug("Duplicate debug command ignored", { trigger_id: command.trigger_id });
+      return;
+    }
+
+    await redis.set(dedupeKey, "1", 60);
+
+    try {
+      // Get organization
+      const org = await getOrganizationBySlackWorkspace(command.team_id);
+      if (!org) {
+        await say("Organization not found. Please set up Nubabel first.");
+        return;
+      }
+
+      // Get user
+      const user = await getUserBySlackId(command.user_id, client as WebClient);
+
+      // Parse the error from command text
+      const errorText = command.text.trim();
+      if (!errorText) {
+        await say("Please provide an error description. Usage: `/debug <error message or description>`");
+        return;
+      }
+
+      // Queue the code operation
+      const jobId = await codeOperationQueue.enqueueOperation({
+        operationType: "debug",
+        description: `Debug: ${errorText}`,
+        repository: {
+          owner: "kyndof",  // TODO: Get from org settings
+          name: "nubabel",
+          branch: "main",
+          url: "https://github.com/kyndof/nubabel.git",
+        },
+        organizationId: org.id,
+        userId: user?.id || "",
+        agentPosition: 0,
+        sessionId: randomUUID(),
+        eventId: command.trigger_id,
+        slackChannel: command.channel_id,
+        slackThreadTs: undefined,
+        slackTeamId: command.team_id,
+        errorContext: {
+          errorMessage: errorText,
+        },
+        approvalRequired: true,
+        priority: "medium",
+      });
+
+      // Respond with status
+      await say({
+        text: "Debug operation queued",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*Debug Operation Queued*\n\n*Error:* ${errorText.substring(0, 200)}${errorText.length > 200 ? "..." : ""}\n*Job ID:* \`${jobId}\``,
+            },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: "I'll analyze the error, find the cause, and create a fix. You'll receive a PR for review when ready.",
+              },
+            ],
+          },
+        ],
+      });
+
+      logger.info("Debug command queued", { jobId, orgId: org.id, user: command.user_id });
+    } catch (error: any) {
+      logger.error("Error processing debug command", { error: error.message });
+      await say(`Error: ${error.message}`);
+    }
+  });
+
+  // /implement - Queue a feature implementation
+  app.command("/implement", async ({ command, ack, say, client }) => {
+    await ack();
+
+    const dedupeKey = `slack:dedupe:implement_command:${command.team_id}:${command.channel_id}:${command.trigger_id}`;
+    const alreadyProcessed = await redis.exists(dedupeKey);
+    if (alreadyProcessed) {
+      logger.debug("Duplicate implement command ignored", { trigger_id: command.trigger_id });
+      return;
+    }
+
+    await redis.set(dedupeKey, "1", 60);
+
+    try {
+      const org = await getOrganizationBySlackWorkspace(command.team_id);
+      if (!org) {
+        await say("Organization not found.");
+        return;
+      }
+
+      const user = await getUserBySlackId(command.user_id, client as WebClient);
+      const featureText = command.text.trim();
+
+      if (!featureText) {
+        await say("Please describe the feature. Usage: `/implement <feature description>`");
+        return;
+      }
+
+      const jobId = await codeOperationQueue.enqueueOperation({
+        operationType: "implement",
+        description: `Implement: ${featureText}`,
+        repository: {
+          owner: "kyndof",
+          name: "nubabel",
+          branch: "main",
+          url: "https://github.com/kyndof/nubabel.git",
+        },
+        organizationId: org.id,
+        userId: user?.id || "",
+        agentPosition: 0,
+        sessionId: randomUUID(),
+        eventId: command.trigger_id,
+        slackChannel: command.channel_id,
+        slackTeamId: command.team_id,
+        featureContext: {
+          requirements: featureText,
+          acceptanceCriteria: [],
+        },
+        approvalRequired: true,
+        priority: "medium",
+      });
+
+      await say({
+        text: "Implementation queued",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*Feature Implementation Queued*\n\n*Feature:* ${featureText.substring(0, 200)}${featureText.length > 200 ? "..." : ""}\n*Job ID:* \`${jobId}\``,
+            },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: "I'll plan the implementation, write the code, add tests, and create a PR for your review.",
+              },
+            ],
+          },
+        ],
+      });
+
+      logger.info("Implement command queued", { jobId, orgId: org.id });
+    } catch (error: any) {
+      logger.error("Error processing implement command", { error: error.message });
+      await say(`Error: ${error.message}`);
+    }
+  });
+
+  // /fix - Queue a quick fix operation
+  app.command("/fix", async ({ command, ack, say, client }) => {
+    await ack();
+
+    const dedupeKey = `slack:dedupe:fix_command:${command.team_id}:${command.channel_id}:${command.trigger_id}`;
+    const alreadyProcessed = await redis.exists(dedupeKey);
+    if (alreadyProcessed) {
+      logger.debug("Duplicate fix command ignored", { trigger_id: command.trigger_id });
+      return;
+    }
+
+    await redis.set(dedupeKey, "1", 60);
+
+    try {
+      const org = await getOrganizationBySlackWorkspace(command.team_id);
+      if (!org) {
+        await say("Organization not found.");
+        return;
+      }
+
+      const user = await getUserBySlackId(command.user_id, client as WebClient);
+      const fixText = command.text.trim();
+
+      if (!fixText) {
+        await say("Please describe what to fix. Usage: `/fix <issue description>`");
+        return;
+      }
+
+      const jobId = await codeOperationQueue.enqueueOperation({
+        operationType: "fix",
+        description: `Fix: ${fixText}`,
+        repository: {
+          owner: "kyndof",
+          name: "nubabel",
+          branch: "main",
+          url: "https://github.com/kyndof/nubabel.git",
+        },
+        organizationId: org.id,
+        userId: user?.id || "",
+        agentPosition: 0,
+        sessionId: randomUUID(),
+        eventId: command.trigger_id,
+        slackChannel: command.channel_id,
+        slackTeamId: command.team_id,
+        errorContext: {
+          errorMessage: fixText,
+        },
+        approvalRequired: true,
+        priority: "high",
+      });
+
+      await say({
+        text: "Fix queued",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*Fix Operation Queued*\n\n*Issue:* ${fixText.substring(0, 200)}${fixText.length > 200 ? "..." : ""}\n*Job ID:* \`${jobId}\``,
+            },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: "I'll fix the issue and create a PR. This is marked as high priority.",
+              },
+            ],
+          },
+        ],
+      });
+
+      logger.info("Fix command queued", { jobId, orgId: org.id });
+    } catch (error: any) {
+      logger.error("Error processing fix command", { error: error.message });
+      await say(`Error: ${error.message}`);
     }
   });
 

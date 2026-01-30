@@ -98,6 +98,145 @@ export const MCP_PROVIDER_DISPLAY_NAMES: Record<string, { en: string; ko: string
 /**
  * MCP Tool action verbs for status display
  */
+/**
+ * Thinking messages for each processing stage
+ * These rotate automatically via Slack's loading_messages feature
+ */
+export const STAGE_THINKING_MESSAGES: Record<string, { en: string[]; ko: string[] }> = {
+  analyzing: {
+    en: [
+      "Reading your message carefully...",
+      "Understanding the context...",
+      "Identifying key requirements...",
+      "Analyzing intent and scope...",
+    ],
+    ko: [
+      "메시지를 주의 깊게 읽는 중...",
+      "맥락을 파악하는 중...",
+      "핵심 요구사항을 확인하는 중...",
+      "의도와 범위를 분석하는 중...",
+    ],
+  },
+  selectingApproach: {
+    en: [
+      "Evaluating available tools...",
+      "Selecting the best approach...",
+      "Planning the execution strategy...",
+      "Preparing resources...",
+    ],
+    ko: [
+      "사용 가능한 도구를 평가하는 중...",
+      "최적의 방법을 선택하는 중...",
+      "실행 전략을 계획하는 중...",
+      "리소스를 준비하는 중...",
+    ],
+  },
+  processing: {
+    en: [
+      "Processing your request...",
+      "Working on it...",
+      "Making progress...",
+      "Almost there...",
+    ],
+    ko: [
+      "요청을 처리하는 중...",
+      "작업 진행 중...",
+      "진행 중...",
+      "거의 완료...",
+    ],
+  },
+  generating: {
+    en: [
+      "Synthesizing the response...",
+      "Crafting a helpful answer...",
+      "Finalizing the output...",
+      "Polishing the response...",
+    ],
+    ko: [
+      "응답을 종합하는 중...",
+      "도움이 될 답변을 작성하는 중...",
+      "결과물을 마무리하는 중...",
+      "응답을 다듬는 중...",
+    ],
+  },
+  executing: {
+    en: [
+      "Executing the task...",
+      "Running operations...",
+      "Processing actions...",
+      "Completing the work...",
+    ],
+    ko: [
+      "작업을 실행하는 중...",
+      "작업을 수행하는 중...",
+      "액션을 처리하는 중...",
+      "작업을 완료하는 중...",
+    ],
+  },
+};
+
+/**
+ * Thinking messages for MCP providers
+ */
+export const MCP_THINKING_MESSAGES: Record<string, { en: string[]; ko: string[] }> = {
+  notion: {
+    en: [
+      "Connecting to Notion workspace...",
+      "Searching Notion databases...",
+      "Reading Notion pages...",
+      "Processing Notion data...",
+    ],
+    ko: [
+      "노션 워크스페이스에 연결하는 중...",
+      "노션 데이터베이스를 검색하는 중...",
+      "노션 페이지를 읽는 중...",
+      "노션 데이터를 처리하는 중...",
+    ],
+  },
+  linear: {
+    en: [
+      "Connecting to Linear...",
+      "Fetching issues from Linear...",
+      "Processing Linear data...",
+      "Syncing with Linear...",
+    ],
+    ko: [
+      "리니어에 연결하는 중...",
+      "리니어에서 이슈를 가져오는 중...",
+      "리니어 데이터를 처리하는 중...",
+      "리니어와 동기화하는 중...",
+    ],
+  },
+  github: {
+    en: [
+      "Connecting to GitHub...",
+      "Fetching repository data...",
+      "Processing GitHub information...",
+      "Analyzing code changes...",
+    ],
+    ko: [
+      "깃허브에 연결하는 중...",
+      "저장소 데이터를 가져오는 중...",
+      "깃허브 정보를 처리하는 중...",
+      "코드 변경사항을 분석하는 중...",
+    ],
+  },
+  slack: {
+    en: [
+      "Searching Slack messages...",
+      "Fetching channel information...",
+      "Processing Slack data...",
+      "Analyzing conversations...",
+    ],
+    ko: [
+      "슬랙 메시지를 검색하는 중...",
+      "채널 정보를 가져오는 중...",
+      "슬랙 데이터를 처리하는 중...",
+      "대화를 분석하는 중...",
+    ],
+  },
+};
+
 export const MCP_TOOL_ACTIONS: Record<string, { en: string; ko: string }> = {
   getTasks: { en: "fetching tasks from", ko: "에서 작업을 가져오는 중" },
   createTask: { en: "creating task in", ko: "에 작업을 생성하는 중" },
@@ -416,4 +555,35 @@ export function getStageStatus(
     default:
       return AGENT_STATUS_MESSAGES.thinking[locale];
   }
+}
+
+/**
+ * Get thinking messages for a processing stage.
+ * These messages rotate automatically via Slack's loading_messages feature.
+ *
+ * @param stage - Processing stage
+ * @param locale - User's locale
+ * @returns Array of thinking messages
+ */
+export function getStageThinkingMessages(
+  stage: "analyzing" | "selectingApproach" | "processing" | "generating" | "executing",
+  locale: "en" | "ko" = "en",
+): string[] {
+  return STAGE_THINKING_MESSAGES[stage]?.[locale] || STAGE_THINKING_MESSAGES.processing[locale];
+}
+
+/**
+ * Get thinking messages for an MCP provider.
+ * These messages rotate automatically via Slack's loading_messages feature.
+ *
+ * @param provider - MCP provider name (e.g., "notion", "linear")
+ * @param locale - User's locale
+ * @returns Array of thinking messages
+ */
+export function getMcpThinkingMessages(
+  provider: string,
+  locale: "en" | "ko" = "en",
+): string[] {
+  const normalizedProvider = provider.toLowerCase();
+  return MCP_THINKING_MESSAGES[normalizedProvider]?.[locale] || STAGE_THINKING_MESSAGES.processing[locale];
 }

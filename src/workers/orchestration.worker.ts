@@ -52,7 +52,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
       sessionId,
     });
 
-    // Store Slack context and update status
+    // Store Slack context and update status with thinking messages
     if (eventId && slackChannel && slackThreadTs) {
       await slackStatusUpdater.storeContext(eventId, {
         channelId: slackChannel,
@@ -60,7 +60,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         organizationId,
         locale: "en",
       });
-      await slackStatusUpdater.updateStageStatus(eventId, "analyzing");
+      await slackStatusUpdater.updateStageStatusWithThinking(eventId, "analyzing");
     }
 
     // Update Slack progress message
@@ -95,9 +95,9 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         },
       );
 
-      // Update Slack status
+      // Update Slack status with thinking messages
       if (eventId) {
-        await slackStatusUpdater.updateStageStatus(eventId, "selectingApproach");
+        await slackStatusUpdater.updateStageStatusWithThinking(eventId, "selectingApproach");
       }
 
       // Update Slack progress message
@@ -135,7 +135,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
 
       // Update Slack status
       if (eventId) {
-        await slackStatusUpdater.updateStageStatus(eventId, "processing");
+        await slackStatusUpdater.updateStageStatusWithThinking(eventId, "processing");
       }
 
       // Update Slack progress message
@@ -178,7 +178,7 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
 
       // Update Slack status
       if (eventId) {
-        await slackStatusUpdater.updateStageStatus(eventId, "generating");
+        await slackStatusUpdater.updateStageStatusWithThinking(eventId, "generating");
       }
 
       // Update Slack progress message

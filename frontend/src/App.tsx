@@ -47,6 +47,15 @@ import AgentOptimizationPage from "./pages/AgentOptimizationPage";
 import ClaudeMaxAccountsPage from "./pages/ClaudeMaxAccountsPage";
 import ClaudeConnectPage from "./pages/ClaudeConnectPage";
 import N8nWorkflowsPage from "./pages/N8nWorkflowsPage";
+import AgentMonitorPage from "./pages/AgentMonitorPage";
+// AR (Agent Resource) Management Pages
+import ARDashboardPage from "./pages/ar/ARDashboardPage";
+import ARDepartmentsPage from "./pages/ar/ARDepartmentsPage";
+import ARPositionsPage from "./pages/ar/ARPositionsPage";
+import ARAssignmentsPage from "./pages/ar/ARAssignmentsPage";
+import ARApprovalsPage from "./pages/ar/ARApprovalsPage";
+import ARAnalyticsPage from "./pages/ar/ARAnalyticsPage";
+import ARWorkloadPage from "./pages/ar/ARWorkloadPage";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -286,6 +295,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/agent-monitor"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AgentMonitorPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/conversations"
           element={
             <ProtectedRoute>
@@ -480,6 +499,77 @@ function App() {
           element={
             <ProtectedRoute>
               <ClaudeConnectPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* AR (Agent Resource) Management Routes */}
+        <Route
+          path="/ar"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ARDashboardPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ar/departments"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ARDepartmentsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ar/positions"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ARPositionsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ar/assignments"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ARAssignmentsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ar/approvals"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ARApprovalsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ar/analytics"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ARAnalyticsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ar/workload"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ARWorkloadPage />
+              </DashboardLayout>
             </ProtectedRoute>
           }
         />
