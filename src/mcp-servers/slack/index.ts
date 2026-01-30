@@ -63,22 +63,61 @@ export function registerTools(): string[] {
     "slack__removeReaction",
     "slack__getThreadMessages",
     "slack__getChannelInfo",
-    // New OpenClaw-style tools
+    // Message management
     "slack__updateMessage",
     "slack__deleteMessage",
     "slack__uploadFile",
     "slack__pinMessage",
     "slack__unpinMessage",
     "slack__getPermalink",
+    "slack__scheduleMessage",
+    "slack__postEphemeral",
+    // User management
     "slack__listUsers",
     "slack__getUserPresence",
-    "slack__scheduleMessage",
+    // Channel management
     "slack__createChannel",
     "slack__inviteToChannel",
     "slack__kickFromChannel",
     "slack__setChannelTopic",
+    "slack__setChannelPurpose",
     "slack__archiveChannel",
     "slack__getChannelHistory",
+    "slack__getChannelMembers",
+    // Canvas API
+    "slack__createCanvas",
+    "slack__editCanvas",
+    "slack__deleteCanvas",
+    "slack__createChannelCanvas",
+    // Bookmarks API
+    "slack__addBookmark",
+    "slack__listBookmarks",
+    "slack__removeBookmark",
+    "slack__editBookmark",
+    // Views/Modals API
+    "slack__openView",
+    "slack__updateView",
+    "slack__pushView",
+    "slack__publishHomeView",
+    // Usergroups API
+    "slack__listUsergroups",
+    "slack__createUsergroup",
+    "slack__updateUsergroupMembers",
+    // Calls API
+    "slack__addCall",
+    "slack__endCall",
+    // DND API
+    "slack__getDndInfo",
+    "slack__setSnooze",
+    "slack__endSnooze",
+    // Search API
+    "slack__searchAll",
+    // Emoji API
+    "slack__listEmoji",
+    // Files API
+    "slack__deleteFile",
+    "slack__getFileInfo",
+    "slack__listFiles",
   ];
 }
 
@@ -269,6 +308,268 @@ export async function executeSlackTool(
             const { client, release } = await getSlackClient({ token, connection, userId });
             try {
               return await client.getChannelHistory(input.channel, input);
+            } finally {
+              release();
+            }
+          }
+
+          // Canvas API
+          case "createCanvas": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.createCanvas(input.title, input.document_content);
+            } finally {
+              release();
+            }
+          }
+
+          case "editCanvas": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.editCanvas(input.canvas_id, input.changes);
+            } finally {
+              release();
+            }
+          }
+
+          case "deleteCanvas": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.deleteCanvas(input.canvas_id);
+            } finally {
+              release();
+            }
+          }
+
+          case "createChannelCanvas": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.createChannelCanvas(input.channel_id, input.document_content);
+            } finally {
+              release();
+            }
+          }
+
+          // Bookmarks API
+          case "addBookmark": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.addBookmark(input.channel_id, input.title, input.type, input.link, input.emoji);
+            } finally {
+              release();
+            }
+          }
+
+          case "listBookmarks": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.listBookmarks(input.channel_id);
+            } finally {
+              release();
+            }
+          }
+
+          case "removeBookmark": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.removeBookmark(input.channel_id, input.bookmark_id);
+            } finally {
+              release();
+            }
+          }
+
+          case "editBookmark": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.editBookmark(input.channel_id, input.bookmark_id, input);
+            } finally {
+              release();
+            }
+          }
+
+          // Views/Modals API
+          case "openView": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.openView(input.trigger_id, input.view);
+            } finally {
+              release();
+            }
+          }
+
+          case "updateView": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.updateView(input.view_id, input.view, input.hash);
+            } finally {
+              release();
+            }
+          }
+
+          case "pushView": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.pushView(input.trigger_id, input.view);
+            } finally {
+              release();
+            }
+          }
+
+          case "publishHomeView": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.publishHomeView(input.user_id, input.view);
+            } finally {
+              release();
+            }
+          }
+
+          // Usergroups API
+          case "listUsergroups": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.listUsergroups();
+            } finally {
+              release();
+            }
+          }
+
+          case "createUsergroup": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.createUsergroup(input.name, input);
+            } finally {
+              release();
+            }
+          }
+
+          case "updateUsergroupMembers": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.updateUsergroupMembers(input.usergroup_id, input.users);
+            } finally {
+              release();
+            }
+          }
+
+          // Calls API
+          case "addCall": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.addCall(input.external_unique_id, input.join_url, input);
+            } finally {
+              release();
+            }
+          }
+
+          case "endCall": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.endCall(input.call_id);
+            } finally {
+              release();
+            }
+          }
+
+          // DND API
+          case "getDndInfo": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.getDndInfo(input.user);
+            } finally {
+              release();
+            }
+          }
+
+          case "setSnooze": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.setSnooze(input.num_minutes);
+            } finally {
+              release();
+            }
+          }
+
+          case "endSnooze": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.endSnooze();
+            } finally {
+              release();
+            }
+          }
+
+          // Search API
+          case "searchAll": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.searchAll(input.query, input);
+            } finally {
+              release();
+            }
+          }
+
+          // Emoji API
+          case "listEmoji": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.listEmoji();
+            } finally {
+              release();
+            }
+          }
+
+          // Additional Conversations
+          case "getChannelMembers": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.getConversationMembers(input.channel, input);
+            } finally {
+              release();
+            }
+          }
+
+          case "setChannelPurpose": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.setConversationPurpose(input.channel, input.purpose);
+            } finally {
+              release();
+            }
+          }
+
+          case "postEphemeral": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.postEphemeral(input.channel, input.user, input.text, input);
+            } finally {
+              release();
+            }
+          }
+
+          // Files API
+          case "deleteFile": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.deleteFile(input.file_id);
+            } finally {
+              release();
+            }
+          }
+
+          case "getFileInfo": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.getFileInfo(input.file_id);
+            } finally {
+              release();
+            }
+          }
+
+          case "listFiles": {
+            const { client, release } = await getSlackClient({ token, connection, userId });
+            try {
+              return await client.listFiles(input);
             } finally {
               release();
             }

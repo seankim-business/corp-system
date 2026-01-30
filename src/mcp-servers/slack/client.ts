@@ -731,6 +731,472 @@ export class SlackClient {
       },
     );
   }
+
+  // === Canvas API ===
+
+  async createCanvas(
+    title: string,
+    documentContent?: { type: "markdown"; markdown: string },
+  ): Promise<{ ok: boolean; canvas_id?: string }> {
+    return this.executeWithMetrics(
+      "createCanvas",
+      { "slack.canvas_title": title },
+      async () => {
+        const response = await (this.client as any).canvases.create({
+          title,
+          document_content: documentContent,
+        });
+        return { ok: response.ok, canvas_id: response.canvas_id };
+      },
+    );
+  }
+
+  async editCanvas(
+    canvasId: string,
+    changes: Array<{
+      operation: "insert_at_start" | "insert_at_end" | "replace" | "delete";
+      document_content?: { type: "markdown"; markdown: string };
+      section_id?: string;
+    }>,
+  ): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "editCanvas",
+      { "slack.canvas_id": canvasId },
+      async () => {
+        const response = await (this.client as any).canvases.edit({
+          canvas_id: canvasId,
+          changes,
+        });
+        return { ok: response.ok };
+      },
+    );
+  }
+
+  async deleteCanvas(canvasId: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "deleteCanvas",
+      { "slack.canvas_id": canvasId },
+      async () => {
+        const response = await (this.client as any).canvases.delete({
+          canvas_id: canvasId,
+        });
+        return { ok: response.ok };
+      },
+    );
+  }
+
+  async createChannelCanvas(
+    channelId: string,
+    documentContent?: { type: "markdown"; markdown: string },
+  ): Promise<{ ok: boolean; canvas_id?: string }> {
+    return this.executeWithMetrics(
+      "createChannelCanvas",
+      { "slack.channel": channelId },
+      async () => {
+        const response = await (this.client as any).conversations.canvases.create({
+          channel_id: channelId,
+          document_content: documentContent,
+        });
+        return { ok: response.ok, canvas_id: response.canvas_id };
+      },
+    );
+  }
+
+  // === Bookmarks API ===
+
+  async addBookmark(
+    channelId: string,
+    title: string,
+    type: "link" | "folder",
+    link?: string,
+    emoji?: string,
+  ): Promise<{ ok: boolean; bookmark?: any }> {
+    return this.executeWithMetrics(
+      "addBookmark",
+      { "slack.channel": channelId },
+      async () => {
+        const args: any = {
+          channel_id: channelId,
+          title,
+          type,
+        };
+        if (link) args.link = link;
+        if (emoji) args.emoji = emoji;
+        const response = await this.client.bookmarks.add(args);
+        return { ok: response.ok, bookmark: (response as any).bookmark };
+      },
+    );
+  }
+
+  async listBookmarks(channelId: string): Promise<{ ok: boolean; bookmarks: any[] }> {
+    return this.executeWithMetrics(
+      "listBookmarks",
+      { "slack.channel": channelId },
+      async () => {
+        const response = await this.client.bookmarks.list({ channel_id: channelId });
+        return { ok: response.ok, bookmarks: (response as any).bookmarks || [] };
+      },
+    );
+  }
+
+  async removeBookmark(channelId: string, bookmarkId: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "removeBookmark",
+      { "slack.channel": channelId },
+      async () => {
+        const response = await this.client.bookmarks.remove({
+          channel_id: channelId,
+          bookmark_id: bookmarkId,
+        });
+        return { ok: response.ok };
+      },
+    );
+  }
+
+  async editBookmark(
+    channelId: string,
+    bookmarkId: string,
+    options?: { title?: string; link?: string; emoji?: string },
+  ): Promise<{ ok: boolean; bookmark?: any }> {
+    return this.executeWithMetrics(
+      "editBookmark",
+      { "slack.channel": channelId },
+      async () => {
+        const response = await this.client.bookmarks.edit({
+          channel_id: channelId,
+          bookmark_id: bookmarkId,
+          ...options,
+        });
+        return { ok: response.ok, bookmark: (response as any).bookmark };
+      },
+    );
+  }
+
+  // === Views/Modals API ===
+
+  async openView(
+    triggerId: string,
+    view: any,
+  ): Promise<{ ok: boolean; view?: any }> {
+    return this.executeWithMetrics(
+      "openView",
+      {},
+      async () => {
+        const response = await this.client.views.open({
+          trigger_id: triggerId,
+          view,
+        });
+        return { ok: response.ok, view: response.view };
+      },
+    );
+  }
+
+  async updateView(
+    viewId: string,
+    view: any,
+    hash?: string,
+  ): Promise<{ ok: boolean; view?: any }> {
+    return this.executeWithMetrics(
+      "updateView",
+      { "slack.view_id": viewId },
+      async () => {
+        const response = await this.client.views.update({
+          view_id: viewId,
+          view,
+          hash,
+        });
+        return { ok: response.ok, view: response.view };
+      },
+    );
+  }
+
+  async pushView(
+    triggerId: string,
+    view: any,
+  ): Promise<{ ok: boolean; view?: any }> {
+    return this.executeWithMetrics(
+      "pushView",
+      {},
+      async () => {
+        const response = await this.client.views.push({
+          trigger_id: triggerId,
+          view,
+        });
+        return { ok: response.ok, view: response.view };
+      },
+    );
+  }
+
+  async publishHomeView(
+    userId: string,
+    view: any,
+  ): Promise<{ ok: boolean; view?: any }> {
+    return this.executeWithMetrics(
+      "publishHomeView",
+      { "slack.user_id": userId },
+      async () => {
+        const response = await this.client.views.publish({
+          user_id: userId,
+          view,
+        });
+        return { ok: response.ok, view: response.view };
+      },
+    );
+  }
+
+  // === Usergroups API ===
+
+  async listUsergroups(): Promise<{ ok: boolean; usergroups: any[] }> {
+    return this.executeWithMetrics("listUsergroups", {}, async () => {
+      const response = await this.client.usergroups.list({
+        include_users: true,
+        include_count: true,
+      });
+      return { ok: response.ok, usergroups: response.usergroups || [] };
+    });
+  }
+
+  async createUsergroup(
+    name: string,
+    options?: { handle?: string; description?: string; channels?: string[] },
+  ): Promise<{ ok: boolean; usergroup?: any }> {
+    return this.executeWithMetrics(
+      "createUsergroup",
+      { "slack.usergroup_name": name },
+      async () => {
+        const response = await this.client.usergroups.create({
+          name,
+          handle: options?.handle,
+          description: options?.description,
+          channels: options?.channels?.join(","),
+        });
+        return { ok: response.ok, usergroup: response.usergroup };
+      },
+    );
+  }
+
+  async updateUsergroupMembers(
+    usergroupId: string,
+    users: string[],
+  ): Promise<{ ok: boolean; usergroup?: any }> {
+    return this.executeWithMetrics(
+      "updateUsergroupMembers",
+      { "slack.usergroup_id": usergroupId },
+      async () => {
+        const response = await this.client.usergroups.users.update({
+          usergroup: usergroupId,
+          users: users.join(","),
+        });
+        return { ok: response.ok, usergroup: response.usergroup };
+      },
+    );
+  }
+
+  // === Calls API ===
+
+  async addCall(
+    externalUniqueId: string,
+    joinUrl: string,
+    options?: { title?: string; desktopAppJoinUrl?: string },
+  ): Promise<{ ok: boolean; call?: any }> {
+    return this.executeWithMetrics("addCall", {}, async () => {
+      const response = await this.client.calls.add({
+        external_unique_id: externalUniqueId,
+        join_url: joinUrl,
+        title: options?.title,
+        desktop_app_join_url: options?.desktopAppJoinUrl,
+      });
+      return { ok: response.ok, call: response.call };
+    });
+  }
+
+  async endCall(callId: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "endCall",
+      { "slack.call_id": callId },
+      async () => {
+        const response = await this.client.calls.end({ id: callId });
+        return { ok: response.ok };
+      },
+    );
+  }
+
+  // === DND (Do Not Disturb) API ===
+
+  async getDndInfo(userId?: string): Promise<{
+    ok: boolean;
+    dnd_enabled?: boolean;
+    next_dnd_start_ts?: number;
+    next_dnd_end_ts?: number;
+    snooze_enabled?: boolean;
+    snooze_endtime?: number;
+  }> {
+    return this.executeWithMetrics("getDndInfo", {}, async () => {
+      const response = await this.client.dnd.info({ user: userId }) as any;
+      return {
+        ok: response.ok,
+        dnd_enabled: response.dnd_enabled,
+        next_dnd_start_ts: response.next_dnd_start_ts,
+        next_dnd_end_ts: response.next_dnd_end_ts,
+        snooze_enabled: response.snooze_enabled,
+        snooze_endtime: response.snooze_endtime,
+      };
+    });
+  }
+
+  async setSnooze(numMinutes: number): Promise<{ ok: boolean; snooze_endtime?: number }> {
+    return this.executeWithMetrics(
+      "setSnooze",
+      { "slack.snooze_minutes": numMinutes },
+      async () => {
+        const response = await this.client.dnd.setSnooze({ num_minutes: numMinutes });
+        return { ok: response.ok, snooze_endtime: response.snooze_endtime };
+      },
+    );
+  }
+
+  async endSnooze(): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics("endSnooze", {}, async () => {
+      const response = await this.client.dnd.endSnooze();
+      return { ok: response.ok };
+    });
+  }
+
+  // === Search API (enhanced) ===
+
+  async searchAll(
+    query: string,
+    options?: { sort?: "score" | "timestamp"; sortDir?: "asc" | "desc"; count?: number },
+  ): Promise<{ ok: boolean; messages: any; files: any }> {
+    return this.executeWithMetrics(
+      "searchAll",
+      { "slack.query": query },
+      async () => {
+        const response = await this.client.search.all({
+          query,
+          sort: options?.sort || "score",
+          sort_dir: options?.sortDir || "desc",
+          count: options?.count || 20,
+        });
+        return {
+          ok: response.ok,
+          messages: response.messages,
+          files: response.files,
+        };
+      },
+    );
+  }
+
+  // === Emoji API ===
+
+  async listEmoji(): Promise<{ ok: boolean; emoji: Record<string, string> }> {
+    return this.executeWithMetrics("listEmoji", {}, async () => {
+      const response = await this.client.emoji.list();
+      return { ok: response.ok, emoji: response.emoji || {} };
+    });
+  }
+
+  // === Conversations (additional methods) ===
+
+  async getConversationMembers(
+    channel: string,
+    options?: { limit?: number; cursor?: string },
+  ): Promise<{ ok: boolean; members: string[]; nextCursor?: string }> {
+    return this.executeWithMetrics(
+      "getConversationMembers",
+      { "slack.channel": channel },
+      async () => {
+        const response = await this.client.conversations.members({
+          channel,
+          limit: options?.limit ?? 100,
+          cursor: options?.cursor,
+        });
+        return {
+          ok: response.ok,
+          members: response.members || [],
+          nextCursor: response.response_metadata?.next_cursor,
+        };
+      },
+    );
+  }
+
+  async setConversationPurpose(channel: string, purpose: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "setConversationPurpose",
+      { "slack.channel": channel },
+      async () => {
+        const response = await this.client.conversations.setPurpose({ channel, purpose });
+        return { ok: response.ok };
+      },
+    );
+  }
+
+  // === Post Ephemeral (private message in channel) ===
+
+  async postEphemeral(
+    channel: string,
+    user: string,
+    text: string,
+    options?: { blocks?: any[]; threadTs?: string },
+  ): Promise<{ ok: boolean; message_ts?: string }> {
+    return this.executeWithMetrics(
+      "postEphemeral",
+      { "slack.channel": channel, "slack.user": user },
+      async () => {
+        const response = await this.client.chat.postEphemeral({
+          channel,
+          user,
+          text,
+          blocks: options?.blocks as any,
+          thread_ts: options?.threadTs,
+        });
+        return { ok: response.ok, message_ts: response.message_ts };
+      },
+    );
+  }
+
+  // === Files (additional methods) ===
+
+  async deleteFile(fileId: string): Promise<{ ok: boolean }> {
+    return this.executeWithMetrics(
+      "deleteFile",
+      { "slack.file_id": fileId },
+      async () => {
+        const response = await this.client.files.delete({ file: fileId });
+        return { ok: response.ok };
+      },
+    );
+  }
+
+  async getFileInfo(fileId: string): Promise<{ ok: boolean; file?: any }> {
+    return this.executeWithMetrics(
+      "getFileInfo",
+      { "slack.file_id": fileId },
+      async () => {
+        const response = await this.client.files.info({ file: fileId });
+        return { ok: response.ok, file: response.file };
+      },
+    );
+  }
+
+  async listFiles(options?: {
+    channel?: string;
+    user?: string;
+    types?: string;
+    count?: number;
+    page?: number;
+  }): Promise<{ ok: boolean; files: any[]; paging?: any }> {
+    return this.executeWithMetrics("listFiles", {}, async () => {
+      const response = await this.client.files.list({
+        channel: options?.channel,
+        user: options?.user,
+        types: options?.types,
+        count: options?.count || 100,
+        page: options?.page || 1,
+      });
+      return { ok: response.ok, files: response.files || [], paging: response.paging };
+    });
+  }
 }
 
 type SlackClientFactoryOptions = {
