@@ -6,6 +6,8 @@ import { webhookWorker } from "./webhook.worker";
 import { scheduledTaskWorker } from "./scheduled-task.worker";
 import { ragIndexingWorker } from "./rag-indexing.worker";
 import { dlqRecoveryWorker } from "./dead-letter-recovery.worker";
+import { n8nSyncWorker } from "./n8n-sync.worker";
+import { n8nGenerationWorker } from "./n8n-generation.worker";
 import { logger } from "../utils/logger";
 
 export {
@@ -16,6 +18,8 @@ export {
   scheduledTaskWorker,
   ragIndexingWorker,
   dlqRecoveryWorker,
+  n8nSyncWorker,
+  n8nGenerationWorker,
 };
 
 const workers: Worker[] = [];
@@ -35,6 +39,8 @@ export async function startWorkers(): Promise<void> {
   registerWorker(scheduledTaskWorker.getWorker());
   registerWorker(ragIndexingWorker.getWorker());
   registerWorker(dlqRecoveryWorker.getWorker());
+  registerWorker(n8nSyncWorker.getWorker());
+  registerWorker(n8nGenerationWorker.getWorker());
 
   logger.info("Workers started:", {
     slackEvents: "active",
@@ -44,6 +50,8 @@ export async function startWorkers(): Promise<void> {
     scheduledTasks: "active",
     ragIndexing: "active",
     dlqRecovery: "active",
+    n8nSync: "active",
+    n8nGeneration: "active",
     totalWorkers: workers.length,
   });
 }
@@ -59,6 +67,8 @@ export async function stopWorkers(): Promise<void> {
     scheduledTaskWorker.close(),
     ragIndexingWorker.close(),
     dlqRecoveryWorker.close(),
+    n8nSyncWorker.close(),
+    n8nGenerationWorker.close(),
   ]);
 
   logger.info("All workers stopped");

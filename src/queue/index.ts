@@ -6,3 +6,5 @@ export * from "./dead-letter.queue";
 export * from "./webhook.queue";
 export * from "./scheduled-task.queue";
 export * from "./rag-indexing.queue";
+export * from "./n8n-sync.queue";
+export * from "./n8n-generation.queue";
