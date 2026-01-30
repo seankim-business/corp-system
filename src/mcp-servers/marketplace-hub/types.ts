@@ -86,3 +86,33 @@ export interface UninstallExtensionOutput {
   success: boolean;
   message?: string;
 }
+
+// API Key Management Input/Output
+export type ApiKeySource = "smithery" | "civitai" | "langchain";
+
+export interface ListApiKeysOutput {
+  keys: Array<{
+    source: ApiKeySource;
+    configured: boolean;
+    maskedKey?: string;
+  }>;
+}
+
+export interface SetApiKeyInput {
+  source: ApiKeySource;
+  apiKey: string;
+}
+
+export interface SetApiKeyOutput {
+  success: boolean;
+  message: string;
+}
+
+export interface DeleteApiKeyInput {
+  source: ApiKeySource;
+}
+
+export interface DeleteApiKeyOutput {
+  success: boolean;
+  message: string;
+}

@@ -14,6 +14,7 @@ import { installExtensionTool } from "./tools/installExtension";
 import { recommendToolsTool } from "./tools/recommendTools";
 import { getInstalledExtensionsTool } from "./tools/getInstalledExtensions";
 import { uninstallExtensionTool } from "./tools/uninstallExtension";
+import { listApiKeysTool, setApiKeyTool, deleteApiKeyTool } from "./tools/apiKeyManagement";
 import {
   MCPExecuteToolOptions,
   executeTool,
@@ -29,6 +30,9 @@ export function registerTools(): string[] {
     "marketplace-hub__recommendTools",
     "marketplace-hub__getInstalledExtensions",
     "marketplace-hub__uninstallExtension",
+    "marketplace-hub__listApiKeys",
+    "marketplace-hub__setApiKey",
+    "marketplace-hub__deleteApiKey",
   ];
 }
 
@@ -37,7 +41,7 @@ export async function executeMarketplaceHubTool(
   input: any,
   organizationId: string,
   userId: string,
-  connection?: MCPConnection,
+  connection: MCPConnection,
   options?: MCPExecuteToolOptions,
 ): Promise<any> {
   const parsed = validateToolAccess(
@@ -77,6 +81,15 @@ export async function executeMarketplaceHubTool(
 
           case "uninstallExtension":
             return await uninstallExtensionTool(input, organizationId);
+
+          case "listApiKeys":
+            return await listApiKeysTool(organizationId);
+
+          case "setApiKey":
+            return await setApiKeyTool(input, organizationId);
+
+          case "deleteApiKey":
+            return await deleteApiKeyTool(input, organizationId);
 
           default:
             throw new Error(`Unknown Marketplace Hub tool: ${toolName}`);
