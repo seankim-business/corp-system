@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError, request } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 
@@ -184,7 +184,7 @@ export default function MembersPage() {
   const organizationId = currentOrganization?.id;
   const currentUserId = user?.id;
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     if (!organizationId) return;
 
     try {
@@ -198,11 +198,11 @@ export default function MembersPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [organizationId]);
 
   useEffect(() => {
     fetchMembers();
-  }, [organizationId]);
+  }, [fetchMembers]);
 
   const handleRemoveMember = async (userId: string, memberName: string) => {
     if (!confirm(`Are you sure you want to remove ${memberName} from this organization?`)) {

@@ -148,18 +148,21 @@ function CreateWorkflowModal({ isOpen, onClose, onSuccess }: CreateWorkflowModal
 export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const fetchWorkflows = async () => {
     try {
+      setError(null);
       const data = await request<{ workflows: Workflow[] }>({
         url: "/api/workflows",
         method: "GET",
       });
       setWorkflows(data.workflows);
-    } catch (error) {
-      console.error("Failed to fetch workflows:", error);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to fetch workflows";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -211,7 +214,13 @@ export default function WorkflowsPage() {
         </button>
       </div>
 
-      {workflows.length === 0 ? (
+      {error && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">{error}</p>
+        </div>
+      )}
+
+      {workflows.length === 0 && !error ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <div className="max-w-md mx-auto">
             <div className="text-6xl mb-4">📋</div>

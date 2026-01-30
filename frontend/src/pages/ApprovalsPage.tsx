@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError, request } from "../api/client";
 
 interface Approval {
@@ -39,7 +39,7 @@ export default function ApprovalsPage() {
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
 
-  const fetchApprovals = async () => {
+  const fetchApprovals = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -66,11 +66,11 @@ export default function ApprovalsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, typeFilter, pagination.page]);
 
   useEffect(() => {
     fetchApprovals();
-  }, [statusFilter, typeFilter, pagination.page]);
+  }, [fetchApprovals]);
 
   const handleRespond = async (approvalId: string, action: "approved" | "rejected") => {
     setRespondingTo(approvalId);
@@ -194,7 +194,7 @@ export default function ApprovalsPage() {
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <div className="max-w-md mx-auto">
             <div className="text-6xl mb-4">
-              {statusFilter === "pending" ? "inbox" : "check-circle"}
+              {statusFilter === "pending" ? "📥" : "✅"}
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               {statusFilter === "pending" ? "No pending approvals" : "No approvals found"}

@@ -11,6 +11,7 @@ import { redis } from "../db/redis";
 import { db as prisma } from "../db/client";
 import { updateApprovalMessage } from "../services/approval-slack";
 import { createAuditLog } from "../services/audit-logger";
+import { undoAutoApproval } from "../services/auto-approval.service";
 
 let slackApp: App | null = null;
 
@@ -438,7 +439,6 @@ function setupEventHandlers(app: App): void {
       const { agentRegistry } = await import("../orchestrator/agent-registry");
 
       // Parse cron expression (support shortcuts)
-      let cronExpression: string;
       const shortcuts: Record<string, string> = {
         hourly: "0 * * * *",
         daily: "0 9 * * *",
@@ -446,7 +446,7 @@ function setupEventHandlers(app: App): void {
         monthly: "0 9 1 * *",
       };
 
-      cronExpression = shortcuts[cronInput.toLowerCase()] || cronInput;
+      const cronExpression = shortcuts[cronInput.toLowerCase()] || cronInput;
 
       // Validate cron expression
       try {
@@ -885,6 +885,113 @@ function setupEventHandlers(app: App): void {
     } catch (error) {
       logger.error(
         "Slack reject action error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+  });
+
+  // Auto-approval undo button handler
+  app.action(/^auto_approval_undo_/, async ({ action, ack, body, client }) => {
+    await ack();
+
+    try {
+      const actionValue = (action as { value?: string }).value;
+      if (!actionValue) {
+        logger.warn("Auto-approval undo action without value");
+        return;
+      }
+
+      const approvalId = actionValue;
+      const slackUserId = body.user.id;
+
+      logger.info("Auto-approval undo requested", { approvalId, slackUserId });
+
+      const nubabelUser = await getUserBySlackId(slackUserId, client as WebClient);
+      if (!nubabelUser) {
+        logger.warn("Nubabel user not found for auto-approval undo", { slackUserId });
+        // Respond to user
+        if ("message" in body && body.message?.ts && "channel" in body.container) {
+          await client.chat.postMessage({
+            channel: (body.container as any).channel_id,
+            thread_ts: body.message.ts,
+            text: "❌ User not found. Please login at https://nubabel.com first.",
+          });
+        }
+        return;
+      }
+
+      const result = await undoAutoApproval(approvalId);
+
+      // Update the message to show undo status
+      if ("message" in body && body.message?.ts && "channel" in body.container) {
+        if (result.success) {
+          await client.chat.update({
+            channel: (body.container as any).channel_id,
+            ts: body.message.ts,
+            text: "🔄 Auto-approval undone - manual approval required",
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: "🔄 *Auto-approval undone*\n\n_This request now requires manual approval._",
+                },
+              },
+            ],
+          });
+
+          metrics.increment("slack.auto_approval.undo_success");
+          logger.info("Auto-approval undone via Slack", { approvalId, userId: nubabelUser.id });
+        } else {
+          await client.chat.postMessage({
+            channel: (body.container as any).channel_id,
+            thread_ts: body.message.ts,
+            text: `❌ Failed to undo: ${result.reason}`,
+          });
+
+          metrics.increment("slack.auto_approval.undo_failed");
+          logger.warn("Auto-approval undo failed", { approvalId, reason: result.reason });
+        }
+      }
+    } catch (error) {
+      logger.error(
+        "Slack auto-approval undo action error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+  });
+
+  // Auto-approval details button handler
+  app.action(/^auto_approval_details_/, async ({ action, ack, body, client }) => {
+    await ack();
+
+    try {
+      const actionValue = (action as { value?: string }).value;
+      if (!actionValue) {
+        logger.warn("Auto-approval details action without value");
+        return;
+      }
+
+      const approvalId = actionValue;
+
+      // For now, just log - could open a modal with details in the future
+      logger.info("Auto-approval details requested", { approvalId });
+
+      // Respond with a simple message
+      if ("message" in body && body.message?.ts && "channel" in body.container) {
+        await client.chat.postMessage({
+          channel: (body.container as any).channel_id,
+          thread_ts: body.message.ts,
+          text: `ℹ️ Approval details: ID \`${approvalId}\`\n\nThis request was automatically approved based on low risk score and historical approval patterns.`,
+        });
+      }
+
+      metrics.increment("slack.auto_approval.details_viewed");
+    } catch (error) {
+      logger.error(
+        "Slack auto-approval details action error",
         {},
         error instanceof Error ? error : new Error(String(error)),
       );

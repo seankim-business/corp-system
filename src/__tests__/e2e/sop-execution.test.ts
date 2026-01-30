@@ -169,7 +169,7 @@ class MockSOPExecutor {
         execution.status = "waiting_approval";
         break;
 
-      case "parallel":
+      case "parallel": {
         // Execute all parallel steps
         const parallelResults = await Promise.all(
           (currentStep.parallel_steps || []).map(async (ps) => ({
@@ -186,6 +186,7 @@ class MockSOPExecutor {
         execution.stepResults.push(stepResult);
         execution.currentStepIndex++;
         break;
+      }
     }
 
     this.executions.set(executionId, execution);

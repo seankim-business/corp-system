@@ -253,10 +253,11 @@ export class AdminRevenueService {
     switch (granularity) {
       case "day":
         return date.toISOString().split("T")[0];
-      case "week":
+      case "week": {
         const weekStart = new Date(date);
         weekStart.setDate(date.getDate() - date.getDay());
         return weekStart.toISOString().split("T")[0];
+      }
       case "month":
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       default:
