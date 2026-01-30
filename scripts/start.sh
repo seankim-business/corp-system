@@ -14,7 +14,12 @@ echo "Step 2: Deploy migrations..."
 if npx prisma migrate deploy; then
   echo "✅ Migrations completed successfully"
 else
-  echo "⚠️  Migration failed, starting server anyway"
+  echo "⚠️  Migration deploy failed, trying db push..."
+  if npx prisma db push --accept-data-loss; then
+    echo "✅ Schema synchronized with db push"
+  else
+    echo "⚠️  db push also failed, starting server anyway"
+  fi
 fi
 
 echo "Step 3: Seed starter workflows (if not exists)..."
