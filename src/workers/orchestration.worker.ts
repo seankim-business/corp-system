@@ -9,6 +9,7 @@ import { buildSuccessMessage, buildErrorMessage } from "../services/slack-block-
 import { emitOrgEvent } from "../services/sse-service";
 import { emitJobProgress, PROGRESS_STAGES, PROGRESS_PERCENTAGES } from "../events/job-progress";
 import { runWithContext } from "../utils/async-context";
+import { getSlackProgressService } from "../services/slack-progress.service";
 
 export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
   constructor() {
@@ -50,6 +51,18 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
       sessionId,
     });
 
+    // Update Slack progress message
+    if (slackChannel && slackThreadTs) {
+      await getSlackProgressService().updateProgress({
+        eventId,
+        organizationId,
+        channel: slackChannel,
+        threadTs: slackThreadTs,
+        stage: PROGRESS_STAGES.STARTED,
+        percentage: PROGRESS_PERCENTAGES.STARTED,
+      });
+    }
+
     logger.info(`Executing orchestration for event ${eventId}`, {
       sessionId,
       organizationId,
@@ -70,6 +83,18 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         },
       );
 
+      // Update Slack progress message
+      if (slackChannel && slackThreadTs) {
+        await getSlackProgressService().updateProgress({
+          eventId,
+          organizationId,
+          channel: slackChannel,
+          threadTs: slackThreadTs,
+          stage: PROGRESS_STAGES.VALIDATED,
+          percentage: PROGRESS_PERCENTAGES.VALIDATED,
+        });
+      }
+
       const result = await orchestrate({
         userRequest,
         sessionId,
@@ -88,6 +113,18 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
           skills: result.metadata.skills,
         },
       );
+
+      // Update Slack progress message
+      if (slackChannel && slackThreadTs) {
+        await getSlackProgressService().updateProgress({
+          eventId,
+          organizationId,
+          channel: slackChannel,
+          threadTs: slackThreadTs,
+          stage: PROGRESS_STAGES.PROCESSING,
+          percentage: PROGRESS_PERCENTAGES.PROCESSING,
+        });
+      }
 
       const duration = Date.now() - startTime;
 
@@ -115,6 +152,18 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         },
       );
 
+      // Update Slack progress message
+      if (slackChannel && slackThreadTs) {
+        await getSlackProgressService().updateProgress({
+          eventId,
+          organizationId,
+          channel: slackChannel,
+          threadTs: slackThreadTs,
+          stage: PROGRESS_STAGES.FINALIZING,
+          percentage: PROGRESS_PERCENTAGES.FINALIZING,
+        });
+      }
+
       await notificationQueue.enqueueNotification({
         channel: slackChannel,
         threadTs: slackThreadTs,
@@ -137,6 +186,18 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         },
       );
 
+      // Update Slack progress message
+      if (slackChannel && slackThreadTs) {
+        await getSlackProgressService().updateProgress({
+          eventId,
+          organizationId,
+          channel: slackChannel,
+          threadTs: slackThreadTs,
+          stage: PROGRESS_STAGES.COMPLETED,
+          percentage: PROGRESS_PERCENTAGES.COMPLETED,
+        });
+      }
+
       emitOrgEvent(organizationId, "orchestration.completed", {
         eventId,
         sessionId,
@@ -150,6 +211,19 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         eventId,
         error: error.message,
       });
+
+      // Update Slack progress message with failure
+      if (slackChannel && slackThreadTs) {
+        await getSlackProgressService().updateProgress({
+          eventId,
+          organizationId,
+          channel: slackChannel,
+          threadTs: slackThreadTs,
+          stage: PROGRESS_STAGES.FAILED,
+          percentage: 0,
+          metadata: { error: error.message },
+        });
+      }
 
       const errorMessage = buildErrorMessage({
         error: error.message,

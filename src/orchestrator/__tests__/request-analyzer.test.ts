@@ -1,4 +1,10 @@
-import { analyzeRequest, analyzeRequestEnhanced } from "../request-analyzer";
+import {
+  analyzeRequest,
+  analyzeRequestEnhanced,
+  analyzeRequestWithLLMFallback,
+  getLLMUsageMetrics,
+  resetLLMUsageMetrics,
+} from "../request-analyzer";
 
 describe("Request Analyzer - Enhanced NLP Capabilities", () => {
   describe("Task Creation Intent", () => {
@@ -418,5 +424,135 @@ describe("Request Analyzer - Enhanced NLP Capabilities", () => {
       const result3 = await analyzeRequestEnhanced("by 2024-12-25");
       expect(result3.extractedEntities?.dueDate).toBeDefined();
     });
+  });
+
+  describe("LLM Fallback Integration", () => {
+    beforeEach(() => {
+      resetLLMUsageMetrics();
+    });
+
+    it("should detect Notion intent without LLM for high-confidence Korean request", async () => {
+      // Korean: "create a new task in Notion"
+      const result = await analyzeRequestWithLLMFallback("노션에 새 태스크 만들어줘");
+
+      expect(result.intent).toBe("create_task");
+      expect(result.entities?.target).toBe("notion");
+      expect(result.intentConfidence).toBeGreaterThanOrEqual(0.8);
+      expect(result.llmUsed).toBe(false);
+      expect(result.needsClarification).toBe(false);
+    });
+
+    it("should detect Slack intent without LLM for high-confidence English request", async () => {
+      const result = await analyzeRequestWithLLMFallback("send a message to slack");
+
+      expect(result.entities?.target).toBe("slack");
+      expect(result.intentConfidence).toBeGreaterThan(0.5);
+      expect(result.needsClarification).toBe(false);
+    });
+
+    it("should use LLM for low-confidence requests", async () => {
+      // Ambiguous Korean: "do that thing"
+      const result = await analyzeRequestWithLLMFallback("그거 해줘");
+
+      // Should either classify or mark as needing clarification
+      expect(result).toBeDefined();
+      expect(result.llmUsed).toBe(true);
+      // Low confidence should trigger clarification need
+      if (result.intent === "unknown") {
+        expect(result.needsClarification).toBe(true);
+      }
+    }, 15000); // Longer timeout for LLM call
+
+    it("should track LLM usage metrics", async () => {
+      // Start with clean metrics
+      resetLLMUsageMetrics();
+      const initialMetrics = getLLMUsageMetrics();
+      expect(initialMetrics.llmCallCount).toBe(0);
+
+      // High confidence request - no LLM
+      await analyzeRequestWithLLMFallback("create task in notion");
+      const afterHighConfidence = getLLMUsageMetrics();
+      expect(afterHighConfidence.llmCallCount).toBe(0);
+
+      // Low confidence request - should use LLM
+      await analyzeRequestWithLLMFallback("해줘");
+      const afterLowConfidence = getLLMUsageMetrics();
+      expect(afterLowConfidence.llmCallCount).toBeGreaterThan(0);
+    }, 15000);
+
+    it("should return llmUsed flag correctly", async () => {
+      // High confidence - no LLM needed
+      const highConfResult = await analyzeRequestEnhanced(
+        "create task for john in notion by friday",
+        undefined,
+        { enableLLMFallback: false }
+      );
+      expect(highConfResult.llmUsed).toBe(false);
+
+      // Explicit LLM disable should prevent LLM use
+      const disabledResult = await analyzeRequestEnhanced(
+        "handle this",
+        undefined,
+        { enableLLMFallback: false }
+      );
+      expect(disabledResult.llmUsed).toBe(false);
+    });
+
+    it("should support Korean task creation patterns", async () => {
+      const patterns = [
+        "작업 생성해줘",           // "create a task"
+        "태스크 추가해줘",          // "add a task"
+        "새 작업 만들어줘",         // "make a new task"
+      ];
+
+      for (const pattern of patterns) {
+        const result = await analyzeRequestWithLLMFallback(pattern);
+        expect(result.intent).toBe("create_task");
+        expect(result.intentConfidence).toBeGreaterThan(0.5);
+      }
+    });
+
+    it("should support Korean query patterns", async () => {
+      const patterns = [
+        "작업 목록 보여줘",         // "show task list"
+        "할 일 확인해줘",           // "check to-dos"
+        "태스크 조회해줘",          // "query tasks"
+      ];
+
+      for (const pattern of patterns) {
+        const result = await analyzeRequestWithLLMFallback(pattern);
+        expect(result.intent).toBe("query_data");
+        expect(result.intentConfidence).toBeGreaterThan(0.5);
+      }
+    });
+
+    it("should detect need for clarification on ambiguous requests", async () => {
+      const ambiguousRequests = [
+        "이거 좀 처리해줘",  // "handle this thing"
+        "저거 해줘",        // "do that"
+      ];
+
+      for (const request of ambiguousRequests) {
+        const result = await analyzeRequestWithLLMFallback(request);
+        // Should either classify with low confidence or mark needing clarification
+        expect(result.intentConfidence).toBeLessThanOrEqual(0.9);
+        if (result.intent === "unknown") {
+          expect(result.needsClarification).toBe(true);
+        }
+      }
+    }, 15000);
+
+    it("should combine regex and LLM results for better accuracy", async () => {
+      // Request with some specific keywords but potentially ambiguous context
+      const result = await analyzeRequestEnhanced(
+        "update the thing",
+        undefined,
+        { enableLLMFallback: true }
+      );
+
+      // Should have analyzed the request
+      expect(result.intent).toBeDefined();
+      expect(result.intentConfidence).toBeGreaterThan(0);
+    }, 15000);
   });
 });

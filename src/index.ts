@@ -730,6 +730,19 @@ const server = app.listen(port, "0.0.0.0", async () => {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+
+  try {
+    const { loadAvailableProviders } = await import("./mcp/providers");
+    const providers = await loadAvailableProviders();
+    logger.info("✅ MCP providers loaded", {
+      count: providers.length,
+      providers,
+    });
+  } catch (error) {
+    logger.warn("⚠️  Failed to load MCP providers (continuing without MCP tools)", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 server.on("error", (error: any) => {

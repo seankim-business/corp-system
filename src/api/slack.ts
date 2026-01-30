@@ -188,10 +188,15 @@ function setupEventHandlers(app: App): void {
         eventId,
       });
 
-      await say({
+      const progressMessage = await say({
         text: `🤔 Processing your request...`,
         thread_ts: messageTs,
       });
+
+      // Store the progress message timestamp for updates
+      if (progressMessage?.ts) {
+        await redis.set(`slack:progress:${eventId}`, progressMessage.ts, 600);
+      }
 
       logger.info("Slack event enqueued", {
         eventId,
@@ -286,7 +291,12 @@ function setupEventHandlers(app: App): void {
           eventId,
         });
 
-        await say(`🤔 Processing your message...`);
+        const progressMessage = await say(`🤔 Processing your message...`);
+
+        // Store the progress message timestamp for updates
+        if (progressMessage?.ts) {
+          await redis.set(`slack:progress:${eventId}`, progressMessage.ts, 600);
+        }
       } catch (error: unknown) {
         await redis.del(dedupeKey);
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -353,7 +363,12 @@ function setupEventHandlers(app: App): void {
         eventId,
       });
 
-      await say(`🤔 Processing your command...`);
+      const progressMessage = await say(`🤔 Processing your command...`);
+
+      // Store the progress message timestamp for updates
+      if (progressMessage?.ts) {
+        await redis.set(`slack:progress:${eventId}`, progressMessage.ts, 600);
+      }
     } catch (error: unknown) {
       await redis.del(dedupeKey);
       const errorMessage = error instanceof Error ? error.message : String(error);

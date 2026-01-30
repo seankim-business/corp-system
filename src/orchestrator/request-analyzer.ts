@@ -1,6 +1,49 @@
 import { RequestAnalysis } from "./types";
 import * as chrono from "chrono-node";
 import { format, isValid } from "date-fns";
+import Anthropic from "@anthropic-ai/sdk";
+import { logger } from "../utils/logger";
+
+// ---------------------------------------------------------------------------
+// LLM Configuration
+// ---------------------------------------------------------------------------
+
+const LLM_CONFIDENCE_THRESHOLD = 0.8; // Use LLM when regex confidence < this
+const LLM_MODEL = "claude-3-5-haiku-20241022";
+const LLM_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// LLM Classification Cache
+interface CachedLLMClassification {
+  intent: string;
+  category: IntentClassification["category"];
+  confidence: number;
+  target?: string;
+  timestamp: number;
+}
+
+const llmClassificationCache = new Map<string, CachedLLMClassification>();
+
+// Track LLM usage for cost monitoring
+export interface LLMUsageMetrics {
+  llmCallCount: number;
+  cacheHits: number;
+  lastCallTimestamp?: number;
+}
+
+const llmUsageMetrics: LLMUsageMetrics = {
+  llmCallCount: 0,
+  cacheHits: 0,
+};
+
+export function getLLMUsageMetrics(): LLMUsageMetrics {
+  return { ...llmUsageMetrics };
+}
+
+export function resetLLMUsageMetrics(): void {
+  llmUsageMetrics.llmCallCount = 0;
+  llmUsageMetrics.cacheHits = 0;
+  llmUsageMetrics.lastCallTimestamp = undefined;
+}
 
 export interface ExtractedEntity {
   type: string;
@@ -29,12 +72,221 @@ export interface EnhancedRequestAnalysis extends RequestAnalysis {
     isFollowUp: boolean;
     relatedTo?: string;
   };
+  /** Indicates whether LLM was used for intent classification */
+  llmUsed?: boolean;
+  /** Low confidence flag to trigger clarification */
+  needsClarification?: boolean;
 }
 
 export interface IntentClassification {
   intent: string;
   confidence: number;
   category: "task_creation" | "search" | "report" | "approval" | "general_query" | "unknown";
+}
+
+// ---------------------------------------------------------------------------
+// LLM Intent Classification System Prompt (Korean + English support)
+// ---------------------------------------------------------------------------
+
+const INTENT_CLASSIFICATION_SYSTEM_PROMPT = `You are an intent classifier for a task management assistant that supports both Korean and English.
+
+Classify the user request into ONE of these categories:
+- task_creation: Creating/making/adding new tasks, items, issues (생성, 만들, 추가, create, add, make)
+- search: Viewing/checking/finding/listing existing items (조회, 확인, 보여, 찾, 검색, show, list, find, search)
+- report: Generating reports/summaries/analytics (리포트, 보고서, 분석, 통계, 요약, report, summary, analytics)
+- approval: Approving/rejecting/confirming items (승인, 거절, 거부, 수락, approve, reject, confirm)
+- general_query: General questions or conversation
+- unknown: Cannot determine intent
+
+Also identify:
+- target: The platform/service (notion, slack, github, linear, jira, asana, airtable, google, calendar, etc.) or "unknown"
+- action: The action verb (create, read, update, delete, search, etc.)
+
+Output ONLY valid JSON (no markdown, no code fences):
+{"intent": "<category>", "target": "<platform>", "action": "<verb>", "confidence": <0.0-1.0>, "reasoning": "<brief explanation>"}
+
+Rules:
+- intent must be one of: task_creation, search, report, approval, general_query, unknown
+- confidence between 0.0 and 1.0
+- Support both Korean and English inputs
+- For ambiguous inputs like "그거 해줘" (do that), return unknown with low confidence`;
+
+// ---------------------------------------------------------------------------
+// LLM Classification Function
+// ---------------------------------------------------------------------------
+
+interface LLMClassificationResult extends IntentClassification {
+  target?: string;
+  action?: string;
+  reasoning?: string;
+}
+
+/**
+ * Classify intent using LLM when pattern matching confidence is low.
+ * Uses caching to avoid redundant API calls.
+ */
+async function classifyIntentWithLLM(request: string): Promise<LLMClassificationResult> {
+  // Check cache first
+  const cacheKey = request.toLowerCase().trim();
+  const cached = llmClassificationCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < LLM_CACHE_TTL_MS) {
+    llmUsageMetrics.cacheHits++;
+    logger.debug("LLM intent classification cache hit", { request: request.slice(0, 50) });
+    return {
+      intent: cached.intent,
+      category: cached.category,
+      confidence: cached.confidence,
+      target: cached.target,
+    };
+  }
+
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      logger.warn("No Anthropic API key for LLM classification, returning unknown");
+      return {
+        intent: "unknown",
+        category: "unknown",
+        confidence: 0.1,
+      };
+    }
+
+    const client = new Anthropic({ apiKey });
+
+    logger.debug("Classifying intent with LLM", {
+      requestLength: request.length,
+      model: LLM_MODEL,
+    });
+
+    llmUsageMetrics.llmCallCount++;
+    llmUsageMetrics.lastCallTimestamp = Date.now();
+
+    const response = await client.messages.create({
+      model: LLM_MODEL,
+      max_tokens: 256,
+      system: INTENT_CLASSIFICATION_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: request }],
+    });
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      logger.warn("LLM intent classification: no text in response");
+      return {
+        intent: "unknown",
+        category: "unknown",
+        confidence: 0.1,
+      };
+    }
+
+    // Parse JSON response (handle potential markdown wrapping)
+    const cleaned = textBlock.text
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim();
+
+    const parsed = JSON.parse(cleaned) as {
+      intent: string;
+      target?: string;
+      action?: string;
+      confidence: number;
+      reasoning?: string;
+    };
+
+    // Validate category is valid
+    const validCategories: IntentClassification["category"][] = [
+      "task_creation",
+      "search",
+      "report",
+      "approval",
+      "general_query",
+      "unknown",
+    ];
+
+    const category: IntentClassification["category"] = validCategories.includes(
+      parsed.intent as IntentClassification["category"]
+    )
+      ? (parsed.intent as IntentClassification["category"])
+      : "unknown";
+
+    // Map category to legacy intent names for backward compatibility
+    const categoryToIntent: Record<string, string> = {
+      task_creation: "create_task",
+      search: "query_data",
+      report: "generate_content",
+      approval: "update_task",
+      general_query: "general",
+      unknown: "unknown",
+    };
+
+    const result: LLMClassificationResult = {
+      intent: categoryToIntent[category] || "unknown",
+      category,
+      confidence: Math.min(Math.max(parsed.confidence, 0), 1),
+      target: parsed.target,
+      action: parsed.action,
+      reasoning: parsed.reasoning,
+    };
+
+    logger.info("LLM intent classification complete", {
+      intent: result.intent,
+      category: result.category,
+      confidence: result.confidence,
+      target: result.target,
+      reasoning: result.reasoning,
+    });
+
+    // Cache the result
+    llmClassificationCache.set(cacheKey, {
+      intent: result.intent,
+      category: result.category,
+      confidence: result.confidence,
+      target: result.target,
+      timestamp: Date.now(),
+    });
+
+    return result;
+  } catch (error) {
+    logger.error("LLM intent classification failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      intent: "unknown",
+      category: "unknown",
+      confidence: 0.1,
+    };
+  }
+}
+
+/**
+ * Combine regex-based and LLM-based classification results.
+ * Uses weighted averaging based on confidence scores.
+ */
+function combineClassifications(
+  regexResult: IntentClassification,
+  llmResult: LLMClassificationResult
+): IntentClassification & { target?: string } {
+  // If they agree, boost confidence
+  if (regexResult.intent === llmResult.intent) {
+    return {
+      intent: regexResult.intent,
+      category: regexResult.category,
+      confidence: Math.min((regexResult.confidence + llmResult.confidence) / 2 + 0.1, 0.95),
+      target: llmResult.target,
+    };
+  }
+
+  // If they disagree, use the higher confidence result
+  if (llmResult.confidence > regexResult.confidence) {
+    return {
+      intent: llmResult.intent,
+      category: llmResult.category,
+      confidence: llmResult.confidence,
+      target: llmResult.target,
+    };
+  }
+
+  return regexResult;
 }
 
 export async function analyzeRequest(
@@ -61,34 +313,192 @@ export async function analyzeRequest(
   };
 }
 
+/**
+ * Analyze request with explicit LLM fallback control.
+ * This is the recommended function for production use.
+ *
+ * @example
+ * // High-confidence requests skip LLM (fast path)
+ * const result = await analyzeRequestWithLLMFallback("노션에 새 태스크 만들어줘");
+ * // Expected: { intent: "create_task", target: "notion", confidence: 0.95, llmUsed: false }
+ *
+ * // Ambiguous requests use LLM
+ * const result = await analyzeRequestWithLLMFallback("그거 해줘");
+ * // Expected: { intent: "unknown", needsClarification: true, llmUsed: true }
+ */
+export async function analyzeRequestWithLLMFallback(
+  request: string,
+  context?: {
+    previousMessages?: Array<{ role: string; content: string }>;
+    sessionMetadata?: Record<string, any>;
+  },
+): Promise<EnhancedRequestAnalysis> {
+  // Step 1: Try regex-based classification
+  const regexResult = classifyIntent(request.toLowerCase(), context);
+
+  // Step 2: If high confidence, return immediately (fast path)
+  if (regexResult.confidence >= LLM_CONFIDENCE_THRESHOLD) {
+    logger.debug("High regex confidence, skipping LLM", {
+      confidence: regexResult.confidence,
+      intent: regexResult.intent,
+    });
+
+    const lowercased = request.toLowerCase();
+    const entities = extractEntities(lowercased, context);
+    const extractedEntities = extractEntitiesEnhanced(request);
+    const keywords = extractKeywords(lowercased);
+    const requiresMultiAgent = detectMultiAgentNeed(lowercased);
+    const complexity = assessComplexity(lowercased, requiresMultiAgent, context);
+    const ambiguity = detectAmbiguity(request, extractedEntities);
+    const followUp = detectFollowUp(request, context);
+
+    return {
+      intent: regexResult.intent,
+      entities,
+      keywords,
+      requiresMultiAgent,
+      complexity,
+      intentConfidence: regexResult.confidence,
+      extractedEntities,
+      ambiguity,
+      followUp,
+      llmUsed: false,
+      needsClarification: false,
+    };
+  }
+
+  // Step 3: LLM fallback for ambiguous requests
+  logger.info("Using LLM fallback for low-confidence request", {
+    regexConfidence: regexResult.confidence,
+    request: request.slice(0, 50),
+  });
+
+  const llmResult = await classifyIntentWithLLM(request);
+
+  // Step 4: Combine scores
+  const combined = combineClassifications(regexResult, llmResult);
+
+  const lowercased = request.toLowerCase();
+  const entities = extractEntities(lowercased, context);
+
+  // Override target from LLM if detected
+  if (combined.target && !entities.target) {
+    entities.target = combined.target;
+  }
+
+  const extractedEntities = extractEntitiesEnhanced(request);
+  const keywords = extractKeywords(lowercased);
+  const requiresMultiAgent = detectMultiAgentNeed(lowercased);
+  const complexity = assessComplexity(lowercased, requiresMultiAgent, context);
+  const ambiguity = detectAmbiguity(request, extractedEntities);
+  const followUp = detectFollowUp(request, context);
+
+  // Determine if clarification is needed
+  const needsClarification = combined.confidence < 0.5 ||
+    (combined.intent === "unknown" && combined.confidence < 0.7);
+
+  return {
+    intent: combined.intent,
+    entities,
+    keywords,
+    requiresMultiAgent,
+    complexity,
+    intentConfidence: combined.confidence,
+    extractedEntities,
+    ambiguity,
+    followUp,
+    llmUsed: true,
+    needsClarification,
+  };
+}
+
+/**
+ * Analyze request with LLM fallback for intent classification.
+ * Uses regex-based classification first, falls back to LLM when confidence < threshold.
+ * @param userRequest - The user's request text
+ * @param context - Optional conversation context
+ * @param options - Optional configuration for LLM fallback
+ */
 export async function analyzeRequestEnhanced(
   userRequest: string,
   context?: {
     previousMessages?: Array<{ role: string; content: string }>;
     sessionMetadata?: Record<string, any>;
   },
+  options?: {
+    enableLLMFallback?: boolean;
+    confidenceThreshold?: number;
+  },
 ): Promise<EnhancedRequestAnalysis> {
   const lowercased = userRequest.toLowerCase();
+  const enableLLM = options?.enableLLMFallback !== false; // Default: enabled
+  const confidenceThreshold = options?.confidenceThreshold ?? LLM_CONFIDENCE_THRESHOLD;
 
   const keywords = extractKeywords(lowercased);
-  const { intent, confidence: intentConfidence } = detectIntentWithConfidence(lowercased, context);
+
+  // Step 1: Try regex-based classification
+  const regexResult = classifyIntent(lowercased, context);
+  let finalIntent = regexResult.intent;
+  let finalConfidence = regexResult.confidence;
+  let llmUsed = false;
+  let llmTarget: string | undefined;
+
+  // Step 2: LLM fallback when confidence is below threshold
+  if (enableLLM && regexResult.confidence < confidenceThreshold) {
+    logger.info("Regex confidence below threshold, using LLM fallback", {
+      regexConfidence: regexResult.confidence,
+      threshold: confidenceThreshold,
+      request: userRequest.slice(0, 50),
+    });
+
+    const llmResult = await classifyIntentWithLLM(userRequest);
+    llmUsed = true;
+
+    // Step 3: Combine classifications
+    const combined = combineClassifications(regexResult, llmResult);
+    finalIntent = combined.intent;
+    finalConfidence = combined.confidence;
+    llmTarget = combined.target;
+
+    logger.debug("Combined classification result", {
+      regexIntent: regexResult.intent,
+      regexConfidence: regexResult.confidence,
+      llmIntent: llmResult.intent,
+      llmConfidence: llmResult.confidence,
+      finalIntent,
+      finalConfidence,
+    });
+  }
+
   const entities = extractEntities(lowercased, context);
+
+  // Override target from LLM if detected and not present in regex
+  if (llmTarget && !entities.target) {
+    entities.target = llmTarget;
+  }
+
   const extractedEntities = extractEntitiesEnhanced(userRequest);
   const requiresMultiAgent = detectMultiAgentNeed(lowercased);
   const complexity = assessComplexity(lowercased, requiresMultiAgent, context);
   const ambiguity = detectAmbiguity(userRequest, extractedEntities);
   const followUp = detectFollowUp(userRequest, context);
 
+  // Determine if clarification is needed (low confidence even after LLM)
+  const needsClarification = finalConfidence < 0.5 ||
+    (finalIntent === "unknown" && finalConfidence < 0.7);
+
   return {
-    intent,
+    intent: finalIntent,
     entities,
     keywords,
     requiresMultiAgent,
     complexity,
-    intentConfidence,
+    intentConfidence: finalConfidence,
     extractedEntities,
     ambiguity,
     followUp,
+    llmUsed,
+    needsClarification,
   };
 }
 

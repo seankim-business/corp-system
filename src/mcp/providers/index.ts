@@ -154,6 +154,14 @@ export async function loadAvailableProviders(): Promise<string[]> {
         return createSlackProvider() as unknown as MCPProvider;
       },
     },
+    {
+      name: "notion",
+      envKey: "NOTION_API_KEY",
+      loader: async () => {
+        const { createNotionProvider } = await import("./notion");
+        return createNotionProvider() as unknown as MCPProvider;
+      },
+    },
   ];
 
   for (const config of providerConfigs) {

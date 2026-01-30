@@ -1,6 +1,6 @@
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { logger } from "../utils/logger";
-import { Category } from "./types";
+import { Category, MCPConnection } from "./types";
 import { trackUsage } from "../services/cost-tracker";
 import { recordAiRequest } from "../services/metrics";
 import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
@@ -12,6 +12,10 @@ import { AnthropicProvider } from "../providers/anthropic-provider";
 import { mcpRegistry } from "../mcp/registry";
 import { executeProviderTool, getAllProviderTools } from "../mcp/providers";
 import { MCPTool } from "../mcp/types";
+import {
+  getActiveMCPConnections,
+  getAccessTokenFromConfig,
+} from "../services/mcp-registry";
 
 export interface AIExecutionParams {
   category: Category;
@@ -170,10 +174,308 @@ function convertMCPToolsToAnthropic(mcpTools: MCPTool[]): AnthropicTool[] {
 }
 
 /**
- * Get available tools for the AI executor
+ * Build tools from organization MCP connections
  */
-function getAvailableTools(_organizationId: string, _skills: string[]): AnthropicTool[] {
+function buildOrganizationConnectionTools(connections: MCPConnection[]): AnthropicTool[] {
   const tools: AnthropicTool[] = [];
+
+  for (const conn of connections) {
+    const provider = conn.provider.toLowerCase();
+
+    // Generate standard tools based on provider type
+    switch (provider) {
+      case "notion":
+        tools.push(
+          {
+            name: `${conn.namespace}__getTasks`,
+            description: `Get tasks from Notion database via connection "${conn.name}". Returns paginated tasks with optional filtering.`,
+            input_schema: {
+              type: "object",
+              properties: {
+                databaseId: {
+                  type: "string",
+                  description: "ID of the Notion database to query",
+                },
+                filter: {
+                  type: "object",
+                  description: "Optional filter criteria (status, assignee)",
+                },
+                limit: {
+                  type: "number",
+                  description: "Maximum number of tasks to return (default: 50)",
+                },
+              },
+              required: ["databaseId"],
+            },
+          },
+          {
+            name: `${conn.namespace}__createTask`,
+            description: `Create a new task in Notion via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                databaseId: {
+                  type: "string",
+                  description: "ID of the Notion database to create task in",
+                },
+                title: {
+                  type: "string",
+                  description: "Task title",
+                },
+                status: {
+                  type: "string",
+                  description: "Task status (optional)",
+                },
+                assignee: {
+                  type: "string",
+                  description: "Assignee ID or name (optional)",
+                },
+                dueDate: {
+                  type: "string",
+                  description: "Due date in ISO 8601 format (optional)",
+                },
+              },
+              required: ["databaseId", "title"],
+            },
+          },
+          {
+            name: `${conn.namespace}__updateTask`,
+            description: `Update an existing task in Notion via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                taskId: {
+                  type: "string",
+                  description: "ID of the task to update",
+                },
+                title: { type: "string", description: "New task title (optional)" },
+                status: { type: "string", description: "New task status (optional)" },
+                assignee: { type: "string", description: "New assignee (optional)" },
+                dueDate: { type: "string", description: "New due date (optional)" },
+              },
+              required: ["taskId"],
+            },
+          },
+          {
+            name: `${conn.namespace}__deleteTask`,
+            description: `Delete (archive) a task in Notion via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                taskId: {
+                  type: "string",
+                  description: "ID of the task to delete",
+                },
+              },
+              required: ["taskId"],
+            },
+          },
+        );
+        break;
+
+      case "slack":
+        tools.push(
+          {
+            name: `${conn.namespace}__sendMessage`,
+            description: `Send a message to a Slack channel via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                channel: {
+                  type: "string",
+                  description: "Channel ID to send the message to",
+                },
+                text: {
+                  type: "string",
+                  description: "Message text",
+                },
+                thread_ts: {
+                  type: "string",
+                  description: "Thread timestamp to reply in thread (optional)",
+                },
+              },
+              required: ["channel", "text"],
+            },
+          },
+          {
+            name: `${conn.namespace}__listChannels`,
+            description: `List Slack channels via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                types: {
+                  type: "string",
+                  description: "Channel types: public_channel, private_channel (default: public_channel)",
+                },
+                exclude_archived: {
+                  type: "boolean",
+                  description: "Exclude archived channels (default: true)",
+                },
+                limit: {
+                  type: "number",
+                  description: "Max channels to return (default: 100)",
+                },
+              },
+            },
+          },
+          {
+            name: `${conn.namespace}__getUser`,
+            description: `Get user information from Slack via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                user: {
+                  type: "string",
+                  description: "User ID to look up",
+                },
+              },
+              required: ["user"],
+            },
+          },
+          {
+            name: `${conn.namespace}__searchMessages`,
+            description: `Search for messages in Slack via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "Search query text",
+                },
+                sort: {
+                  type: "string",
+                  description: "Sort order: score or timestamp (default: score)",
+                },
+                count: {
+                  type: "number",
+                  description: "Number of results (default: 20, max: 100)",
+                },
+              },
+              required: ["query"],
+            },
+          },
+        );
+        break;
+
+      case "linear":
+        tools.push(
+          {
+            name: `${conn.namespace}__getIssues`,
+            description: `Get issues from Linear via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                teamId: { type: "string", description: "Team ID to filter issues" },
+                status: { type: "string", description: "Issue status filter" },
+                limit: { type: "number", description: "Max issues to return" },
+              },
+            },
+          },
+          {
+            name: `${conn.namespace}__createIssue`,
+            description: `Create a new issue in Linear via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                teamId: { type: "string", description: "Team ID for the issue" },
+                title: { type: "string", description: "Issue title" },
+                description: { type: "string", description: "Issue description" },
+                priority: { type: "number", description: "Priority (0-4)" },
+                assigneeId: { type: "string", description: "Assignee user ID" },
+              },
+              required: ["teamId", "title"],
+            },
+          },
+          {
+            name: `${conn.namespace}__updateIssue`,
+            description: `Update an issue in Linear via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                issueId: { type: "string", description: "Issue ID to update" },
+                title: { type: "string", description: "New title" },
+                description: { type: "string", description: "New description" },
+                status: { type: "string", description: "New status" },
+                priority: { type: "number", description: "New priority" },
+              },
+              required: ["issueId"],
+            },
+          },
+        );
+        break;
+
+      case "github":
+        tools.push(
+          {
+            name: `${conn.namespace}__getIssues`,
+            description: `Get issues from GitHub repository via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                owner: { type: "string", description: "Repository owner" },
+                repo: { type: "string", description: "Repository name" },
+                state: { type: "string", description: "Issue state: open, closed, all" },
+                labels: { type: "string", description: "Comma-separated labels" },
+              },
+              required: ["owner", "repo"],
+            },
+          },
+          {
+            name: `${conn.namespace}__createIssue`,
+            description: `Create a GitHub issue via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                owner: { type: "string", description: "Repository owner" },
+                repo: { type: "string", description: "Repository name" },
+                title: { type: "string", description: "Issue title" },
+                body: { type: "string", description: "Issue body" },
+                labels: { type: "array", items: { type: "string" }, description: "Labels" },
+              },
+              required: ["owner", "repo", "title"],
+            },
+          },
+          {
+            name: `${conn.namespace}__getPullRequests`,
+            description: `Get pull requests from GitHub via connection "${conn.name}".`,
+            input_schema: {
+              type: "object",
+              properties: {
+                owner: { type: "string", description: "Repository owner" },
+                repo: { type: "string", description: "Repository name" },
+                state: { type: "string", description: "PR state: open, closed, all" },
+              },
+              required: ["owner", "repo"],
+            },
+          },
+        );
+        break;
+
+      default:
+        logger.debug("No predefined tools for provider", {
+          provider,
+          connectionId: conn.id,
+        });
+    }
+  }
+
+  return tools;
+}
+
+/**
+ * Get available tools for the AI executor
+ * Loads tools from multiple sources:
+ * 1. Built-in web search (if EXA_API_KEY available)
+ * 2. MCP registry tools (statically registered)
+ * 3. Provider tools (loaded from environment)
+ * 4. Organization MCP connections (from database)
+ */
+async function getAvailableToolsAsync(
+  organizationId: string,
+  _skills: string[],
+): Promise<{ tools: AnthropicTool[]; connections: MCPConnection[] }> {
+  const tools: AnthropicTool[] = [];
+  let orgConnections: MCPConnection[] = [];
 
   // Add web search if enabled (via EXA_API_KEY)
   if (process.env.EXA_API_KEY) {
@@ -184,20 +486,71 @@ function getAvailableTools(_organizationId: string, _skills: string[]): Anthropi
   const registryTools = mcpRegistry.getToolsForAgent("ai_executor");
   tools.push(...convertMCPToolsToAnthropic(registryTools));
 
-  // Add provider tools
+  // Add provider tools (env-based providers like LINEAR_API_KEY)
   const providerTools = getAllProviderTools();
   tools.push(...convertMCPToolsToAnthropic(providerTools));
 
-  return tools;
+  // Load organization-specific MCP connections from database
+  try {
+    orgConnections = await getActiveMCPConnections(organizationId);
+
+    if (orgConnections.length > 0) {
+      const orgTools = buildOrganizationConnectionTools(orgConnections);
+      tools.push(...orgTools);
+
+      logger.info("Loaded organization MCP connections for AI executor", {
+        organizationId,
+        connectionCount: orgConnections.length,
+        providers: orgConnections.map((c) => c.provider),
+        toolCount: orgTools.length,
+      });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn("Failed to load organization MCP connections", {
+      organizationId,
+      error: message,
+    });
+  }
+
+  return { tools, connections: orgConnections };
+}
+
+
+/**
+ * Parse a namespaced tool name (namespace__toolName format)
+ */
+function parseNamespacedToolName(toolName: string): {
+  namespace: string | null;
+  localName: string;
+} {
+  if (toolName.includes("__")) {
+    const parts = toolName.split("__");
+    return {
+      namespace: parts[0] || null,
+      localName: parts.slice(1).join("__"),
+    };
+  }
+  return { namespace: null, localName: toolName };
 }
 
 /**
- * Execute a tool call from the AI response
+ * Execute a tool call from the AI response.
+ * Supports multiple tool sources:
+ * 1. Built-in web search
+ * 2. Organization MCP connection tools (namespace__toolName format)
+ * 3. MCP registry tools
+ * 4. Provider tools (env-based)
  */
 async function executeToolCall(
   toolName: string,
   toolInput: Record<string, unknown>,
-  context: { organizationId: string; userId: string; sessionId: string },
+  context: {
+    organizationId: string;
+    userId: string;
+    sessionId: string;
+    connections?: MCPConnection[];
+  },
 ): Promise<{ success: boolean; result: unknown; error?: string }> {
   const startTime = Date.now();
 
@@ -228,7 +581,14 @@ async function executeToolCall(
         throw new Error(`Exa API error: ${response.status}`);
       }
 
-      const data = await response.json() as { results?: Array<{ title: string; url: string; text: string; publishedDate?: string }> };
+      const data = (await response.json()) as {
+        results?: Array<{
+          title: string;
+          url: string;
+          text: string;
+          publishedDate?: string;
+        }>;
+      };
       const results = (data.results || []).map((r) => ({
         title: r.title,
         url: r.url,
@@ -245,6 +605,119 @@ async function executeToolCall(
       return { success: true, result: results };
     }
 
+    // Check if this is an organization MCP connection tool (namespace__toolName format)
+    const parsed = parseNamespacedToolName(toolName);
+    if (parsed.namespace && context.connections) {
+      const connection = context.connections.find(
+        (c) => c.namespace === parsed.namespace,
+      );
+
+      if (connection) {
+        const accessToken = getAccessTokenFromConfig(connection.config);
+        if (!accessToken) {
+          return {
+            success: false,
+            result: null,
+            error: `No access token found for MCP connection: ${connection.name}`,
+          };
+        }
+
+        // Execute via the appropriate MCP server
+        const provider = connection.provider.toLowerCase();
+        const localToolName = parsed.localName;
+
+        logger.info("Executing organization MCP tool", {
+          toolName,
+          provider,
+          localToolName,
+          connectionId: connection.id,
+          connectionName: connection.name,
+        });
+
+        try {
+          let result: unknown;
+
+          switch (provider) {
+            case "notion": {
+              const { executeNotionTool } = await import("../mcp-servers/notion");
+              result = await executeNotionTool(
+                accessToken,
+                `${parsed.namespace}__${localToolName}`,
+                toolInput,
+                context.organizationId,
+                connection,
+                context.userId,
+              );
+              break;
+            }
+
+            case "slack": {
+              const { executeSlackTool } = await import("../mcp-servers/slack");
+              result = await executeSlackTool(
+                accessToken,
+                `${parsed.namespace}__${localToolName}`,
+                toolInput,
+                context.organizationId,
+                connection,
+                context.userId,
+              );
+              break;
+            }
+
+            case "linear": {
+              const { executeLinearTool } = await import("../mcp-servers/linear");
+              result = await executeLinearTool(
+                accessToken,
+                `${parsed.namespace}__${localToolName}`,
+                toolInput,
+                context.organizationId,
+                connection,
+                context.userId,
+              );
+              break;
+            }
+
+            case "github": {
+              const { executeGitHubTool } = await import("../mcp-servers/github");
+              result = await executeGitHubTool(
+                accessToken,
+                `${parsed.namespace}__${localToolName}`,
+                toolInput,
+                context.organizationId,
+                connection,
+                context.userId,
+              );
+              break;
+            }
+
+            default:
+              return {
+                success: false,
+                result: null,
+                error: `Unsupported MCP provider: ${provider}`,
+              };
+          }
+
+          logger.info("Organization MCP tool executed", {
+            toolName,
+            provider,
+            duration: Date.now() - startTime,
+          });
+
+          return { success: true, result };
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          logger.error("Organization MCP tool execution failed", {
+            toolName,
+            provider,
+            error: errorMessage,
+          });
+          return { success: false, result: null, error: errorMessage };
+        }
+      }
+    }
+
     // Try MCP registry first
     const registryTool = mcpRegistry.getTool(toolName);
     if (registryTool) {
@@ -254,7 +727,11 @@ async function executeToolCall(
         organizationId: context.organizationId,
         sessionId: context.sessionId,
       });
-      return { success: result.success, result: result.data, error: result.error?.message };
+      return {
+        success: result.success,
+        result: result.data,
+        error: result.error?.message,
+      };
     }
 
     // Try provider tools
@@ -390,13 +867,15 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
 
         span.setAttribute("ai.tokens.input_estimate", inputTokenEstimate);
 
-        // Get available tools
-        const availableTools = getAvailableTools(params.organizationId, params.skills);
+        // Get available tools (async to load organization MCP connections)
+        const { tools: availableTools, connections: orgConnections } =
+          await getAvailableToolsAsync(params.organizationId, params.skills);
         const hasTools = availableTools.length > 0;
 
         logger.info("AI execution with tools", {
           toolCount: availableTools.length,
-          tools: availableTools.map(t => t.name),
+          tools: availableTools.map((t) => t.name),
+          orgConnectionCount: orgConnections.length,
         });
 
         const response = await tracer.startActiveSpan("ai_executor.api_call", async (apiSpan) => {
@@ -475,7 +954,8 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
                     organizationId: params.organizationId,
                     userId: params.userId,
                     sessionId: params.sessionId,
-                  }
+                    connections: orgConnections,
+                  },
                 );
 
                 toolResults.push({
