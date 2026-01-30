@@ -5,7 +5,7 @@
  * Captures feature requests when pages are created/updated with type "Feature Request".
  */
 import { Router, Request, Response } from "express";
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { logger } from "../utils/logger";
 import { getNotionClient } from "../services/notion/client";
 import { getIntakeService } from "../services/mega-app/feature-request-pipeline/intake.service";
@@ -111,7 +111,7 @@ notionWebhooksRouter.post("/webhooks/notion", async (req: Request, res: Response
       return res.status(401).json({ error: "Missing signature" });
     }
 
-    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
+    const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
     const bodyString = rawBody.toString("utf8");
 
     if (!verifyNotionSignature(bodyString, signature, webhookSecret)) {

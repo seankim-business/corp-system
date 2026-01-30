@@ -123,7 +123,7 @@ export class InboundEmailParser {
       try {
         const metadata: Record<string, SendGridAttachmentMetadata> = JSON.parse(payload.attachments);
 
-        Object.entries(metadata).forEach(([key, meta]) => {
+        Object.entries(metadata).forEach(([_key, meta]) => {
           attachments.push({
             filename: meta.filename,
             contentType: meta.type,

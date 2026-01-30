@@ -1,60 +1,69 @@
 /**
  * Tool Recommender Service
  *
- * AI-powered recommendation engine for the Marketplace Hub.
- * Analyzes user requests and recommends relevant tools from external sources.
+ * Uses AI to analyze user requests and recommend relevant tools from external sources.
+ * Searches across multiple marketplaces (Smithery, MCP Registry, Glama, etc.) and
+ * ranks results based on relevance, popularity, and type matching.
  *
  * @module marketplace/services/tool-recommender
  */
 
+import { ExtensionType } from "@prisma/client";
 import { logger } from "../../utils/logger";
-import type { BaseExternalSource, ExternalSourceItem } from "./sources/external/types";
-import type { AIProvider, Message } from "../../providers/ai-provider";
+import {
+  BaseExternalSource,
+  ExternalSourceItem,
+  createAllSources,
+  SourceConfig,
+} from "./sources/external";
+import { AnthropicProvider } from "../../providers/anthropic-provider";
+import { Message } from "../../providers/ai-provider";
 
 /**
- * Context for generating recommendations
- *
- * @interface RecommendationContext
- * @property {string} orgId - Organization ID for filtering installed tools
- * @property {string[]} [installedTools] - List of already installed tool IDs
- * @property {string} [agentId] - Agent ID for personalized recommendations
+ * Context information for generating tool recommendations
  */
 export interface RecommendationContext {
+  /** Organization ID requesting recommendations */
   orgId: string;
+  /** List of already installed tool IDs (to avoid duplicates) */
   installedTools?: string[];
-  agentId?: string;
+  /** User preferences for filtering or weighting results */
+  userPreferences?: Record<string, unknown>;
 }
 
 /**
- * Tool recommendation with reasoning
- *
- * @interface ToolRecommendation
- * @property {ExternalSourceItem} item - The recommended tool
- * @property {string} reason - Why this tool is recommended
- * @property {number} confidence - Confidence score (0-1)
- * @property {number} priority - Priority ranking (1 = highest)
+ * A recommended tool with explanation and confidence score
  */
 export interface ToolRecommendation {
+  /** The external source item being recommended */
   item: ExternalSourceItem;
+  /** Human-readable explanation of why this tool was recommended */
   reason: string;
+  /** Confidence score (0-1) indicating how well this matches the request */
   confidence: number;
-  priority: number;
 }
 
 /**
- * Analysis of user request
- *
- * @interface RequestAnalysis
- * @property {string} searchQuery - Optimized search query for external sources
- * @property {string} preferredType - Preferred extension type (mcp_server, skill, etc.)
- * @property {string[]} capabilities - Required capabilities/features
- * @property {string} urgency - Urgency level (low, medium, high)
+ * Analysis result from AI processing of user request
  */
-export interface RequestAnalysis {
+interface RequestAnalysis {
+  /** Search query terms to use across sources */
   searchQuery: string;
-  preferredType: string;
+  /** Preferred type of tool to prioritize */
+  preferredType?: ExtensionType;
+  /** List of capabilities the user is looking for */
   capabilities: string[];
-  urgency: string;
+  /** How urgent/important is this request */
+  urgency: "high" | "medium" | "low";
+}
+
+/**
+ * Scored item during ranking process
+ */
+interface ScoredItem {
+  item: ExternalSourceItem;
+  score: number;
+  matchReasons: string[];
 }
 
 /**

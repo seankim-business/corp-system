@@ -70,6 +70,7 @@ model Organization {
   slackWorkspaces              SlackWorkspace[]
   externalCredentials          ExternalMarketplaceCredential[]
   installationQueue            InstallationQueue[]
+  marketplaceSettings          OrganizationMarketplaceSettings?
   n8nInstances                 N8nInstance[]
   n8nWorkflows                 N8nWorkflow[]
   n8nCredentials               N8nCredential[]

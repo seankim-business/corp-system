@@ -7,7 +7,6 @@ import { Client } from "@notionhq/client";
 import {
   BlockObjectResponse,
   PageObjectResponse,
-  PartialBlockObjectResponse,
 } from "@notionhq/client/build/src/api-endpoints";
 import { logger } from "../../utils/logger";
 
@@ -53,7 +52,7 @@ export class NotionClientService {
 
       // Extract title from properties
       let title = "Untitled";
-      for (const [key, prop] of Object.entries(pageObj.properties)) {
+      for (const prop of Object.values(pageObj.properties)) {
         if (prop.type === "title" && prop.title.length > 0) {
           title = prop.title.map((t) => ("plain_text" in t ? t.plain_text : "")).join("");
           break;

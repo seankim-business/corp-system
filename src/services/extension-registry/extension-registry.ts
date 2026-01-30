@@ -3,7 +3,7 @@
  *
  * Manages marketplace extensions and skills with Prisma persistence
  */
-import { PrismaClient, MarketplaceExtension, ExtensionType as PrismaExtensionType } from "@prisma/client";
+import { PrismaClient, MarketplaceExtension, ExtensionType as PrismaExtensionType, Prisma } from "@prisma/client";
 import { Redis } from "ioredis";
 import { createHash } from "crypto";
 import { logger } from "../../utils/logger";
@@ -16,6 +16,7 @@ import {
   ListOptions,
   ResolvedSkill,
   SearchOptions,
+  MegaAppModuleConfig,
 } from "./types";
 
 export class ExtensionRegistry {
@@ -58,6 +59,7 @@ export class ExtensionRegistry {
       dependencies: record.dependencies || [],
       toolsRequired: record.toolsRequired || [],
       mcpProviders: record.mcpProviders || [],
+      megaAppConfig: (record.megaAppConfig as MegaAppModuleConfig | null) || undefined,
       isPublic: record.isPublic,
       verified: record.verified,
       enabled: record.enabled,
@@ -448,6 +450,70 @@ export class ExtensionRegistry {
     return assignments
       .filter(a => a.extension !== null)
       .map(a => this.mapToExtension(a.extension!));
+  }
+
+  /**
+   * Register an extension as a MegaApp module
+   */
+  async registerMegaAppModule(
+    extensionId: string,
+    config: MegaAppModuleConfig,
+  ): Promise<Extension> {
+    const existing = await this.prisma.marketplaceExtension.findUnique({
+      where: { id: extensionId },
+    });
+
+    if (!existing) {
+      throw new Error(`Extension not found: ${extensionId}`);
+    }
+
+    const updated = await this.prisma.marketplaceExtension.update({
+      where: { id: extensionId },
+      data: {
+        megaAppConfig: config as never,
+      },
+    });
+
+    await this.invalidateCache(existing.organizationId!);
+
+    logger.info(`Registered MegaApp module: ${config.moduleId}`, {
+      extensionId,
+      moduleId: config.moduleId,
+    });
+
+    return this.mapToExtension(updated);
+  }
+
+  /**
+   * Get all extensions configured as MegaApp modules for an organization
+   */
+  async getMegaAppModules(organizationId: string): Promise<MegaAppModuleConfig[]> {
+    const cacheKey = this.getCacheKey(organizationId, 'mega-modules');
+
+    if (this.redis) {
+      const cached = await this.redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    }
+
+    const extensions = await this.prisma.marketplaceExtension.findMany({
+      where: {
+        organizationId,
+        megaAppConfig: { not: Prisma.JsonNull },
+        enabled: true,
+      },
+    });
+
+    const modules = extensions
+      .map(ext => ext.megaAppConfig as MegaAppModuleConfig | null)
+      .filter((config): config is MegaAppModuleConfig => config !== null);
+
+    if (this.redis) {
+      await this.redis.setex(cacheKey, 300, JSON.stringify(modules));
+    }
+
+    return modules;
   }
 
   async invalidateCache(orgId: string): Promise<void> {

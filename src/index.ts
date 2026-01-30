@@ -49,6 +49,7 @@ import notionOAuthRoutes from "./api/notion-oauth";
 import { organizationSettingsRouter } from "./api/organization-settings";
 import { featureFlagsAdminRouter, featureFlagsRouter } from "./api/feature-flags";
 import { webhooksRouter } from "./api/webhooks";
+import { emailWebhooksRouter } from "./api/email-webhooks";
 import { sidecarCallbacksRouter } from "./api/sidecar-callbacks";
 import gdprRoutes from "./api/gdpr.routes";
 import dashboardRoutes from "./api/dashboard";
@@ -85,6 +86,7 @@ import identityRoutes from "./api/identity";
 import memberInviteRoutes from "./api/member-invite";
 import resourceRegistryRoutes from "./api/resource-registry";
 import featureRequestsRoutes from "./api/feature-requests";
+import { notionWebhooksRouter } from "./api/notion-webhooks";
 // import agentSessionsRoutes from "./api/agent-sessions";
 // import costsRoutes from "./api/costs";
 // import onboardingRoutes from "./api/onboarding";
@@ -492,6 +494,7 @@ app.post("/health/circuits/reset", (req, res) => {
 app.use("/auth", authRateLimiter, authRoutes);
 
 app.use("/api", webhookRateLimiter, webhooksRouter);
+app.use("/webhooks/email", webhookRateLimiter, emailWebhooksRouter);
 app.use("/api/sidecar", sidecarRateLimiter, sidecarCallbacksRouter);
 app.use("/api", webhookRateLimiter, syncRoutes);
 
@@ -549,6 +552,7 @@ app.use("/api", apiRateLimiter, authenticate, sentryUserContext, identityRoutes)
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, memberInviteRoutes);
 app.use("/api/resource-registry", apiRateLimiter, authenticate, sentryUserContext, resourceRegistryRoutes);
 app.use("/api/feature-requests", apiRateLimiter, authenticate, sentryUserContext, featureRequestsRoutes);
+app.use("/api", webhookRateLimiter, notionWebhooksRouter);
 // app.use("/api/agent", apiRateLimiter, authenticate, sentryUserContext, agentSessionsRoutes);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
 app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);

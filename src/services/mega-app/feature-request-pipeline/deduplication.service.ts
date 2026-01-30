@@ -16,23 +16,121 @@ import {
   FeatureRequestPipelineConfig,
   DEFAULT_PIPELINE_CONFIG,
 } from "./types";
+import { getEmbeddingService } from "./embedding.service";
 
 export class FeatureRequestDeduplicationService {
   private config: FeatureRequestPipelineConfig;
+  private embeddingService = getEmbeddingService();
 
   constructor(config: Partial<FeatureRequestPipelineConfig> = {}) {
     this.config = { ...DEFAULT_PIPELINE_CONFIG, ...config };
   }
 
   /**
-   * Find similar requests to a new request
+   * Find similar requests using vector embeddings (primary method)
    */
-  async findSimilarRequests(
+  async findSimilarByEmbedding(
     organizationId: string,
     rawContent: string,
     excludeRequestId?: string
   ): Promise<SimilarRequest[]> {
-    logger.info("Finding similar feature requests", {
+    if (!this.embeddingService.isAvailable()) {
+      logger.debug("Embedding service not available, falling back to text similarity");
+      return this.findSimilarByText(organizationId, rawContent, excludeRequestId);
+    }
+
+    logger.info("Finding similar feature requests using embeddings", {
+      organizationId,
+      contentLength: rawContent.length,
+      excludeRequestId,
+    });
+
+    try {
+      // Get all non-closed requests for the organization
+      const existingRequests = await db.featureRequest.findMany({
+        where: {
+          organizationId,
+          status: {
+            notIn: ["released", "rejected", "merged"],
+          },
+          ...(excludeRequestId ? { id: { not: excludeRequestId } } : {}),
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 100, // Limit to most recent 100 for performance
+      });
+
+      if (existingRequests.length === 0) {
+        logger.debug("No existing requests to compare against", { organizationId });
+        return [];
+      }
+
+      // Generate embedding for new request
+      const newEmbedding = await this.embeddingService.generateEmbedding(rawContent);
+
+      // Get or generate embeddings for existing requests
+      const embeddingsMap = await this.embeddingService.batchGenerateEmbeddings(
+        existingRequests.map((req) => ({
+          id: req.id,
+          content: req.rawContent,
+        }))
+      );
+
+      // Calculate similarity for each existing request
+      const similarRequests: SimilarRequest[] = [];
+
+      for (const existing of existingRequests) {
+        const existingEmbedding = embeddingsMap.get(existing.id);
+        if (!existingEmbedding) continue;
+
+        const similarity = this.embeddingService.cosineSimilarity(
+          newEmbedding,
+          existingEmbedding
+        );
+
+        if (similarity >= this.config.relatedThreshold) {
+          similarRequests.push({
+            requestId: existing.id,
+            similarity,
+            status: existing.status as FeatureRequestStatus,
+            rawContent: existing.rawContent,
+            analyzedIntent: existing.analyzedIntent || undefined,
+            createdAt: existing.createdAt,
+            requestCount: existing.requestCount,
+          });
+        }
+      }
+
+      // Sort by similarity descending
+      const sorted = similarRequests.sort((a, b) => b.similarity - a.similarity);
+
+      logger.info("Similar requests found using embeddings", {
+        organizationId,
+        similarCount: sorted.length,
+        topSimilarity: sorted[0]?.similarity,
+      });
+
+      return sorted;
+    } catch (error) {
+      logger.error(
+        "Embedding-based similarity failed, falling back to text similarity",
+        { organizationId },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return this.findSimilarByText(organizationId, rawContent, excludeRequestId);
+    }
+  }
+
+  /**
+   * Find similar requests using text-based methods (fallback)
+   */
+  async findSimilarByText(
+    organizationId: string,
+    rawContent: string,
+    excludeRequestId?: string
+  ): Promise<SimilarRequest[]> {
+    logger.info("Finding similar feature requests using text similarity", {
       organizationId,
       contentLength: rawContent.length,
       excludeRequestId,
@@ -82,13 +180,24 @@ export class FeatureRequestDeduplicationService {
     // Sort by similarity descending
     const sorted = similarRequests.sort((a, b) => b.similarity - a.similarity);
 
-    logger.info("Similar requests found", {
+    logger.info("Similar requests found using text similarity", {
       organizationId,
       similarCount: sorted.length,
       topSimilarity: sorted[0]?.similarity,
     });
 
     return sorted;
+  }
+
+  /**
+   * Find similar requests (uses embedding by default, falls back to text)
+   */
+  async findSimilarRequests(
+    organizationId: string,
+    rawContent: string,
+    excludeRequestId?: string
+  ): Promise<SimilarRequest[]> {
+    return this.findSimilarByEmbedding(organizationId, rawContent, excludeRequestId);
   }
 
   /**

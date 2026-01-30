@@ -20,6 +20,7 @@ import {
   handleFeatureRequestReaction,
 } from "./slack-feature-requests";
 import { setProcessingIndicator } from "../utils/slack-agent-status";
+import { createFeedbackReceivedBlock } from "../utils/slack-feedback-blocks";
 
 let slackApp: App | null = null;
 
@@ -180,6 +181,109 @@ async function authorize(query: AuthorizeQuery): Promise<AuthorizeResult> {
     botUserId: integration.botUserId || undefined,
     botId: integration.botUserId || undefined,
   };
+}
+
+/**
+ * Handle feedback button interactions
+ */
+async function handleFeedbackAction(
+  action: any,
+  body: any,
+  client: WebClient,
+  sentiment: "positive" | "negative",
+): Promise<void> {
+  try {
+    const messageId = action.value; // This is the eventId we stored
+    const slackUserId = body.user.id;
+
+    // Get user info
+    const nubabelUser = await getUserBySlackId(slackUserId, client);
+
+    // Get workspace info for organization
+    const slackWorkspace = await client.team.info();
+    const workspaceId = slackWorkspace.team?.id;
+
+    if (!workspaceId) {
+      logger.warn("Could not get workspace ID for feedback");
+      return;
+    }
+
+    const organization = await getOrganizationBySlackWorkspace(workspaceId);
+
+    if (!organization) {
+      logger.warn("Organization not found for feedback");
+      return;
+    }
+
+    // Import feedback capture service
+    const { captureFeedback } = await import("../services/feedback-capture.service");
+
+    // Get channel and message info from body
+    const channelId = (body.container as any)?.channel_id;
+    const messageTs = body.message?.ts;
+
+    // Capture the feedback
+    await captureFeedback({
+      organizationId: organization.id,
+      userId: nubabelUser?.id,
+      executionId: undefined, // We don't have direct execution link from button
+      slackWorkspaceId: workspaceId,
+      slackChannelId: channelId,
+      slackMessageTs: messageTs,
+      feedbackType: "button",
+      reaction: sentiment === "positive" ? "thumbsup" : "thumbsdown",
+      metadata: {
+        sentiment,
+        eventId: messageId,
+        source: "feedback_button",
+      },
+    });
+
+    // Update the message to show feedback was received
+    if (messageTs && channelId) {
+      try {
+        // Get current message to preserve content
+        const currentBlocks = body.message?.blocks || [];
+
+        // Remove feedback action blocks and add thank you message
+        const updatedBlocks = currentBlocks.filter(
+          (block: any) => !block.block_id?.startsWith("feedback_actions_")
+        );
+
+        // Remove old feedback context block
+        const finalBlocks = updatedBlocks.filter(
+          (block: any) => !(block.type === "context" && block.elements?.[0]?.text?.includes("Was this response helpful"))
+        );
+
+        // Add feedback received block
+        const receivedBlocks = createFeedbackReceivedBlock(sentiment);
+
+        await client.chat.update({
+          channel: channelId,
+          ts: messageTs,
+          text: body.message?.text || "Response",
+          blocks: [...finalBlocks, ...receivedBlocks],
+        });
+      } catch (updateError) {
+        logger.debug("Could not update message after feedback", {
+          error: updateError instanceof Error ? updateError.message : String(updateError),
+        });
+      }
+    }
+
+    metrics.increment("slack.feedback.received", { sentiment });
+    logger.info("Feedback received via button", {
+      sentiment,
+      messageId,
+      userId: nubabelUser?.id,
+    });
+  } catch (error) {
+    logger.error(
+      "Slack feedback button handler error",
+      {},
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
 }
 
 function createSlackApp(): App {
@@ -1210,6 +1314,34 @@ function setupEventHandlers(app: App): void {
         error instanceof Error ? error : new Error(String(error)),
       );
     }
+  });
+
+  // ============================================================================
+  // Feedback Button Handlers
+  // ============================================================================
+
+  // Feedback thumbs up handler
+  app.action("feedback_thumbs_up", async ({ action, ack, body, client }) => {
+    await ack();
+    await handleFeedbackAction(action, body, client as WebClient, "positive");
+  });
+
+  // Feedback thumbs down handler
+  app.action("feedback_thumbs_down", async ({ action, ack, body, client }) => {
+    await ack();
+    await handleFeedbackAction(action, body, client as WebClient, "negative");
+  });
+
+  // Feedback helpful handler
+  app.action("feedback_helpful", async ({ action, ack, body, client }) => {
+    await ack();
+    await handleFeedbackAction(action, body, client as WebClient, "positive");
+  });
+
+  // Feedback not helpful handler
+  app.action("feedback_not_helpful", async ({ action, ack, body, client }) => {
+    await ack();
+    await handleFeedbackAction(action, body, client as WebClient, "negative");
   });
 
   // Reaction added event handler for feedback capture
