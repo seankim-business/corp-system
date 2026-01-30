@@ -38,8 +38,8 @@ model Organization {
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  // Marketplace Hub settings
-  installationMode String @default("recommend") @map("installation_mode") @db.VarChar(20) // recommend, auto, manual
+  // Marketplace Hub settings - temporarily removed until migration applied
+  // installationMode String @default("recommend") @map("installation_mode") @db.VarChar(20) // recommend, auto, manual
 
   // Relations
   workspaceDomains       WorkspaceDomain[]
@@ -78,6 +78,7 @@ model Organization {
   knowledgeClusters      KnowledgeCluster[]
   entityMemories         EntityMemory[]
   memories               Memory[]
+  feedbackCaptures       FeedbackCapture[]
 
   @@map("organizations")
 }
@@ -101,6 +102,7 @@ model User {
   orchestratorExecutions OrchestratorExecution[]
   featureFlagAuditLogs   FeatureFlagAuditLog[]
   slackUsers             SlackUser[]
+  feedbackCaptures       FeedbackCapture[]
 
   @@index([email])
   @@index([googleId])
@@ -2035,4 +2037,52 @@ model Memory {
   @@index([importance])
   @@index([lastAccessedAt])
   @@map("memories")
+}
+
+// ============================================================================
+// FEEDBACK & LEARNING SYSTEM (Phase 3 Intelligence Layer)
+// ============================================================================
+
+/// FeedbackCapture - User feedback on agent responses
+/// Captures reactions, corrections, and ratings for continuous improvement
+model FeedbackCapture {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  userId         String  @map("user_id") @db.Uuid
+  executionId    String? @map("execution_id") @db.Uuid // Link to OrchestratorExecution if available
+
+  // Slack context
+  slackWorkspaceId String? @map("slack_workspace_id") @db.VarChar(50)
+  slackChannelId   String? @map("slack_channel_id") @db.VarChar(50)
+  slackThreadTs    String? @map("slack_thread_ts") @db.VarChar(50)
+  slackMessageTs   String  @map("slack_message_ts") @db.VarChar(50)
+
+  // Feedback type
+  feedbackType String @map("feedback_type") @db.VarChar(50) // reaction, correction, rating
+
+  // Reaction data
+  reaction String? @db.VarChar(50) // thumbsdown, -1, thumbsup, +1, etc.
+
+  // Original message content
+  originalMessage String @map("original_message") @db.Text
+
+  // Correction text (optional, provided by user)
+  correction String? @db.Text
+
+  // Metadata
+  metadata Json @default("{}") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([executionId])
+  @@index([slackWorkspaceId, slackMessageTs])
+  @@index([feedbackType])
+  @@index([userId])
+  @@map("feedback_captures")
 }

@@ -76,12 +76,20 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
         },
       );
 
-      await slackClient.chat.postMessage({
+      const result = await slackClient.chat.postMessage({
         channel,
         text,
         ...(threadTs ? { thread_ts: threadTs } : {}),
         blocks,
       });
+
+      // Store bot message timestamp for feedback tracking
+      if (result.ts && eventId) {
+        const { redis } = await import("../db/redis");
+        await redis.set(`slack:bot_message:${eventId}`, result.ts, 86400); // 24 hour expiry
+        // Also store reverse mapping: message timestamp -> eventId
+        await redis.set(`slack:bot_message_reverse:${channel}:${result.ts}`, eventId, 86400);
+      }
 
       await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);
       await emitJobProgress(

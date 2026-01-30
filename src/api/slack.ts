@@ -890,6 +890,147 @@ function setupEventHandlers(app: App): void {
       );
     }
   });
+
+  // Reaction added event handler for feedback capture
+  app.event("reaction_added", async ({ event, client }) => {
+    try {
+      const { reaction, user: slackUserId, item } = event;
+
+      // Only process message reactions
+      if (item.type !== "message") {
+        return;
+      }
+
+      const { channel, ts: messageTs } = item;
+
+      // Only capture negative feedback (thumbsdown, -1)
+      const {
+        mapReactionToSentiment,
+      } = await import("../services/feedback-capture.service");
+      const sentiment = mapReactionToSentiment(reaction);
+
+      if (sentiment !== "negative") {
+        logger.debug("Ignoring non-negative reaction", { reaction });
+        return;
+      }
+
+      // Get Slack workspace info
+      const slackWorkspace = await client.team.info();
+      const workspaceId = slackWorkspace.team?.id;
+
+      if (!workspaceId) {
+        logger.warn("Could not get workspace ID for reaction");
+        return;
+      }
+
+      // Get organization from workspace
+      const organization = await getOrganizationBySlackWorkspace(workspaceId);
+      if (!organization) {
+        logger.warn("Organization not found for Slack workspace", { workspaceId });
+        return;
+      }
+
+      // Get Nubabel user
+      const nubabelUser = await getUserBySlackId(slackUserId, client as WebClient);
+      if (!nubabelUser) {
+        logger.debug("Nubabel user not found for reaction", { slackUserId });
+        return;
+      }
+
+      // Check if this is a bot message (check if we have it in Redis)
+      const eventId = await redis.get(`slack:bot_message_reverse:${channel}:${messageTs}`);
+
+      // Retrieve the bot message content
+      const {
+        getBotMessageContent,
+        findExecutionByEventId,
+        captureFeedback,
+        feedbackExists,
+        promptForCorrection,
+      } = await import("../services/feedback-capture.service");
+
+      // Check if feedback already exists
+      const alreadyCaptured = await feedbackExists(workspaceId, messageTs, nubabelUser.id);
+      if (alreadyCaptured) {
+        logger.debug("Feedback already captured for this message", { messageTs, userId: nubabelUser.id });
+        return;
+      }
+
+      const originalMessage = await getBotMessageContent(client as WebClient, channel, messageTs);
+
+      if (!originalMessage) {
+        logger.warn("Could not retrieve bot message content", { channel, messageTs });
+        return;
+      }
+
+      // Find execution ID if available
+      let executionId: string | undefined;
+      if (eventId) {
+        const foundExecutionId = await findExecutionByEventId(eventId);
+        if (foundExecutionId) {
+          executionId = foundExecutionId;
+        }
+      }
+
+      // Get thread_ts if this is in a thread
+      let threadTs: string | undefined;
+      try {
+        const messageInfo = await client.conversations.history({
+          channel,
+          latest: messageTs,
+          limit: 1,
+          inclusive: true,
+        });
+        if (messageInfo.messages && messageInfo.messages.length > 0) {
+          threadTs = messageInfo.messages[0].thread_ts;
+        }
+      } catch (error) {
+        logger.debug("Could not retrieve thread_ts", { error });
+      }
+
+      // Capture the feedback
+      await captureFeedback({
+        organizationId: organization.id,
+        userId: nubabelUser.id,
+        executionId,
+        slackWorkspaceId: workspaceId,
+        slackChannelId: channel,
+        slackThreadTs: threadTs,
+        slackMessageTs: messageTs,
+        feedbackType: "reaction",
+        reaction,
+        originalMessage,
+        metadata: {
+          sentiment,
+          eventId: eventId || null,
+        },
+      });
+
+      // Prompt user for correction text
+      await promptForCorrection(
+        client as WebClient,
+        slackUserId,
+        channel,
+        threadTs || messageTs,
+        messageTs,
+      );
+
+      logger.info("Feedback captured from Slack reaction", {
+        reaction,
+        sentiment,
+        organizationId: organization.id,
+        userId: nubabelUser.id,
+        hasExecution: !!executionId,
+      });
+    } catch (error) {
+      logger.error(
+        "Slack reaction_added handler error",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      // Don't throw - reaction handling should not block
+    }
+  });
 }
 
 export async function startSlackBot(): Promise<void> {

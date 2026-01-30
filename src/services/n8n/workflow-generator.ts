@@ -1,7 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
+import { db as prismaDb } from "../../db/client";
 import { logger } from "../../utils/logger";
-import { N8nWorkflowInput, N8nNode } from "./types";
+import { N8nConnections, N8nNode, N8nWorkflowInput } from "./types";
+
+const anthropic = new Anthropic();
+const n8nWorkflow = (prismaDb as unknown as Record<string, any>).n8nWorkflow as {
+  create: (args: Record<string, unknown>) => Promise<any>;
+};
 
 export interface GenerateOptions {
   category?: string;
@@ -26,6 +33,86 @@ export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
 }
+
+const N8nNodeSchema: z.ZodType<N8nNode> = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  typeVersion: z.number(),
+  position: z.tuple([z.number(), z.number()]),
+  parameters: z.record(z.unknown()),
+  credentials: z.record(z.object({ id: z.string(), name: z.string() })).optional(),
+});
+
+const N8nConnectionsSchema: z.ZodType<N8nConnections> = z.record(
+  z.record(
+    z.array(
+      z.array(
+        z.object({
+          node: z.string(),
+          type: z.string(),
+          index: z.number(),
+        }),
+      ),
+    ),
+  ),
+);
+
+const N8nWorkflowSchema: z.ZodType<N8nWorkflowInput> = z.object({
+  name: z.string(),
+  nodes: z.array(N8nNodeSchema),
+  connections: N8nConnectionsSchema,
+  settings: z
+    .object({
+      executionOrder: z.enum(["v0", "v1"]).optional(),
+    })
+    .optional(),
+});
+
+export interface GenerationRequest {
+  prompt: string;
+  organizationId: string;
+  userId: string;
+  category?: string;
+  availableCredentials?: string[];
+}
+
+export interface GenerationResult {
+  success: boolean;
+  workflow?: N8nWorkflowInput;
+  error?: string;
+  tokensUsed?: number;
+}
+
+const SYSTEM_PROMPT = `You are an expert n8n workflow automation engineer. Generate valid n8n workflow JSON from user descriptions.
+
+RULES:
+1. Output ONLY valid JSON - no markdown, no explanations
+2. Use standard n8n-nodes-base node types
+3. Use descriptive node names in kebab-case (e.g., "fetch-data", "send-notification")
+4. Position nodes logically (left-to-right flow, ~300px horizontal spacing)
+5. Include proper connections between nodes
+6. Set executionOrder to "v1"
+7. Do NOT include credentials or credential IDs in the output
+
+COMMON NODE TYPES:
+- n8n-nodes-base.webhook (trigger)
+- n8n-nodes-base.scheduleTrigger (cron trigger)
+- n8n-nodes-base.httpRequest (API calls)
+- n8n-nodes-base.slack (Slack messages)
+- n8n-nodes-base.notion (Notion operations)
+- n8n-nodes-base.set (set/transform data)
+- n8n-nodes-base.if (conditional branching)
+- n8n-nodes-base.code (JavaScript code)
+- n8n-nodes-base.respondToWebhook (webhook response)
+
+WORKFLOW STRUCTURE:
+{
+  "name": "Workflow Name",
+  "nodes": [...],
+  "connections": {...},
+  "settings": { "executionOrder": "v1" }
+}`;
 
 const WORKFLOW_GENERATION_SYSTEM_PROMPT = `You are an n8n workflow generator. Generate valid n8n workflow JSON based on user requirements.
 
@@ -113,11 +200,89 @@ export class WorkflowGeneratorService {
   private maxRetries = 2;
 
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is required");
+    this.client = anthropic;
+  }
+
+  async generate(request: GenerationRequest): Promise<GenerationResult> {
+    const { prompt, organizationId, userId, category, availableCredentials } = request;
+
+    try {
+      const userPrompt = this.buildUserPrompt(prompt, category, availableCredentials);
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+
+      const content = response.content.find((block) => block.type === "text");
+      if (!content || content.type !== "text") {
+        return { success: false, error: "Unexpected response type" };
+      }
+
+      const jsonText = this.extractJson(content.text);
+      const parsed = JSON.parse(jsonText);
+      const validated = N8nWorkflowSchema.parse(parsed);
+      const sanitized = this.stripCredentials(validated);
+
+      logger.info("Workflow generated successfully", {
+        organizationId,
+        userId,
+        workflowName: sanitized.name,
+        nodeCount: sanitized.nodes.length,
+      });
+
+      return {
+        success: true,
+        workflow: sanitized,
+        tokensUsed: response.usage.input_tokens + response.usage.output_tokens,
+      };
+    } catch (error) {
+      logger.error("Workflow generation failed", { organizationId, error });
+
+      if (error instanceof z.ZodError) {
+        return { success: false, error: `Invalid workflow structure: ${error.message}` };
+      }
+      if (error instanceof SyntaxError) {
+        return { success: false, error: "Generated invalid JSON" };
+      }
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
-    this.client = new Anthropic({ apiKey });
+  }
+
+  async generateAndSave(
+    request: GenerationRequest & { instanceId: string },
+  ): Promise<{ workflowId?: string } & GenerationResult> {
+    const result = await this.generate(request);
+
+    if (!result.success || !result.workflow) {
+      return result;
+    }
+
+    const workflow = await n8nWorkflow.create({
+      data: {
+        organizationId: request.organizationId,
+        instanceId: request.instanceId,
+        n8nWorkflowId: `generated_${Date.now()}`,
+        name: result.workflow.name,
+        description: `AI-generated: ${request.prompt.substring(0, 200)}`,
+        category: request.category || "ai-generated",
+        tags: ["ai-generated"],
+        workflowJson: result.workflow as object,
+        isActive: false,
+        isSkill: false,
+      },
+    });
+
+    return {
+      ...result,
+      workflowId: workflow.id,
+    };
   }
 
   async generateWorkflow(prompt: string, options?: GenerateOptions): Promise<N8nWorkflowInput> {
@@ -144,7 +309,7 @@ export class WorkflowGeneratorService {
           throw new Error("No text response from Claude");
         }
 
-        const workflow = this.parseWorkflowJson(textContent.text);
+        const workflow = this.stripCredentials(this.parseWorkflowJson(textContent.text));
         const validation = this.validateGeneratedWorkflow(workflow);
 
         if (!validation.valid) {
@@ -211,7 +376,7 @@ Please modify the workflow based on the feedback and return the complete updated
           throw new Error("No text response from Claude");
         }
 
-        const workflow = this.parseWorkflowJson(textContent.text);
+        const workflow = this.stripCredentials(this.parseWorkflowJson(textContent.text));
         const validation = this.validateGeneratedWorkflow(workflow);
 
         if (!validation.valid) {
@@ -382,6 +547,39 @@ Please modify the workflow based on the feedback and return the complete updated
     };
   }
 
+  private buildUserPrompt(
+    prompt: string,
+    category?: string,
+    availableCredentials?: string[],
+  ): string {
+    let fullPrompt = `Create an n8n workflow for: ${prompt}`;
+
+    if (category) {
+      fullPrompt += `\n\nCategory: ${category}`;
+    }
+
+    if (availableCredentials?.length) {
+      fullPrompt += `\n\nAvailable credentials: ${availableCredentials.join(", ")}`;
+    }
+
+    return fullPrompt;
+  }
+
+  private extractJson(text: string): string {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new SyntaxError("No JSON found in response");
+    }
+    return jsonMatch[0];
+  }
+
+  private stripCredentials(workflow: N8nWorkflowInput): N8nWorkflowInput {
+    return {
+      ...workflow,
+      nodes: workflow.nodes.map(({ credentials, ...node }) => node),
+    };
+  }
+
   private buildGenerationPrompt(prompt: string, options?: GenerateOptions): string {
     let fullPrompt = `Generate an n8n workflow for the following requirement:\n${prompt}`;
 
@@ -429,7 +627,7 @@ Please modify the workflow based on the feedback and return the complete updated
     const parsed = JSON.parse(cleanedText);
 
     if (parsed.nodes) {
-      parsed.nodes = parsed.nodes.map((node: N8nNode) => ({
+      parsed.nodes = parsed.nodes.map(({ credentials, ...node }: N8nNode) => ({
         ...node,
         id: node.id || uuidv4(),
         typeVersion: node.typeVersion || 1,
@@ -458,3 +656,4 @@ Please modify the workflow based on the feedback and return the complete updated
 }
 
 export const workflowGeneratorService = new WorkflowGeneratorService();
+export const workflowGenerator = workflowGeneratorService;

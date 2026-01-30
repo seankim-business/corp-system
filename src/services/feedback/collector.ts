@@ -145,37 +145,13 @@ export async function handleSlackReaction(
   reaction: string,
   slackUserId: string
 ): Promise<void> {
-  // Map Slack reactions to feedback
-  const reactionMap: Record<string, "positive" | "negative"> = {
-    "+1": "positive",
-    thumbsup: "positive",
-    heart: "positive",
-    "-1": "negative",
-    thumbsdown: "negative",
-  };
-
-  const mappedReaction = reactionMap[reaction];
-  if (!mappedReaction) {
-    logger.debug("Unmapped Slack reaction", { reaction });
-    return;
-  }
-
-  // Database implementation commented out - requires userFeedback table
-  // Find the execution associated with this message
-  // const execution = await db.orchestratorExecution.findFirst({
-  //   where: {
-  //     metadata: {
-  //       path: ["slackMessageTs"],
-  //       equals: messageTs,
-  //     },
-  //   },
-  // });
-
-  logger.warn("handleSlackReaction: userFeedback table not yet implemented", {
+  // This function is now handled by the reaction_added event handler in slack.ts
+  // which uses the feedback-capture.service.ts
+  logger.debug("Slack reaction handling delegated to event handler", {
     workspaceId,
     channelId,
     messageTs,
-    reaction: mappedReaction,
+    reaction,
     slackUserId,
   });
 }

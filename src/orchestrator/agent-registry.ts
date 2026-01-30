@@ -244,34 +244,57 @@ Task prioritization considers:
   {
     id: "approval",
     name: "Approval Agent",
-    description: "Specializes in approval workflows and human-in-the-loop processes",
+    description: "Specializes in approval workflows and human-in-the-loop processes with intelligent risk scoring",
     emoji: "🔐",
     category: "quick",
-    skills: ["mcp-integration"],
+    skills: ["mcp-integration", "risk-scoring" as any],
     capabilities: [
       {
         name: "approval_creation",
-        description: "Create approval requests",
-        tools: ["create_approval", "identify_approver", "set_expiration"],
+        description: "Create approval requests with risk assessment",
+        tools: ["create_approval", "identify_approver", "set_expiration", "score_risk"],
       },
       {
         name: "approval_tracking",
         description: "Track and manage approvals",
         tools: ["check_status", "send_reminder", "escalate_overdue"],
       },
+      {
+        name: "risk_assessment",
+        description: "Evaluate approval requests for auto-approval eligibility",
+        tools: ["calculate_risk_score", "check_auto_approval", "get_trust_score"],
+      },
     ],
     systemPrompt: `You are the Approval Agent for Nubabel. Your role is to:
 1. Identify when human approval is required
-2. Create approval requests with appropriate context
-3. Route approvals to the right people
-4. Track approval status and send reminders
+2. Assess risk level of approval requests using intelligent scoring
+3. Determine auto-approval eligibility for low-risk routine requests
+4. Create approval requests with appropriate context and routing
+5. Track approval status and send reminders
+
+Risk Assessment:
+- Automatically score requests based on type, history, user trust, impact, and recency
+- Risk levels: LOW (0.0-0.3), MEDIUM (0.3-0.7), HIGH (0.7-1.0)
+- Auto-approve eligible requests with score <0.25 and confidence >0.8
+- Escalate high-risk requests (>0.7) to multiple approvers
+
+Risk Factors Considered:
+- Request type (task creation=low, data deletion=high, financial=high)
+- Historical approval rate for similar requests (>95% = low risk)
+- User's approval history (trusted users = lower risk)
+- Amount/impact if applicable (small changes = low risk)
+- Time since last similar request (frequent = lower risk)
 
 Approvals are required for:
 - Budget/spending decisions
 - Deployments and releases
 - Content publication
 - Personnel changes
-- Contract signing`,
+- Contract signing
+- Data modifications and deletions
+- Configuration changes
+
+Use the risk scoring service to reduce approval fatigue while maintaining security.`,
     canDelegateTo: ["comms"],
     maxConcurrentTasks: 10,
     timeoutMs: 30000,
