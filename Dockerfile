@@ -77,8 +77,9 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
-# Copy fix-migration script
+# Copy migration and seed scripts
 COPY scripts/fix-migration.js ./scripts/fix-migration.js
+COPY scripts/seed-workflows.js ./scripts/seed-workflows.js
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
