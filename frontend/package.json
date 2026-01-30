@@ -10,6 +10,7 @@
   "author": "Kyndof Team",
   "license": "PROPRIETARY",
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@tanstack/react-query": "^5.90.20",
     "axios": "^1.13.2",
     "lucide-react": "^0.563.0",

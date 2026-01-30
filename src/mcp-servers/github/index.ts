@@ -4,7 +4,8 @@ import { updateIssueTool } from "./tools/updateIssue";
 import { getPullRequestsTool } from "./tools/getPullRequests";
 import { createPullRequestTool } from "./tools/createPullRequest";
 import { getRepositoriesTool } from "./tools/getRepositories";
-import { getFileTool } from "./tools/getFile";
+// TODO: Re-enable when getFile tool is restored
+// import { getFileTool } from "./tools/getFile";
 import {
   MCPExecuteToolOptions,
   executeTool,
@@ -31,7 +32,7 @@ export function registerTools(): string[] {
     "github__getPullRequests",
     "github__createPullRequest",
     "github__getRepositories",
-    "github__getFile",
+    // "github__getFile", // TODO: Re-enable when tool is restored
   ];
 }
 
@@ -82,8 +83,8 @@ export async function executeGitHubTool(
           case "getRepositories":
             return await getRepositoriesTool(accessToken, input, connection, userId);
 
-          case "getFile":
-            return await getFileTool(accessToken, input, connection, userId);
+          // case "getFile":
+          //   return await getFileTool(accessToken, input, connection, userId);
 
           default:
             throw new Error(`Unknown GitHub tool: ${toolName}`);

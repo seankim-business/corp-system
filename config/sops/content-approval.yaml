@@ -1,0 +1,112 @@
+schema_version: "1.0"
+kind: SOP
+
+metadata:
+  id: content-approval
+  name: Content Approval Process
+  function: brand
+  owner: brand-manager
+  version: 1.0.0
+
+triggers:
+  - pattern: "콘텐츠 승인"
+  - pattern: "content approval"
+  - pattern: "마케팅 검토"
+  - pattern: "marketing review"
+  - pattern: "브랜드 검토"
+
+steps:
+  - id: content-review
+    name: Initial Content Review
+    description: Review content for brand guidelines compliance and quality standards.
+    type: automated
+    agent: brand-agent
+    tool: content_review
+    input:
+      content_url: "{{content.url}}"
+      content_type: "{{content.type}}"
+      guidelines_version: "latest"
+    output:
+      review_notes: "string"
+      compliance_score: "number"
+      issues: "array"
+    timeout: 1h
+
+  - id: brand-consistency-check
+    name: Brand Consistency Check
+    description: Verify brand voice, tone, and visual identity adherence.
+    type: manual
+    requires_approval: false
+    assignee: brand-specialist
+    checklist:
+      - Brand colors used correctly
+      - Logo placement follows guidelines
+      - Typography is consistent
+      - Tone of voice matches brand persona
+      - Key messaging aligns with brand values
+
+  - id: legal-check
+    name: Legal Review
+    description: Check for legal compliance, required disclaimers, and copyright issues.
+    type: manual
+    requires_approval: false
+    assignee: legal-team
+    timeout: 2h
+    checklist:
+      - No trademark violations
+      - Required disclaimers present
+      - Privacy policy compliance
+      - Copyright clearance verified
+      - Claims are substantiated
+
+  - id: stakeholder-feedback
+    name: Stakeholder Feedback Collection
+    description: Gather feedback from relevant stakeholders before final approval.
+    type: manual
+    requires_approval: false
+    assignee: content-coordinator
+    timeout: 24h
+    checklist:
+      - Product team review
+      - Sales team input
+      - Customer success perspective
+      - Executive summary prepared
+
+  - id: final-approval
+    name: Final Approval
+    description: Marketing director final sign-off on content.
+    type: approval_required
+    approver: marketing-director
+    timeout: 24h
+    input:
+      content_summary: "{{content.summary}}"
+      review_notes: "{{steps.content-review.output.review_notes}}"
+      compliance_score: "{{steps.content-review.output.compliance_score}}"
+
+  - id: publish-notification
+    name: Publish Notification
+    description: Notify relevant teams that content is approved and ready for publishing.
+    type: automated
+    agent: brand-agent
+    tool: notify_slack
+    input:
+      channel: "#marketing-content"
+      message: "Content '{{content.title}}' has been approved and is ready for publishing."
+
+exception_handling:
+  - condition: "step.failed"
+    action: notify_owner
+    message: "Content approval step failed: {{step.name}}"
+  - condition: "step.timeout"
+    action: escalate
+    target: brand-manager
+    message: "Content approval timeout: {{step.name}} - Please review immediately"
+  - condition: "approval.rejected"
+    action: return_to_step
+    step: content-review
+    message: "Content rejected. Please revise and resubmit."
+    max_retries: 3
+  - condition: "compliance_score < 70"
+    action: halt_and_escalate
+    target: brand-manager
+    message: "Low compliance score ({{compliance_score}}). Manual review required."

@@ -23,11 +23,245 @@ import { logger } from "../utils/logger";
 import { metrics } from "../utils/metrics";
 import { db as prisma } from "../db/client";
 
+// ============================================================================
+// Loop Detection System
+// ============================================================================
+
+export interface LoopDetectionConfig {
+  /** Maximum iterations before forced termination (default: 10) */
+  maxIterations: number;
+  /** Maximum depth for circular dependency detection (default: 5) */
+  maxDependencyDepth: number;
+  /** Enable task repetition detection (default: true) */
+  detectTaskRepetition: boolean;
+  /** Similarity threshold for task comparison (0-1, default: 0.85) */
+  similarityThreshold: number;
+}
+
+export interface LoopDetectionState {
+  /** Track task hashes executed by each agent */
+  agentTaskHistory: Map<AgentType, string[]>;
+  /** Track agent execution chain for circular dependency detection */
+  executionChain: AgentType[];
+  /** Current iteration count */
+  iterationCount: number;
+  /** Detected loops */
+  detectedLoops: LoopInfo[];
+}
+
+export interface LoopInfo {
+  type: "task-repetition" | "circular-dependency";
+  agents: AgentType[];
+  description: string;
+  timestamp: number;
+}
+
+export interface LoopDetectionResult {
+  loopDetected: boolean;
+  loopType?: "task-repetition" | "circular-dependency" | "max-iterations";
+  summary: string;
+  detectedLoops: LoopInfo[];
+  iterationCount: number;
+}
+
+const DEFAULT_LOOP_CONFIG: LoopDetectionConfig = {
+  maxIterations: 10,
+  maxDependencyDepth: 5,
+  detectTaskRepetition: true,
+  similarityThreshold: 0.85,
+};
+
+/**
+ * Create a hash from a task description for comparison
+ */
+function hashTask(task: string): string {
+  // Normalize and create a simple hash
+  const normalized = task.toLowerCase().trim().replace(/\s+/g, " ");
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString(16);
+}
+
+
+/**
+ * Detect circular dependencies in agent execution chain (A→B→C→A)
+ */
+function detectCircularDependency(
+  chain: AgentType[],
+  newAgent: AgentType,
+  maxDepth: number
+): { detected: boolean; cycle: AgentType[] } {
+  // Check if new agent already exists in the recent chain
+  const recentChain = chain.slice(-maxDepth);
+  const agentIndex = recentChain.indexOf(newAgent);
+  
+  if (agentIndex !== -1) {
+    // Found a cycle: extract the circular path
+    const cycle = [...recentChain.slice(agentIndex), newAgent];
+    return { detected: true, cycle };
+  }
+  
+  return { detected: false, cycle: [] };
+}
+
+/**
+ * Detect if an agent is repeating the same task
+ */
+function detectTaskRepetition(
+  agentHistory: string[],
+  newTaskHash: string,
+  _config: LoopDetectionConfig
+): boolean {
+  // Check for exact hash match
+  if (agentHistory.includes(newTaskHash)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Initialize loop detection state
+ */
+export function initLoopDetectionState(): LoopDetectionState {
+  return {
+    agentTaskHistory: new Map(),
+    executionChain: [],
+    iterationCount: 0,
+    detectedLoops: [],
+  };
+}
+
+/**
+ * Check for loops before executing an agent task
+ */
+export function checkForLoop(
+  state: LoopDetectionState,
+  agentType: AgentType,
+  task: string,
+  config: LoopDetectionConfig = DEFAULT_LOOP_CONFIG
+): LoopDetectionResult {
+  state.iterationCount++;
+  
+  // Check max iterations
+  if (state.iterationCount > config.maxIterations) {
+    return {
+      loopDetected: true,
+      loopType: "max-iterations",
+      summary: `Maximum iterations (${config.maxIterations}) exceeded. Forcing termination to prevent infinite loop.`,
+      detectedLoops: state.detectedLoops,
+      iterationCount: state.iterationCount,
+    };
+  }
+  
+  // Check for circular dependencies
+  const circularCheck = detectCircularDependency(
+    state.executionChain,
+    agentType,
+    config.maxDependencyDepth
+  );
+  
+  if (circularCheck.detected) {
+    const loopInfo: LoopInfo = {
+      type: "circular-dependency",
+      agents: circularCheck.cycle,
+      description: `Circular dependency detected: ${circularCheck.cycle.join(" → ")}`,
+      timestamp: Date.now(),
+    };
+    state.detectedLoops.push(loopInfo);
+    
+    return {
+      loopDetected: true,
+      loopType: "circular-dependency",
+      summary: `Circular dependency detected: ${circularCheck.cycle.join(" → ")}. Terminating to prevent infinite loop.`,
+      detectedLoops: state.detectedLoops,
+      iterationCount: state.iterationCount,
+    };
+  }
+  
+  // Check for task repetition
+  if (config.detectTaskRepetition) {
+    const taskHash = hashTask(task);
+    const agentHistory = state.agentTaskHistory.get(agentType) || [];
+    
+    if (detectTaskRepetition(agentHistory, taskHash, config)) {
+      const loopInfo: LoopInfo = {
+        type: "task-repetition",
+        agents: [agentType],
+        description: `Agent ${agentType} attempted to repeat the same task`,
+        timestamp: Date.now(),
+      };
+      state.detectedLoops.push(loopInfo);
+      
+      return {
+        loopDetected: true,
+        loopType: "task-repetition",
+        summary: `Agent ${agentType} is repeating the same task. Terminating to prevent infinite loop.`,
+        detectedLoops: state.detectedLoops,
+        iterationCount: state.iterationCount,
+      };
+    }
+    
+    // Update history
+    agentHistory.push(taskHash);
+    state.agentTaskHistory.set(agentType, agentHistory);
+  }
+  
+  // Update execution chain
+  state.executionChain.push(agentType);
+  
+  return {
+    loopDetected: false,
+    summary: "No loop detected",
+    detectedLoops: state.detectedLoops,
+    iterationCount: state.iterationCount,
+  };
+}
+
+/**
+ * Generate a summary when loop is detected for graceful exit
+ */
+export function generateLoopExitSummary(
+  state: LoopDetectionState,
+  partialResults: Map<string, AgentExecutionResult>
+): string {
+  const completedTasks = Array.from(partialResults.entries())
+    .filter(([_, result]) => result.success)
+    .map(([taskId, result]) => `- ${taskId}: ${result.output.substring(0, 100)}...`);
+  
+  const loopSummary = state.detectedLoops
+    .map((loop) => `- ${loop.type}: ${loop.description}`)
+    .join("\n");
+  
+  return `
+## Loop Detection Summary
+
+**Status:** Terminated due to loop detection
+**Total Iterations:** ${state.iterationCount}
+
+### Detected Loops:
+${loopSummary || "None"}
+
+### Completed Tasks Before Termination:
+${completedTasks.length > 0 ? completedTasks.join("\n") : "None"}
+
+### Execution Chain:
+${state.executionChain.join(" → ")}
+
+**Recommendation:** Review the task decomposition to avoid circular dependencies or repetitive tasks.
+`.trim();
+}
+
 export interface MultiAgentRequest extends OrchestrationRequest {
   enableMultiAgent?: boolean;
   maxAgents?: number;
   enableParallel?: boolean;
   timeout?: number;
+  /** Loop detection configuration */
+  loopDetection?: Partial<LoopDetectionConfig>;
 }
 
 export interface MultiAgentResult extends OrchestrationResult {
@@ -36,6 +270,8 @@ export interface MultiAgentResult extends OrchestrationResult {
     decomposition?: DecompositionResult;
     executionMode: "single" | "sequential" | "parallel";
     subtaskResults?: Map<string, AgentExecutionResult>;
+    /** Loop detection information */
+    loopDetection?: LoopDetectionResult;
   };
 }
 
@@ -62,7 +298,15 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
     maxAgents = MAX_AGENTS_PER_REQUEST,
     enableParallel = true,
     timeout = DEFAULT_TIMEOUT_MS,
+    loopDetection: loopDetectionConfig,
   } = request;
+
+  // Initialize loop detection
+  const loopConfig: LoopDetectionConfig = {
+    ...DEFAULT_LOOP_CONFIG,
+    ...loopDetectionConfig,
+  };
+  const loopState = initLoopDetectionState();
 
   logger.info("Multi-agent orchestration started", {
     sessionId,
@@ -138,9 +382,41 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
 
     let results: Map<string, AgentExecutionResult>;
     let executionMode: "sequential" | "parallel";
+    let loopResult: LoopDetectionResult | undefined;
 
     if (enableParallel && canExecuteInParallel(decomposition)) {
       executionMode = "parallel";
+      
+      // Check for loops before parallel execution
+      for (const subtask of limitedSubtasks) {
+        loopResult = checkForLoop(loopState, subtask.assignedAgent, subtask.description, loopConfig);
+        if (loopResult.loopDetected) {
+          logger.warn("Loop detected before parallel execution", {
+            loopType: loopResult.loopType,
+            summary: loopResult.summary,
+          });
+          
+          const summary = generateLoopExitSummary(loopState, new Map());
+          return {
+            output: summary,
+            status: "failed",
+            metadata: {
+              category: "unspecified-high",
+              skills: [],
+              duration: Date.now() - startTime,
+              model: "multi-agent",
+              sessionId,
+            },
+            multiAgentMetadata: {
+              agentsUsed: [],
+              decomposition,
+              executionMode,
+              loopDetection: loopResult,
+            },
+          };
+        }
+      }
+      
       const parallelTasks = limitedSubtasks.map((subtask) => ({
         agentType: subtask.assignedAgent,
         prompt: subtask.description,
@@ -157,10 +433,56 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
       });
     } else {
       executionMode = "sequential";
-      results = await Promise.race([
-        coordinateAgents(userRequest, limitedSubtasks, context),
-        createTimeoutPromise<Map<string, AgentExecutionResult>>(timeout),
-      ]);
+      results = new Map();
+      
+      // Execute sequentially with loop detection
+      for (const subtask of limitedSubtasks) {
+        loopResult = checkForLoop(loopState, subtask.assignedAgent, subtask.description, loopConfig);
+        
+        if (loopResult.loopDetected) {
+          logger.warn("Loop detected during sequential execution", {
+            loopType: loopResult.loopType,
+            summary: loopResult.summary,
+            completedTasks: results.size,
+          });
+          
+          metrics.increment("multi_agent.loop_detected", {
+            organizationId,
+            loopType: loopResult.loopType || "unknown",
+          });
+          
+          const summary = generateLoopExitSummary(loopState, results);
+          return {
+            output: summary,
+            status: "failed",
+            metadata: {
+              category: "unspecified-high",
+              skills: [],
+              duration: Date.now() - startTime,
+              model: "multi-agent",
+              sessionId,
+            },
+            multiAgentMetadata: {
+              agentsUsed: Array.from(results.values()).map((r) => r.agentId),
+              decomposition,
+              executionMode,
+              subtaskResults: results,
+              loopDetection: loopResult,
+            },
+          };
+        }
+        
+        // Execute single subtask
+        const singleTaskResults = await Promise.race([
+          coordinateAgents(userRequest, [subtask], context),
+          createTimeoutPromise<Map<string, AgentExecutionResult>>(timeout),
+        ]);
+        
+        // Merge results
+        singleTaskResults.forEach((value, key) => {
+          results.set(key, value);
+        });
+      }
     }
 
     const aggregatedOutput = aggregateResults(results);
@@ -230,6 +552,12 @@ export async function orchestrateMultiAgent(request: MultiAgentRequest): Promise
         decomposition,
         executionMode,
         subtaskResults: results,
+        loopDetection: {
+          loopDetected: false,
+          summary: "Execution completed without loops",
+          detectedLoops: loopState.detectedLoops,
+          iterationCount: loopState.iterationCount,
+        },
       },
     };
   } catch (error) {

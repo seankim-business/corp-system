@@ -39,10 +39,17 @@ interface Organization {
   domain: string;
 }
 
+interface Membership {
+  id: string;
+  role: string; // "owner", "admin", "member"
+  permissions: Record<string, unknown>;
+}
+
 interface AuthState {
   user: User | null;
   currentOrganization: Organization | null;
   organizations: Organization[];
+  membership: Membership | null;
   isLoading: boolean;
   hasCheckedAuth: boolean;
 
@@ -56,6 +63,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   currentOrganization: null,
   organizations: [],
+  membership: null,
   isLoading: true,
   hasCheckedAuth: false,
 
@@ -68,6 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: User;
         currentOrganization: Organization | null;
         organizations: Organization[];
+        membership: Membership | null;
       }>({
         url: "/auth/me",
         method: "GET",
@@ -77,11 +86,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: data.user,
         currentOrganization: data.currentOrganization,
         organizations: data.organizations || [],
+        membership: data.membership || null,
         isLoading: false,
       });
     } catch (error) {
       console.error("Failed to fetch user:", error);
-      set({ user: null, currentOrganization: null, organizations: [], isLoading: false });
+      set({ user: null, currentOrganization: null, organizations: [], membership: null, isLoading: false });
     }
   },
 
@@ -91,7 +101,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         url: "/auth/logout",
         method: "POST",
       });
-      set({ user: null, currentOrganization: null, organizations: [] });
+      set({ user: null, currentOrganization: null, organizations: [], membership: null });
       window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);

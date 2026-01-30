@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-01-28T17:55:11.380Z",
+  "trigger": "auto",
+  "active_modes": {
+    "autopilot": {
+      "phase": "execution",
+      "originalIdea": ""
+    },
+    "ultrawork": {
+      "original_prompt": "현재 누바벨 사용성이 너무 안좋아서, 전반적인 사용성 부분에서 거의 카피 수준으로 다가져와야할것같아. 너의 페이즈에 맞게 그리고, 나의 의도에 맞게 플래닝하고 그거에 맞게 끝까지실행 ㄱㄱ해. 테스트할땐 브라우저 켜서 테스트하고 크롬은 무조건 기존 프로파일 쓰도록해. ralplan ralph ulw"
+    }
+  },
+  "todo_summary": {
+    "pending": 0,
+    "in_progress": 0,
+    "completed": 0
+  },
+  "wisdom_exported": true
+}

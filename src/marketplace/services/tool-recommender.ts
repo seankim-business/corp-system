@@ -69,36 +69,30 @@ interface ScoredItem {
 /**
  * Tool Recommender Service
  *
- * Analyzes user requests and recommends relevant tools from external sources.
- * Uses AI to understand intent and rank results by relevance.
- *
- * @class ToolRecommender
- *
- * @example
- * const recommender = new ToolRecommender([smitherySource, mcpRegistrySource], aiProvider);
- * const recommendations = await recommender.recommendTools(
- *   "I need to integrate with Slack",
- *   { orgId: "org-123", installedTools: ["smithery:@anthropic/slack-mcp"] }
- * );
+ * Main service for analyzing user requests and recommending tools from external marketplaces.
  */
 export class ToolRecommender {
-  private readonly sources: BaseExternalSource[];
-  private readonly aiProvider?: AIProvider;
+  private sources: BaseExternalSource[];
+  private aiProvider: AnthropicProvider;
 
   /**
-   * Create a new ToolRecommender
-   *
-   * @param {BaseExternalSource[]} sources - External sources to search
-   * @param {AIProvider} [aiProvider] - Optional AI provider for request analysis
+   * Create a new ToolRecommender instance
+   * @param sourceConfig Optional API keys for external sources
+   * @param anthropicApiKey Anthropic API key for AI analysis (defaults to env var)
    */
-  constructor(sources: BaseExternalSource[], aiProvider?: AIProvider) {
-    this.sources = sources;
-    this.aiProvider = aiProvider;
+  constructor(sourceConfig?: SourceConfig, anthropicApiKey?: string) {
+    // Initialize all external sources
+    this.sources = createAllSources(sourceConfig);
+
+    // Initialize Anthropic provider for AI analysis
+    const apiKey = anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error("ANTHROPIC_API_KEY is required for ToolRecommender");
+    }
+    this.aiProvider = new AnthropicProvider({ apiKey });
 
     logger.info("ToolRecommender initialized", {
-      sourceCount: sources.length,
-      sources: sources.map((s) => s.sourceId),
-      hasAI: !!aiProvider,
+      sources: this.sources.map((s) => s.sourceId),
     });
   }
 

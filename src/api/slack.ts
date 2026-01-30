@@ -222,16 +222,17 @@ async function handleFeedbackAction(
     const channelId = (body.container as any)?.channel_id;
     const messageTs = body.message?.ts;
 
-    // Capture the feedback
+    // Capture the feedback - use "rating" type for button feedback
     await captureFeedback({
       organizationId: organization.id,
-      userId: nubabelUser?.id,
+      userId: nubabelUser?.id || "anonymous",
       executionId: undefined, // We don't have direct execution link from button
       slackWorkspaceId: workspaceId,
-      slackChannelId: channelId,
-      slackMessageTs: messageTs,
-      feedbackType: "button",
+      slackChannelId: channelId || "",
+      slackMessageTs: messageTs || "",
+      feedbackType: "rating",  // Use rating for button-based feedback
       reaction: sentiment === "positive" ? "thumbsup" : "thumbsdown",
+      originalMessage: body.message?.text || "",  // Required field
       metadata: {
         sentiment,
         eventId: messageId,
