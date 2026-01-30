@@ -54,7 +54,7 @@ type AgentWithCount = {
   managerId: string | null;
   organizationId: string;
   _count: {
-    agentSkills: number;
+    skillAssignments: number;
   };
 };
 
@@ -118,7 +118,7 @@ async function getReportingChain(agentId: string, organizationId: string): Promi
         organizationId: true,
         _count: {
           select: {
-            agentSkills: true,
+            skillAssignments: true,
           },
         },
       },
@@ -133,7 +133,7 @@ async function getReportingChain(agentId: string, organizationId: string): Promi
       type: agentResult.type,
       managerId: agentResult.managerId,
       organizationId: agentResult.organizationId,
-      skillsCount: agentResult._count.agentSkills,
+      skillsCount: agentResult._count.skillAssignments,
     });
 
     currentId = agentResult.managerId;
@@ -189,7 +189,7 @@ router.get(
           organizationId: true,
           _count: {
             select: {
-              agentSkills: true,
+              skillAssignments: true,
             },
           },
         },
@@ -203,7 +203,7 @@ router.get(
         type: agent.type,
         managerId: agent.managerId,
         organizationId: agent.organizationId,
-        skillsCount: agent._count.agentSkills,
+        skillsCount: agent._count.skillAssignments,
       }));
 
       const tree = buildHierarchyTree(agentBasics);
@@ -257,7 +257,7 @@ router.get(
           organizationId: true,
           _count: {
             select: {
-              agentSkills: true,
+              skillAssignments: true,
             },
           },
         },
@@ -271,7 +271,7 @@ router.get(
         type: sub.type,
         managerId: sub.managerId,
         organizationId: sub.organizationId,
-        skillsCount: sub._count.agentSkills,
+        skillsCount: sub._count.skillAssignments,
       }));
 
       return res.json({
@@ -387,7 +387,7 @@ router.put(
           organizationId: true,
           _count: {
             select: {
-              agentSkills: true,
+              skillAssignments: true,
             },
           },
         },
@@ -408,7 +408,7 @@ router.put(
           type: updatedAgent.type,
           managerId: updatedAgent.managerId,
           organizationId: updatedAgent.organizationId,
-          skillsCount: updatedAgent._count.agentSkills,
+          skillsCount: updatedAgent._count.skillAssignments,
         },
       });
     } catch (error) {

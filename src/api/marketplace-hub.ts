@@ -17,6 +17,13 @@ import type {
   ExternalSourceItem,
   SearchOptions,
 } from "../marketplace/services/sources/external/types";
+import { ToolRecommender } from "../marketplace/services/tool-recommender";
+import { InstallationExecutor } from "../marketplace/services/installation-executor";
+import {
+  InstallationPolicyChecker,
+  getDefaultPolicy,
+} from "../marketplace/types/installation-modes";
+import { marketplaceAnalytics } from "../marketplace/services/marketplace-analytics";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -119,11 +126,13 @@ router.get("/sources", requireAuth, (_req: Request, res: Response) => {
  */
 router.get("/search", requireAuth, (req: Request, res: Response) => {
   void (async () => {
+    const startTime = Date.now();
     try {
       const query = typeof req.query.q === "string" ? req.query.q : "";
       const sourcesParam = typeof req.query.sources === "string" ? req.query.sources : "all";
       const type = typeof req.query.type === "string" ? req.query.type : undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const orgId = getOrgId(req);
 
       if (!query) {
         res.status(400).json({
@@ -205,10 +214,22 @@ router.get("/search", requireAuth, (req: Request, res: Response) => {
         sourcesSearched.push(result.sourceId);
       }
 
+      const latencyMs = Date.now() - startTime;
+
+      // Record search analytics
+      await marketplaceAnalytics.recordSearch({
+        orgId,
+        query,
+        sources: sourcesSearched,
+        latencyMs,
+        resultsCount: allItems.length,
+      });
+
       logger.info("Marketplace hub search completed", {
         query,
         sources: sourcesSearched,
         totalResults: allItems.length,
+        latencyMs,
       });
 
       res.json({
@@ -314,9 +335,17 @@ router.get("/item/:source/:itemId", requireAuth, (req: Request, res: Response) =
  */
 router.post("/install", requireAuth, (req: Request, res: Response) => {
   void (async () => {
+    let installSuccess = false;
+    let sourceId: string | undefined;
+    let itemId: string | undefined;
+    let itemName: string | undefined;
+    let orgId: string | undefined;
+
     try {
-      const { source: sourceId, itemId, config } = req.body;
-      const orgId = getOrgId(req);
+      const { source, itemId: itemIdParam, config } = req.body;
+      sourceId = source;
+      itemId = itemIdParam;
+      orgId = getOrgId(req);
       const userId = req.user?.id;
 
       if (!userId) {
@@ -340,9 +369,9 @@ router.post("/install", requireAuth, (req: Request, res: Response) => {
       }
 
       const sourcesMap = getSources();
-      const source = sourcesMap.get(sourceId);
+      const sourceInstance = sourcesMap.get(sourceId);
 
-      if (!source) {
+      if (!sourceInstance) {
         res.status(404).json({
           error: {
             code: "SOURCE_NOT_FOUND",
@@ -353,7 +382,7 @@ router.post("/install", requireAuth, (req: Request, res: Response) => {
       }
 
       // Get item details
-      const item = await source.getById(itemId);
+      const item = await sourceInstance.getById(itemId);
 
       if (!item) {
         res.status(404).json({
@@ -365,67 +394,40 @@ router.post("/install", requireAuth, (req: Request, res: Response) => {
         return;
       }
 
-      // Create marketplace extension record
-      const extension = await prisma.marketplaceExtension.create({
-        data: {
-          organizationId: orgId,
-          slug: `${sourceId}-${itemId}`.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-          name: item.name,
-          description: item.description,
-          version: item.version || "1.0.0",
-          extensionType: item.type,
-          category: item.tags?.[0] || "general",
-          tags: item.tags || [],
-          source: sourceId,
-          format: "external",
-          manifest: JSON.parse(
-            JSON.stringify({
-              externalSource: sourceId,
-              externalId: itemId,
-              installMethod: item.installMethod,
-              installConfig: item.installConfig,
-              rawData: item.rawData,
-            }),
-          ),
-          isPublic: false,
-          verified: false,
-          status: "published",
-          enabled: true,
-          createdBy: userId,
-        },
-      });
+      itemName = item.name;
 
-      // Create installation record
-      const installation = await prisma.extensionInstallation.create({
-        data: {
-          organizationId: orgId,
-          extensionId: extension.id,
-          version: extension.version,
-          installedBy: userId,
-          status: "active",
-          autoUpdate: true,
-          configOverrides: config ? JSON.parse(JSON.stringify(config)) : null,
-        },
-      });
+      // Check installation policy
+      const policyChecker = new InstallationPolicyChecker();
+      const policy = getDefaultPolicy();
+      const decision = policyChecker.canInstall(policy, sourceId);
 
-      // Generate installation instructions
-      const instructions = source.getInstallInstructions(item);
+      if (!decision.allowed) {
+        res.status(403).json({
+          error: {
+            code: "INSTALLATION_BLOCKED",
+            message: `Installation from source '${sourceId}' is not allowed by organization policy`,
+          },
+        });
+        return;
+      }
 
-      logger.info("External item installed", {
+      // Use InstallationExecutor
+      const executor = new InstallationExecutor();
+      const result = await executor.install(item, orgId, userId, config);
+
+      installSuccess = true;
+
+      logger.info("External item installed via executor", {
         sourceId,
         itemId,
-        extensionId: extension.id,
+        extensionId: result.extensionId,
         orgId,
         userId,
       });
 
       res.status(201).json({
         success: true,
-        data: {
-          extensionId: extension.id,
-          installationId: installation.id,
-          instructions,
-        },
+        data: result,
       });
     } catch (error) {
       logger.error(
@@ -442,6 +444,18 @@ router.post("/install", requireAuth, (req: Request, res: Response) => {
           message: "Failed to install item",
         },
       });
+    } finally {
+      // Record installation analytics
+      if (orgId && sourceId && itemId && itemName) {
+        await marketplaceAnalytics.recordInstallation({
+          orgId,
+          source: sourceId,
+          itemId,
+          itemName,
+          mode: "manual",
+          success: installSuccess,
+        });
+      }
     }
   })();
 });
@@ -520,6 +534,7 @@ router.post("/recommend", requireAuth, (req: Request, res: Response) => {
   void (async () => {
     try {
       const { request, context } = req.body;
+      const orgId = getOrgId(req);
 
       if (!request) {
         res.status(400).json({
@@ -531,17 +546,52 @@ router.post("/recommend", requireAuth, (req: Request, res: Response) => {
         return;
       }
 
-      // NOTE: AI-powered recommendation system - requires ML model training on usage patterns
-      logger.info("Tool recommendation requested", {
+      // Get installed tools for the organization
+      const installations = await prisma.extensionInstallation.findMany({
+        where: {
+          organizationId: orgId,
+          status: "active",
+        },
+        include: {
+          extension: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              extensionType: true,
+              source: true,
+            },
+          },
+        },
+      });
+
+      const installedTools = installations.map((inst) => inst.extension.id);
+
+      // Create ToolRecommender with API keys
+      const recommender = new ToolRecommender({
+        smitheryApiKey: process.env.SMITHERY_API_KEY,
+        civitaiApiKey: process.env.CIVITAI_API_KEY,
+        langchainApiKey: process.env.LANGCHAIN_API_KEY,
+      }, process.env.ANTHROPIC_API_KEY);
+
+      // Get recommendations
+      const recommendations = await recommender.recommendTools(request, {
+        orgId,
+        installedTools,
+        userPreferences: context,
+      });
+
+      logger.info("Tool recommendations generated", {
         request,
+        orgId,
+        count: recommendations.length,
         hasContext: !!context,
       });
 
       res.json({
         success: true,
         data: {
-          recommendations: [],
-          message: "AI-powered recommendations coming soon",
+          recommendations,
         },
       });
     } catch (error) {
@@ -614,6 +664,114 @@ router.get("/installed", requireAuth, (req: Request, res: Response) => {
         error: {
           code: "LIST_INSTALLED_FAILED",
           message: "Failed to list installed extensions",
+        },
+      });
+    }
+  })();
+});
+
+/**
+ * GET /api/marketplace-hub/settings
+ * Get organization marketplace settings
+ */
+router.get("/settings", requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const orgId = getOrgId(req);
+
+      let settings = await prisma.organizationMarketplaceSettings.findUnique({
+        where: { organizationId: orgId },
+      });
+
+      // Create default settings if not exists
+      if (!settings) {
+        const defaultPolicy = getDefaultPolicy();
+        settings = await prisma.organizationMarketplaceSettings.create({
+          data: {
+            organizationId: orgId,
+            installationMode: defaultPolicy.mode,
+            allowedSources: defaultPolicy.allowedSources || [],
+            blockedSources: defaultPolicy.blockedSources || [],
+            maxAutoInstalls: defaultPolicy.maxAutoInstalls || 5,
+            requireReview: defaultPolicy.requireReview || false,
+          },
+        });
+      }
+
+      logger.info("Marketplace settings retrieved", { orgId });
+
+      res.json({
+        success: true,
+        data: settings,
+      });
+    } catch (error) {
+      logger.error("Failed to get marketplace settings", {}, error as Error);
+      res.status(500).json({
+        error: {
+          code: "GET_SETTINGS_FAILED",
+          message: "Failed to get marketplace settings",
+        },
+      });
+    }
+  })();
+});
+
+/**
+ * PUT /api/marketplace-hub/settings
+ * Update organization marketplace settings
+ *
+ * Body:
+ * - installationMode: Installation mode (manual/recommend/yolo)
+ * - allowedSources: Array of allowed source IDs (empty = all allowed)
+ * - blockedSources: Array of blocked source IDs
+ */
+router.put("/settings", requireAuth, (req: Request, res: Response) => {
+  void (async () => {
+    try {
+      const orgId = getOrgId(req);
+      const { installationMode, allowedSources, blockedSources } = req.body;
+
+      // Validate installation mode if provided
+      if (
+        installationMode &&
+        !["manual", "recommend", "yolo"].includes(installationMode)
+      ) {
+        res.status(400).json({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Invalid installation mode. Must be manual, recommend, or yolo",
+          },
+        });
+        return;
+      }
+
+      const settings = await prisma.organizationMarketplaceSettings.upsert({
+        where: { organizationId: orgId },
+        create: {
+          organizationId: orgId,
+          installationMode: installationMode || "recommend",
+          allowedSources: allowedSources || [],
+          blockedSources: blockedSources || [],
+        },
+        update: {
+          ...(installationMode && { installationMode }),
+          ...(allowedSources !== undefined && { allowedSources }),
+          ...(blockedSources !== undefined && { blockedSources }),
+        },
+      });
+
+      logger.info("Marketplace settings updated", { orgId, installationMode });
+
+      res.json({
+        success: true,
+        data: settings,
+      });
+    } catch (error) {
+      logger.error("Failed to update marketplace settings", {}, error as Error);
+      res.status(500).json({
+        error: {
+          code: "UPDATE_SETTINGS_FAILED",
+          message: "Failed to update marketplace settings",
         },
       });
     }

@@ -8,6 +8,7 @@ import { deadLetterQueue } from "./dead-letter.queue";
 import { scheduledTaskQueue } from "./scheduled-task.queue";
 import { webhookQueue } from "./webhook.queue";
 import { ragIndexingQueue } from "./rag-indexing.queue";
+import { installationQueue } from "./installation.queue";
 
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/admin/queues");
@@ -21,6 +22,7 @@ createBullBoard({
     new BullMQAdapter(scheduledTaskQueue.getQueue()),
     new BullMQAdapter(webhookQueue.getQueue()),
     new BullMQAdapter(ragIndexingQueue.getQueue()),
+    new BullMQAdapter(installationQueue.getQueue()),
   ],
   serverAdapter,
 });

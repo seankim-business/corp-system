@@ -45,6 +45,7 @@ import SOPEditorPage from "./pages/SOPEditorPage";
 import SystemHealthPage from "./pages/SystemHealthPage";
 import AgentOptimizationPage from "./pages/AgentOptimizationPage";
 import ClaudeMaxAccountsPage from "./pages/ClaudeMaxAccountsPage";
+import ClaudeConnectPage from "./pages/ClaudeConnectPage";
 import N8nWorkflowsPage from "./pages/N8nWorkflowsPage";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -471,6 +472,14 @@ function App() {
               <DashboardLayout>
                 <N8nWorkflowsPage />
               </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/claude-connect"
+          element={
+            <ProtectedRoute>
+              <ClaudeConnectPage />
             </ProtectedRoute>
           }
         />

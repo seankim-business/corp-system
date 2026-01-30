@@ -8,6 +8,7 @@ export interface NotificationData {
   organizationId: string;
   userId: string;
   eventId: string;
+  agentType?: string; // Optional agent type for dynamic identity (e.g., "notion", "analyzing", "executing")
 }
 
 export class NotificationQueue extends BaseQueue<NotificationData> {

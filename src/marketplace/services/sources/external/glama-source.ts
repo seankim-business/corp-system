@@ -11,39 +11,38 @@ import type { ExtensionType } from "@prisma/client";
 import { BaseExternalSource, ExternalSourceItem, SearchOptions, SearchResult } from "./types";
 
 /**
- * Glama API response for server listing
- *
- * @interface GlamaServer
+ * Glama API v1 server structure
  */
 interface GlamaServer {
-  id?: string;
+  id: string;
   name: string;
+  namespace?: string;
+  slug?: string;
   description?: string;
-  version?: string;
-  author?: string;
-  repository?: string;
-  homepage?: string;
-  license?: string;
-  tags?: string[];
-  downloads?: number;
-  stars?: number;
-  rating?: number;
-  installUrl?: string;
-  installCommand?: string;
-  [key: string]: unknown;
+  repository?: {
+    url?: string;
+  };
+  spdxLicense?: {
+    name?: string;
+    url?: string;
+  };
+  url?: string;
+  attributes?: string[];
+  environmentVariablesJsonSchema?: Record<string, unknown>;
+  tools?: unknown[];
 }
 
 /**
- * Glama API response structure
- *
- * @interface GlamaApiResponse
+ * Glama API v1 response structure
  */
 interface GlamaApiResponse {
-  servers?: GlamaServer[];
-  items?: GlamaServer[];
-  results?: GlamaServer[];
-  data?: GlamaServer[];
-  [key: string]: unknown;
+  servers: GlamaServer[];
+  pageInfo?: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    startCursor?: string;
+    endCursor?: string;
+  };
 }
 
 /**
@@ -69,8 +68,8 @@ export class GlamaSource extends BaseExternalSource {
   readonly supportedTypes: ExtensionType[] = ["mcp_server"];
 
   private readonly baseUrl = "https://glama.ai";
-  private readonly apiEndpoint = `${this.baseUrl}/api/mcp/servers`;
-  private readonly requestTimeout = 5000; // 5 seconds
+  private readonly apiEndpoint = `${this.baseUrl}/api/mcp/v1/servers`;
+  private readonly requestTimeout = 10000; // 10 seconds
 
   /**
    * Search for MCP servers in Glama
@@ -125,7 +124,7 @@ export class GlamaSource extends BaseExternalSource {
       }
 
       const data = (await response.json()) as GlamaApiResponse;
-      const servers = this.extractServers(data);
+      const servers = data.servers || [];
 
       // Map Glama servers to ExternalSourceItem format
       const items = servers.map((server) => this.mapToExternalItem(server));
@@ -133,7 +132,7 @@ export class GlamaSource extends BaseExternalSource {
       return {
         items,
         total: items.length,
-        hasMore: items.length >= limit,
+        hasMore: data.pageInfo?.hasNextPage ?? items.length >= limit,
       };
     } catch (error) {
       // Log error but don't throw - graceful degradation
@@ -198,49 +197,10 @@ export class GlamaSource extends BaseExternalSource {
   }
 
   /**
-   * Extract servers array from various possible API response formats
-   *
-   * Glama API response structure may vary, so we check multiple possible
-   * locations for the servers array.
-   *
-   * @private
-   * @param {GlamaApiResponse} data - API response data
-   * @returns {GlamaServer[]} Array of servers
-   */
-  private extractServers(data: GlamaApiResponse): GlamaServer[] {
-    // Try multiple possible response structures
-    if (Array.isArray(data.servers)) {
-      return data.servers;
-    }
-    if (Array.isArray(data.items)) {
-      return data.items;
-    }
-    if (Array.isArray(data.results)) {
-      return data.results;
-    }
-    if (Array.isArray(data.data)) {
-      return data.data;
-    }
-    if (Array.isArray(data)) {
-      return data as GlamaServer[];
-    }
-
-    return [];
-  }
-
-  /**
    * Map a Glama server to ExternalSourceItem format
-   *
-   * Converts Glama API response to the universal ExternalSourceItem format
-   * used by the Marketplace Hub.
-   *
-   * @private
-   * @param {GlamaServer} server - Glama server data
-   * @param {string} [overrideId] - Optional ID override
-   * @returns {ExternalSourceItem} Mapped item
    */
   private mapToExternalItem(server: GlamaServer, overrideId?: string): ExternalSourceItem {
-    const id = overrideId || server.id || server.name.toLowerCase().replace(/\s+/g, "-");
+    const id = overrideId || server.id;
 
     return {
       id: `glama:${id}`,
@@ -248,15 +208,11 @@ export class GlamaSource extends BaseExternalSource {
       type: "mcp_server",
       name: server.name,
       description: server.description || "MCP Server from Glama",
-      version: server.version,
-      author: server.author,
-      repository: server.repository,
-      homepage: server.homepage,
-      license: server.license,
-      tags: server.tags || [],
-      downloads: server.downloads,
-      stars: server.stars,
-      rating: server.rating,
+      author: server.namespace,
+      repository: server.repository?.url,
+      homepage: server.url,
+      license: server.spdxLicense?.name,
+      tags: server.attributes || [],
       installMethod: this.inferInstallMethod(server),
       installConfig: this.buildInstallConfig(server),
       rawData: server,
@@ -265,27 +221,18 @@ export class GlamaSource extends BaseExternalSource {
 
   /**
    * Infer the installation method from server metadata
-   *
-   * Determines the most appropriate installation method based on available
-   * server information.
-   *
-   * @private
-   * @param {GlamaServer} server - Server data
-   * @returns {InstallMethod} Installation method
    */
   private inferInstallMethod(server: GlamaServer): "npx" | "http" | "git" | "manual" {
-    // If there's an install command, assume npx
-    if (server.installCommand) {
-      return "npx";
-    }
+    // Check if remote-capable
+    const isRemoteCapable = server.attributes?.includes("hosting:remote-capable");
 
-    // If there's a repository, assume git
-    if (server.repository) {
+    // If there's a repository, prefer git install
+    if (server.repository?.url) {
       return "git";
     }
 
-    // If there's an install URL, assume http (remote server)
-    if (server.installUrl) {
+    // If remote-capable, could use http
+    if (isRemoteCapable) {
       return "http";
     }
 
@@ -295,31 +242,20 @@ export class GlamaSource extends BaseExternalSource {
 
   /**
    * Build installation configuration from server metadata
-   *
-   * Creates the InstallConfig object with appropriate command, URL, or
-   * other installation details.
-   *
-   * @private
-   * @param {GlamaServer} server - Server data
-   * @returns {InstallConfig} Installation configuration
    */
-  private buildInstallConfig(server: GlamaServer) {
+  private buildInstallConfig(server: GlamaServer): Record<string, unknown> {
     const config: Record<string, unknown> = {};
 
-    if (server.installCommand) {
-      config.command = server.installCommand;
+    if (server.repository?.url) {
+      config.url = server.repository.url;
     }
 
-    if (server.repository) {
-      config.url = server.repository;
+    if (server.url) {
+      config.homepage = server.url;
     }
 
-    if (server.installUrl) {
-      config.url = server.installUrl;
-    }
-
-    if (server.homepage) {
-      config.url = config.url || server.homepage;
+    if (server.environmentVariablesJsonSchema) {
+      config.envSchema = server.environmentVariablesJsonSchema;
     }
 
     return config;

@@ -8,3 +8,4 @@ export * from "./scheduled-task.queue";
 export * from "./rag-indexing.queue";
 export * from "./n8n-sync.queue";
 export * from "./n8n-generation.queue";
+export * from "./installation.queue";

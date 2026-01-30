@@ -118,6 +118,7 @@ import { logger } from "./utils/logger";
 import { calculateSLI, createMetricsRouter, getMcpCacheStats } from "./services/metrics";
 import { adminRouter } from "./admin";
 import { claudeMaxAccountsRouter } from "./api/claude-max-accounts";
+import { claudeConnectRouter, claudeConnectPublicRouter } from "./api/claude-connect";
 // NOTE: accounts.routes.ts removed - functionality migrated to user.routes.ts
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
@@ -557,6 +558,9 @@ app.use("/api", webhookRateLimiter, notionWebhooksRouter);
 // app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, agentAdminRoutes);
 app.use("/api/admin", apiRateLimiter, authenticate, sentryUserContext, adminRouter);
 app.use("/api", apiRateLimiter, authenticate, sentryUserContext, claudeMaxAccountsRouter);
+app.use("/api", apiRateLimiter, authenticate, sentryUserContext, claudeConnectRouter);
+// Public endpoint for receiving tokens from claude.ai (no auth required)
+app.use("/api", webhookRateLimiter, claudeConnectPublicRouter);
 // app.use("/api/admin/accounts", apiRateLimiter, authenticate, sentryUserContext, accountsRouter);
 // app.use("/api", apiRateLimiter, authenticate, sentryUserContext, costsRoutes);
 // app.use("/api/optimization", apiRateLimiter, authenticate, sentryUserContext, optimizationRoutes);

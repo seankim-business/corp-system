@@ -10,6 +10,7 @@ import { emitOrgEvent } from "../services/sse-service";
 import { emitJobProgress, PROGRESS_STAGES, PROGRESS_PERCENTAGES } from "../events/job-progress";
 import { runWithContext } from "../utils/async-context";
 import { getSlackProgressService } from "../services/slack-progress.service";
+import { slackStatusUpdater } from "../services/slack-status-updater";
 
 export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
   constructor() {
@@ -51,6 +52,17 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
       sessionId,
     });
 
+    // Store Slack context and update status
+    if (eventId && slackChannel && slackThreadTs) {
+      await slackStatusUpdater.storeContext(eventId, {
+        channelId: slackChannel,
+        threadTs: slackThreadTs,
+        organizationId,
+        locale: "en",
+      });
+      await slackStatusUpdater.updateStageStatus(eventId, "analyzing");
+    }
+
     // Update Slack progress message
     if (slackChannel && slackThreadTs) {
       await getSlackProgressService().updateProgress({
@@ -83,6 +95,11 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         },
       );
 
+      // Update Slack status
+      if (eventId) {
+        await slackStatusUpdater.updateStageStatus(eventId, "selectingApproach");
+      }
+
       // Update Slack progress message
       if (slackChannel && slackThreadTs) {
         await getSlackProgressService().updateProgress({
@@ -114,6 +131,11 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
           skills: result.metadata.skills,
         },
       );
+
+      // Update Slack status
+      if (eventId) {
+        await slackStatusUpdater.updateStageStatus(eventId, "processing");
+      }
 
       // Update Slack progress message
       if (slackChannel && slackThreadTs) {
@@ -153,6 +175,11 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         },
       );
 
+      // Update Slack status
+      if (eventId) {
+        await slackStatusUpdater.updateStageStatus(eventId, "generating");
+      }
+
       // Update Slack progress message
       if (slackChannel && slackThreadTs) {
         await getSlackProgressService().updateProgress({
@@ -187,6 +214,11 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         },
       );
 
+      // Clear Slack status on completion
+      if (eventId) {
+        await slackStatusUpdater.clearStatus(eventId);
+      }
+
       // Update Slack progress message
       if (slackChannel && slackThreadTs) {
         await getSlackProgressService().updateProgress({
@@ -212,6 +244,11 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         eventId,
         error: error.message,
       });
+
+      // Clear Slack status on failure
+      if (eventId) {
+        await slackStatusUpdater.clearStatus(eventId);
+      }
 
       // Update Slack progress message with failure
       if (slackChannel && slackThreadTs) {

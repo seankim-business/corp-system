@@ -21,6 +21,7 @@ import {
 } from "./slack-feature-requests";
 import { setProcessingIndicator } from "../utils/slack-agent-status";
 import { createFeedbackReceivedBlock } from "../utils/slack-feedback-blocks";
+import { slackStatusUpdater } from "../services/slack-status-updater";
 
 let slackApp: App | null = null;
 
@@ -428,6 +429,14 @@ function setupEventHandlers(app: App): void {
 
       const eventId = randomUUID();
 
+      // Store Slack context for dynamic status updates
+      await slackStatusUpdater.storeContext(eventId, {
+        channelId: channel,
+        threadTs: thread_ts || ts,
+        organizationId: organization.id,
+        locale: "en",
+      });
+
       // Collect thread context for AI (OpenClaw-style context awareness)
       let threadContextPrompt: string | undefined;
       try {
@@ -567,6 +576,14 @@ function setupEventHandlers(app: App): void {
         }
 
         const eventId = randomUUID();
+
+        // Store Slack context for dynamic status updates
+        await slackStatusUpdater.storeContext(eventId, {
+          channelId: msg.channel,
+          threadTs: msg.ts,
+          organizationId: organization.id,
+          locale: "en",
+        });
 
         // Collect context for DMs (recent messages in conversation)
         let threadContextPrompt: string | undefined;

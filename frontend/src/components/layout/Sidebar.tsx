@@ -44,6 +44,7 @@ const knowledgeNavItems: NavItem[] = [
 
 const marketplaceNavItems: NavItem[] = [
   { name: "Marketplace", path: "/marketplace", icon: "🏪" },
+  { name: "External Tools", path: "/marketplace-hub", icon: "🔌" },
   { name: "Developer Portal", path: "/developer", icon: "👨‍💻" },
 ];
 

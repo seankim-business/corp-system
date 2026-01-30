@@ -17,6 +17,7 @@ import {
   getAccessTokenFromConfig,
 } from "../services/mcp-registry";
 import { applyPatternContext } from "../services/pattern-optimizer";
+import { slackStatusUpdater } from "../services/slack-status-updater";
 
 export interface AIExecutionParams {
   category: Category;
@@ -29,6 +30,7 @@ export interface AIExecutionParams {
   selectedAccount?: ClaudeAccount;
   agentType?: string; // Agent type for pattern retrieval
   enablePatternOptimization?: boolean; // Enable/disable pattern application
+  eventId?: string; // For Slack status updates
 }
 
 export interface AIExecutionResult {
@@ -675,6 +677,7 @@ async function executeToolCall(
     userId: string;
     sessionId: string;
     connections?: MCPConnection[];
+    eventId?: string;
   },
 ): Promise<{ success: boolean; result: unknown; error?: string }> {
   const startTime = Date.now();
@@ -1109,6 +1112,17 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
                   iteration,
                 });
 
+                // Update Slack status for MCP tool execution
+                if (params.eventId) {
+                  const parsed = parseNamespacedToolName(toolUse.name);
+                  if (parsed.namespace) {
+                    // Find provider from connection or infer from namespace
+                    const conn = orgConnections.find(c => c.namespace === parsed.namespace);
+                    const provider = conn?.provider || parsed.namespace;
+                    await slackStatusUpdater.updateMcpToolStatus(params.eventId, provider, parsed.localName);
+                  }
+                }
+
                 const execResult = await executeToolCall(
                   toolUse.name,
                   toolUse.input as Record<string, unknown>,
@@ -1117,6 +1131,7 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
                     userId: params.userId,
                     sessionId: params.sessionId,
                     connections: orgConnections,
+                    eventId: params.eventId,
                   },
                 );
 

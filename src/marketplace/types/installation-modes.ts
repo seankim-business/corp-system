@@ -139,7 +139,7 @@ export class InstallationPolicyChecker {
   canInstall(
     policy: InstallationPolicy,
     source: string,
-    _mode: InstallationMode
+    _mode?: InstallationMode
   ): InstallationDecision {
     // Check blocklist first (blocklist takes precedence)
     if (policy.blockedSources?.some(blocked => this.matchesSource(source, blocked))) {

@@ -361,7 +361,7 @@ export class ARIntegrationService {
           moduleId: change.moduleId,
           ...change.details,
         },
-        impactScope: approvalRequest.impactScope === "organization" ? "org" : approvalRequest.impactScope,
+        impactScope: (approvalRequest.impactScope === "organization" ? "org" : approvalRequest.impactScope) as "individual" | "team" | "department" | "org",
         estimatedValue: approvalRequest.estimatedCost,
         requesterType: "agent",
         requesterId: "mega-app-evolution-service",

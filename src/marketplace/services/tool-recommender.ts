@@ -97,394 +97,352 @@ export class ToolRecommender {
   }
 
   /**
-   * Recommend tools based on user request
+   * Analyze a user request and recommend relevant tools
    *
-   * Flow:
-   * 1. Analyze request with AI to extract search terms and preferred types
-   * 2. Search across all sources in parallel
-   * 3. Filter out already installed tools
-   * 4. Rank results by relevance
-   * 5. Return top 5 recommendations with reasons
-   *
-   * @param {string} request - User's natural language request
-   * @param {RecommendationContext} context - Context for filtering and personalization
-   * @returns {Promise<ToolRecommendation[]>} Top 5 recommendations
-   *
-   * @example
-   * const recommendations = await recommender.recommendTools(
-   *   "I need to integrate with Slack and send messages",
-   *   { orgId: "org-123", installedTools: [] }
-   * );
+   * @param request Natural language description of what the user needs
+   * @param context Additional context for filtering and personalization
+   * @returns Array of tool recommendations sorted by relevance
    */
   async recommendTools(
     request: string,
     context: RecommendationContext,
   ): Promise<ToolRecommendation[]> {
-    logger.info("Starting tool recommendation", {
-      request,
-      orgId: context.orgId,
-      installedCount: context.installedTools?.length || 0,
-    });
+    logger.info("Starting tool recommendation", { request, orgId: context.orgId });
 
-    try {
-      const analysis = await this.analyzeRequest(request);
-      logger.debug("Request analysis completed", analysis);
-      const searchPromises = this.sources.map(async (source) => {
-        try {
-          const result = await source.search({
-            query: analysis.searchQuery,
-            limit: 20,
-          });
-          logger.debug("Source search completed", {
-            source: source.sourceId,
-            found: result.items.length,
-          });
-          return result.items;
-        } catch (error) {
-          logger.error("Source search failed", {
-            source: source.sourceId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          return [];
-        }
-      });
+    // Step 1: Analyze request with AI to extract structured information
+    const analysis = await this.analyzeRequest(request);
+    logger.debug("Request analysis complete", analysis);
 
-      const searchResults = await Promise.all(searchPromises);
-      const allItems = searchResults.flat();
+    // Step 2: Search across all sources in parallel
+    const allItems = await this.searchAllSources(analysis);
+    logger.debug(`Found ${allItems.length} items across all sources`);
 
-      logger.info("All sources searched", {
-        totalItems: allItems.length,
-        sourceResults: searchResults.map((items, i) => ({
-          source: this.sources[i].sourceId,
-          count: items.length,
-        })),
-      });
+    // Step 3: Filter out already installed tools
+    const filteredItems = this.filterInstalledTools(allItems, context.installedTools);
+    logger.debug(`${filteredItems.length} items after filtering installed tools`);
 
-      const installedSet = new Set(context.installedTools || []);
-      const uninstalledItems = allItems.filter((item) => !installedSet.has(item.id));
+    // Step 4: Rank and score items based on relevance
+    const scoredItems = this.rankItems(filteredItems, analysis);
 
-      logger.debug("Filtered installed tools", {
-        before: allItems.length,
-        after: uninstalledItems.length,
-        filtered: allItems.length - uninstalledItems.length,
-      });
+    // Step 5: Convert top scored items to recommendations
+    const recommendations = this.createRecommendations(scoredItems, analysis);
 
-      const rankedItems = this.rankItems(uninstalledItems, analysis, request);
-      const topRecommendations = rankedItems.slice(0, 5).map((item, index) => ({
-        item,
-        reason: this.generateReason(item, analysis, request),
-        confidence: this.calculateConfidence(item, analysis, request),
-        priority: index + 1,
-      }));
-
-      logger.info("Recommendations generated", {
-        total: topRecommendations.length,
-        topItem: topRecommendations[0]?.item.name,
-      });
-
-      return topRecommendations;
-    } catch (error) {
-      logger.error("Tool recommendation failed", {
-        request,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
+    logger.info(`Generated ${recommendations.length} recommendations`);
+    return recommendations;
   }
 
   /**
-   * Analyze user request to extract search parameters
+   * Analyze user request using AI to extract structured information
    *
-   * Uses AI if available, otherwise falls back to simple keyword extraction.
-   *
-   * @param {string} request - User's natural language request
-   * @returns {Promise<RequestAnalysis>} Analysis results
-   *
-   * @example
-   * const analysis = await recommender.analyzeRequest("I need to integrate with Slack");
-   * // Returns: { searchQuery: "slack integration", preferredType: "mcp_server", ... }
-   */
-  async analyzeRequest(request: string): Promise<RequestAnalysis> {
-    if (this.aiProvider) {
-      return this.analyzeWithAI(request);
-    } else {
-      return this.analyzeWithKeywords(request);
-    }
-  }
-
-  /**
-   * Analyze request using AI
+   * Uses Claude to understand what the user is asking for and extract:
+   * - Search terms to use
+   * - Preferred tool type
+   * - Specific capabilities needed
+   * - Urgency level
    *
    * @private
-   * @param {string} request - User's request
-   * @returns {Promise<RequestAnalysis>} Analysis results
    */
-  private async analyzeWithAI(request: string): Promise<RequestAnalysis> {
-    const systemPrompt = `You are a tool recommendation assistant. Analyze user requests and extract:
-1. Search query: Optimized keywords for finding relevant tools
-2. Preferred type: What kind of tool they need (mcp_server, skill, extension, workflow)
-3. Capabilities: List of required features/capabilities
-4. Urgency: How urgent is this need (low, medium, high)
+  private async analyzeRequest(request: string): Promise<RequestAnalysis> {
+    const systemPrompt = `You are an AI assistant that analyzes user requests for developer tools.
+Extract the following information from the user's request:
 
-Respond in JSON format:
+1. searchQuery: Key search terms (2-5 words) to find relevant tools
+2. preferredType: The type of tool they need (mcp_server, skill, extension, or null if unclear)
+3. capabilities: List of specific capabilities they're looking for
+4. urgency: How urgent this need is (high/medium/low)
+
+Respond ONLY with valid JSON matching this schema:
 {
-  "searchQuery": "optimized search terms",
-  "preferredType": "mcp_server|skill|extension|workflow",
-  "capabilities": ["capability1", "capability2"],
-  "urgency": "low|medium|high"
-}`;
+  "searchQuery": "string",
+  "preferredType": "mcp_server" | "skill" | "extension" | null,
+  "capabilities": ["string"],
+  "urgency": "high" | "medium" | "low"
+}
+
+Example:
+Request: "I need a tool to integrate with Slack for our team"
+Response: {"searchQuery":"slack integration","preferredType":"mcp_server","capabilities":["slack api","team communication","message sending"],"urgency":"medium"}`;
 
     const messages: Message[] = [
       {
         role: "user",
-        content: `Analyze this request: "${request}"`,
+        content: request,
       },
     ];
 
     try {
-      const response = await this.aiProvider!.chat(messages, {
+      const response = await this.aiProvider.chat(messages, {
         systemPrompt,
+        model: "claude-3-5-sonnet-20241022",
         temperature: 0.3,
         maxTokens: 500,
       });
 
-      logger.debug("AI analysis completed", {
-        usage: response.usage,
-        model: response.model,
-      });
+      // Parse JSON response
+      const analysisText = response.content.trim();
+      // Remove markdown code blocks if present
+      const jsonText = analysisText.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+      const analysis = JSON.parse(jsonText) as RequestAnalysis;
 
-      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("AI response did not contain valid JSON");
-      }
-
-      const analysis = JSON.parse(jsonMatch[0]) as RequestAnalysis;
       return analysis;
     } catch (error) {
-      logger.warn("AI analysis failed, falling back to keyword extraction", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return this.analyzeWithKeywords(request);
+      logger.error("Failed to analyze request with AI", { error, request });
+
+      // Fallback: Simple keyword extraction
+      return {
+        searchQuery: request.slice(0, 100), // Use first 100 chars as search query
+        preferredType: undefined,
+        capabilities: [],
+        urgency: "medium",
+      };
     }
   }
 
   /**
-   * Analyze request using simple keyword matching (fallback)
+   * Search across all external sources in parallel
    *
    * @private
-   * @param {string} request - User's request
-   * @returns {RequestAnalysis} Analysis results
    */
-  private analyzeWithKeywords(request: string): RequestAnalysis {
-    const lowerRequest = request.toLowerCase();
+  private async searchAllSources(analysis: RequestAnalysis): Promise<ExternalSourceItem[]> {
+    const searchPromises = this.sources.map(async (source) => {
+      try {
+        const result = await source.search({
+          query: analysis.searchQuery,
+          type: analysis.preferredType,
+          limit: 20, // Get top 20 from each source
+        });
+        return result.items;
+      } catch (error) {
+        logger.warn(`Search failed for source ${source.sourceId}`, { error });
+        return [];
+      }
+    });
 
-    const stopWords = new Set([
-      "i",
-      "need",
-      "to",
-      "want",
-      "a",
-      "an",
-      "the",
-      "for",
-      "with",
-      "how",
-      "can",
-    ]);
-    const searchQuery = request
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((word) => !stopWords.has(word))
-      .join(" ");
+    const resultsArrays = await Promise.all(searchPromises);
+    // Flatten array of arrays into single array
+    return resultsArrays.flat();
+  }
 
-    let preferredType = "mcp_server";
-    if (lowerRequest.includes("workflow") || lowerRequest.includes("automation")) {
-      preferredType = "workflow";
-    } else if (lowerRequest.includes("skill") || lowerRequest.includes("capability")) {
-      preferredType = "skill";
-    } else if (lowerRequest.includes("extension") || lowerRequest.includes("plugin")) {
-      preferredType = "extension";
+  /**
+   * Filter out tools that are already installed
+   *
+   * @private
+   */
+  private filterInstalledTools(
+    items: ExternalSourceItem[],
+    installedTools?: string[],
+  ): ExternalSourceItem[] {
+    if (!installedTools || installedTools.length === 0) {
+      return items;
     }
 
-    const capabilities: string[] = [];
-    const capabilityKeywords = [
-      "integration",
-      "communication",
-      "data",
-      "analytics",
-      "automation",
-      "ai",
-      "search",
-      "storage",
-    ];
-    for (const keyword of capabilityKeywords) {
-      if (lowerRequest.includes(keyword)) {
-        capabilities.push(keyword);
+    const installedSet = new Set(installedTools);
+    return items.filter((item) => !installedSet.has(item.id));
+  }
+
+  /**
+   * Rank and score items based on relevance to the analyzed request
+   *
+   * Scoring factors:
+   * - Name/description match to query (0-40 points)
+   * - Type match to preferred type (0-20 points)
+   * - Popularity metrics (downloads/stars) (0-20 points)
+   * - Capability match (0-20 points)
+   *
+   * @private
+   */
+  private rankItems(items: ExternalSourceItem[], analysis: RequestAnalysis): ScoredItem[] {
+    const queryTerms = analysis.searchQuery.toLowerCase().split(/\s+/);
+
+    const scoredItems: ScoredItem[] = items.map((item) => {
+      let score = 0;
+      const matchReasons: string[] = [];
+
+      // 1. Name/description match (0-40 points)
+      const nameMatch = this.calculateTextMatch(item.name.toLowerCase(), queryTerms);
+      const descMatch = this.calculateTextMatch(item.description.toLowerCase(), queryTerms);
+      const textScore = Math.max(nameMatch, descMatch) * 40;
+      score += textScore;
+      if (textScore > 20) {
+        matchReasons.push("Strong text match");
+      }
+
+      // 2. Type match (0-20 points)
+      if (analysis.preferredType && item.type === analysis.preferredType) {
+        score += 20;
+        matchReasons.push(`Matches preferred type: ${analysis.preferredType}`);
+      }
+
+      // 3. Popularity metrics (0-20 points)
+      const popularityScore = this.calculatePopularityScore(item);
+      score += popularityScore * 20;
+      if (popularityScore > 0.7) {
+        matchReasons.push("Highly popular");
+      }
+
+      // 4. Capability match (0-20 points)
+      if (analysis.capabilities.length > 0) {
+        const capabilityScore = this.calculateCapabilityMatch(item, analysis.capabilities);
+        score += capabilityScore * 20;
+        if (capabilityScore > 0.5) {
+          matchReasons.push("Matches required capabilities");
+        }
+      }
+
+      return { item, score, matchReasons };
+    });
+
+    // Sort by score descending
+    return scoredItems.sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Calculate how well text matches query terms
+   * Returns a score between 0 and 1
+   *
+   * @private
+   */
+  private calculateTextMatch(text: string, queryTerms: string[]): number {
+    if (queryTerms.length === 0) return 0;
+
+    let matchCount = 0;
+    for (const term of queryTerms) {
+      if (text.includes(term)) {
+        matchCount++;
       }
     }
 
-    let urgency = "medium";
-    if (
-      lowerRequest.includes("urgent") ||
-      lowerRequest.includes("asap") ||
-      lowerRequest.includes("immediately")
-    ) {
-      urgency = "high";
-    } else if (lowerRequest.includes("eventually") || lowerRequest.includes("someday")) {
-      urgency = "low";
+    return matchCount / queryTerms.length;
+  }
+
+  /**
+   * Calculate popularity score based on downloads and stars
+   * Returns a normalized score between 0 and 1
+   *
+   * @private
+   */
+  private calculatePopularityScore(item: ExternalSourceItem): number {
+    let score = 0;
+
+    // Downloads score (0-0.5)
+    if (item.downloads) {
+      // Logarithmic scale: 1000 downloads = 0.25, 10000 = 0.4, 100000 = 0.5
+      const downloadScore = Math.min(Math.log10(item.downloads + 1) / 5, 0.5);
+      score += downloadScore;
     }
 
-    return {
-      searchQuery,
-      preferredType,
-      capabilities,
-      urgency,
-    };
+    // Stars score (0-0.5)
+    if (item.stars) {
+      // Linear scale: 100 stars = 0.25, 500+ = 0.5
+      const starScore = Math.min(item.stars / 1000, 0.5);
+      score += starScore;
+    }
+
+    // Rating boost (multiply by rating if available)
+    if (item.rating) {
+      score *= item.rating / 5;
+    }
+
+    return score;
   }
 
   /**
-   * Rank items by relevance to the request
-   *
-   * Ranking factors:
-   * - Match with request keywords
-   * - Popularity (downloads, stars)
-   * - Verified sources
-   * - Type match
+   * Calculate how well item matches required capabilities
+   * Returns a score between 0 and 1
    *
    * @private
-   * @param {ExternalSourceItem[]} items - Items to rank
-   * @param {RequestAnalysis} analysis - Request analysis
-   * @param {string} request - Original request
-   * @returns {ExternalSourceItem[]} Ranked items
    */
-  private rankItems(
-    items: ExternalSourceItem[],
-    analysis: RequestAnalysis,
-    request: string,
-  ): ExternalSourceItem[] {
-    const requestKeywords = new Set(
-      request
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => w.length > 2),
-    );
-
-    return items
-      .map((item) => {
-        let score = 0;
-
-        const itemText = `${item.name} ${item.description} ${item.tags?.join(" ")}`.toLowerCase();
-        const matchedKeywords = Array.from(requestKeywords).filter((keyword) =>
-          itemText.includes(keyword),
-        );
-        score += (matchedKeywords.length / requestKeywords.size) * 100;
-
-        if (item.type === analysis.preferredType) {
-          score += 50;
-        }
-
-        const downloads = item.downloads || 0;
-        const stars = item.stars || 0;
-        const popularityScore = Math.min(50, Math.log10(downloads + stars + 1) * 10);
-        score += popularityScore;
-
-        const verifiedSources = new Set(["smithery", "mcp-registry"]);
-        if (verifiedSources.has(item.source)) {
-          score += 20;
-        }
-
-        if (item.rating) {
-          score += (item.rating / 5) * 25;
-        }
-
-        return { item, score };
-      })
-      .sort((a, b) => b.score - a.score)
-      .map(({ item }) => item);
-  }
-
-  /**
-   * Generate human-readable reason for recommendation
-   *
-   * @private
-   * @param {ExternalSourceItem} item - Recommended item
-   * @param {RequestAnalysis} analysis - Request analysis
-   * @param {string} request - Original request
-   * @returns {string} Reason text
-   */
-  private generateReason(
+  private calculateCapabilityMatch(
     item: ExternalSourceItem,
-    analysis: RequestAnalysis,
-    _request: string,
-  ): string {
-    const reasons: string[] = [];
-
-    if (item.type === analysis.preferredType) {
-      reasons.push(`Matches your need for a ${analysis.preferredType}`);
-    }
-
-    if (item.downloads && item.downloads > 1000) {
-      reasons.push(`Popular tool with ${item.downloads.toLocaleString()} downloads`);
-    }
-
-    if (item.rating && item.rating >= 4.0) {
-      reasons.push(`Highly rated (${item.rating.toFixed(1)}/5.0)`);
-    }
-
-    const matchedCapabilities = analysis.capabilities.filter((cap) =>
-      item.description.toLowerCase().includes(cap),
-    );
-    if (matchedCapabilities.length > 0) {
-      reasons.push(`Provides ${matchedCapabilities.join(", ")} capabilities`);
-    }
-
-    if (reasons.length === 0) {
-      reasons.push("Relevant to your request");
-    }
-
-    return reasons.join(". ");
-  }
-
-  /**
-   * Calculate confidence score for recommendation
-   *
-   * @private
-   * @param {ExternalSourceItem} item - Recommended item
-   * @param {RequestAnalysis} analysis - Request analysis
-   * @param {string} request - Original request
-   * @returns {number} Confidence score (0-1)
-   */
-  private calculateConfidence(
-    item: ExternalSourceItem,
-    analysis: RequestAnalysis,
-    request: string,
+    capabilities: string[],
   ): number {
-    let confidence = 0.5;
+    if (capabilities.length === 0) return 0;
 
-    if (item.type === analysis.preferredType) {
-      confidence += 0.2;
+    const itemText = `${item.name} ${item.description} ${item.tags?.join(" ") || ""}`.toLowerCase();
+    let matchCount = 0;
+
+    for (const capability of capabilities) {
+      const capabilityTerms = capability.toLowerCase().split(/\s+/);
+      const matchesAll = capabilityTerms.every((term) => itemText.includes(term));
+      if (matchesAll) {
+        matchCount++;
+      }
     }
 
-    if (item.rating && item.rating >= 4.5) {
-      confidence += 0.15;
+    return matchCount / capabilities.length;
+  }
+
+  /**
+   * Convert scored items to final recommendations with explanations
+   *
+   * @private
+   */
+  private createRecommendations(
+    scoredItems: ScoredItem[],
+    _analysis: RequestAnalysis,
+  ): ToolRecommendation[] {
+    // Take top 10 items
+    const topItems = scoredItems.slice(0, 10);
+
+    return topItems.map((scored) => {
+      // Normalize score to 0-1 confidence
+      const maxPossibleScore = 100;
+      const confidence = Math.min(scored.score / maxPossibleScore, 1);
+
+      // Build reason string
+      let reason = scored.matchReasons.join("; ");
+      if (!reason) {
+        reason = "Matches your search query";
+      }
+
+      // Add source context
+      reason += ` (from ${scored.item.source})`;
+
+      return {
+        item: scored.item,
+        reason,
+        confidence: Math.round(confidence * 100) / 100, // Round to 2 decimals
+      };
+    });
+  }
+
+  /**
+   * Get a specific item by ID from any source
+   *
+   * @param itemId Full item ID (e.g., "smithery:@anthropic/slack-mcp")
+   * @returns The item or null if not found
+   */
+  async getItemById(itemId: string): Promise<ExternalSourceItem | null> {
+    // Extract source from ID (format: "source:id")
+    const [sourceId, ...idParts] = itemId.split(":");
+    const id = idParts.join(":"); // Re-join in case ID contains colons
+
+    const source = this.sources.find((s) => s.sourceId === sourceId);
+    if (!source) {
+      logger.warn(`Unknown source in item ID: ${itemId}`);
+      return null;
     }
 
-    if (item.downloads && item.downloads > 5000) {
-      confidence += 0.1;
+    try {
+      return await source.getById(id);
+    } catch (error) {
+      logger.error(`Failed to get item ${itemId}`, { error });
+      return null;
     }
+  }
 
-    const requestKeywords = new Set(
-      request
-        .toLowerCase()
-        .split(/\s+/)
-        .filter((w) => w.length > 2),
-    );
-    const itemText = `${item.name} ${item.description}`.toLowerCase();
-    const matchedKeywords = Array.from(requestKeywords).filter((keyword) =>
-      itemText.includes(keyword),
-    );
-    confidence += (matchedKeywords.length / requestKeywords.size) * 0.15;
-
-    return Math.min(1.0, confidence);
+  /**
+   * Get list of all available sources
+   */
+  getAvailableSources(): Array<{
+    id: string;
+    name: string;
+    supportedTypes: ExtensionType[];
+  }> {
+    return this.sources.map((source) => ({
+      id: source.sourceId,
+      name: source.displayName,
+      supportedTypes: source.supportedTypes,
+    }));
   }
 }

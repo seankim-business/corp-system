@@ -1935,6 +1935,45 @@ model InstallationQueue {
   @@map("installation_queue")
 }
 
+/// OrganizationMarketplaceSettings - Organization-level marketplace settings
+model OrganizationMarketplaceSettings {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @unique @map("organization_id") @db.Uuid
+
+  // Installation mode settings
+  installationMode String   @default("recommend") @map("installation_mode") @db.VarChar(20) // manual, recommend, yolo
+  allowedSources   String[] @default([]) @map("allowed_sources") // Empty = all allowed
+  blockedSources   String[] @default([]) @map("blocked_sources")
+  maxAutoInstalls  Int      @default(5) @map("max_auto_installs") // Per session limit
+  requireReview    Boolean  @default(false) @map("require_review") // Human review for YOLO
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("organization_marketplace_settings")
+}
+
+/// AgentInstallationPolicy - Per-agent installation policy overrides
+model AgentInstallationPolicy {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  agentId        String @map("agent_id") @db.Uuid // Agent UUID
+
+  // Override settings (null = use org default)
+  installationMode String?  @map("installation_mode") @db.VarChar(20)
+  allowedSources   String[] @map("allowed_sources")
+  blockedSources   String[] @map("blocked_sources")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([organizationId, agentId])
+  @@index([organizationId])
+  @@map("agent_installation_policies")
+}
+
 // ============================================================================
 // N8N WORKFLOW AUTOMATION INTEGRATION TABLES
 // ============================================================================
@@ -3432,7 +3471,7 @@ model FeatureRequest {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   embedding    FeatureRequestEmbedding?
 
   @@index([organizationId, status])
@@ -3445,7 +3484,7 @@ model FeatureRequest {
 model FeatureRequestEmbedding {
   id               String   @id @default(uuid()) @db.Uuid
   featureRequestId String   @unique @map("feature_request_id") @db.Uuid
-  embedding        Float[]  // Vector embedding array
+  embedding        Float[] // Vector embedding array
   contentHash      String   @map("content_hash") @db.VarChar(50)
   generatedAt      DateTime @default(now()) @map("generated_at") @db.Timestamptz(6)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -8,6 +8,7 @@ import { ragIndexingWorker } from "./rag-indexing.worker";
 import { dlqRecoveryWorker } from "./dead-letter-recovery.worker";
 import { n8nSyncWorker } from "./n8n-sync.worker";
 import { n8nGenerationWorker } from "./n8n-generation.worker";
+import { installationWorker } from "./installation.worker";
 import { logger } from "../utils/logger";
 
 export {
@@ -20,6 +21,7 @@ export {
   dlqRecoveryWorker,
   n8nSyncWorker,
   n8nGenerationWorker,
+  installationWorker,
 };
 
 const workers: Worker[] = [];
@@ -41,6 +43,7 @@ export async function startWorkers(): Promise<void> {
   registerWorker(dlqRecoveryWorker.getWorker());
   registerWorker(n8nSyncWorker.getWorker());
   registerWorker(n8nGenerationWorker.getWorker());
+  registerWorker(installationWorker.getWorker());
 
   logger.info("Workers started:", {
     slackEvents: "active",
@@ -52,6 +55,7 @@ export async function startWorkers(): Promise<void> {
     dlqRecovery: "active",
     n8nSync: "active",
     n8nGeneration: "active",
+    installations: "active",
     totalWorkers: workers.length,
   });
 }
@@ -69,6 +73,7 @@ export async function stopWorkers(): Promise<void> {
     dlqRecoveryWorker.close(),
     n8nSyncWorker.close(),
     n8nGenerationWorker.close(),
+    installationWorker.close(),
   ]);
 
   logger.info("All workers stopped");

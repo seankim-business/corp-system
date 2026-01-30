@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Plus,
   RefreshCw,
   Trash2,
   Edit2,
@@ -9,7 +8,7 @@ import {
   CheckCircle,
   Clock,
   Zap,
-  HelpCircle,
+  Link,
   ExternalLink,
 } from "lucide-react";
 import { api } from "../api/client";
@@ -40,12 +39,9 @@ interface PoolSummary {
   averageUsage: number;
 }
 
-interface AccountFormData {
+interface EditAccountFormData {
   nickname: string;
-  email: string;
   priority: number;
-  sessionToken?: string;
-  cookieData?: string;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -99,42 +95,29 @@ function UsageBar({ percent }: { percent: number }) {
   );
 }
 
-function AccountModal({
+function EditAccountModal({
   isOpen,
   onClose,
   onSubmit,
   initialData,
-  isEditing,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: AccountFormData) => Promise<void>;
-  initialData?: ClaudeMaxAccount;
-  isEditing: boolean;
+  onSubmit: (data: EditAccountFormData) => Promise<void>;
+  initialData: ClaudeMaxAccount;
 }) {
-  const [formData, setFormData] = useState<AccountFormData>({
-    nickname: initialData?.nickname || "",
-    email: initialData?.email || "",
-    priority: initialData?.priority || 100,
-    sessionToken: "",
-    cookieData: "",
+  const [formData, setFormData] = useState<EditAccountFormData>({
+    nickname: initialData.nickname,
+    priority: initialData.priority,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        nickname: initialData.nickname,
-        email: initialData.email,
-        priority: initialData.priority,
-        sessionToken: "",
-        cookieData: "",
-      });
-    } else {
-      setFormData({ nickname: "", email: "", priority: 100, sessionToken: "", cookieData: "" });
-    }
+    setFormData({
+      nickname: initialData.nickname,
+      priority: initialData.priority,
+    });
     setError(null);
   }, [initialData, isOpen]);
 
@@ -157,9 +140,7 @@ function AccountModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-semibold mb-4">
-          {isEditing ? "Edit Account" : "Add Claude Max Account"}
-        </h2>
+        <h2 className="text-xl font-semibold mb-4">Edit Account</h2>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
@@ -184,12 +165,11 @@ function AccountModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="claude-account@example.com"
-              required
+              value={initialData.email}
+              disabled
+              className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500"
             />
+            <p className="text-xs text-gray-400 mt-1">Email is set when connecting the account</p>
           </div>
 
           <div>
@@ -209,70 +189,21 @@ function AccountModal({
           </div>
 
           <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500">Session Credentials</p>
-              <button
-                type="button"
-                onClick={() => setShowGuide(!showGuide)}
-                className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+            <div className="flex items-center gap-2 text-sm">
+              <span
+                className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                  initialData.hasCredentials
+                    ? "bg-green-100 text-green-800"
+                    : "bg-yellow-100 text-yellow-800"
+                }`}
               >
-                <HelpCircle className="w-4 h-4" />
-                How to get credentials
-              </button>
-            </div>
-
-            {showGuide && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm">
-                <p className="font-medium text-blue-800 mb-2">How to extract Claude session:</p>
-                <ol className="list-decimal list-inside text-blue-700 space-y-1">
-                  <li>
-                    Open{" "}
-                    <a
-                      href="https://claude.ai"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline inline-flex items-center gap-1"
-                    >
-                      claude.ai
-                      <ExternalLink className="w-3 h-3" />
-                    </a>{" "}
-                    and log in
-                  </li>
-                  <li>Open DevTools (F12) → Application → Cookies</li>
-                  <li>
-                    Copy the <code className="bg-blue-100 px-1 rounded">sessionKey</code> value
-                  </li>
-                  <li>Paste it in the Session Token field below</li>
-                </ol>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Session Token (sessionKey)
-                </label>
-                <input
-                  type="password"
-                  value={formData.sessionToken}
-                  onChange={(e) => setFormData({ ...formData, sessionToken: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="sk-ant-sid01-..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cookie Data (optional, full cookie string)
-                </label>
-                <textarea
-                  value={formData.cookieData}
-                  onChange={(e) => setFormData({ ...formData, cookieData: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Only needed for advanced setups"
-                  rows={2}
-                />
-              </div>
+                {initialData.hasCredentials ? "Credentials saved" : "No credentials"}
+              </span>
+              {!initialData.hasCredentials && (
+                <span className="text-gray-500">
+                  Use "Connect Account" to add credentials
+                </span>
+              )}
             </div>
           </div>
 
@@ -289,7 +220,7 @@ function AccountModal({
               disabled={loading}
               className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
-              {loading ? "Saving..." : isEditing ? "Update" : "Add Account"}
+              {loading ? "Saving..." : "Update"}
             </button>
           </div>
         </form>
@@ -303,7 +234,7 @@ export default function ClaudeMaxAccountsPage() {
   const [summary, setSummary] = useState<PoolSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<ClaudeMaxAccount | null>(null);
 
   const fetchAccounts = useCallback(async () => {
@@ -327,35 +258,35 @@ export default function ClaudeMaxAccountsPage() {
     return () => clearInterval(interval);
   }, [fetchAccounts]);
 
-  const handleCreate = async (data: AccountFormData) => {
-    await api.post("/api/claude-max-accounts", {
-      nickname: data.nickname,
-      email: data.email,
-      priority: data.priority,
-      credentials:
-        data.sessionToken || data.cookieData
-          ? {
-              sessionToken: data.sessionToken || undefined,
-              cookieData: data.cookieData || undefined,
-            }
-          : undefined,
-    });
-    await fetchAccounts();
+  // Listen for messages from connect popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "claude-connect-success") {
+        fetchAccounts();
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [fetchAccounts]);
+
+  const handleConnectAccount = () => {
+    // Open in a popup window
+    const width = 700;
+    const height = 800;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    window.open(
+      "/claude-connect",
+      "claude-connect",
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+    );
   };
 
-  const handleUpdate = async (data: AccountFormData) => {
+  const handleUpdate = async (data: EditAccountFormData) => {
     if (!editingAccount) return;
     await api.patch(`/api/claude-max-accounts/${editingAccount.id}`, {
       nickname: data.nickname,
-      email: data.email,
       priority: data.priority,
-      credentials:
-        data.sessionToken || data.cookieData
-          ? {
-              sessionToken: data.sessionToken || undefined,
-              cookieData: data.cookieData || undefined,
-            }
-          : undefined,
     });
     await fetchAccounts();
   };
@@ -397,17 +328,38 @@ export default function ClaudeMaxAccountsPage() {
             Refresh
           </button>
           <button
-            onClick={() => {
-              setEditingAccount(null);
-              setModalOpen(true);
-            }}
+            onClick={handleConnectAccount}
             className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" />
-            Add Account
+            <Link className="w-4 h-4" />
+            Connect Claude Account
           </button>
         </div>
       </div>
+
+      {/* Quick Connect Banner */}
+      {accounts.length === 0 && (
+        <div className="mb-6 p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg text-white">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-white/20 rounded-lg">
+              <ExternalLink className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg mb-1">Get Started with Claude Max</h3>
+              <p className="text-indigo-100 mb-4">
+                Connect your Claude Max subscription to enable AI-powered workflows. The connection
+                process takes less than a minute.
+              </p>
+              <button
+                onClick={handleConnectAccount}
+                className="px-4 py-2 bg-white text-indigo-600 rounded-md hover:bg-indigo-50 font-medium"
+              >
+                Connect Your First Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
@@ -415,7 +367,7 @@ export default function ClaudeMaxAccountsPage() {
         </div>
       )}
 
-      {summary && (
+      {summary && accounts.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow border">
             <div className="text-sm text-gray-500">Total Accounts</div>
@@ -448,46 +400,40 @@ export default function ClaudeMaxAccountsPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow border overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Account
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Usage
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Priority
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Last Active
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {accounts.length === 0 ? (
+      {accounts.length > 0 && (
+        <div className="bg-white rounded-lg shadow border overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                  No accounts configured. Add your first Claude Max account to get started.
-                </td>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Account
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Usage
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Priority
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Last Active
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            ) : (
-              accounts.map((account) => (
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {accounts.map((account) => (
                 <tr key={account.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="font-medium text-gray-900">{account.nickname}</div>
                     <div className="text-sm text-gray-500">{account.email}</div>
                     {account.hasCredentials && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 mt-1">
-                        Credentials saved
+                        Connected
                       </span>
                     )}
                   </td>
@@ -527,7 +473,7 @@ export default function ClaudeMaxAccountsPage() {
                       <button
                         onClick={() => {
                           setEditingAccount(account);
-                          setModalOpen(true);
+                          setEditModalOpen(true);
                         }}
                         className="p-2 text-gray-600 hover:bg-gray-100 rounded"
                         title="Edit"
@@ -544,22 +490,23 @@ export default function ClaudeMaxAccountsPage() {
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <AccountModal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingAccount(null);
-        }}
-        onSubmit={editingAccount ? handleUpdate : handleCreate}
-        initialData={editingAccount || undefined}
-        isEditing={!!editingAccount}
-      />
+      {editingAccount && (
+        <EditAccountModal
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditingAccount(null);
+          }}
+          onSubmit={handleUpdate}
+          initialData={editingAccount}
+        />
+      )}
     </div>
   );
 }

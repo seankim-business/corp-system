@@ -11,6 +11,7 @@ import { markMessageComplete } from "../api/slack";
 import { prepareSlackMessages } from "../utils/slack-format";
 import { clearAgentStatus } from "../utils/slack-agent-status";
 import { appendFeedbackBlocks } from "../utils/slack-feedback-blocks";
+import { getAgentIdentity } from "../config/agent-identities";
 
 export class NotificationWorker extends BaseWorker<NotificationData> {
   constructor() {
@@ -91,6 +92,10 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
         await clearAgentStatus(slackClient, channel, threadTsForStatus);
       }
 
+      // Get agent identity for dynamic username/icon
+      // Requires chat:write.customize scope in Slack app manifest
+      const identity = getAgentIdentity(job.data.agentType || "default");
+
       // Prepare chunked messages
       const messages = prepareSlackMessages(text, {
         channel,
@@ -105,12 +110,13 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
 
         if (i === 0 && progressTs) {
           // Update the progress message with the first chunk
+          // Note: chat.update does not support username/icon_emoji - identity is already set
           try {
             const updateResult = await slackClient.chat.update({
               channel,
               ts: progressTs,
               text: msg.text,
-              blocks: msg.blocks,
+              blocks: msg.blocks || [],
             });
             firstMessageTs = updateResult.ts;
             lastMessageTs = updateResult.ts;
@@ -118,7 +124,7 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
             // Delete progress key since we've updated it
             await redis.del(`slack:progress:${eventId}`);
           } catch (updateError) {
-            // If update fails, fall back to posting new message
+            // If update fails, fall back to posting new message with agent identity
             logger.warn("Failed to update progress message, posting new", {
               error: updateError instanceof Error ? updateError.message : String(updateError),
             });
@@ -127,6 +133,8 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
               text: msg.text,
               thread_ts: msg.thread_ts,
               blocks: msg.blocks,
+              username: identity.name,
+              icon_emoji: identity.emoji,
             });
             firstMessageTs = postResult.ts;
             lastMessageTs = postResult.ts;
@@ -138,6 +146,8 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
             text: msg.text,
             thread_ts: msg.thread_ts || firstMessageTs,
             blocks: msg.blocks,
+            username: identity.name,
+            icon_emoji: identity.emoji,
           });
 
           if (i === 0) {
@@ -163,7 +173,7 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
             channel,
             ts: lastMessageTs,
             text: lastMsg.text,
-            blocks: blocksWithFeedback as any,
+            blocks: blocksWithFeedback,
           });
         } catch (feedbackError) {
           // Don't fail the notification if feedback buttons fail
