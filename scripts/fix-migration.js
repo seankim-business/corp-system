@@ -20,7 +20,35 @@ async function main() {
     `);
     console.log("   ✓ set_current_organization function created");
 
-    console.log("2. Finding all failed migrations...");
+    console.log("2. Fixing failed migrations...");
+
+    // Add missing installation_mode column to organizations if it doesn't exist
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE organizations 
+        ADD COLUMN IF NOT EXISTS installation_mode VARCHAR(20) NOT NULL DEFAULT 'recommend'
+      `);
+      console.log("   ✓ installation_mode column ensured on organizations");
+    } catch (e) {
+      if (!e.message.includes("already exists")) {
+        console.log("   ⚠ installation_mode column error:", e.message);
+      }
+    }
+
+    // Add missing namespace column to mcp_connections if it doesn't exist
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE mcp_connections 
+        ADD COLUMN IF NOT EXISTS namespace VARCHAR(100) DEFAULT 'default'
+      `);
+      console.log("   ✓ namespace column ensured on mcp_connections");
+    } catch (e) {
+      if (!e.message.includes("already exists")) {
+        console.log("   ⚠ namespace column error:", e.message);
+      }
+    }
+
+    console.log("3. Finding all failed migrations...");
     const failedMigrations = await prisma.$queryRaw`
       SELECT migration_name 
       FROM _prisma_migrations 
