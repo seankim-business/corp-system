@@ -3,6 +3,8 @@ import { logger } from "../utils/logger";
 import { getPoolStats } from "../db/redis";
 import { getCacheStats } from "../services/query-cache";
 import { queryMonitor } from "../services/query-monitor";
+import { getDatabaseCircuitBreakerStats } from "../db/client";
+import { getAllCircuitBreakers } from "../utils/circuit-breaker";
 
 const router = Router();
 
@@ -28,6 +30,7 @@ interface DashboardResponse {
     redis: ComponentHealth;
     cache: ComponentHealth;
     queries: ComponentHealth;
+    circuitBreakers: ComponentHealth;
   };
 }
 
@@ -59,6 +62,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
       redis: checkRedisHealth(),
       cache: checkCacheHealth(),
       queries: checkQueryHealth(),
+      circuitBreakers: checkCircuitBreakerHealth(),
     };
 
     const statuses = Object.values(components).map((c) => c.status);
@@ -248,5 +252,104 @@ function checkQueryHealth(): ComponentHealth {
     lastChecked: new Date().toISOString(),
   };
 }
+
+function checkCircuitBreakerHealth(): ComponentHealth {
+  try {
+    const dbStats = getDatabaseCircuitBreakerStats();
+    const allBreakers = getAllCircuitBreakers();
+
+    const breakerStates: Record<string, { state: string; failureCount: number; successCount: number }> = {};
+    let hasOpenBreaker = false;
+
+    for (const [name, breaker] of allBreakers) {
+      const stats = breaker.getStats();
+      breakerStates[name] = stats;
+      if (stats.state === "OPEN") {
+        hasOpenBreaker = true;
+      }
+    }
+
+    // Also add the DB circuit breaker specifically
+    breakerStates["postgresql"] = dbStats;
+    if (dbStats.state === "OPEN") {
+      hasOpenBreaker = true;
+    }
+
+    let status: HealthStatus = "healthy";
+    if (hasOpenBreaker) {
+      status = "unhealthy";
+    } else if (Object.values(breakerStates).some(s => s.state === "HALF_OPEN")) {
+      status = "degraded";
+    }
+
+    return {
+      status,
+      details: {
+        breakers: breakerStates,
+        totalBreakers: Object.keys(breakerStates).length,
+        openBreakers: Object.values(breakerStates).filter(s => s.state === "OPEN").length,
+      },
+      lastChecked: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      status: "unhealthy",
+      details: { error: error instanceof Error ? error.message : "Unknown error" },
+      lastChecked: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * GET /api/health/circuit-breakers
+ * Get circuit breaker status for all breakers.
+ */
+router.get("/circuit-breakers", (_req: Request, res: Response) => {
+  try {
+    const dbStats = getDatabaseCircuitBreakerStats();
+    const allBreakers = getAllCircuitBreakers();
+
+    const breakers: Record<string, { state: string; failureCount: number; successCount: number }> = {};
+    for (const [name, breaker] of allBreakers) {
+      breakers[name] = breaker.getStats();
+    }
+    breakers["postgresql"] = dbStats;
+
+    res.json({
+      breakers,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Failed to get circuit breaker status", { error });
+    res.status(500).json({ error: "Failed to get circuit breaker status" });
+  }
+});
+
+/**
+ * POST /api/health/circuit-breakers/reset
+ * Reset all circuit breakers (admin action).
+ */
+router.post("/circuit-breakers/reset", (req: Request, res: Response) => {
+  try {
+    const allBreakers = getAllCircuitBreakers();
+    const resetBreakers: string[] = [];
+
+    for (const [name, breaker] of allBreakers) {
+      breaker.reset();
+      resetBreakers.push(name);
+      logger.info(`Circuit breaker ${name} reset via admin API`);
+    }
+
+    res.json({
+      success: true,
+      resetBreakers,
+      message: `Reset ${resetBreakers.length} circuit breakers`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Failed to reset circuit breakers", { error });
+    res.status(500).json({ error: "Failed to reset circuit breakers" });
+  }
+});
 
 export default router;
