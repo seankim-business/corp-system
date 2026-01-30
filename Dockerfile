@@ -77,10 +77,11 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
+# Copy fix-migration script
+COPY scripts/fix-migration.js ./scripts/fix-migration.js
+
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start application (runs migrations first, non-fatal)
-# Using db push to sync schema (fixes table mismatch issues)
-# Added migrate resolve to handle failed migration states
-CMD ["sh", "-c", "echo '=== Starting Nubabel Container v6 ===' && echo '' && echo '=== Resolving Failed Migrations ===' && (npx prisma migrate resolve --applied 20260126_add_feature_flags --schema=prisma/schema.prisma 2>/dev/null || echo 'Migration already resolved') && echo '' && echo '=== Running Database Migrations ===' && (npx prisma migrate deploy --schema=prisma/schema.prisma && echo '✅ Migrations applied successfully' || echo '⚠️  Migration failed, trying db push...') && (npx prisma db push --accept-data-loss --schema=prisma/schema.prisma 2>/dev/null || true) && echo '' && echo '=== Starting Node.js Server ===' && node dist/index.js"]
+# Start application using start.sh (handles migrations + RLS function creation)
+CMD ["./scripts/start.sh"]
