@@ -56,6 +56,55 @@ function toApiError(error: unknown): ApiError {
   return new ApiError(message, null, null);
 }
 
+// 401 interceptor: attempt token refresh, then retry original request once
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function attemptRefresh(): Promise<boolean> {
+  try {
+    await api.post("/auth/refresh");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
+
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retried &&
+      !originalRequest.url?.includes("/auth/refresh") &&
+      !originalRequest.url?.includes("/auth/login")
+    ) {
+      originalRequest._retried = true;
+
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refreshPromise = attemptRefresh();
+      }
+
+      const refreshed = await refreshPromise;
+      isRefreshing = false;
+      refreshPromise = null;
+
+      if (refreshed) {
+        return api.request(originalRequest);
+      }
+
+      // Refresh failed — redirect to login
+      window.location.href = "/login?error=session_expired";
+      return Promise.reject(error);
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 export async function request<T>(config: AxiosRequestConfig): Promise<T> {
   try {
     const response = await api.request<T>(config);

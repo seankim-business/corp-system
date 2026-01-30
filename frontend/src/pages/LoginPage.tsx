@@ -18,11 +18,17 @@ export default function LoginPage() {
     const errorParam = searchParams.get('error');
     if (errorParam && ERROR_MESSAGES[errorParam]) {
       setError(ERROR_MESSAGES[errorParam]);
+      // Clean up URL so refresh doesn't re-show stale error
+      const cleaned = new URLSearchParams(searchParams);
+      cleaned.delete('error');
+      const newSearch = cleaned.toString();
+      window.history.replaceState({}, '', newSearch ? `/login?${newSearch}` : '/login');
     }
   }, [searchParams]);
 
   const handleGoogleLogin = () => {
-    window.location.href = '/auth/google';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+    window.location.href = `${apiBase}/auth/google`;
   };
 
   return (

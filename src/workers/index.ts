@@ -4,6 +4,8 @@ import { orchestrationWorker } from "./orchestration.worker";
 import { notificationWorker } from "./notification.worker";
 import { webhookWorker } from "./webhook.worker";
 import { scheduledTaskWorker } from "./scheduled-task.worker";
+import { ragIndexingWorker } from "./rag-indexing.worker";
+import { dlqRecoveryWorker } from "./dead-letter-recovery.worker";
 import { logger } from "../utils/logger";
 
 export {
@@ -12,6 +14,8 @@ export {
   notificationWorker,
   webhookWorker,
   scheduledTaskWorker,
+  ragIndexingWorker,
+  dlqRecoveryWorker,
 };
 
 const workers: Worker[] = [];
@@ -29,6 +33,8 @@ export async function startWorkers(): Promise<void> {
   registerWorker(notificationWorker.getWorker());
   registerWorker(webhookWorker.getWorker());
   registerWorker(scheduledTaskWorker.getWorker());
+  registerWorker(ragIndexingWorker.getWorker());
+  registerWorker(dlqRecoveryWorker.getWorker());
 
   logger.info("Workers started:", {
     slackEvents: "active",
@@ -36,6 +42,8 @@ export async function startWorkers(): Promise<void> {
     notifications: "active",
     webhooks: "active",
     scheduledTasks: "active",
+    ragIndexing: "active",
+    dlqRecovery: "active",
     totalWorkers: workers.length,
   });
 }
@@ -49,6 +57,8 @@ export async function stopWorkers(): Promise<void> {
     notificationWorker.close(),
     webhookWorker.close(),
     scheduledTaskWorker.close(),
+    ragIndexingWorker.close(),
+    dlqRecoveryWorker.close(),
   ]);
 
   logger.info("All workers stopped");

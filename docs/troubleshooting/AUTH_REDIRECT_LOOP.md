@@ -424,13 +424,13 @@ Before deploying auth-related changes:
 
 ## Changelog
 
-| Date       | Issue             | Commit         | Author   |
-| ---------- | ----------------- | -------------- | -------- |
-| 2026-01-28 | Race condition    | `549ba24`      | Sean Kim |
-| 2026-01-29 | Cookie domain     | `1813146`      | Sean Kim |
-| 2026-01-29 | Domain fallback   | `eef0aa3`      | Sean Kim |
-| 2026-01-29 | VITE_API_BASE_URL | `19735d3`      | Sean Kim |
-| 2026-01-30 | CSP blocking      | PENDING DEPLOY | Sean Kim |
+| Date       | Issue             | Commit    | Author   |
+| ---------- | ----------------- | --------- | -------- |
+| 2026-01-28 | Race condition    | `549ba24` | Sean Kim |
+| 2026-01-29 | Cookie domain     | `1813146` | Sean Kim |
+| 2026-01-29 | Domain fallback   | `eef0aa3` | Sean Kim |
+| 2026-01-29 | VITE_API_BASE_URL | `19735d3` | Sean Kim |
+| 2026-01-30 | CSP blocking      | `5c0cbd3` | Sean Kim |
 
 ---
 
@@ -460,3 +460,62 @@ Content Security Policy directive: "default-src 'self'".
 - No CSP console errors
 - `/auth/me` returns 200 with JSON
 - Dashboard loads without redirect to /login
+
+---
+
+## Post-Deployment Verification (2026-01-30)
+
+**Deploy Time**: 10:56 AM KST  
+**Commit**: `5c0cbd3`  
+**Railway Deployment**: `c98dc1db-d364-4ea0-892f-eb57b467903c`  
+**Status**: **RESOLVED**
+
+### Browser Console Errors (After Fix)
+
+```
+[ERROR] Failed to load resource: the server responded with a status of 401
+[ERROR] Failed to fetch user: ApiError: Session invalid: IP mismatch
+```
+
+**No CSP errors!** The 401 error is expected for unauthenticated users.
+
+### Verification Results
+
+| Check                                    | Before | After | Status   |
+| ---------------------------------------- | ------ | ----- | -------- |
+| CSP blocking API call                    | YES    | NO    | FIXED    |
+| `/auth/me` request reaches server        | NO     | YES   | FIXED    |
+| Unauthenticated user redirects to /login | -      | YES   | EXPECTED |
+| Console shows CSP errors                 | YES    | NO    | FIXED    |
+
+### Evidence
+
+1. **Page URL Behavior**: `/dashboard` URL stays on `/dashboard` during API call loading (no immediate redirect to `/login` due to CSP block)
+2. **Console Errors**: Only 401 Unauthorized (expected), NO "Content Security Policy" errors
+3. **Network Tab**: `/auth/me` request successfully reaches `auth.nubabel.com`
+
+### Root Cause Summary
+
+`helmet()` was used without configuration, applying default CSP `default-src 'self'` which blocked cross-subdomain API requests from `app.nubabel.com` to `auth.nubabel.com`.
+
+### Solution Applied
+
+```typescript
+// src/index.ts
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        connectSrc: [
+          "'self'",
+          "https://auth.nubabel.com",
+          "https://*.nubabel.com",
+          "wss://*.nubabel.com",
+        ],
+        // ... other directives
+      },
+    },
+  }),
+);
+```

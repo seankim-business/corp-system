@@ -38,30 +38,32 @@ model Organization {
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  // Relations
-  workspaceDomains       WorkspaceDomain[]
-  memberships            Membership[]
-  agents                 Agent[]
-  teams                  Team[]
-  projects               Project[]
-  tasks                  Task[]
-  goals                  Goal[]
-  valueStreams           ValueStream[]
-  kpis                   KPI[]
-  workflows              Workflow[]
-  notionConnections      NotionConnection[]
-  mcpConnections         MCPConnection[]
-  claudeAccounts         ClaudeAccount[]
-  slackIntegrations      SlackIntegration[]
-  orchestratorExecutions OrchestratorExecution[]
-  featureFlagOverrides   FeatureFlagOverride[]
-  featureFlagAuditLogs   FeatureFlagAuditLog[]
-  marketplaceExtensions  MarketplaceExtension[]
-  extensionInstallations ExtensionInstallation[]
-  extensionPermissions   ExtensionPermission[]
-  skillLearningPatterns  SkillLearningPattern[]
-  agentSkillAssignments  AgentSkillAssignment[]
-  extensionUsageLogs     ExtensionUsageLog[]
+   // Relations
+   workspaceDomains       WorkspaceDomain[]
+   memberships            Membership[]
+   agents                 Agent[]
+   teams                  Team[]
+   projects               Project[]
+   tasks                  Task[]
+   goals                  Goal[]
+   valueStreams           ValueStream[]
+   kpis                   KPI[]
+   workflows              Workflow[]
+   notionConnections      NotionConnection[]
+   mcpConnections         MCPConnection[]
+   claudeAccounts         ClaudeAccount[]
+   claudeMaxAccounts      ClaudeMaxAccount[]
+   slackIntegrations      SlackIntegration[]
+   orchestratorExecutions OrchestratorExecution[]
+   agentActivities        AgentActivity[]
+   featureFlagOverrides   FeatureFlagOverride[]
+   featureFlagAuditLogs   FeatureFlagAuditLog[]
+   marketplaceExtensions  MarketplaceExtension[]
+   extensionInstallations ExtensionInstallation[]
+   extensionPermissions   ExtensionPermission[]
+   skillLearningPatterns  SkillLearningPattern[]
+   agentSkillAssignments  AgentSkillAssignment[]
+   extensionUsageLogs     ExtensionUsageLog[]
 
   @@map("organizations")
 }
@@ -436,12 +438,73 @@ model OrchestratorExecution {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+   @@index([organizationId, createdAt(sort: Desc)])
+   @@index([organizationId, status])
+   @@index([userId, createdAt(sort: Desc)])
+   @@index([sessionId])
+   @@index([status])
+   @@map("orchestrator_executions")
+}
+
+/// Agent Activity (Real-time agent execution tracking for visibility)
+/// Tracks OMC agent activity for display in Slack and Web UI
+model AgentActivity {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  
+  // Agent identification
+  agentType      String   @map("agent_type") @db.VarChar(100) // sisyphus, oracle, explore, librarian, executor, etc.
+  agentName      String?  @map("agent_name") @db.VarChar(255) // Human-readable name
+  sessionId      String?  @map("session_id") @db.VarChar(255) // OMC session ID
+  parentActivityId String? @map("parent_activity_id") @db.Uuid // For nested delegations
+  
+  // Task details
+  taskDescription String?  @map("task_description") @db.Text
+  category        String?  @db.VarChar(100) // quick, ultrabrain, visual-engineering, etc.
+  skills          String[] @default([]) @db.VarChar(100) // Skills loaded for this task
+  
+  // Status tracking
+  status         String   @default("pending") @db.VarChar(50) // pending, running, completed, failed, cancelled
+  progress       Int      @default(0) // 0-100 percent
+  currentStep    String?  @map("current_step") @db.Text // What the agent is currently doing
+  
+  // Timing
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  durationMs     Int?     @map("duration_ms")
+  
+  // Input/Output data
+  inputData      Json?    @map("input_data") @db.JsonB
+  outputData     Json?    @map("output_data") @db.JsonB
+
+  // Results
+  result         Json?    @db.JsonB // Final result/output
+  errorMessage   String?  @map("error_message") @db.Text
+
+  // Slack visibility
+  slackChannelId String?  @map("slack_channel_id") @db.VarChar(50)
+  slackThreadTs  String?  @map("slack_thread_ts") @db.VarChar(50)
+  slackMessageTs String?  @map("slack_message_ts") @db.VarChar(50) // For updating messages
+  
+  // Claude Max account used (for quota tracking)
+  claudeMaxAccountId String? @map("claude_max_account_id") @db.Uuid
+  
+  metadata       Json     @default("{}") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentActivity AgentActivity? @relation("AgentActivityHierarchy", fields: [parentActivityId], references: [id])
+  childActivities AgentActivity[] @relation("AgentActivityHierarchy")
+
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([organizationId, status])
-  @@index([userId, createdAt(sort: Desc)])
   @@index([sessionId])
+  @@index([agentType])
   @@index([status])
-  @@map("orchestrator_executions")
+  @@index([parentActivityId])
+  @@index([slackChannelId, slackThreadTs])
+  @@map("agent_activities")
 }
 
 // ============================================================================
@@ -519,7 +582,55 @@ model QuotaAlert {
   @@index([severity])
   @@index([resolvedAt])
   @@index([createdAt(sort: Desc)])
-  @@map("quota_alerts")
+   @@map("quota_alerts")
+}
+
+/// Claude Max Subscription Accounts (Consumer accounts running via CLI)
+/// These are NOT API accounts - they use Claude CLI with subscription limits
+model ClaudeMaxAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  
+  // Account identification
+  nickname       String   @db.VarChar(100) // e.g., "work", "personal", "backup-1"
+  email          String   @db.VarChar(255) // Claude account email
+  
+  // Status tracking (no direct API - inferred from CLI behavior)
+  status         String   @default("active") @db.VarChar(50) // active, rate_limited, exhausted, cooldown
+  
+  // Usage estimation (tracked from CLI output/errors)
+  estimatedUsagePercent   Float    @default(0) @map("estimated_usage_percent") // 0-100
+  lastUsageUpdateAt       DateTime? @map("last_usage_update_at") @db.Timestamptz(6)
+  estimatedResetAt        DateTime? @map("estimated_reset_at") @db.Timestamptz(6) // When quota resets
+  
+  // Session tracking for c2switcher-style rotation
+  currentSessionId        String?  @map("current_session_id") @db.VarChar(255)
+  lastActiveAt            DateTime? @map("last_active_at") @db.Timestamptz(6)
+  
+  // Rate limit detection
+  consecutiveRateLimits   Int      @default(0) @map("consecutive_rate_limits")
+  lastRateLimitAt         DateTime? @map("last_rate_limit_at") @db.Timestamptz(6)
+  cooldownUntil           DateTime? @map("cooldown_until") @db.Timestamptz(6)
+  
+  // Priority for selection algorithm (higher = prefer)
+  priority                Int      @default(100)
+  
+  // Encrypted credentials storage reference (stored separately)
+  credentialRef           String?  @map("credential_ref") @db.VarChar(255)
+  
+  metadata                Json     @default("{}") @db.JsonB
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, nickname])
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([status])
+  @@index([priority])
+  @@index([cooldownUntil])
+  @@map("claude_max_accounts")
 }
 
 /// Legacy Notion Connections (Backward compatibility)
@@ -1349,31 +1460,59 @@ model OrganizationAIProvider {
 }
 
 // ============================================================================
-// AGENT ACTIVITY TRACKING (Real-time monitoring)
+// WORK QUEUE & JOB EXECUTION (PostgreSQL Queue Pattern)
 // ============================================================================
 
-model AgentActivity {
-  id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  sessionId      String    @map("session_id") @db.VarChar(255)
-  agentType      String    @map("agent_type") @db.VarChar(100)
-  agentName      String?   @map("agent_name") @db.VarChar(255)
-  category       String?   @db.VarChar(100)
-  status         String    @default("running") @db.VarChar(50)
-  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+/// WorkQueue - PostgreSQL-backed queue for reliable task processing
+/// Used as a durable fallback when Redis/BullMQ is unavailable
+model WorkQueue {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  queueName      String   @map("queue_name") @db.VarChar(100) // slack-events, orchestration, notifications, etc.
+  priority       Int      @default(0) // Higher = more important
+  status         String   @default("pending") @db.VarChar(50) // pending, processing, completed, failed, dead_letter
+  payload        Json     @db.JsonB
+  result         Json?    @db.JsonB
+  errorMessage   String?  @map("error_message") @db.Text
+  attempts       Int      @default(0)
+  maxAttempts    Int      @default(3) @map("max_attempts")
+  lockedBy       String?  @map("locked_by") @db.VarChar(255) // Worker ID that locked this job
+  lockedAt       DateTime? @map("locked_at") @db.Timestamptz(6)
+  scheduledFor   DateTime? @map("scheduled_for") @db.Timestamptz(6) // For delayed jobs
   completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
-  durationMs     Int?      @map("duration_ms")
-  inputData      Json?     @map("input_data") @db.JsonB
-  outputData     Json?     @map("output_data") @db.JsonB
-  errorMessage   String?   @map("error_message") @db.Text
-  metadata       Json      @default("{}") @db.JsonB
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  metadata       Json     @default("{}") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@index([organizationId])
-  @@index([sessionId])
-  @@index([status])
-  @@index([createdAt(sort: Desc)])
-  @@index([organizationId, createdAt(sort: Desc)])
-  @@map("agent_activities")
+  jobExecutions  JobExecution[]
+
+  @@index([queueName, status, priority(sort: Desc), createdAt])
+  @@index([organizationId, queueName])
+  @@index([status, scheduledFor])
+  @@index([lockedBy, lockedAt])
+  @@index([status, attempts])
+  @@map("work_queue")
 }
+
+/// JobExecution - Tracks individual execution attempts of work queue items
+model JobExecution {
+  id          String   @id @default(uuid()) @db.Uuid
+  workQueueId String   @map("work_queue_id") @db.Uuid
+  workerId    String   @map("worker_id") @db.VarChar(255) // Which worker processed this
+  attempt     Int      // Attempt number (1, 2, 3...)
+  status      String   @db.VarChar(50) // started, completed, failed, timeout
+  result      Json?    @db.JsonB
+  errorMessage String? @map("error_message") @db.Text
+  startedAt   DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  durationMs  Int?     @map("duration_ms")
+
+  workQueue   WorkQueue @relation(fields: [workQueueId], references: [id], onDelete: Cascade)
+
+  @@index([workQueueId, attempt])
+  @@index([workerId, startedAt(sort: Desc)])
+  @@index([status])
+  @@map("job_executions")
+}
+
+

@@ -5,3 +5,4 @@ export * from "./notification.queue";
 export * from "./dead-letter.queue";
 export * from "./webhook.queue";
 export * from "./scheduled-task.queue";
+export * from "./rag-indexing.queue";

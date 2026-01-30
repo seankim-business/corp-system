@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { Response } from "express";
 import { db as prisma } from "../../db/client";
 import { logger } from "../../utils/logger";
+import { sseManager } from "../../api/sse";
 
 interface SSEClient {
   id: string;
@@ -32,7 +33,13 @@ interface CompletionResult {
 }
 
 interface ActivityEvent {
-  type: "agent_started" | "agent_progress" | "agent_completed" | "agent_failed";
+  type:
+    | "agent_started"
+    | "agent_progress"
+    | "agent_completed"
+    | "agent_failed"
+    | "agent_delegated"
+    | "account_selected";
   activityId: string;
   organizationId: string;
   sessionId: string;
@@ -85,7 +92,7 @@ class AgentActivityService extends EventEmitter {
         inputData: params.inputData,
         metadata: params.metadata,
       },
-      timestamp: activity.startedAt,
+      timestamp: (activity.startedAt ?? new Date()) as Date,
     };
 
     this.broadcast(params.organizationId, event);
@@ -125,7 +132,7 @@ class AgentActivityService extends EventEmitter {
       type: "agent_progress",
       activityId,
       organizationId: activity.organizationId,
-      sessionId: activity.sessionId,
+      sessionId: (activity.sessionId ?? "") as string,
       agentType: activity.agentType,
       agentName: activity.agentName || undefined,
       category: activity.category || undefined,
@@ -157,7 +164,9 @@ class AgentActivityService extends EventEmitter {
     }
 
     const completedAt = new Date();
-    const durationMs = completedAt.getTime() - activity.startedAt.getTime();
+    const durationMs = activity.startedAt
+      ? completedAt.getTime() - activity.startedAt.getTime()
+      : 0;
     const status = result.errorMessage ? "failed" : "completed";
 
     await prisma.agentActivity.update({
@@ -179,7 +188,7 @@ class AgentActivityService extends EventEmitter {
       type: result.errorMessage ? "agent_failed" : "agent_completed",
       activityId,
       organizationId: activity.organizationId,
-      sessionId: activity.sessionId,
+      sessionId: (activity.sessionId ?? "") as string,
       agentType: activity.agentType,
       agentName: activity.agentName || undefined,
       category: activity.category || undefined,
@@ -201,6 +210,70 @@ class AgentActivityService extends EventEmitter {
     }
   }
 
+  async trackDelegation(parentActivityId: string, childParams: TrackStartParams): Promise<string> {
+    const childActivity = await prisma.agentActivity.create({
+      data: {
+        organizationId: childParams.organizationId,
+        sessionId: childParams.sessionId,
+        agentType: childParams.agentType,
+        agentName: childParams.agentName,
+        category: childParams.category,
+        parentActivityId: parentActivityId,
+        status: "running",
+        startedAt: new Date(),
+        inputData: (childParams.inputData || {}) as any,
+        metadata: (childParams.metadata || {}) as any,
+      },
+    });
+
+    const event: ActivityEvent = {
+      type: "agent_delegated",
+      activityId: childActivity.id,
+      organizationId: childParams.organizationId,
+      sessionId: childParams.sessionId,
+      agentType: childParams.agentType,
+      agentName: childParams.agentName || undefined,
+      category: childParams.category || undefined,
+      data: {
+        parentActivityId,
+        inputData: childParams.inputData,
+      },
+      timestamp: childActivity.startedAt!,
+    };
+
+    this.broadcast(childParams.organizationId, event);
+
+    return childActivity.id;
+  }
+
+  async trackAccountSelection(
+    organizationId: string,
+    sessionId: string,
+    accountInfo: {
+      accountId: string;
+      nickname: string;
+      usage: number;
+      drainRate: number;
+    },
+  ): Promise<void> {
+    const event: ActivityEvent = {
+      type: "account_selected",
+      activityId: accountInfo.accountId,
+      organizationId,
+      sessionId,
+      agentType: "account_selector",
+      data: {
+        accountId: accountInfo.accountId,
+        nickname: accountInfo.nickname,
+        usage: accountInfo.usage,
+        drainRate: accountInfo.drainRate,
+      },
+      timestamp: new Date(),
+    };
+
+    this.broadcast(organizationId, event);
+  }
+
   addSSEClient(client: SSEClient): void {
     this.clients.set(client.id, client);
     logger.info("SSE client connected to agent activity stream", {
@@ -219,6 +292,8 @@ class AgentActivityService extends EventEmitter {
   }
 
   private broadcast(organizationId: string, event: ActivityEvent): void {
+    sseManager.sendToOrganization(organizationId, event.type, event);
+
     const orgClients = Array.from(this.clients.values()).filter(
       (c) => c.organizationId === organizationId,
     );
@@ -240,6 +315,7 @@ class AgentActivityService extends EventEmitter {
       type: event.type,
       activityId: event.activityId,
       recipientCount: orgClients.length,
+      viaRedis: true,
     });
   }
 
