@@ -10,7 +10,6 @@ import {
   seedApprovalHistory,
   ApprovalRequest,
   RequestType,
-  RiskLevel,
 } from "../approval-risk-scorer";
 
 describe("Approval Risk Scorer", () => {

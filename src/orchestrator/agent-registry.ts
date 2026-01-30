@@ -1,4 +1,4 @@
-import { Category, Skill } from "./types";
+import { Category, Skill, asSkillId } from "./types";
 
 export type AgentType =
   | "orchestrator"
@@ -247,7 +247,7 @@ Task prioritization considers:
     description: "Specializes in approval workflows and human-in-the-loop processes with intelligent risk scoring",
     emoji: "🔐",
     category: "quick",
-    skills: ["mcp-integration", "risk-scoring" as any],
+    skills: ["mcp-integration", asSkillId("risk-scoring")],
     capabilities: [
       {
         name: "approval_creation",

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db as prismaDb } from "../db/client";
 import { logger } from "../utils/logger";
 import { n8nPermissionService } from "../services/n8n/permission-service";
-import { workflowGeneratorService } from "../services/n8n/workflow-generator";
+import { workflowGenerator, workflowGeneratorService } from "../services/n8n/workflow-generator";
 import type { GenerateOptions } from "../services/n8n/workflow-generator";
 import { n8nSkillAdapter } from "../services/n8n/skill-adapter";
 import { sopConverter } from "../services/n8n/sop-converter";
@@ -217,14 +217,22 @@ router.post("/workflows", requireAuth, async (req: Request, res: Response) => {
 router.post("/generate", requireAuth, async (req: Request, res: Response) => {
   try {
     const data = GenerateAiWorkflowSchema.parse(req.body);
-    const workflow = await workflowGeneratorService.generateWorkflow(data.prompt, {
+    const organizationId = req.currentOrganizationId!;
+    const userId = req.user!.id;
+
+    const result = await workflowGenerator.generate({
+      prompt: data.prompt,
+      organizationId,
+      userId,
       category: data.category,
+      availableCredentials: data.availableCredentials,
     });
 
-    return res.json({
-      success: true,
-      workflow,
-    });
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || "Failed to generate workflow" });
+    }
+
+    return res.json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
