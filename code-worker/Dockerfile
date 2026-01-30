@@ -1,4 +1,18 @@
 # Code Worker - Isolated Environment for Code Operations
+# Multi-stage build for TypeScript compilation
+
+# Stage 1: Build
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+COPY package*.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src/ ./src/
+RUN npm run build
+
+# Stage 2: Production
 FROM node:20-alpine
 
 # Security: Non-root user
@@ -23,7 +37,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
-COPY --chown=coderunner:coderunner dist/ ./dist/
+# Copy built files from builder stage
+COPY --from=builder --chown=coderunner:coderunner /build/dist/ ./dist/
 
 # Switch to non-root user
 USER coderunner
