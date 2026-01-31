@@ -7,6 +7,7 @@
 import { WebClient } from "@slack/web-api";
 import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
+import { runWithoutRLS } from "../utils/async-context";
 import { getSlackIntegrationByOrg } from "../api/slack-integration";
 import { getActiveAlerts, ProactiveAlert } from "./proactive-monitor";
 import { getLearningInsights, LearningInsight } from "./learning-system";
@@ -582,17 +583,21 @@ export async function getUsersForBriefing(
 > {
   const timeStr = `${currentHour.toString().padStart(2, "0")}:${currentMinute.toString().padStart(2, "0")}`;
 
-  const memberships = await prisma.membership.findMany({
-    where: {
-      dailyBriefingEnabled: true,
-      dailyBriefingTime: timeStr,
-    },
-    select: {
-      userId: true,
-      organizationId: true,
-      dailyBriefingTimezone: true,
-    },
-  });
+  // Wrap in runWithoutRLS to bypass circuit breaker for scheduled job queries
+  // This query runs every minute and must not count towards circuit breaker failures
+  const memberships = await runWithoutRLS(() =>
+    prisma.membership.findMany({
+      where: {
+        dailyBriefingEnabled: true,
+        dailyBriefingTime: timeStr,
+      },
+      select: {
+        userId: true,
+        organizationId: true,
+        dailyBriefingTimezone: true,
+      },
+    })
+  );
 
   return memberships.map((m: MembershipBriefing) => ({
     userId: m.userId,

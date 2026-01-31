@@ -13,6 +13,7 @@ import { metrics } from "../../utils/metrics";
 import { arApprovalService } from "./ar-approval.service";
 import { arSlackNotifier } from "../notifications/ar-slack-notifier.service";
 import { arAuditService } from "../audit/ar-audit.service";
+import { runWithoutRLS } from "../../utils/async-context";
 
 // =============================================================================
 // TYPES
@@ -134,12 +135,14 @@ export class ARAutoEscalationJob {
         details: [],
       };
 
-      // Find all pending requests
-      const pendingRequests = await prisma.aRApprovalRequest.findMany({
-        where: {
-          status: "pending",
-        },
-      });
+      // Find all pending requests - wrap in runWithoutRLS to bypass circuit breaker
+      const pendingRequests = await runWithoutRLS(() =>
+        prisma.aRApprovalRequest.findMany({
+          where: {
+            status: "pending",
+          },
+        })
+      );
 
       const now = new Date();
 
@@ -406,12 +409,14 @@ export async function runOrganizationEscalationCheck(
     details: [],
   };
 
-  const pendingRequests = await prisma.aRApprovalRequest.findMany({
-    where: {
-      organizationId,
-      status: "pending",
-    },
-  });
+  const pendingRequests = await runWithoutRLS(() =>
+    prisma.aRApprovalRequest.findMany({
+      where: {
+        organizationId,
+        status: "pending",
+      },
+    })
+  );
 
   const now = new Date();
   const job = new ARAutoEscalationJob({ enabled: true });

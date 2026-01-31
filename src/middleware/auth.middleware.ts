@@ -39,9 +39,12 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       });
     }
 
-    const user = await db.user.findUnique({
-      where: { id: payload.userId },
-    });
+    // Wrap in runWithoutRLS to bypass circuit breaker for auth bootstrap
+    const user = await runWithoutRLS(() =>
+      db.user.findUnique({
+        where: { id: payload.userId },
+      })
+    );
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
@@ -124,9 +127,12 @@ export async function authenticateOptional(req: Request, _res: Response, next: N
 
     const payload = authService.verifySessionToken(token);
 
-    const user = await db.user.findUnique({
-      where: { id: payload.userId },
-    });
+    // Wrap in runWithoutRLS to bypass circuit breaker for auth bootstrap
+    const user = await runWithoutRLS(() =>
+      db.user.findUnique({
+        where: { id: payload.userId },
+      })
+    );
 
     if (!user) {
       return next();

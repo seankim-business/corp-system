@@ -4,6 +4,7 @@ import { logger } from "./logger";
 import { startDailyBriefingJob, stopDailyBriefingJob } from "../jobs/daily-briefing.job";
 import { runFeedbackAnalysis } from "../jobs/feedback-analysis.job";
 import { arAutoEscalationJob } from "../ar/approval/ar-auto-escalation.job";
+import { runWithoutRLS } from "./async-context";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -60,24 +61,29 @@ function scheduleAuditLogCleanup() {
 async function expireApprovals(): Promise<number> {
   const now = new Date();
 
-  const expiredApprovals = await prisma.approval.findMany({
-    where: {
-      status: "pending",
-      expiresAt: { lt: now },
-    },
-  });
+  // Wrap in runWithoutRLS to bypass circuit breaker for scheduled job queries
+  const expiredApprovals = await runWithoutRLS(() =>
+    prisma.approval.findMany({
+      where: {
+        status: "pending",
+        expiresAt: { lt: now },
+      },
+    })
+  );
 
   if (expiredApprovals.length === 0) {
     return 0;
   }
 
-  await prisma.approval.updateMany({
-    where: {
-      id: { in: expiredApprovals.map((a: { id: string }) => a.id) },
-      status: "pending",
-    },
-    data: { status: "expired" },
-  });
+  await runWithoutRLS(() =>
+    prisma.approval.updateMany({
+      where: {
+        id: { in: expiredApprovals.map((a: { id: string }) => a.id) },
+        status: "pending",
+      },
+      data: { status: "expired" },
+    })
+  );
 
   for (const approval of expiredApprovals) {
     await createAuditLog({
