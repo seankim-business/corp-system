@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, request } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 import { useMemberIdentities, type MemberIdentity } from "../hooks/useMemberIdentities";
-import { MessageSquare, Mail, FileText, Link as LinkIcon, Users } from "lucide-react";
+import { useSyncSlackIdentities } from "../hooks/useIdentityAdmin";
+import { MessageSquare, Mail, FileText, Link as LinkIcon, Users, RefreshCw } from "lucide-react";
 import InviteFromServicesModal from "../components/InviteFromServicesModal";
 
 interface Member {
@@ -272,7 +273,21 @@ export default function MembersPage() {
   const organizationId = currentOrganization?.id;
   const currentUserId = user?.id;
 
-  const { data: identitiesMap, isLoading: identitiesLoading } = useMemberIdentities();
+  const { data: identitiesMap, isLoading: identitiesLoading, refetch: refetchIdentities } = useMemberIdentities();
+  const syncMutation = useSyncSlackIdentities();
+
+  const handleSyncSlack = () => {
+    if (!confirm("Slack 워크스페이스의 모든 사용자를 동기화합니다. 계속하시겠습니까?")) return;
+    syncMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        alert(`동기화 완료!\n\n총 사용자: ${data.stats.total}\n동기화됨: ${data.stats.synced}\n자동 연결: ${data.stats.autoLinked}\n제안 생성: ${data.stats.suggested}`);
+        refetchIdentities();
+      },
+      onError: (error) => {
+        alert(`동기화 실패: ${error.message}`);
+      },
+    });
+  };
 
   const fetchMembers = useCallback(async () => {
     if (!organizationId) return;
@@ -378,6 +393,14 @@ export default function MembersPage() {
           <p className="text-gray-600">Manage your organization members and their linked accounts</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleSyncSlack}
+            disabled={syncMutation.isPending}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            <RefreshCw size={18} className={syncMutation.isPending ? "animate-spin" : ""} />
+            {syncMutation.isPending ? "동기화 중..." : "Slack 동기화"}
+          </button>
           <button
             onClick={() => setIsInviteFromServicesModalOpen(true)}
             className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
