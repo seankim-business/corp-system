@@ -47,7 +47,7 @@ export default function DashboardPage() {
     async function fetchStats() {
       try {
         setIsLoading(true);
-        const response = await api.get('/dashboard/stats');
+        const response = await api.get('/api/dashboard/stats');
         setStats(response.data);
         setError(null);
       } catch (err) {
