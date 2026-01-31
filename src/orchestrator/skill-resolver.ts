@@ -54,11 +54,13 @@ export async function resolveSkillsFromRegistry(
       // Get the ExtensionRegistry singleton
       const registry = getExtensionRegistry();
 
-      // Resolve skills for the request using keywords
+      // Resolve skills for the request
+      // NOTE: Do NOT pass keywords as third param - that's agentId (UUID), not keywords.
+      // The method extracts keywords from the request internally.
       const allResolvedSkills = await registry.resolveSkillsForRequest(
         organizationId,
         userRequest,
-        analysis.keywords.join(' '),
+        // agentId is optional - only pass if we have a specific agent UUID to filter by
       );
 
       span.setAttribute('total_matches', allResolvedSkills.length);
