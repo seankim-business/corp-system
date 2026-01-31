@@ -436,7 +436,7 @@ function setupEventHandlers(app: App): void {
           });
 
           if (profile) {
-            const provisionedUser = await provisionSlackUser(user, workspaceId, organization.id, {
+            const provisionedSlackUser = await provisionSlackUser(user, workspaceId, organization.id, {
               email: profile?.email,
               displayName: profile?.display_name || profile?.real_name,
               realName: profile?.real_name,
@@ -447,9 +447,20 @@ function setupEventHandlers(app: App): void {
             logger.warn("Slack user provisioned successfully (WARN for visibility)", {
               slackUserId: user,
               organizationId: organization.id,
-              userId: provisionedUser?.userId,
-              userEmail: provisionedUser?.email,
+              userId: provisionedSlackUser?.userId,
+              userEmail: provisionedSlackUser?.email,
+              hasUserRelation: !!provisionedSlackUser?.user,
             });
+
+            // IMPORTANT: Use the user from provisioning directly to avoid race conditions
+            // The provisionSlackUser function returns SlackUser with { include: { user: true } }
+            if (provisionedSlackUser?.user) {
+              logger.warn("Using provisioned user directly (avoiding redundant lookup)", {
+                slackUserId: user,
+                userId: provisionedSlackUser.user.id,
+              });
+              return provisionedSlackUser.user;
+            }
           } else {
             logger.warn("No Slack profile available for provisioning", { slackUserId: user });
           }
@@ -460,11 +471,11 @@ function setupEventHandlers(app: App): void {
             error: provisionError instanceof Error ? provisionError.message : String(provisionError),
             stack: provisionError instanceof Error ? provisionError.stack : undefined,
           });
-          // Continue anyway - getUserBySlackId may still find the user
+          // Continue to fallback lookup
         }
 
-        // Now lookup user (still within RLS bypass context)
-        logger.warn("Looking up Nubabel user (RLS bypassed for auth bootstrap) - WARN for visibility", {
+        // Fallback: lookup user if provisioning didn't return a user
+        logger.warn("Fallback: Looking up Nubabel user via getUserBySlackId", {
           slackUserId: user,
           organizationId: organization.id,
           workspaceId,
