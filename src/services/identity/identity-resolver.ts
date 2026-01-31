@@ -237,9 +237,11 @@ export class IdentityResolver {
   }
 
   /**
-   * Find user by exact email match within organization
+   * Find user by exact email match within organization.
+   * If user exists but is not a member, auto-create membership for Slack users.
    */
   private async findUserByEmail(organizationId: string, email: string) {
+    // First try to find existing member
     const membership = await db.membership.findFirst({
       where: {
         organizationId,
@@ -247,7 +249,36 @@ export class IdentityResolver {
       },
       include: { user: true },
     });
-    return membership?.user ?? null;
+
+    if (membership?.user) {
+      return membership.user;
+    }
+
+    // User not a member - check if user exists globally
+    const user = await db.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (user) {
+      // Auto-create membership for the user (enables Slack access)
+      logger.info("Auto-creating membership for Slack user", {
+        userId: user.id,
+        organizationId,
+        email: email.toLowerCase(),
+      });
+
+      await db.membership.create({
+        data: {
+          userId: user.id,
+          organizationId,
+          role: "member", // Default role for auto-created members
+        },
+      });
+
+      return user;
+    }
+
+    return null;
   }
 
   /**
