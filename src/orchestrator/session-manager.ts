@@ -1,6 +1,7 @@
 import { db as prisma } from "../db/client";
 import Redis from "ioredis";
 import { Session } from "./types";
+import { runWithoutRLS } from "../utils/async-context";
 
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
@@ -32,18 +33,20 @@ export async function createSession(params: {
     JSON.stringify(session),
   );
 
-  // PostgreSQL에 저장 (Cold)
-  await prisma.session.create({
-    data: {
-      id: session.id,
-      userId: params.userId,
-      organizationId: params.organizationId,
-      source: params.source,
-      state: session.state,
-      history: session.history,
-      metadata: session.metadata,
-      expiresAt: session.expiresAt,
-    },
+  // PostgreSQL에 저장 (Cold) - RLS bypass for auth bootstrap
+  await runWithoutRLS(async () => {
+    await prisma.session.create({
+      data: {
+        id: session.id,
+        userId: params.userId,
+        organizationId: params.organizationId,
+        source: params.source,
+        state: session.state,
+        history: session.history,
+        metadata: session.metadata,
+        expiresAt: session.expiresAt,
+      },
+    });
   });
 
   return session;
@@ -51,6 +54,7 @@ export async function createSession(params: {
 
 /**
  * 세션 조회
+ * RLS bypass for contexts where org context may not be established
  */
 export async function getSession(sessionId: string): Promise<Session | null> {
   // 1. Redis에서 조회 (빠름)
@@ -59,9 +63,11 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     return JSON.parse(cached);
   }
 
-  // 2. PostgreSQL에서 조회 (느림)
-  const dbSession = await prisma.session.findUnique({
-    where: { id: sessionId },
+  // 2. PostgreSQL에서 조회 (느림) - RLS bypass for auth bootstrap
+  const dbSession = await runWithoutRLS(async () => {
+    return prisma.session.findUnique({
+      where: { id: sessionId },
+    });
   });
 
   if (!dbSession) {
@@ -88,17 +94,20 @@ export async function getSession(sessionId: string): Promise<Session | null> {
 
 /**
  * Slack 스레드로 세션 조회
+ * RLS bypass needed for Slack auth bootstrap context
  */
 export async function getSessionBySlackThread(threadTs: string): Promise<Session | null> {
-  const dbSession = await prisma.session.findFirst({
-    where: {
-      source: "slack",
-      metadata: {
-        path: ["slackThreadTs"],
-        equals: threadTs,
+  const dbSession = await runWithoutRLS(async () => {
+    return prisma.session.findFirst({
+      where: {
+        source: "slack",
+        metadata: {
+          path: ["slackThreadTs"],
+          equals: threadTs,
+        },
       },
-    },
-    orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "desc" },
+    });
   });
 
   if (!dbSession) {
@@ -128,14 +137,16 @@ export async function updateSession(
   // Redis 업데이트
   await redis.setex(`session:${sessionId}`, 3600, JSON.stringify(updatedSession));
 
-  // PostgreSQL 업데이트
-  await prisma.session.update({
-    where: { id: sessionId },
-    data: {
-      state: updatedSession.state,
-      history: updatedSession.history,
-      metadata: updatedSession.metadata,
-      updatedAt: new Date(),
-    },
+  // PostgreSQL 업데이트 - RLS bypass for contexts outside org
+  await runWithoutRLS(async () => {
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        state: updatedSession.state,
+        history: updatedSession.history,
+        metadata: updatedSession.metadata,
+        updatedAt: new Date(),
+      },
+    });
   });
 }
