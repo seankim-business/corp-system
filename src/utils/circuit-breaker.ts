@@ -20,6 +20,7 @@ export class CircuitBreaker {
   private state: CircuitState = "CLOSED";
   private failureCount = 0;
   private successCount = 0;
+  private halfOpenFailures = 0; // Track failures specifically in HALF_OPEN state
   private lastFailureTime: number | null = null;
   private options: CircuitBreakerOptions;
 
@@ -34,6 +35,7 @@ export class CircuitBreaker {
     if (this.state === "OPEN") {
       if (this.shouldAttemptReset()) {
         this.state = "HALF_OPEN";
+        this.halfOpenFailures = 0; // Reset half-open failure counter
         logger.info(`Circuit breaker ${this.name} entering HALF_OPEN state`);
       } else {
         throw new CircuitBreakerError(`Circuit breaker ${this.name} is OPEN`);
@@ -87,8 +89,13 @@ export class CircuitBreaker {
     this.successCount = 0;
 
     if (this.state === "HALF_OPEN") {
-      this.state = "OPEN";
-      logger.warn(`Circuit breaker ${this.name} reopened after failure in HALF_OPEN state`);
+      this.halfOpenFailures++;
+      // Allow up to 3 failures in HALF_OPEN before reopening (more resilient recovery)
+      if (this.halfOpenFailures >= 3) {
+        this.state = "OPEN";
+        this.halfOpenFailures = 0;
+        logger.warn(`Circuit breaker ${this.name} reopened after ${this.halfOpenFailures} failures in HALF_OPEN state`);
+      }
     } else if (this.failureCount >= this.options.failureThreshold) {
       this.state = "OPEN";
       logger.warn(`Circuit breaker ${this.name} opened after ${this.failureCount} failures`);
@@ -116,6 +123,7 @@ export class CircuitBreaker {
     this.state = "CLOSED";
     this.failureCount = 0;
     this.successCount = 0;
+    this.halfOpenFailures = 0;
     this.lastFailureTime = null;
   }
 }
