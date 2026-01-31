@@ -426,7 +426,7 @@ function App() {
           }
         />
         <Route
-          path="/marketplace/:extensionId"
+          path="/marketplace/:slug"
           element={
             <ProtectedRoute>
               <DashboardLayout>
