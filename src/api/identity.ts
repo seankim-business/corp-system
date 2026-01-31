@@ -829,17 +829,31 @@ router.post(
         });
       }
 
-      // Also update SlackUser if it exists
+      // Also create or update SlackUser
       const slackUser = await db.slackUser.findUnique({
         where: { slackUserId },
       });
 
-      if (slackUser && slackUser.userId !== targetUser.id) {
-        await db.slackUser.update({
-          where: { slackUserId },
-          data: { userId: targetUser.id },
+      if (slackUser) {
+        if (slackUser.userId !== targetUser.id) {
+          await db.slackUser.update({
+            where: { slackUserId },
+            data: { userId: targetUser.id },
+          });
+          logger.info("SlackUser updated via fix-link", { slackUserId, userId: targetUser.id });
+        }
+      } else {
+        // Create SlackUser entry if it doesn't exist
+        await db.slackUser.create({
+          data: {
+            slackUserId,
+            userId: targetUser.id,
+            organizationId,
+            email: targetUserEmail,
+            displayName: targetUser.displayName || targetUserEmail,
+          },
         });
-        logger.info("SlackUser updated via fix-link", { slackUserId, userId: targetUser.id });
+        logger.info("SlackUser created via fix-link", { slackUserId, userId: targetUser.id });
       }
 
       return res.json({
