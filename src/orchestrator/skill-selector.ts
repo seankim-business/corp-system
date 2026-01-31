@@ -50,12 +50,14 @@ const SKILL_KEYWORDS: Record<Skill, string[]> = {
     "webpage",
     "캡처",
     "capture",
-    "automation",
-    "자동화",
-    "test",
-    "테스트",
     "scrape",
+    "스크래핑",
     "크롤링",
+    "crawl",
+    "playwright",
+    "headless",
+    "selenium",
+    "puppeteer",
   ],
   "git-master": [
     "커밋",
@@ -136,9 +138,24 @@ function scoreSkill(text: string, skill: Skill): SkillScore {
   let score = 0;
 
   for (const keyword of keywords) {
-    if (text.includes(keyword)) {
-      matchedKeywords.push(keyword);
-      score++;
+    // Use word boundary matching for Latin keywords to avoid false positives
+    // e.g., "test" shouldn't match "contest" or "greatest"
+    // Korean keywords use simple includes() since they use different word separation
+    const isLatinKeyword = /^[a-z0-9-]+$/i.test(keyword);
+
+    if (isLatinKeyword) {
+      // Word boundary match for Latin keywords
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      if (regex.test(text)) {
+        matchedKeywords.push(keyword);
+        score++;
+      }
+    } else {
+      // Simple includes for non-Latin keywords (Korean, etc.)
+      if (text.includes(keyword)) {
+        matchedKeywords.push(keyword);
+        score++;
+      }
     }
   }
 
