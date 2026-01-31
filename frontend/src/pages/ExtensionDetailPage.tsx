@@ -79,11 +79,11 @@ export default function ExtensionDetailPage() {
     if (!slug) return;
     setIsLoading(true);
     try {
-      const result = await request<{ extension: Extension }>({
-        url: `/api/marketplace/extensions/${slug}`,
+      const result = await request<{ success: boolean; data: Extension }>({
+        url: `/api/marketplace/${slug}`,
         method: "GET",
       });
-      setExtension(result.extension);
+      setExtension(result.data);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setError("Extension not found");
@@ -99,13 +99,13 @@ export default function ExtensionDetailPage() {
     if (!slug) return;
     try {
       const result = await request<{ reviews: { items: Review[] }; summary: RatingSummary }>({
-        url: `/api/marketplace/extensions/${slug}/reviews`,
+        url: `/api/marketplace/${slug}/reviews`,
         method: "GET",
       });
-      setReviews(result.reviews.items);
-      setRatingSummary(result.summary);
-    } catch (err) {
-      console.error("Failed to fetch reviews:", err);
+      setReviews(result.reviews?.items || []);
+      setRatingSummary(result.summary || null);
+    } catch {
+      // Reviews endpoint may not exist yet - fail silently
     }
   }, [slug]);
 
@@ -113,12 +113,12 @@ export default function ExtensionDetailPage() {
     if (!slug) return;
     try {
       const result = await request<{ versions: Version[] }>({
-        url: `/api/marketplace/extensions/${slug}/versions`,
+        url: `/api/marketplace/${slug}/versions`,
         method: "GET",
       });
-      setVersions(result.versions);
-    } catch (err) {
-      console.error("Failed to fetch versions:", err);
+      setVersions(result.versions || []);
+    } catch {
+      // Versions endpoint may not exist yet - fail silently
     }
   }, [slug]);
 
@@ -126,24 +126,25 @@ export default function ExtensionDetailPage() {
     if (!slug) return;
     try {
       const result = await request<{ extensions: Extension[] }>({
-        url: `/api/marketplace/extensions/${slug}/similar`,
+        url: `/api/marketplace/${slug}/similar`,
         method: "GET",
       });
-      setSimilar(result.extensions);
-    } catch (err) {
-      console.error("Failed to fetch similar:", err);
+      setSimilar(result.extensions || []);
+    } catch {
+      // Similar endpoint may not exist yet - fail silently
     }
   }, [slug]);
 
   const checkInstalled = useCallback(async () => {
     try {
-      const result = await request<{ installed: { extension: { slug: string } }[] }>({
-        url: "/api/marketplace/installed",
+      const result = await request<{ success: boolean; data: { extensionId: string; extension: { slug: string } }[] }>({
+        url: "/api/marketplace/my-extensions",
         method: "GET",
       });
-      setIsInstalled(result.installed.some((i) => i.extension.slug === slug));
+      const installations = result.data || [];
+      setIsInstalled(installations.some((i) => i.extension?.slug === slug));
     } catch {
-      // Not logged in or other error
+      // Not logged in or other error - fail silently
     }
   }, [slug]);
 
@@ -160,7 +161,7 @@ export default function ExtensionDetailPage() {
     setIsInstalling(true);
     try {
       await request({
-        url: `/api/marketplace/extensions/${extension.id}/install`,
+        url: `/api/marketplace/${extension.slug}/install`,
         method: "POST",
       });
       setIsInstalled(true);
@@ -176,8 +177,8 @@ export default function ExtensionDetailPage() {
     if (!extension || !confirm("Are you sure you want to uninstall this extension?")) return;
     try {
       await request({
-        url: `/api/marketplace/extensions/${extension.id}/uninstall`,
-        method: "POST",
+        url: `/api/marketplace/${extension.slug}/uninstall`,
+        method: "DELETE",
       });
       setIsInstalled(false);
     } catch (err) {

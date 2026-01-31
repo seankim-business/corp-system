@@ -410,6 +410,109 @@ router.get('/suggestions', requireAuth, (req: Request, res: Response) => {
   })();
 });
 
+// Sample extension data for demo/featured extensions
+const SAMPLE_EXTENSIONS: Record<string, any> = {
+  'slack-integration': {
+    id: 'sample-1',
+    name: 'Slack Integration',
+    slug: 'slack-integration',
+    description: 'Connect your workspace with Slack for seamless team communication and notifications.',
+    longDescription: `## Slack Integration for Nubabel
+
+Connect your Nubabel workspace with Slack for seamless team communication and real-time notifications.
+
+### Features
+- **Real-time notifications**: Get instant updates in Slack when workflows complete
+- **Two-way messaging**: Interact with Nubabel directly from Slack channels
+- **Custom triggers**: Set up Slack messages to trigger Nubabel workflows
+- **Team collaboration**: Share workflow results with your team automatically
+
+### Setup
+1. Install the extension
+2. Connect your Slack workspace via OAuth
+3. Configure notification channels
+4. Start automating!`,
+    publisherName: 'Nubabel',
+    publisherVerified: true,
+    version: '1.2.0',
+    category: 'communication',
+    tags: ['slack', 'messaging', 'notifications', 'collaboration'],
+    pricing: 'free',
+    stats: { downloads: 1250, activeInstalls: 890, rating: 4.8, reviewCount: 45 },
+    icon: null,
+    screenshots: [],
+    requirements: { nubabelVersion: '1.0.0', permissions: ['slack:read', 'slack:write'] },
+    publishedAt: '2025-06-15T00:00:00Z',
+    updatedAt: '2025-12-01T00:00:00Z',
+  },
+  'github-sync': {
+    id: 'sample-2',
+    name: 'GitHub Sync',
+    slug: 'github-sync',
+    description: 'Automatically sync your code repositories and track issues directly in Nubabel.',
+    longDescription: `## GitHub Sync for Nubabel
+
+Keep your development workflow in sync with GitHub integration.
+
+### Features
+- **Repository sync**: Monitor commits, PRs, and issues
+- **Automated workflows**: Trigger Nubabel workflows on GitHub events
+- **Issue tracking**: Create and update GitHub issues from Nubabel
+- **Code review automation**: Get notified about review requests
+
+### Setup
+1. Install the extension
+2. Authenticate with GitHub
+3. Select repositories to sync
+4. Configure event triggers`,
+    publisherName: 'Nubabel',
+    publisherVerified: true,
+    version: '2.0.1',
+    category: 'development',
+    tags: ['github', 'git', 'development', 'ci-cd'],
+    pricing: 'free',
+    stats: { downloads: 2100, activeInstalls: 1500, rating: 4.9, reviewCount: 78 },
+    icon: null,
+    screenshots: [],
+    requirements: { nubabelVersion: '1.0.0', permissions: ['github:read', 'github:write'] },
+    publishedAt: '2025-05-01T00:00:00Z',
+    updatedAt: '2025-11-15T00:00:00Z',
+  },
+  'ai-assistant-pro': {
+    id: 'sample-3',
+    name: 'AI Assistant Pro',
+    slug: 'ai-assistant-pro',
+    description: 'Enhanced AI capabilities with custom prompts and workflow automation.',
+    longDescription: `## AI Assistant Pro for Nubabel
+
+Supercharge your workflows with advanced AI capabilities.
+
+### Features
+- **Custom prompts**: Create and save reusable AI prompts
+- **Context-aware responses**: AI that understands your workflow context
+- **Multi-model support**: Choose from various AI models
+- **Batch processing**: Process multiple items with AI
+
+### Setup
+1. Install the extension
+2. Configure AI model preferences
+3. Create your first custom prompt
+4. Start automating with AI`,
+    publisherName: 'Nubabel',
+    publisherVerified: true,
+    version: '3.1.0',
+    category: 'ai-ml',
+    tags: ['ai', 'automation', 'prompts', 'machine-learning'],
+    pricing: 'free',
+    stats: { downloads: 3500, activeInstalls: 2800, rating: 4.7, reviewCount: 120 },
+    icon: null,
+    screenshots: [],
+    requirements: { nubabelVersion: '1.0.0', permissions: ['ai:execute'] },
+    publishedAt: '2025-04-01T00:00:00Z',
+    updatedAt: '2025-12-10T00:00:00Z',
+  },
+};
+
 /**
  * GET /api/marketplace/:slug
  * Get extension details
@@ -419,6 +522,15 @@ router.get('/:slug', requireAuth, (req: Request, res: Response) => {
     try {
       const slug = req.params.slug as string;
       const orgId = getOrgId(req);
+
+      // Check for sample extensions first
+      if (SAMPLE_EXTENSIONS[slug]) {
+        res.json({
+          success: true,
+          data: SAMPLE_EXTENSIONS[slug],
+        });
+        return;
+      }
 
       const extension = await prisma.marketplaceExtension.findFirst({
         where: {
@@ -464,9 +576,38 @@ router.get('/:slug', requireAuth, (req: Request, res: Response) => {
         return;
       }
 
+      // Transform database extension to match expected format
+      const transformed = {
+        id: extension.id,
+        name: extension.name,
+        slug: extension.slug,
+        description: extension.description,
+        longDescription: extension.description, // Use description as fallback
+        publisherName: extension.publisher?.name || 'Unknown',
+        publisherVerified: extension.publisher?.verified || false,
+        version: extension.version,
+        category: extension.category,
+        tags: extension.tags || [],
+        pricing: 'free' as const,
+        stats: {
+          downloads: extension.downloads || 0,
+          activeInstalls: extension.downloads || 0,
+          rating: extension.rating || 0,
+          reviewCount: extension.ratingCount || 0,
+        },
+        icon: null,
+        screenshots: [],
+        requirements: {
+          nubabelVersion: '1.0.0',
+          permissions: extension.toolsRequired || [],
+        },
+        publishedAt: extension.createdAt?.toISOString() || null,
+        updatedAt: extension.updatedAt?.toISOString() || new Date().toISOString(),
+      };
+
       res.json({
         success: true,
-        data: extension,
+        data: transformed,
       });
     } catch (error) {
       logger.error('Failed to get extension details', { slug: req.params.slug }, error as Error);

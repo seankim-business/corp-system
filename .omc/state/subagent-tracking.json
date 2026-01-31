@@ -5,11 +5,13 @@
       "agent_type": "oh-my-claudecode:architect",
       "started_at": "2026-01-31T03:44:17.152Z",
       "parent_mode": "autopilot",
-      "status": "running"
+      "status": "failed",
+      "completed_at": "2026-01-31T03:45:25.101Z",
+      "duration_ms": 67949
     }
   ],
   "total_spawned": 1,
   "total_completed": 0,
-  "total_failed": 0,
-  "last_updated": "2026-01-31T03:44:17.153Z"
+  "total_failed": 1,
+  "last_updated": "2026-01-31T03:45:25.103Z"
 }
