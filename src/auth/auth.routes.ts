@@ -61,13 +61,16 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-router.get("/google", async (_req: Request, res: Response) => {
+router.get("/google", async (req: Request, res: Response) => {
   const verifier = generateCodeVerifier();
   const challenge = generateCodeChallenge(verifier);
+  const returnUrl = (req.query.returnUrl as string) || "/dashboard";
 
   const sessionId = `pkce:${Date.now()}:${Math.random().toString(36).substring(7)}`;
+  // Store verifier and returnUrl together
+  const sessionData = JSON.stringify({ verifier, returnUrl });
   // 15 minutes TTL for PKCE session (users may take time on Google auth page)
-  const stored = await redis.set(sessionId, verifier, 900);
+  const stored = await redis.set(sessionId, sessionData, 900);
 
   if (!stored) {
     logger.error("Failed to store PKCE session in Redis", { sessionId });
@@ -111,8 +114,8 @@ router.get("/google/callback", async (req: Request, res: Response) => {
   try {
     logger.info("Processing OAuth callback", { state, hasCode: !!code });
 
-    const verifier = await redis.get(state as string);
-    if (!verifier) {
+    const sessionData = await redis.get(state as string);
+    if (!sessionData) {
       logger.warn("PKCE session not found or expired", {
         state,
         stateType: typeof state,
@@ -122,7 +125,19 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       return res.redirect(`${frontendUrl}/login?error=session_expired`);
     }
 
-    logger.info("PKCE session validated", { state });
+    // Parse session data (supports legacy string format and new JSON format)
+    let verifier: string;
+    let returnUrl = "/dashboard";
+    try {
+      const parsed = JSON.parse(sessionData);
+      verifier = parsed.verifier;
+      returnUrl = parsed.returnUrl || "/dashboard";
+    } catch {
+      // Legacy format: just the verifier string
+      verifier = sessionData;
+    }
+
+    logger.info("PKCE session validated", { state, returnUrl });
     await redis.del(state as string);
 
     const ipAddress = extractIpAddress(req);
@@ -160,7 +175,8 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       domain: getCookieDomain(),
     });
 
-    const redirectUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL}/dashboard`;
+    const frontendBase = process.env.FRONTEND_URL || process.env.BASE_URL;
+    const redirectUrl = `${frontendBase}${returnUrl}`;
     return res.redirect(redirectUrl);
   } catch (error) {
     const err = error as Error & { response?: { data?: unknown } };

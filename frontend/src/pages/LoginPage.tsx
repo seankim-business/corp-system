@@ -28,7 +28,8 @@ export default function LoginPage() {
 
   const handleGoogleLogin = () => {
     const apiBase = import.meta.env.VITE_API_BASE_URL || "https://auth.nubabel.com";
-    window.location.href = `${apiBase}/auth/google`;
+    const returnUrl = searchParams.get("returnUrl") || "/dashboard";
+    window.location.href = `${apiBase}/auth/google?returnUrl=${encodeURIComponent(returnUrl)}`;
   };
 
   return (

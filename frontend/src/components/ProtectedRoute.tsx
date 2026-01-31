@@ -23,7 +23,7 @@
  */
 
 import { ReactNode, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 
 interface ProtectedRouteProps {
@@ -32,6 +32,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, isLoading, fetchUser } = useAuthStore();
+  const location = useLocation();
 
   useEffect(() => {
     fetchUser();
@@ -49,7 +50,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    const returnUrl = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
   return <>{children}</>;
