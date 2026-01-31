@@ -96,12 +96,17 @@ publicRouter.post("/claude-connect/receive-token", corsMiddleware, async (req, r
       return res.status(400).json({ error: "token and code are required" });
     }
 
-    // Validate token format (sessionKey typically starts with sk-ant-sid)
-    if (!token.startsWith("sk-ant-sid")) {
+    // Validate token format - accept both OAuth (sk-ant-oat01-*) and session (sk-ant-sid*) tokens
+    const isOAuthToken = token.startsWith("sk-ant-oat01-");
+    const isSessionToken = token.startsWith("sk-ant-sid");
+
+    if (!isOAuthToken && !isSessionToken) {
       return res.status(400).json({
-        error: "Invalid token format. Expected Claude sessionKey (starts with sk-ant-sid)",
+        error: "Invalid token format. Run `claude get-token` in your terminal to get a valid token.",
       });
     }
+
+    const tokenType = isOAuthToken ? "oauth" : "session";
 
     // Check if session exists
     const sessionKey = `${REDIS_PREFIX}session:${code}`;
@@ -122,6 +127,7 @@ publicRouter.post("/claude-connect/receive-token", corsMiddleware, async (req, r
       tokenKey,
       JSON.stringify({
         token,
+        tokenType,
         receivedAt: new Date().toISOString(),
       }),
       PENDING_TOKEN_TTL,
@@ -134,12 +140,61 @@ publicRouter.post("/claude-connect/receive-token", corsMiddleware, async (req, r
     logger.info("Claude token received", {
       code: code.substring(0, 8) + "...",
       organizationId: session.organizationId,
+      tokenType,
     });
 
     return res.json({ success: true, message: "Token received successfully" });
   } catch (error) {
     logger.error("Failed to receive Claude token", {}, error as Error);
     return res.status(500).json({ error: "Failed to receive token" });
+  }
+});
+
+/**
+ * POST /api/claude-connect/validate-token
+ * Validates token format without storing it - for frontend auto-validation
+ * PUBLIC ENDPOINT - no auth required
+ */
+publicRouter.options("/claude-connect/validate-token", corsMiddleware);
+publicRouter.post("/claude-connect/validate-token", corsMiddleware, async (req, res) => {
+  try {
+    const { token } = req.body as { token: string };
+
+    if (!token) {
+      return res.status(400).json({
+        valid: false,
+        type: null,
+        error: "Please paste your token from `claude get-token`"
+      });
+    }
+
+    // Validate token format
+    const isOAuthToken = token.startsWith("sk-ant-oat01-");
+    const isSessionToken = token.startsWith("sk-ant-sid");
+
+    if (!isOAuthToken && !isSessionToken) {
+      return res.status(400).json({
+        valid: false,
+        type: null,
+        error: "This doesn't look like a Claude token. Run `claude get-token` to get a valid token.",
+      });
+    }
+
+    const tokenType = isOAuthToken ? "oauth" : "session";
+
+    logger.info("Token format validated", { tokenType, tokenPrefix: token.substring(0, 15) + "..." });
+
+    return res.json({
+      valid: true,
+      type: tokenType,
+    });
+  } catch (error) {
+    logger.error("Token validation failed", {}, error as Error);
+    return res.status(500).json({
+      valid: false,
+      type: null,
+      error: "Validation failed. Please try again."
+    });
   }
 });
 
@@ -235,7 +290,7 @@ authRouter.post("/claude-connect/complete", async (req, res) => {
       return res.status(400).json({ error: "No token received yet" });
     }
 
-    const { token } = JSON.parse(tokenData);
+    const { token, tokenType } = JSON.parse(tokenData);
 
     // Check for duplicate nickname
     const existingByNickname = await db.claudeMaxAccount.findFirst({
@@ -269,7 +324,8 @@ authRouter.post("/claude-connect/complete", async (req, res) => {
         credentialRef,
         metadata: {
           encryptedCredentials,
-          connectedVia: "bookmarklet",
+          connectedVia: tokenType === "oauth" ? "oauth-cli" : "bookmarklet",
+          tokenType: tokenType || "session",
           connectedAt: new Date().toISOString(),
         } as Prisma.InputJsonValue,
       },
