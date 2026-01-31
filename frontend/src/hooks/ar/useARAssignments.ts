@@ -34,6 +34,8 @@ export function useARAssignments(filters?: ARFilters) {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -47,6 +49,8 @@ export function useARAssignment(id: string | undefined) {
       });
     },
     enabled: !!id,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 

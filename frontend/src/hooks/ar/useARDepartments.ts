@@ -33,6 +33,8 @@ export function useARDepartments(filters?: ARFilters) {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -46,6 +48,8 @@ export function useARDepartment(id: string | undefined) {
       });
     },
     enabled: !!id,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -59,6 +63,8 @@ export function useARDepartmentHierarchy(id: string | undefined) {
       });
     },
     enabled: !!id,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 

@@ -24,12 +24,69 @@ import type {
   IdentitySettingsConfig,
 } from "./types";
 
+/**
+ * Simple LRU cache implementation to prevent unbounded memory growth
+ */
+class LRUCache<K, V> {
+  private cache: Map<K, V>;
+  private maxSize: number;
+
+  constructor(maxSize: number) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+  }
+
+  get(key: K): V | undefined {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      // Move to end (most recently used)
+      this.cache.delete(key);
+      this.cache.set(key, value);
+    }
+    return value;
+  }
+
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+
+  set(key: K, value: V): void {
+    // Remove if already exists (to update position)
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+
+    // Evict oldest if at capacity
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey);
+      }
+    }
+
+    this.cache.set(key, value);
+  }
+
+  delete(key: K): boolean {
+    return this.cache.delete(key);
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
 export class IdentityResolver {
   private matcher: FuzzyMatcher;
   private linker: IdentityLinker;
   private suggestions: SuggestionEngine;
-  private userCache: Map<string, { users: any[]; timestamp: number }> = new Map();
+  private userCache: LRUCache<string, { users: any[]; timestamp: number }>;
   private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private readonly MAX_CACHE_ENTRIES = 1000;
   private readonly BATCH_SIZE = 100;
   private readonly MAX_USERS_LIMIT = 1000;
   private readonly MIN_HIGH_CONFIDENCE = 0.8; // Early exit threshold
@@ -39,6 +96,7 @@ export class IdentityResolver {
     this.matcher = matcher ?? fuzzyMatcher;
     this.linker = linker ?? identityLinker;
     this.suggestions = suggestions ?? suggestionEngine;
+    this.userCache = new LRUCache(this.MAX_CACHE_ENTRIES);
   }
 
   /**

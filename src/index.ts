@@ -26,7 +26,7 @@ import {
   webhookRateLimiter,
   sidecarRateLimiter,
 } from "./middleware/rate-limiter.middleware";
-import { getAllCircuitBreakers } from "./utils/circuit-breaker";
+import { getAllCircuitBreakers, getCircuitBreaker } from "./utils/circuit-breaker";
 import { getEnv } from "./utils/env";
 import { startScheduledTasks, stopScheduledTasks } from "./utils/scheduler";
 import {
@@ -494,6 +494,46 @@ app.post("/health/circuits/reset", (req, res) => {
     success: true,
     message: `All ${breakers.size} circuit breakers have been reset`,
   });
+});
+
+/**
+ * POST /health/reset-all
+ * Manual reset endpoint for all circuit breakers, including postgresql.
+ * This endpoint explicitly resets the postgresql circuit breaker along with all others.
+ */
+app.post("/health/reset-all", (_req, res) => {
+  try {
+    const allBreakers = getAllCircuitBreakers();
+    const resetBreakers: string[] = [];
+
+    // Reset all circuit breakers in the registry
+    for (const [name, breaker] of allBreakers) {
+      breaker.reset();
+      resetBreakers.push(name);
+      logger.info(`Circuit breaker ${name} reset via reset-all endpoint`);
+    }
+
+    // Explicitly reset the postgresql circuit breaker
+    const postgresqlBreaker = getCircuitBreaker("postgresql");
+    postgresqlBreaker.reset();
+    if (!resetBreakers.includes("postgresql")) {
+      resetBreakers.push("postgresql");
+    }
+    logger.info("PostgreSQL circuit breaker explicitly reset via reset-all endpoint");
+
+    res.json({
+      success: true,
+      resetBreakers,
+      message: `Successfully reset ${resetBreakers.length} circuit breakers`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Failed to reset circuit breakers via reset-all", { error });
+    res.status(500).json({
+      success: false,
+      error: "Failed to reset circuit breakers",
+    });
+  }
 });
 
 app.use("/auth", authRateLimiter, authRoutes);

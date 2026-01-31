@@ -173,7 +173,7 @@ Response: {"searchQuery":"slack integration","preferredType":"mcp_server","capab
     try {
       const response = await this.aiProvider.chat(messages, {
         systemPrompt,
-        model: "claude-3-5-sonnet-20241022",
+        model: "claude-sonnet-4-20250514",
         temperature: 0.3,
         maxTokens: 500,
       });

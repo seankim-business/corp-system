@@ -11,7 +11,7 @@ jest.mock("../delegate-task", () => ({
     output: "Mocked agent response",
     status: "success",
     metadata: {
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-20250514",
       duration: 1000,
     },
   }),
@@ -135,13 +135,13 @@ describe("Multi-Agent Orchestrator", () => {
           agentId: "data" as const,
           success: true,
           output: "Extracted metrics: Revenue $1M",
-          metadata: { duration: 500, model: "claude-3-5-sonnet-20241022" },
+          metadata: { duration: 500, model: "claude-sonnet-4-20250514" },
         },
         {
           agentId: "report" as const,
           success: true,
           output: "Report created successfully",
-          metadata: { duration: 800, model: "claude-3-5-sonnet-20241022" },
+          metadata: { duration: 800, model: "claude-sonnet-4-20250514" },
         },
       ];
 
@@ -169,13 +169,13 @@ describe("Multi-Agent Orchestrator", () => {
           agentId: "data" as const,
           success: true,
           output: "Data extracted",
-          metadata: { duration: 500, model: "claude-3-5-sonnet-20241022" },
+          metadata: { duration: 500, model: "claude-sonnet-4-20250514" },
         },
         {
           agentId: "task" as const,
           success: true,
           output: "Tasks updated",
-          metadata: { duration: 500, model: "claude-3-5-sonnet-20241022" },
+          metadata: { duration: 500, model: "claude-sonnet-4-20250514" },
         },
       ];
 

@@ -16,6 +16,8 @@ export function useARAnalyticsReport(periodDays: number = 30) {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -28,6 +30,8 @@ export function useARMetric(metric: 'workload' | 'performance' | 'cost' | 'compl
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -40,6 +44,8 @@ export function useARDailyOps() {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -53,6 +59,8 @@ export function useARHealthCheck() {
       });
     },
     refetchInterval: 60000, // Refresh every minute
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -65,6 +73,8 @@ export function useARCoachingNeeds() {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -77,5 +87,7 @@ export function useARRecommendations() {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }

@@ -4,7 +4,7 @@ import { getPoolStats } from "../db/redis";
 import { getCacheStats } from "../services/query-cache";
 import { queryMonitor } from "../services/query-monitor";
 import { getDatabaseCircuitBreakerStats } from "../db/client";
-import { getAllCircuitBreakers } from "../utils/circuit-breaker";
+import { getAllCircuitBreakers, getCircuitBreaker } from "../utils/circuit-breaker";
 
 const router = Router();
 
@@ -349,6 +349,46 @@ router.post("/circuit-breakers/reset", (_req: Request, res: Response) => {
   } catch (error) {
     logger.error("Failed to reset circuit breakers", { error });
     res.status(500).json({ error: "Failed to reset circuit breakers" });
+  }
+});
+
+/**
+ * POST /api/health/reset-all
+ * Manual reset endpoint for all circuit breakers, including postgresql.
+ * Requires admin authentication.
+ */
+router.post("/reset-all", (_req: Request, res: Response) => {
+  try {
+    const allBreakers = getAllCircuitBreakers();
+    const resetBreakers: string[] = [];
+
+    // Reset all circuit breakers in the registry
+    for (const [name, breaker] of allBreakers) {
+      breaker.reset();
+      resetBreakers.push(name);
+      logger.info(`Circuit breaker ${name} reset via reset-all endpoint`);
+    }
+
+    // Explicitly reset the postgresql circuit breaker
+    const postgresqlBreaker = getCircuitBreaker("postgresql");
+    postgresqlBreaker.reset();
+    if (!resetBreakers.includes("postgresql")) {
+      resetBreakers.push("postgresql");
+    }
+    logger.info("PostgreSQL circuit breaker explicitly reset via reset-all endpoint");
+
+    res.json({
+      success: true,
+      resetBreakers,
+      message: `Successfully reset ${resetBreakers.length} circuit breakers`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Failed to reset circuit breakers via reset-all", { error });
+    res.status(500).json({
+      success: false,
+      error: "Failed to reset circuit breakers"
+    });
   }
 });
 

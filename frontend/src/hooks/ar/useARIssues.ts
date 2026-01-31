@@ -17,6 +17,8 @@ export function useARIssues() {
       });
     },
     refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -30,6 +32,8 @@ export function useARIssueSummary() {
       });
     },
     refetchInterval: 30000,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 

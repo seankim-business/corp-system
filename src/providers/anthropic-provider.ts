@@ -26,15 +26,15 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     outputCostPer1k: 0.005,
   },
   {
-    id: "claude-3-5-sonnet-20241022",
-    name: "Claude 3.5 Sonnet",
+    id: "claude-sonnet-4-20250514",
+    name: "Claude Sonnet 4",
     contextWindow: 200000,
     inputCostPer1k: 0.003,
     outputCostPer1k: 0.015,
   },
   {
-    id: "claude-3-opus-20240229",
-    name: "Claude 3 Opus",
+    id: "claude-opus-4-20250514",
+    name: "Claude Opus 4",
     contextWindow: 200000,
     inputCostPer1k: 0.015,
     outputCostPer1k: 0.075,
@@ -43,8 +43,8 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
 
 const TIER_TO_MODEL: Record<ModelTier, string> = {
   fast: "claude-3-5-haiku-20241022",
-  standard: "claude-3-5-sonnet-20241022",
-  advanced: "claude-3-opus-20240229",
+  standard: "claude-sonnet-4-20250514",
+  advanced: "claude-opus-4-20250514",
 };
 
 export class AnthropicProvider implements AIProvider {

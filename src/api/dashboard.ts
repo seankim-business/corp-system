@@ -10,6 +10,7 @@ const CACHE_TTL_SECONDS = 60;
 const LOCK_TTL_MS = 10000;
 const LOCK_RETRY_INTERVAL_MS = 50;
 const MAX_LOCK_WAIT_MS = 5000;
+const IN_MEMORY_CACHE_TTL_MS = 30000; // 30 seconds
 
 interface DashboardStats {
   totalWorkflows: number;
@@ -18,6 +19,13 @@ interface DashboardStats {
   activeIntegrations: string[];
   pendingApprovals: number;
 }
+
+interface CachedStats {
+  data: DashboardStats;
+  timestamp: number;
+}
+
+const inMemoryCache = new Map<string, CachedStats>();
 
 async function getWithStampedeProtection(
   redis: any,
@@ -68,23 +76,45 @@ router.get("/stats", requireAuth, async (req: Request, res: Response): Promise<v
     const { organizationId } = req.user!;
     const cacheKey = `dashboard:stats:${organizationId}`;
 
+    // Check in-memory cache first
+    const cached = inMemoryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < IN_MEMORY_CACHE_TTL_MS) {
+      logger.debug("Dashboard stats served from in-memory cache", { organizationId });
+      res.json(cached.data);
+      return;
+    }
+
     let redis = null;
     try {
       redis = await getRedisConnection();
       const stats = await getWithStampedeProtection(redis, cacheKey, () =>
         calculateDashboardStats(organizationId),
       );
-      logger.debug("Dashboard stats served", { organizationId });
+      // Update in-memory cache
+      inMemoryCache.set(cacheKey, { data: stats, timestamp: Date.now() });
+      logger.debug("Dashboard stats served from Redis", { organizationId });
       res.json(stats);
       return;
     } catch (cacheError) {
-      logger.warn("Redis cache operation failed, computing directly", {
+      logger.warn("Redis cache operation failed, checking in-memory cache", {
         organizationId,
         error: cacheError instanceof Error ? cacheError.message : String(cacheError),
       });
+
+      // Fallback to in-memory cache even if expired
+      if (cached) {
+        logger.info("Serving stale in-memory cache due to Redis failure", {
+          organizationId,
+          age: Date.now() - cached.timestamp
+        });
+        res.json(cached.data);
+        return;
+      }
     }
 
     const stats = await calculateDashboardStats(organizationId);
+    // Update in-memory cache
+    inMemoryCache.set(cacheKey, { data: stats, timestamp: Date.now() });
     res.json(stats);
   } catch (error) {
     logger.error(

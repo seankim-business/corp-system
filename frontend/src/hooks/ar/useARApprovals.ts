@@ -28,6 +28,8 @@ export function useARApprovals(filters?: ARFilters & { requestType?: string; lev
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -41,6 +43,8 @@ export function useARApproval(id: string | undefined) {
       });
     },
     enabled: !!id,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -53,6 +57,8 @@ export function usePendingApprovals() {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 

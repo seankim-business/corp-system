@@ -35,13 +35,6 @@ const CLAUDE_MAX_MODELS: ModelInfo[] = [
     inputCostPer1k: 0, // Free with Claude Max subscription
     outputCostPer1k: 0,
   },
-  {
-    id: "claude-3-5-sonnet-20241022",
-    name: "Claude 3.5 Sonnet",
-    contextWindow: 200000,
-    inputCostPer1k: 0,
-    outputCostPer1k: 0,
-  },
 ];
 
 // Map model tiers to Claude Max model IDs

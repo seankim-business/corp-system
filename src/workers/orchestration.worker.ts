@@ -11,6 +11,7 @@ import { emitJobProgress, PROGRESS_STAGES, PROGRESS_PERCENTAGES } from "../event
 import { runWithContext } from "../utils/async-context";
 import { getSlackProgressService } from "../services/slack-progress.service";
 import { slackStatusUpdater } from "../services/slack-status-updater";
+import { agentActivityService } from "../services/monitoring/agent-activity.service";
 
 export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
   constructor() {
@@ -51,6 +52,23 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
       eventId,
       sessionId,
     });
+
+    // Track agent start for Activity page real-time monitoring
+    let activityId: string | undefined;
+    try {
+      activityId = await agentActivityService.trackStart({
+        organizationId,
+        sessionId,
+        agentType: "orchestrator",
+        agentName: "Nubabel Orchestrator",
+        category: "orchestration",
+        inputData: { userRequest: userRequest.substring(0, 200), eventId },
+        metadata: { jobId: job.id, slackChannel, slackThreadTs },
+      });
+      logger.info(`Agent activity tracking started for event ${eventId}`, { activityId });
+    } catch (activityErr) {
+      logger.error(`Failed to track agent start for event ${eventId}`, { error: String(activityErr) });
+    }
 
     // Store Slack context and update status with thinking messages
     if (eventId && slackChannel && slackThreadTs) {
@@ -120,6 +138,19 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         threadContext,
         eventId,
       });
+
+      // Track orchestration progress
+      if (activityId) {
+        try {
+          await agentActivityService.trackProgress(activityId, {
+            message: `Processing with ${result.metadata.category}`,
+            progress: 60,
+            metadata: { category: result.metadata.category, skills: result.metadata.skills },
+          });
+        } catch (progressErr) {
+          logger.error(`Failed to track agent progress for event ${eventId}`, { error: String(progressErr) });
+        }
+      }
 
       await job.updateProgress(PROGRESS_PERCENTAGES.PROCESSING);
       await emitJobProgress(
@@ -249,6 +280,24 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         status: result.status,
         duration,
       });
+
+      // Track agent completion for Activity page
+      if (activityId) {
+        try {
+          await agentActivityService.trackComplete(activityId, {
+            outputData: {
+              status: result.status,
+              category: result.metadata.category,
+              skills: result.metadata.skills,
+              model: result.metadata.model,
+            },
+            metadata: { duration, eventId },
+          });
+          logger.info(`Agent activity tracking completed for event ${eventId}`, { activityId });
+        } catch (completeErr) {
+          logger.error(`Failed to track agent completion for event ${eventId}`, { error: String(completeErr) });
+        }
+      }
     } catch (error: any) {
       logger.error(`Orchestration failed for event ${eventId}:`, error);
 
@@ -295,6 +344,19 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         sessionId,
         error: error.message,
       });
+
+      // Track agent failure for Activity page
+      if (activityId) {
+        try {
+          await agentActivityService.trackComplete(activityId, {
+            errorMessage: error.message,
+            metadata: { eventId, attemptsMade: job.attemptsMade },
+          });
+          logger.info(`Agent activity tracking failed for event ${eventId}`, { activityId });
+        } catch (failErr) {
+          logger.error(`Failed to track agent failure for event ${eventId}`, { error: String(failErr) });
+        }
+      }
 
       if (job.attemptsMade >= (job.opts.attempts || 2)) {
         await deadLetterQueue.enqueueFailedJob({

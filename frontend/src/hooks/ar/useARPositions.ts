@@ -33,6 +33,8 @@ export function useARPositions(filters?: ARFilters) {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -46,6 +48,8 @@ export function useARPosition(id: string | undefined) {
       });
     },
     enabled: !!id,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 

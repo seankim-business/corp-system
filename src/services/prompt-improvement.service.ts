@@ -134,7 +134,7 @@ async function detectPatternsWithLLM(
   }));
 
   const message = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-sonnet-4-20250514",
     max_tokens: 4096,
     temperature: 0.3,
     messages: [
@@ -222,7 +222,7 @@ export async function generatePromptSuggestion(
   pattern: CorrectionPattern,
 ): Promise<string> {
   const message = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-sonnet-4-20250514",
     max_tokens: 2048,
     temperature: 0.5,
     messages: [

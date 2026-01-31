@@ -190,7 +190,17 @@ export async function shutdownSSE(): Promise<void> {
   await sseManager.shutdown();
 }
 
-sseRouter.get("/events", authenticate, (req: Request, res: Response) => {
+sseRouter.get("/events", authenticate, async (req: Request, res: Response) => {
+  // Redis health check before setting up SSE connection
+  try {
+    const redis = getQueueConnectionSync(false);
+    await redis.ping();
+  } catch (err) {
+    logger.error("Redis unavailable for SSE setup", { error: String(err) });
+    res.status(503).json({ error: "SSE temporarily unavailable" });
+    return;
+  }
+
   const clientId = `${req.user!.id}-${Date.now()}`;
   const lastEventIdHeader = req.header("Last-Event-ID");
   const lastEventId = typeof lastEventIdHeader === "string" ? lastEventIdHeader : undefined;

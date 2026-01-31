@@ -45,7 +45,7 @@ export default function ARAssignmentsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const { data: positionsData } = useARPositions({ status: "active" });
+  const { data: positionsData } = useARPositions();
   const { data: agentsData } = useAgents();
   const { data, isLoading, refetch } = useARAssignments({
     status: statusFilter === "all" ? undefined : statusFilter,

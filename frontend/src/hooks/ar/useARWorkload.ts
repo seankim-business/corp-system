@@ -17,6 +17,8 @@ export function useARWorkload() {
       });
     },
     refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -29,6 +31,8 @@ export function useRebalanceProposals() {
         method: "GET",
       });
     },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
   });
 }
 
