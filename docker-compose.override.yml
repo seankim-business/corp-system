@@ -1,0 +1,19 @@
+# Local development overrides
+# Use different ports to avoid conflicts with other projects
+
+version: '3.8'
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  n8n:
+    environment:
+      # Connect to local postgres on port 5433
+      - DB_POSTGRESDB_HOST=host.docker.internal
+      - DB_POSTGRESDB_PORT=5433
+      - QUEUE_BULL_REDIS_HOST=host.docker.internal
+      - QUEUE_BULL_REDIS_PORT=6379
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

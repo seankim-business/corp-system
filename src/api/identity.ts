@@ -911,4 +911,198 @@ router.post(
   },
 );
 
+/**
+ * POST /api/admin/identities/create-user-and-link
+ * Emergency endpoint to create a Nubabel user account AND link their Slack identity
+ * Used when the user doesn't exist in Nubabel yet
+ */
+router.post(
+  "/admin/identities/create-user-and-link",
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId, id: adminId } = req.user!;
+      const { slackUserId, email, displayName } = req.body;
+
+      if (!slackUserId || !email) {
+        return res.status(400).json({
+          error: "Missing required fields",
+          required: ["slackUserId", "email"],
+          optional: ["displayName"],
+        });
+      }
+
+      logger.info("Admin create-user-and-link requested", {
+        slackUserId,
+        email,
+        displayName,
+        adminId,
+        organizationId,
+      });
+
+      const result = await runWithoutRLS(async () => {
+        const normalizedEmail = email.toLowerCase();
+
+        // 1. Check if user already exists
+        let user = await db.user.findUnique({
+          where: { email: normalizedEmail },
+        });
+
+        if (user) {
+          logger.info("create-user-and-link: User already exists", {
+            userId: user.id,
+            email: normalizedEmail,
+          });
+        } else {
+          // Create new user
+          user = await db.user.create({
+            data: {
+              email: normalizedEmail,
+              displayName: displayName || email.split("@")[0],
+              emailVerified: true, // Admin-created users skip email verification
+            },
+          });
+          logger.info("create-user-and-link: User created", {
+            userId: user.id,
+            email: normalizedEmail,
+          });
+        }
+
+        // 2. Check/create membership
+        const existingMembership = await db.membership.findFirst({
+          where: { userId: user.id, organizationId },
+        });
+
+        if (!existingMembership) {
+          await db.membership.create({
+            data: {
+              userId: user.id,
+              organizationId,
+              role: "member",
+            },
+          });
+          logger.info("create-user-and-link: Membership created", {
+            userId: user.id,
+            organizationId,
+          });
+        }
+
+        // 3. Get SlackIntegration for workspaceId
+        const slackIntegration = await db.slackIntegration.findFirst({
+          where: { organizationId },
+        });
+
+        if (!slackIntegration?.workspaceId) {
+          logger.warn("create-user-and-link: No SlackIntegration.workspaceId found", { organizationId });
+          return { error: "No SlackIntegration.workspaceId found for organization" };
+        }
+
+        // 4. Create/update ExternalIdentity
+        const existingIdentity = await db.externalIdentity.findUnique({
+          where: {
+            organizationId_provider_providerUserId: {
+              organizationId,
+              provider: "slack",
+              providerUserId: slackUserId,
+            },
+          },
+        });
+
+        let identity;
+        if (existingIdentity) {
+          identity = await db.externalIdentity.update({
+            where: { id: existingIdentity.id },
+            data: {
+              userId: user.id,
+              email: normalizedEmail,
+              displayName: displayName || existingIdentity.displayName,
+              linkStatus: "linked",
+              linkMethod: "admin",
+              linkedAt: new Date(),
+              lastSyncedAt: new Date(),
+            },
+          });
+          logger.info("create-user-and-link: ExternalIdentity updated", {
+            identityId: identity.id,
+            userId: user.id,
+          });
+        } else {
+          identity = await db.externalIdentity.create({
+            data: {
+              organizationId,
+              provider: "slack",
+              providerUserId: slackUserId,
+              providerTeamId: slackIntegration.workspaceId,
+              email: normalizedEmail,
+              displayName: displayName || email.split("@")[0],
+              userId: user.id,
+              linkStatus: "linked",
+              linkMethod: "admin",
+              linkedAt: new Date(),
+              lastSyncedAt: new Date(),
+            },
+          });
+          logger.info("create-user-and-link: ExternalIdentity created", {
+            identityId: identity.id,
+            userId: user.id,
+          });
+        }
+
+        // 5. Create/update SlackUser
+        const existingSlackUser = await db.slackUser.findUnique({
+          where: { slackUserId },
+        });
+
+        if (existingSlackUser) {
+          if (existingSlackUser.userId !== user.id) {
+            await db.slackUser.update({
+              where: { slackUserId },
+              data: { userId: user.id },
+            });
+            logger.info("create-user-and-link: SlackUser updated", {
+              slackUserId,
+              userId: user.id,
+            });
+          }
+        } else {
+          await db.slackUser.create({
+            data: {
+              slackUserId,
+              slackTeamId: slackIntegration.workspaceId,
+              userId: user.id,
+              organizationId,
+              email: normalizedEmail,
+              displayName: displayName || email.split("@")[0],
+            },
+          });
+          logger.info("create-user-and-link: SlackUser created", {
+            slackUserId,
+            userId: user.id,
+            slackTeamId: slackIntegration.workspaceId,
+          });
+        }
+
+        return {
+          success: true,
+          message: "User created and identity linked",
+          user: {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+          },
+          identity: formatIdentityResponse(identity),
+        };
+      });
+
+      if ("error" in result) {
+        return res.status(400).json(result);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error("Failed to create-user-and-link", { error });
+      return res.status(500).json({ error: "Failed to create user and link identity" });
+    }
+  },
+);
+
 export default router;

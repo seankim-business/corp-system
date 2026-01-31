@@ -107,7 +107,36 @@ async function main() {
       console.log("✅ SlackUser already has correct userId");
     }
   } else {
-    console.log("⚠️ No SlackUser record found for U07NXUUS0FP");
+    // Get slackTeamId from SlackIntegration
+    console.log("📌 Looking up SlackIntegration for workspaceId...");
+    const slackIntegration = await prisma.slackIntegration.findFirst({
+      where: { organizationId }
+    });
+
+    if (!slackIntegration?.workspaceId) {
+      console.error("❌ No SlackIntegration.workspaceId found for organization!");
+      console.log("   Available SlackIntegrations:");
+      const allIntegrations = await prisma.slackIntegration.findMany({
+        include: { organization: true }
+      });
+      for (const i of allIntegrations) {
+        console.log(`   → ${i.workspaceName} (${i.workspaceId}) → ${i.organization.name}`);
+      }
+      return;
+    }
+
+    console.log(`📝 Creating SlackUser with slackTeamId: ${slackIntegration.workspaceId}`);
+    await prisma.slackUser.create({
+      data: {
+        slackUserId,
+        slackTeamId: slackIntegration.workspaceId,
+        userId: nubabelUser.id,
+        organizationId,
+        email: seonbinEmail,
+        displayName: nubabelUser.displayName || seonbinEmail
+      }
+    });
+    console.log("✅ SlackUser created!");
   }
 
   console.log("\n🎉 Fix complete! Test the Slack bot now.");

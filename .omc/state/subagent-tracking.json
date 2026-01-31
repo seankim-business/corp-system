@@ -44,10 +44,19 @@
       "status": "failed",
       "completed_at": "2026-01-31T12:20:50.750Z",
       "duration_ms": 65259
+    },
+    {
+      "agent_id": "a7dfd30",
+      "agent_type": "oh-my-claudecode:qa-tester",
+      "started_at": "2026-01-31T13:11:55.817Z",
+      "parent_mode": "autopilot",
+      "status": "failed",
+      "completed_at": "2026-01-31T13:14:56.067Z",
+      "duration_ms": 180250
     }
   ],
-  "total_spawned": 5,
+  "total_spawned": 6,
   "total_completed": 0,
-  "total_failed": 5,
-  "last_updated": "2026-01-31T12:42:26.902Z"
+  "total_failed": 6,
+  "last_updated": "2026-01-31T13:43:36.367Z"
 }

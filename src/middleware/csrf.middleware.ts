@@ -36,6 +36,7 @@ const EXEMPT_PATHS = [
   "/auth/google/callback",
   "/api/admin/identities/sync-slack", // Admin-only endpoint with auth, CSRF not needed
   "/api/admin/identities/fix-link", // Emergency admin fix endpoint
+  "/api/admin/identities/create-user-and-link", // Emergency admin endpoint to create user + link
 ];
 
 /**
