@@ -196,7 +196,7 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const { organizationId, id: userId } = req.user!;
-      const { status, type, page, limit } = req.query as unknown as ListApprovalsQuery;
+      const { status, type, page, limit } = ((req as any).validatedQuery || req.query) as ListApprovalsQuery;
 
       const where: any = {
         organizationId,

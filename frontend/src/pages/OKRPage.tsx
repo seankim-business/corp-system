@@ -7,6 +7,28 @@
 import { useEffect, useState } from "react";
 import { request } from "../api/client";
 
+// Backend response types
+interface KeyResultResponse {
+  id: string;
+  title: string;
+  current: number;
+  target: number;
+  unit: string;
+  progress: number;
+}
+
+interface ObjectiveResponse {
+  id: string;
+  title: string;
+  description?: string | null;
+  progress: number;
+  keyResults: KeyResultResponse[];
+  ownerId: string;
+  quarter: string;
+  status: string;
+}
+
+// Display types (transformed from backend)
 interface KeyResult {
   id: string;
   title: string;
@@ -22,7 +44,26 @@ interface Objective {
   progress: number;
   keyResults: KeyResult[];
   owner: string;
-  dueDate?: string;
+  quarter?: string;
+}
+
+// Transform backend response to display format
+function transformObjective(obj: ObjectiveResponse): Objective {
+  return {
+    id: obj.id,
+    title: obj.title,
+    description: obj.description || undefined,
+    progress: obj.progress,
+    keyResults: obj.keyResults.map((kr) => ({
+      id: kr.id,
+      title: kr.title,
+      currentValue: kr.current,
+      targetValue: kr.target,
+      unit: kr.unit,
+    })),
+    owner: obj.ownerId || "Unassigned",
+    quarter: obj.quarter,
+  };
 }
 
 export default function OKRPage() {
@@ -32,11 +73,11 @@ export default function OKRPage() {
   useEffect(() => {
     const fetchOKRs = async () => {
       try {
-        const data = await request<{ objectives: Objective[] }>({
-          url: "/api/okrs",
+        const data = await request<{ objectives: ObjectiveResponse[] }>({
+          url: "/api/okr",
           method: "GET",
         });
-        setObjectives(data.objectives || []);
+        setObjectives((data.objectives || []).map(transformObjective));
       } catch (error) {
         console.error("Failed to fetch OKRs:", error);
       } finally {
@@ -102,8 +143,7 @@ export default function OKRPage() {
                   )}
                   <p className="text-sm text-gray-500 mt-2">
                     Owner: {objective.owner}
-                    {objective.dueDate &&
-                      ` | Due: ${new Date(objective.dueDate).toLocaleDateString()}`}
+                    {objective.quarter && ` | ${objective.quarter}`}
                   </p>
                 </div>
                 <div className="text-right">

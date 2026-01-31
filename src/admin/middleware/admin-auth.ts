@@ -8,6 +8,7 @@
 import { Request, Response, NextFunction } from "express";
 import { db as prisma } from "../../db/client";
 import { logger } from "../../utils/logger";
+// Type augmentation is in types/express.d.ts and included in tsconfig
 
 export interface AdminUser {
   id: string;

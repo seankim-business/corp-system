@@ -1,4 +1,4 @@
-import "../../types/express.d.ts";
+// Type augmentation is in types/express.d.ts and included in tsconfig
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "../../middleware/auth.middleware";

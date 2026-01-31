@@ -17,7 +17,10 @@ export function validate(schemas: ValidationSchemas) {
         req.params = (await schemas.params.parseAsync(req.params)) as any;
       }
       if (schemas.query) {
-        req.query = (await schemas.query.parseAsync(req.query)) as any;
+        const validatedQuery = await schemas.query.parseAsync(req.query);
+        // Store validated query in a custom property since req.query may be read-only
+        // The API handlers should use (req as any).validatedQuery || req.query
+        (req as any).validatedQuery = validatedQuery;
       }
       next();
     } catch (error) {

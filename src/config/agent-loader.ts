@@ -21,6 +21,7 @@ export const AgentConfigSchema = z.object({
   sops: z.array(z.string()).optional(),
   fallback: z.boolean().optional().default(false),
   emoji: z.string().optional().default("🤖"),
+  enabled: z.boolean().optional().default(true),
 });
 
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;

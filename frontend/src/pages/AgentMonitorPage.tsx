@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, ReactNode } from "react";
 import { request } from "../api/client";
 
 // Types matching backend CodeOperation model
@@ -127,7 +127,7 @@ export default function AgentMonitorPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, JSX.Element> = {
+    const badges: Record<string, ReactNode> = {
       queued: (
         <span className="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-700 text-slate-300 border border-slate-600">
           QUEUED
