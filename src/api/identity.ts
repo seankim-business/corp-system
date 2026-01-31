@@ -733,4 +733,130 @@ router.post(
   },
 );
 
+/**
+ * POST /api/admin/identities/fix-link
+ * Emergency fix to manually create/link an ExternalIdentity for a Slack user
+ * Admin only - bypasses normal restrictions for quick fixes
+ */
+router.post(
+  "/admin/identities/fix-link",
+  requirePermission(Permission.ADMIN_IDENTITIES_WRITE),
+  async (req: Request, res: Response) => {
+    try {
+      const { organizationId, id: adminId } = req.user!;
+      const { slackUserId, targetUserEmail } = req.body;
+
+      if (!slackUserId || !targetUserEmail) {
+        return res.status(400).json({
+          error: "Missing required fields",
+          required: ["slackUserId", "targetUserEmail"],
+        });
+      }
+
+      logger.info("Admin fix-link requested", {
+        slackUserId,
+        targetUserEmail,
+        adminId,
+        organizationId,
+      });
+
+      // Find the target Nubabel user
+      const targetUser = await db.user.findFirst({
+        where: {
+          email: targetUserEmail.toLowerCase(),
+          memberships: {
+            some: { organizationId },
+          },
+        },
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({
+          error: "Target user not found",
+          email: targetUserEmail,
+        });
+      }
+
+      // Check if ExternalIdentity already exists
+      const existingIdentity = await db.externalIdentity.findUnique({
+        where: {
+          organizationId_provider_providerUserId: {
+            organizationId,
+            provider: "slack",
+            providerUserId: slackUserId,
+          },
+        },
+      });
+
+      let identity;
+      if (existingIdentity) {
+        // Update existing identity
+        identity = await db.externalIdentity.update({
+          where: { id: existingIdentity.id },
+          data: {
+            userId: targetUser.id,
+            linkStatus: "linked",
+            linkMethod: "admin",
+            linkedAt: new Date(),
+            lastSyncedAt: new Date(),
+          },
+        });
+        logger.info("ExternalIdentity updated via fix-link", {
+          identityId: identity.id,
+          slackUserId,
+          userId: targetUser.id,
+        });
+      } else {
+        // Create new identity
+        identity = await db.externalIdentity.create({
+          data: {
+            organizationId,
+            provider: "slack",
+            providerUserId: slackUserId,
+            email: targetUserEmail.toLowerCase(),
+            displayName: targetUser.displayName || targetUserEmail,
+            userId: targetUser.id,
+            linkStatus: "linked",
+            linkMethod: "admin",
+            linkedAt: new Date(),
+            lastSyncedAt: new Date(),
+          },
+        });
+        logger.info("ExternalIdentity created via fix-link", {
+          identityId: identity.id,
+          slackUserId,
+          userId: targetUser.id,
+        });
+      }
+
+      // Also update SlackUser if it exists
+      const slackUser = await db.slackUser.findUnique({
+        where: { slackUserId },
+      });
+
+      if (slackUser && slackUser.userId !== targetUser.id) {
+        await db.slackUser.update({
+          where: { slackUserId },
+          data: { userId: targetUser.id },
+        });
+        logger.info("SlackUser updated via fix-link", { slackUserId, userId: targetUser.id });
+      }
+
+      return res.json({
+        success: true,
+        message: existingIdentity ? "Identity updated and linked" : "Identity created and linked",
+        identity: formatIdentityResponse(identity),
+        targetUser: {
+          id: targetUser.id,
+          email: targetUser.email,
+          displayName: targetUser.displayName,
+        },
+      });
+    } catch (error) {
+      logger.error("Failed to fix-link identity", { error });
+      return res.status(500).json({ error: "Failed to fix-link identity" });
+    }
+  },
+);
+
 export default router;
