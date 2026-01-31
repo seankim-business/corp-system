@@ -21,7 +21,8 @@ export async function getUserBySlackId(
   // the user before we can establish organization context
   return runWithoutRLS(async () => {
     try {
-      logger.info("getUserBySlackId called (RLS bypassed for auth bootstrap)", {
+      // Using WARN level to ensure these diagnostic logs appear in production
+      logger.warn("getUserBySlackId called (RLS bypassed for auth bootstrap)", {
         slackUserId,
         organizationId,
         hasOrganizationId: !!organizationId,
@@ -33,7 +34,7 @@ export async function getUserBySlackId(
         include: { user: true },
       });
 
-    logger.info("Method 1 - SlackUser lookup result", {
+    logger.warn("Method 1 - SlackUser lookup result", {
       slackUserId,
       found: !!slackUserRecord,
       hasUser: !!slackUserRecord?.user,
@@ -44,7 +45,7 @@ export async function getUserBySlackId(
     });
 
     if (slackUserRecord?.user) {
-      logger.info("User found via SlackUser table", {
+      logger.warn("User found via SlackUser table", {
         slackUserId,
         userId: slackUserRecord.user.id,
       });
@@ -53,7 +54,7 @@ export async function getUserBySlackId(
 
     // Method 2: Try ExternalIdentity lookup
     if (organizationId) {
-      logger.info("Method 2 - ExternalIdentity lookup starting", {
+      logger.warn("Method 2 - ExternalIdentity lookup starting", {
         slackUserId,
         organizationId,
       });
@@ -69,7 +70,7 @@ export async function getUserBySlackId(
         include: { user: true },
       });
 
-      logger.info("Method 2 - ExternalIdentity lookup result", {
+      logger.warn("Method 2 - ExternalIdentity lookup result", {
         slackUserId,
         organizationId,
         found: !!externalIdentity,
@@ -80,7 +81,7 @@ export async function getUserBySlackId(
       });
 
       if (externalIdentity?.user) {
-        logger.info("User found via ExternalIdentity", {
+        logger.warn("User found via ExternalIdentity", {
           slackUserId,
           userId: externalIdentity.user.id,
         });
@@ -103,7 +104,7 @@ export async function getUserBySlackId(
     }
 
     // Log the email lookup attempt
-    logger.info("Looking up Nubabel user by Slack email", {
+    logger.warn("Method 3 - Looking up Nubabel user by Slack email", {
       slackUserId,
       email: email.toLowerCase(),
       organizationId,
@@ -114,7 +115,7 @@ export async function getUserBySlackId(
     });
 
     if (user) {
-      logger.info("User found via email lookup", { slackUserId, email: email.toLowerCase(), userId: user.id });
+      logger.warn("User found via email lookup", { slackUserId, email: email.toLowerCase(), userId: user.id });
 
       // Auto-create ExternalIdentity if org is known (for future fast lookup)
       if (organizationId) {
@@ -147,7 +148,7 @@ export async function getUserBySlackId(
             lastSyncedAt: new Date(),
           },
         });
-        logger.info("Auto-linked Slack identity via email", {
+        logger.warn("Auto-linked Slack identity via email", {
           slackUserId,
           userId: user.id,
           organizationId,
