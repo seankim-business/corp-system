@@ -474,15 +474,128 @@ function setupEventHandlers(app: App): void {
         logger.warn("Nubabel user not found for Slack user", {
           slackUserId: user,
           organizationId: organization.id,
-          // This means all 3 lookup methods failed
           lookupMethods: "SlackUser, ExternalIdentity, Email all returned null",
         });
         metrics.increment("slack.error.user_not_found");
 
-        await say({
-          text: "❌ Nubabel user not found. Please login first at https://nubabel.com",
-          thread_ts: thread_ts || ts,
-        });
+        // Try to find potential match by email for account linking
+        try {
+          const slackUserInfo = await client.users.info({ user });
+          const slackEmail = slackUserInfo.user?.profile?.email;
+
+          if (slackEmail) {
+            // Look for a Nubabel user with this email
+            // Use runWithoutRLS since this is fallback auth lookup (circuit breaker bypass needed)
+            const potentialUser = await runWithoutRLS(async () => {
+              return prisma.user.findFirst({
+                where: {
+                  email: slackEmail.toLowerCase(),
+                  memberships: {
+                    some: { organizationId: organization.id }
+                  }
+                },
+              });
+            });
+
+            if (potentialUser) {
+              // Found potential match - offer to link
+              logger.info("Found potential user match for Slack linking", {
+                slackUserId: user,
+                slackEmail,
+                potentialUserId: potentialUser.id,
+              });
+
+              await say({
+                text: `🔗 I found a Nubabel account matching your email (${slackEmail})!`,
+                thread_ts: thread_ts || ts,
+                blocks: [
+                  {
+                    type: "section",
+                    text: {
+                      type: "mrkdwn",
+                      text: `🔗 *Account Link Available*\n\nI found a Nubabel account matching your Slack email:\n• Email: \`${slackEmail}\`\n• Name: ${potentialUser.displayName || 'Unknown'}\n\nClick below to link your accounts and start using @Nubabel.`
+                    }
+                  },
+                  {
+                    type: "actions",
+                    elements: [
+                      {
+                        type: "button",
+                        text: { type: "plain_text", text: "✅ Link My Account", emoji: true },
+                        style: "primary",
+                        action_id: "link_account_confirm",
+                        value: JSON.stringify({
+                          userId: potentialUser.id,
+                          slackUserId: user,
+                          organizationId: organization.id,
+                          workspaceId
+                        })
+                      },
+                      {
+                        type: "button",
+                        text: { type: "plain_text", text: "❌ Not Me", emoji: true },
+                        action_id: "link_account_cancel"
+                      }
+                    ]
+                  },
+                  {
+                    type: "context",
+                    elements: [
+                      {
+                        type: "mrkdwn",
+                        text: "Or visit <https://app.nubabel.com/settings|Settings> to manage your Slack connection"
+                      }
+                    ]
+                  }
+                ]
+              });
+              await sequence.error();
+              return;
+            }
+          }
+
+          // No match found - show helpful instructions
+          await say({
+            text: `❌ I don't recognize you yet.\n\n1. Visit https://app.nubabel.com to create or login to your account\n2. Make sure you use the same email as your Slack (${slackEmail || 'unknown'})\n3. Or go to Settings → Slack Connection to link manually`,
+            thread_ts: thread_ts || ts,
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `❌ *Account Not Found*\n\nI couldn't find a Nubabel account linked to your Slack.${slackEmail ? `\nYour Slack email: \`${slackEmail}\`` : ''}`
+                }
+              },
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: "*To get started:*\n1. Visit <https://app.nubabel.com|app.nubabel.com> to create or login\n2. Use the same email as your Slack account\n3. Come back and mention me again!"
+                }
+              },
+              {
+                type: "context",
+                elements: [
+                  {
+                    type: "mrkdwn",
+                    text: "Already have an account? Go to <https://app.nubabel.com/settings|Settings → Slack Connection>"
+                  }
+                ]
+              }
+            ]
+          });
+        } catch (lookupError) {
+          logger.error("Failed to lookup Slack user for linking", {
+            slackUserId: user,
+            error: lookupError instanceof Error ? lookupError.message : String(lookupError),
+          });
+
+          // Fallback to simple error message
+          await say({
+            text: "❌ Nubabel account not found. Please login first at https://app.nubabel.com",
+            thread_ts: thread_ts || ts,
+          });
+        }
         await sequence.error();
         return;
       }
@@ -1719,6 +1832,121 @@ function setupEventHandlers(app: App): void {
   app.action("feedback_not_helpful", async ({ action, ack, body, client }) => {
     await ack();
     await handleFeedbackAction(action, body, client as WebClient, "negative");
+  });
+
+  // ============================================================================
+  // Account Link Button Handlers
+  // ============================================================================
+
+  // Link account confirmation handler
+  app.action("link_account_confirm", async ({ action, ack, body, client }) => {
+    await ack();
+
+    try {
+      const actionValue = (action as { value?: string }).value;
+      if (!actionValue) {
+        logger.warn("No value in link_account_confirm action");
+        return;
+      }
+
+      const { userId, slackUserId, organizationId, workspaceId } = JSON.parse(actionValue);
+      const clickedBySlackUserId = body.user.id;
+
+      // Security: Verify the clicker is the same user who was offered the link
+      if (clickedBySlackUserId !== slackUserId) {
+        logger.warn("Different user attempted to link account", {
+          expectedSlackUserId: slackUserId,
+          actualSlackUserId: clickedBySlackUserId,
+        });
+        return;
+      }
+
+      // Get Slack user profile for provisioning
+      const slackUserInfo = await client.users.info({ user: slackUserId });
+      const profile = slackUserInfo.user?.profile;
+
+      // Provision the SlackUser link
+      await provisionSlackUser(slackUserId, workspaceId, organizationId, {
+        email: profile?.email,
+        displayName: profile?.display_name || profile?.real_name,
+        realName: profile?.real_name,
+        avatarUrl: profile?.image_192 || profile?.image_72,
+        isBot: slackUserInfo.user?.is_bot,
+        isAdmin: slackUserInfo.user?.is_admin,
+      });
+
+      logger.info("Account linked via Slack button", {
+        slackUserId,
+        userId,
+        organizationId,
+      });
+
+      // Update the message to show success
+      const messageBody = body as { channel?: { id: string }; message?: { ts: string } };
+      if (messageBody.channel?.id && messageBody.message?.ts) {
+        await client.chat.update({
+          channel: messageBody.channel.id,
+          ts: messageBody.message.ts,
+          text: "✅ Account linked successfully!",
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: "✅ *Account Linked Successfully!*\n\nYour Slack account is now connected to Nubabel. You can start using @Nubabel right away!"
+              }
+            },
+            {
+              type: "context",
+              elements: [
+                {
+                  type: "mrkdwn",
+                  text: "Manage your connection at <https://app.nubabel.com/settings|Settings>"
+                }
+              ]
+            }
+          ]
+        });
+      }
+    } catch (error) {
+      logger.error(
+        "Error in link_account_confirm handler",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+  });
+
+  // Link account cancellation handler
+  app.action("link_account_cancel", async ({ ack, body, client }) => {
+    await ack();
+
+    try {
+      // Update the message to acknowledge cancellation
+      const messageBody = body as { channel?: { id: string }; message?: { ts: string } };
+      if (messageBody.channel?.id && messageBody.message?.ts) {
+        await client.chat.update({
+          channel: messageBody.channel.id,
+          ts: messageBody.message.ts,
+          text: "Account linking cancelled",
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: "No problem! If you need help linking your account later, visit <https://app.nubabel.com/settings|Settings → Slack Connection> or contact your administrator."
+              }
+            }
+          ]
+        });
+      }
+    } catch (error) {
+      logger.error(
+        "Error in link_account_cancel handler",
+        {},
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
   });
 
   // Reaction added event handler for feedback capture
