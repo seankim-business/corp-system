@@ -83,6 +83,31 @@ export async function provisionSlackUser(
       }
     }
 
+    // CRITICAL FIX: Update the linked User's displayName if it's null/empty
+    // This is needed because the orchestrator uses User.displayName for "Who am I?" questions
+    const newDisplayName = profile.displayName ?? profile.realName;
+    if (newDisplayName && (!existing.user?.displayName || existing.user.displayName === "")) {
+      logger.info("Updating User displayName from Slack profile", {
+        slackUserId,
+        userId: existing.userId,
+        oldDisplayName: existing.user?.displayName,
+        newDisplayName,
+      });
+      await prisma.user.update({
+        where: { id: existing.userId },
+        data: { displayName: newDisplayName },
+      });
+      // Refresh the updated record to include the new displayName
+      const refreshed = await prisma.slackUser.findUnique({
+        where: { slackUserId },
+        include: { user: true },
+      });
+      if (refreshed) {
+        // Update the return object with fresh user data
+        updated.user = refreshed.user;
+      }
+    }
+
     // Sync to ExternalIdentity for the unified identity system
     // This ensures ExternalIdentity records exist and enables auto-linking
     await syncToExternalIdentity(slackUserId, slackTeamId, organizationId, {
