@@ -56,6 +56,37 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         organizationId,
       });
 
+      // Load user details for context (needed for "Who am I?" type questions)
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+        },
+      });
+
+      if (!currentUser) {
+        logger.error("User not found in orchestrator", { userId, organizationId });
+        return {
+          output: "❌ Unable to identify you. Please try logging in again at https://app.nubabel.com",
+          status: "failed" as const,
+          metadata: {
+            category: "quick" as const,
+            skills: [],
+            duration: 0,
+            model: "none",
+            sessionId,
+          },
+        };
+      }
+
+      logger.info("User loaded for orchestration", {
+        userId,
+        displayName: currentUser.displayName,
+        email: currentUser.email,
+      });
+
       const sessionState = await getSessionState(sessionId);
       const isFollowUp = isFollowUpQuery(userRequest);
 
@@ -245,6 +276,12 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
         })),
         organizationId,
         userId,
+        // Include current user info for identity questions like "Who am I?"
+        currentUser: {
+          id: currentUser.id,
+          displayName: currentUser.displayName,
+          email: currentUser.email,
+        },
         registrySkillPrompts: registrySkillResult?.skillPrompts || [],
         executableSkills: registrySkillResult?.executableSkills || [],
         // Slack thread context for conversation awareness (OpenClaw-style)

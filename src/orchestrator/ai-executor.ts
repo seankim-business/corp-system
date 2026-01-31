@@ -117,10 +117,17 @@ Provide production-ready code with modern best practices.`,
 
 const tracer = trace.getTracer("ai-executor");
 
+interface CurrentUserContext {
+  id: string;
+  displayName?: string | null;
+  email?: string | null;
+}
+
 function buildSystemPrompt(
   skills: string[],
   registrySkillPrompts?: string[],
   threadContext?: string,
+  currentUser?: CurrentUserContext,
 ): string {
   // Base prompt - action-oriented, no unnecessary questions
   // IMPORTANT: Always introduce yourself as Nubabel, regardless of loaded skills
@@ -138,6 +145,18 @@ CORE BEHAVIOR:
 - When context is provided (like Slack channel/thread info), USE IT directly
 - Be concise - do the task, then briefly confirm what you did
 - If a task seems incomplete, make reasonable assumptions and proceed`;
+
+  // Add current user context for identity-related questions
+  if (currentUser) {
+    const userName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+    basePrompt += `
+
+CURRENT USER CONTEXT:
+- The user talking to you is: ${userName}
+- Email: ${currentUser.email || 'not available'}
+- User ID: ${currentUser.id}
+- When they ask "Who am I?" or similar identity questions, tell them their name and email`;
+  }
 
   // Add Slack-specific behavior if thread context is present
   if (threadContext) {
@@ -940,7 +959,8 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
       const model = CATEGORY_MODEL_MAP[params.category] || "claude-sonnet-4-20250514";
       const registrySkillPrompts = (params.context?.registrySkillPrompts as string[] | undefined);
       const threadContext = (params.context?.threadContext as string | undefined);
-      let systemPrompt = buildSystemPrompt(params.skills, registrySkillPrompts, threadContext);
+      const currentUser = (params.context?.currentUser as CurrentUserContext | undefined);
+      let systemPrompt = buildSystemPrompt(params.skills, registrySkillPrompts, threadContext, currentUser);
       const environment = process.env.NODE_ENV || "development";
 
       span.setAttribute("ai.model", model);
