@@ -312,4 +312,63 @@ export class AccountPoolService {
   getAccountType(account: ClaudeAccount): AccountType {
     return account.accountType || this.detectAccountType(account.metadata);
   }
+
+  /**
+   * Get health status for an account
+   */
+  async getAccountHealth(accountId: string): Promise<{
+    status: string;
+    rateLimited: boolean;
+    lastUsed?: string;
+    requestsToday?: number;
+  } | null> {
+    const account = await this.getAccount(accountId);
+    if (!account) return null;
+
+    const isCoolingDown = await this.isAccountCoolingDown(accountId);
+
+    return {
+      status: account.status,
+      rateLimited: isCoolingDown || account.status === "rate_limited",
+      lastUsed: undefined, // Could be enhanced with usage tracking
+      requestsToday: account.dailyUsage?.requestCount,
+    };
+  }
+
+  /**
+   * Register a new account in the pool
+   */
+  async registerAccount(input: {
+    name: string;
+    organizationId: string;
+    apiKey?: string;
+    tier?: "free" | "pro" | "team" | "enterprise";
+    accountType?: AccountType;
+    metadata?: Record<string, unknown>;
+  }): Promise<ClaudeAccount> {
+    // Merge apiKey into metadata if provided
+    const metadata = {
+      ...(input.metadata || {}),
+      ...(input.apiKey ? { apiKey: input.apiKey } : {}),
+    };
+
+    const account = await prisma.claudeAccount.create({
+      data: {
+        name: input.name,
+        organizationId: input.organizationId,
+        status: "active",
+        metadata: metadata as any, // Cast to avoid Prisma JsonValue issues
+      },
+    });
+
+    return {
+      id: account.id,
+      name: account.name,
+      provider: "anthropic",
+      tier: input.tier || "pro",
+      status: account.status as ClaudeAccount["status"],
+      metadata: account.metadata as Record<string, unknown>,
+      accountType: input.accountType,
+    };
+  }
 }

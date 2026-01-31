@@ -329,7 +329,7 @@ router.get("/circuit-breakers", (_req: Request, res: Response) => {
  * POST /api/health/circuit-breakers/reset
  * Reset all circuit breakers (admin action).
  */
-router.post("/circuit-breakers/reset", (req: Request, res: Response) => {
+router.post("/circuit-breakers/reset", (_req: Request, res: Response) => {
   try {
     const allBreakers = getAllCircuitBreakers();
     const resetBreakers: string[] = [];

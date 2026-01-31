@@ -147,3 +147,70 @@ export interface SubAgentResult {
   }>;
   error?: string;
 }
+
+// Hybrid selector types
+export interface UnifiedKeyword {
+  term: string;
+  categories?: Category[];
+  skills?: Skill[];
+  weight: number;
+  language: "en" | "ko" | "both";
+}
+
+export interface SkillCombination {
+  skills: Skill[];
+  score: number;
+  label?: string;
+  confidenceBoost?: number;
+  emergentCategory?: Category;
+}
+
+export interface CategorySkillConflict {
+  category: Category;
+  skill: Skill;
+  skills?: Skill[];
+  reason: string;
+  resolution?: "category" | "skill" | "keep-both" | "downgrade-category" | "remove-skills" | "reject";
+  severity?: "high" | "medium" | "low" | "warn";
+  action?: string;
+}
+
+export interface HybridSkillScore {
+  skill: Skill;
+  score: number;
+  reasons: string[];
+  matchedKeywords?: string[];
+  fromDependency?: boolean;
+}
+
+export interface ResolvedConflict {
+  conflict: CategorySkillConflict;
+  resolution: "category" | "skill" | "keep-both" | "downgrade-category" | "remove-skills" | "reject";
+  reason: string;
+  resolved?: boolean;
+}
+
+export interface HybridSelectionOptions {
+  preferCategory?: boolean;
+  strictMatching?: boolean;
+  minScore?: number;
+  minSkillScore?: number;
+  minKeywordConfidence?: number;
+  enableCombinationDetection?: boolean;
+  enableConflictDetection?: boolean;
+  enableLLMFallback?: boolean;
+  enableCache?: boolean;
+  organizationId?: string;
+  maxSelectionTimeMs?: number;
+}
+
+export interface HybridSelection {
+  category: Category;
+  skills: Skill[];
+  confidence: number;
+  reasoning: string;
+  method?: "keyword" | "llm" | "cached" | "keyword-fast" | "keyword-llm-hybrid";
+  baseCategory?: Category;
+  selectionTimeMs?: number;
+  downgraded?: boolean;
+}
