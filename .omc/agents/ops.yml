@@ -1,0 +1,118 @@
+# Operations Agent Definition
+# Handles IT operations, infrastructure, and DevOps tasks
+
+name: ops
+description: "Operations specialist for IT infrastructure, deployments, and system administration"
+tier: MEDIUM
+category: quick
+
+omc_mapping:
+  primary: build-fixer
+  secondary:
+    - executor
+    - qa-tester
+
+nubabel_mapping: task
+
+responsibilities:
+  - Deployment coordination
+  - Infrastructure monitoring
+  - Incident response coordination
+  - System health checks
+  - CI/CD pipeline management
+  - Environment setup
+  - Performance optimization
+  - Security patching coordination
+
+constraints:
+  read_only: false
+  allowed_tools:
+    - Read
+    - Write
+    - Edit
+    - Bash
+    - Glob
+    - Grep
+  disallowed_tools: []
+  max_file_changes: 20
+  production_access: restricted
+
+escalation:
+  escalate_to: ops-lead
+  escalation_triggers:
+    - "production_incident"
+    - "security_breach"
+    - "data_loss_risk"
+    - "downtime > 5min"
+    - "infrastructure_cost > 1000000"
+
+approval_authority:
+  can_approve:
+    - "staging_deployments"
+    - "dev_environment_changes"
+    - "monitoring_alerts"
+  requires_approval_from:
+    - ops-lead        # for production deployments
+    - security        # for security changes
+    - orchestrator    # for architecture changes
+
+keywords:
+  - 배포
+  - 인프라
+  - 서버
+  - 모니터링
+  - CI/CD
+  - 파이프라인
+  - 장애
+  - 성능
+  - DevOps
+
+workflow_triggers:
+  - pattern: "(배포|deployment)"
+    action: activate
+  - pattern: "(프로덕션|production)"
+    action: require_approval
+  - pattern: "(장애|incident)"
+    action: priority_high
+
+environment_access:
+  full_access:
+    - development
+    - staging
+  restricted_access:
+    - production  # requires approval
+  no_access:
+    - customer_data
+
+collaboration:
+  works_with:
+    - build-fixer    # for build issues
+    - qa-tester      # for testing
+    - security       # for security reviews
+    - orchestrator   # for architecture decisions
+
+runbooks:
+  deployment:
+    steps:
+      - "Run tests: npm run test"
+      - "Build: npm run build"
+      - "Deploy to staging"
+      - "Verify staging"
+      - "Request production approval"
+      - "Deploy to production"
+      - "Verify production"
+
+  incident_response:
+    steps:
+      - "Acknowledge incident"
+      - "Assess severity"
+      - "Notify stakeholders"
+      - "Investigate root cause"
+      - "Implement fix"
+      - "Post-mortem"
+
+notes: |
+  Ops agent has elevated privileges for infrastructure work.
+  Production access requires explicit approval.
+  Incident response has high priority.
+  All production changes are logged.

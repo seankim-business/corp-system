@@ -1,17 +1,18 @@
 {
   "active": true,
   "goal_type": "interactive",
-  "goal_description": "UX 개선 검증: 브라우저(Claude in Chrome) + Slack #it-test @Nubabel",
-  "cycle": 2,
+  "goal_description": "Marketplace Flow 5 - Extension discovery, installation, configuration, and removal",
+  "mode": "ralph-yolo",
+  "cycle": 1,
   "max_cycles": 5,
+  "scenarios": {
+    "A_browsing": { "status": "pending", "items": ["loading", "search", "category_filter", "sort", "pagination"] },
+    "B_details": { "status": "pending", "items": ["page_entry", "content", "install_button"] },
+    "C_installation": { "status": "pending", "items": ["install_flow", "settings", "disable_delete"] },
+    "D_slack_mcp": { "status": "pending", "items": ["mcp_list", "mcp_search", "mcp_info", "mcp_install"] },
+    "E_edge_cases": { "status": "pending", "items": ["network_error", "permissions", "compatibility"] }
+  },
   "failures": [],
-  "started_at": "2026-01-29T21:00:00Z",
-  "test_cases": [
-    "onboarding_wizard",
-    "dashboard_components",
-    "chat_interface",
-    "sse_realtime",
-    "slack_integration"
-  ],
-  "playwright_tests": "PASSED - 12/12 tests"
+  "fixes_applied": [],
+  "started_at": "2026-01-31T10:00:00Z"
 }

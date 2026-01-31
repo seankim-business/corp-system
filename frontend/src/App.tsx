@@ -48,6 +48,7 @@ import ClaudeMaxAccountsPage from "./pages/ClaudeMaxAccountsPage";
 import ClaudeConnectPage from "./pages/ClaudeConnectPage";
 import N8nWorkflowsPage from "./pages/N8nWorkflowsPage";
 import AgentMonitorPage from "./pages/AgentMonitorPage";
+import N8nInstancesPage from "./pages/admin/N8nInstancesPage";
 // AR (Agent Resource) Management Pages
 import ARDashboardPage from "./pages/ar/ARDashboardPage";
 import ARDepartmentsPage from "./pages/ar/ARDepartmentsPage";
@@ -300,6 +301,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <AgentMonitorPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/n8n-instances"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <N8nInstancesPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

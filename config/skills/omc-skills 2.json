@@ -1,0 +1,316 @@
+{
+  "$schema": "../../src/orchestrator/types/unified-skill.ts",
+  "version": "1.0.0",
+  "description": "OMC skill metadata for Nubabel unified skill routing",
+  "generatedAt": "2026-01-29T00:00:00Z",
+  "skills": [
+    {
+      "name": "autopilot",
+      "description": "Full autonomous execution from idea to working code",
+      "source": "omc",
+      "keywords": [
+        "autopilot",
+        "auto pilot",
+        "autonomous",
+        "build me",
+        "create me",
+        "make me",
+        "full auto",
+        "handle it all",
+        "i want a",
+        "i want an"
+      ],
+      "priority": 100,
+      "omcSkillPath": "skills/autopilot/SKILL.md",
+      "omcAgents": [
+        "analyst",
+        "architect",
+        "critic",
+        "executor",
+        "executor-low",
+        "executor-high",
+        "qa-tester",
+        "security-reviewer",
+        "code-reviewer"
+      ],
+      "omcExecutionMode": true,
+      "requiresAuth": false,
+      "estimatedCost": "high",
+      "maxDuration": 600000,
+      "conflictsWith": ["ralph", "ultrawork", "ultrapilot", "swarm", "pipeline", "ecomode", "ultraqa"]
+    },
+    {
+      "name": "ralph",
+      "description": "Self-referential loop until task completion with architect verification",
+      "source": "omc",
+      "keywords": [
+        "ralph",
+        "don't stop",
+        "must complete",
+        "until done",
+        "persistence",
+        "keep going",
+        "finish it"
+      ],
+      "priority": 100,
+      "omcSkillPath": "skills/ralph/SKILL.md",
+      "omcAgents": [
+        "architect",
+        "architect-low",
+        "architect-medium",
+        "executor",
+        "executor-low",
+        "executor-high",
+        "explore",
+        "explore-medium",
+        "researcher",
+        "researcher-low",
+        "designer",
+        "designer-low",
+        "designer-high",
+        "writer",
+        "vision",
+        "planner",
+        "critic",
+        "analyst",
+        "qa-tester",
+        "security-reviewer",
+        "security-reviewer-low",
+        "build-fixer",
+        "build-fixer-low",
+        "tdd-guide",
+        "tdd-guide-low",
+        "code-reviewer",
+        "code-reviewer-low"
+      ],
+      "omcExecutionMode": true,
+      "requiresAuth": false,
+      "estimatedCost": "high",
+      "maxDuration": 600000,
+      "conflictsWith": ["autopilot", "ultrawork", "ultrapilot", "swarm", "pipeline", "ecomode", "ultraqa"]
+    },
+    {
+      "name": "ultrawork",
+      "description": "Activate maximum performance mode with parallel agent orchestration",
+      "source": "omc",
+      "keywords": [
+        "ultrawork",
+        "ulw",
+        "maximum performance",
+        "parallel execution",
+        "fast",
+        "parallel",
+        "high throughput"
+      ],
+      "priority": 100,
+      "omcSkillPath": "skills/ultrawork/SKILL.md",
+      "omcAgents": [
+        "architect",
+        "architect-low",
+        "architect-medium",
+        "executor",
+        "executor-low",
+        "executor-high",
+        "explore",
+        "explore-medium",
+        "researcher",
+        "researcher-low",
+        "designer",
+        "designer-low",
+        "designer-high",
+        "writer",
+        "vision",
+        "planner",
+        "critic",
+        "analyst",
+        "qa-tester",
+        "security-reviewer",
+        "security-reviewer-low",
+        "build-fixer",
+        "build-fixer-low",
+        "tdd-guide",
+        "tdd-guide-low",
+        "code-reviewer",
+        "code-reviewer-low"
+      ],
+      "omcExecutionMode": true,
+      "requiresAuth": false,
+      "estimatedCost": "high",
+      "maxDuration": 600000,
+      "conflictsWith": ["autopilot", "ralph", "ultrapilot", "swarm", "pipeline", "ecomode", "ultraqa"]
+    },
+    {
+      "name": "plan",
+      "description": "Strategic planning with optional interview workflow",
+      "source": "omc",
+      "keywords": [
+        "plan this",
+        "plan the",
+        "planning",
+        "strategic plan",
+        "create plan",
+        "make a plan",
+        "work plan"
+      ],
+      "priority": 70,
+      "omcSkillPath": "skills/plan/SKILL.md",
+      "omcAgents": [
+        "analyst",
+        "planner",
+        "architect",
+        "critic"
+      ],
+      "omcExecutionMode": false,
+      "requiresAuth": false,
+      "estimatedCost": "medium",
+      "maxDuration": 300000
+    },
+    {
+      "name": "analyze",
+      "description": "Deep analysis and investigation",
+      "source": "omc",
+      "keywords": [
+        "analyze",
+        "debug",
+        "investigate",
+        "why",
+        "deep analysis",
+        "root cause",
+        "explain"
+      ],
+      "priority": 70,
+      "omcSkillPath": "skills/analyze/SKILL.md",
+      "omcAgents": [
+        "architect",
+        "architect-medium",
+        "explore",
+        "explore-medium"
+      ],
+      "omcExecutionMode": false,
+      "requiresAuth": false,
+      "estimatedCost": "medium",
+      "maxDuration": 300000
+    },
+    {
+      "name": "deepsearch",
+      "description": "Thorough codebase search",
+      "source": "omc",
+      "keywords": [
+        "deepsearch",
+        "search",
+        "find in codebase",
+        "where is",
+        "locate",
+        "find all",
+        "search for"
+      ],
+      "priority": 70,
+      "omcSkillPath": "skills/deepsearch/SKILL.md",
+      "omcAgents": [
+        "explore",
+        "explore-medium",
+        "explore-high"
+      ],
+      "omcExecutionMode": false,
+      "requiresAuth": false,
+      "estimatedCost": "low",
+      "maxDuration": 120000
+    },
+    {
+      "name": "code-review",
+      "description": "Run a comprehensive code review",
+      "source": "omc",
+      "keywords": [
+        "code review",
+        "review code",
+        "review this",
+        "code-review",
+        "pull request review",
+        "pr review"
+      ],
+      "priority": 60,
+      "omcSkillPath": "skills/code-review/SKILL.md",
+      "omcAgents": [
+        "code-reviewer",
+        "code-reviewer-low"
+      ],
+      "omcExecutionMode": false,
+      "requiresAuth": false,
+      "estimatedCost": "medium",
+      "maxDuration": 300000
+    },
+    {
+      "name": "tdd",
+      "description": "Test-Driven Development enforcement skill",
+      "source": "omc",
+      "keywords": [
+        "tdd",
+        "test first",
+        "red green",
+        "test-driven",
+        "write tests first"
+      ],
+      "priority": 60,
+      "omcSkillPath": "skills/tdd/SKILL.md",
+      "omcAgents": [
+        "tdd-guide",
+        "tdd-guide-low",
+        "executor",
+        "qa-tester"
+      ],
+      "omcExecutionMode": false,
+      "requiresAuth": false,
+      "estimatedCost": "medium",
+      "maxDuration": 300000
+    },
+    {
+      "name": "security-review",
+      "description": "Run a comprehensive security review on code",
+      "source": "omc",
+      "keywords": [
+        "security review",
+        "security audit",
+        "vulnerability",
+        "owasp",
+        "security scan",
+        "security check"
+      ],
+      "priority": 60,
+      "omcSkillPath": "skills/security-review/SKILL.md",
+      "omcAgents": [
+        "security-reviewer",
+        "security-reviewer-low"
+      ],
+      "omcExecutionMode": false,
+      "requiresAuth": false,
+      "estimatedCost": "medium",
+      "maxDuration": 300000
+    },
+    {
+      "name": "research",
+      "description": "Orchestrate parallel scientist agents for comprehensive research",
+      "source": "omc",
+      "keywords": [
+        "research",
+        "analyze data",
+        "statistics",
+        "comprehensive research",
+        "investigate",
+        "study"
+      ],
+      "priority": 60,
+      "omcSkillPath": "skills/research/SKILL.md",
+      "omcAgents": [
+        "scientist",
+        "scientist-low",
+        "scientist-high",
+        "researcher",
+        "researcher-low"
+      ],
+      "omcExecutionMode": false,
+      "requiresAuth": false,
+      "estimatedCost": "medium",
+      "maxDuration": 300000
+    }
+  ]
+}

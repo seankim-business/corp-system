@@ -1,0 +1,48 @@
+{
+  "name": "@nubabel/extension-cli",
+  "version": "1.0.0",
+  "description": "CLI for building and publishing Nubabel extensions",
+  "bin": {
+    "nubabel-ext": "./bin/nubabel-ext.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nubabel",
+    "extension",
+    "cli",
+    "scaffolding"
+  ],
+  "author": "Nubabel",
+  "license": "MIT",
+  "dependencies": {
+    "@nubabel/extension-sdk": "^1.0.0",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "esbuild": "^0.20.0",
+    "form-data": "^4.0.0",
+    "inquirer": "^8.2.6",
+    "js-yaml": "^4.1.0",
+    "ora": "^5.4.1",
+    "tar": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^8.2.10",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "@types/tar": "^6.1.11",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  }
+}

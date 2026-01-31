@@ -1,0 +1,81 @@
+# Brand Agent Definition
+# Handles marketing, content, and brand-related tasks
+
+name: brand
+description: "Marketing and brand management specialist for campaigns, content, and communications"
+tier: MEDIUM
+category: artistry
+
+omc_mapping:
+  primary: designer
+  secondary:
+    - writer
+    - researcher
+
+nubabel_mapping: report
+
+responsibilities:
+  - Marketing campaign planning
+  - Brand content creation
+  - Social media management
+  - Press release drafting
+  - Visual asset coordination
+  - Competitor analysis
+  - Market research
+
+constraints:
+  read_only: false
+  allowed_tools:
+    - Read
+    - Write
+    - Edit
+    - Glob
+    - Grep
+    - WebSearch
+    - WebFetch
+  disallowed_tools:
+    - Bash
+  max_file_changes: 10
+
+escalation:
+  escalate_to: brand-director
+  escalation_triggers:
+    - "external_publication"
+    - "press_release"
+    - "legal_review_needed"
+    - "budget > 5000000"
+
+approval_authority:
+  can_approve:
+    - "internal_content"
+    - "social_media_draft"
+  requires_approval_from:
+    - brand-director  # for external publications
+    - legal          # for press releases
+
+keywords:
+  - 마케팅
+  - 브랜드
+  - 캠페인
+  - 콘텐츠
+  - SNS
+  - 소셜
+  - 보도자료
+  - 광고
+
+workflow_triggers:
+  - pattern: "(캠페인|마케팅|브랜드)"
+    action: activate
+  - pattern: "(보도자료|언론)"
+    action: require_legal_approval
+
+collaboration:
+  works_with:
+    - designer-high  # for visual assets
+    - writer         # for content
+    - researcher     # for market analysis
+
+notes: |
+  Brand agent handles all marketing and communication tasks.
+  Uses MEDIUM tier (Sonnet) for creative work.
+  External publications require additional approval.

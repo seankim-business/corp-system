@@ -69,17 +69,21 @@ export class InstallationExecutor {
         throw new Error("Invalid parameters: orgId and userId required");
       }
 
-      // Check if already installed
-      const existing = await prisma.extensionInstallation.findUnique({
+      // Check if already installed by looking up extension by slug
+      const slug = this.generateSlug(item.name);
+      const existingExtension = await prisma.marketplaceExtension.findFirst({
         where: {
-          organizationId_extensionId: {
-            organizationId: orgId,
-            extensionId: item.id,
+          organizationId: orgId,
+          slug: slug,
+        },
+        include: {
+          installations: {
+            where: { organizationId: orgId },
           },
         },
       });
 
-      if (existing) {
+      if (existingExtension && existingExtension.installations.length > 0) {
         return {
           success: false,
           error: `Extension ${item.name} is already installed`,

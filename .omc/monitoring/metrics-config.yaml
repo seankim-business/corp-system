@@ -1,0 +1,219 @@
+# OMC Performance Monitoring Configuration
+# Tracks agent usage, routing efficiency, and workflow execution
+
+version: "1.0"
+description: "Performance monitoring setup for OMC integration"
+
+# Metrics to track
+metrics:
+  # Agent usage metrics
+  agent_usage:
+    enabled: true
+    dimensions:
+      - agent_type
+      - tier
+      - category
+    counters:
+      - name: omc_agent_invocations_total
+        description: "Total number of agent invocations"
+        labels: [agent_type, tier]
+      - name: omc_agent_success_total
+        description: "Successful agent completions"
+        labels: [agent_type, tier]
+      - name: omc_agent_failure_total
+        description: "Failed agent invocations"
+        labels: [agent_type, tier, error_type]
+    histograms:
+      - name: omc_agent_duration_seconds
+        description: "Agent execution duration"
+        labels: [agent_type, tier]
+        buckets: [0.5, 1, 2, 5, 10, 30, 60, 120, 300]
+
+  # Routing metrics
+  routing:
+    enabled: true
+    counters:
+      - name: omc_routing_decisions_total
+        description: "Total routing decisions"
+        labels: [matched, tier, category]
+      - name: omc_pattern_matches_total
+        description: "Pattern match counts"
+        labels: [pattern, agent_type]
+    gauges:
+      - name: omc_active_workflows
+        description: "Currently active workflows"
+        labels: [workflow_name]
+
+  # Workflow metrics
+  workflow:
+    enabled: true
+    counters:
+      - name: omc_workflow_started_total
+        description: "Workflows started"
+        labels: [workflow_name]
+      - name: omc_workflow_completed_total
+        description: "Workflows completed successfully"
+        labels: [workflow_name]
+      - name: omc_workflow_failed_total
+        description: "Workflows failed"
+        labels: [workflow_name, failure_stage]
+    histograms:
+      - name: omc_workflow_duration_seconds
+        description: "Total workflow duration"
+        labels: [workflow_name]
+        buckets: [60, 300, 600, 1800, 3600, 7200, 14400]
+
+  # Approval metrics
+  approval:
+    enabled: true
+    counters:
+      - name: omc_approval_requests_total
+        description: "Approval requests created"
+        labels: [request_type, tier]
+      - name: omc_approval_decisions_total
+        description: "Approval decisions made"
+        labels: [request_type, decision]
+    histograms:
+      - name: omc_approval_latency_seconds
+        description: "Time to approval decision"
+        labels: [request_type, approver_level]
+        buckets: [300, 900, 1800, 3600, 7200, 14400, 43200, 86400]
+
+# Logging configuration
+logging:
+  enabled: true
+  level: info
+  format: json
+  output:
+    file:
+      enabled: true
+      path: ".omc/logs/omc-metrics.log"
+      rotation:
+        max_size: "100MB"
+        max_files: 10
+    console:
+      enabled: true
+      level: warn
+
+  # Log specific events
+  events:
+    - event: agent_invocation
+      level: debug
+      fields: [agent_type, tier, request_preview]
+    - event: routing_decision
+      level: info
+      fields: [matched, agent_type, pattern]
+    - event: workflow_start
+      level: info
+      fields: [workflow_name, initiator]
+    - event: workflow_complete
+      level: info
+      fields: [workflow_name, duration, stages_completed]
+    - event: approval_timeout
+      level: warn
+      fields: [request_id, approver, waited_hours]
+    - event: agent_error
+      level: error
+      fields: [agent_type, error_message, stack_trace]
+
+# Alerting rules
+alerting:
+  enabled: true
+  channels:
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_ALERTS_WEBHOOK}"
+      default_channel: "#omc-alerts"
+
+  rules:
+    - name: high_agent_failure_rate
+      condition: "rate(omc_agent_failure_total[5m]) / rate(omc_agent_invocations_total[5m]) > 0.1"
+      severity: warning
+      message: "Agent failure rate above 10% in last 5 minutes"
+      channels: [slack]
+
+    - name: workflow_stuck
+      condition: "omc_active_workflows > 0 AND time() - omc_workflow_started_timestamp > 7200"
+      severity: warning
+      message: "Workflow running for over 2 hours"
+      channels: [slack]
+
+    - name: approval_timeout_approaching
+      condition: "omc_approval_pending_seconds > 0.8 * omc_approval_timeout_seconds"
+      severity: info
+      message: "Approval approaching timeout - consider escalation"
+      channels: [slack]
+
+    - name: critical_agent_down
+      condition: "up{agent_type=~'orchestrator|planner|critic'} == 0"
+      severity: critical
+      message: "Critical agent unavailable"
+      channels: [slack]
+
+# Dashboard configuration
+dashboards:
+  enabled: true
+  refresh_interval: 30s
+
+  panels:
+    - name: "Agent Usage Overview"
+      type: timeseries
+      metrics:
+        - omc_agent_invocations_total
+        - omc_agent_success_total
+      group_by: [agent_type]
+
+    - name: "Tier Distribution"
+      type: piechart
+      metric: omc_agent_invocations_total
+      group_by: [tier]
+
+    - name: "Workflow Status"
+      type: stat
+      metrics:
+        - omc_workflow_started_total
+        - omc_workflow_completed_total
+        - omc_active_workflows
+
+    - name: "Approval Latency"
+      type: heatmap
+      metric: omc_approval_latency_seconds
+      group_by: [request_type]
+
+    - name: "Pattern Match Frequency"
+      type: bargauge
+      metric: omc_pattern_matches_total
+      group_by: [pattern]
+      top_n: 10
+
+# Health checks
+health_checks:
+  enabled: true
+  interval: 60s
+
+  checks:
+    - name: config_loaded
+      type: file_exists
+      path: ".omc/config/delegation-rules.yaml"
+
+    - name: bridge_module_available
+      type: module_import
+      module: "src/orchestrator/omc-bridge"
+
+    - name: yaml_valid
+      type: yaml_syntax
+      paths:
+        - ".omc/config/*.yaml"
+        - ".omc/agents/*.yml"
+        - ".omc/workflows/*.yml"
+
+# Retention policy
+retention:
+  metrics:
+    raw: 7d
+    aggregated_1h: 30d
+    aggregated_1d: 365d
+  logs:
+    default: 30d
+    errors: 90d
+    audit: 365d

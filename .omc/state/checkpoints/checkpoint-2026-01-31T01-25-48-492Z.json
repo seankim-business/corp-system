@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-01-31T01:25:48.490Z",
+  "trigger": "auto",
+  "active_modes": {
+    "autopilot": {
+      "phase": "unknown",
+      "originalIdea": ""
+    },
+    "ultrawork": {
+      "original_prompt": "ralp ulw YOLO MODE"
+    }
+  },
+  "todo_summary": {
+    "pending": 0,
+    "in_progress": 0,
+    "completed": 0
+  },
+  "wisdom_exported": true
+}

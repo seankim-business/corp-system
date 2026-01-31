@@ -2,6 +2,7 @@ import { db as prisma } from "../db/client";
 import { logger } from "../utils/logger";
 import { identityResolver } from "./identity";
 import type { ExternalIdentityProfile } from "./identity/types";
+import { runWithoutRLS } from "../utils/async-context";
 
 interface SlackUserProfile {
   email?: string;
@@ -16,6 +17,8 @@ interface SlackUserProfile {
  * Provision a Slack user by linking to an existing or new internal User.
  * If the SlackUser already exists, updates lastSyncedAt and any changed profile fields.
  * If not, creates a new SlackUser (and User if needed).
+ *
+ * Note: This function runs with RLS bypassed since it's part of auth bootstrap.
  */
 export async function provisionSlackUser(
   slackUserId: string,
@@ -23,8 +26,10 @@ export async function provisionSlackUser(
   organizationId: string,
   profile: SlackUserProfile
 ) {
-  // Check if SlackUser already exists
-  const existing = await prisma.slackUser.findUnique({
+  // Run with RLS bypass since this is auth bootstrap
+  return runWithoutRLS(async () => {
+    // Check if SlackUser already exists
+    const existing = await prisma.slackUser.findUnique({
     where: { slackUserId },
     include: { user: true },
   });
@@ -191,11 +196,12 @@ export async function provisionSlackUser(
     }
   }
 
-  // Also create/update ExternalIdentity for the unified identity system
-  // This enables auto-linking and the admin dashboard
-  await syncToExternalIdentity(slackUserId, slackTeamId, organizationId, profile);
+    // Also create/update ExternalIdentity for the unified identity system
+    // This enables auto-linking and the admin dashboard
+    await syncToExternalIdentity(slackUserId, slackTeamId, organizationId, profile);
 
-  return slackUser;
+    return slackUser;
+  }); // End of runWithoutRLS
 }
 
 /**

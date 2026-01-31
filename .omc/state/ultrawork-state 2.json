@@ -1,0 +1,7 @@
+{
+  "active": true,
+  "started_at": "2026-01-29T13:01:07.298Z",
+  "original_prompt": "계획 실행. 사용성 검증(QA/QC) 할땐, 브라우저는 claude in chrome 사용. 슬랙에서는 #it-test 에서 Nubabel 맨션으로 진행.  ralph ulw autopilot ",
+  "reinforcement_count": 0,
+  "last_checked_at": "2026-01-29T13:01:07.299Z"
+}

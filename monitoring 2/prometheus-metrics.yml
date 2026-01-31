@@ -1,0 +1,149 @@
+# Prometheus Metrics Configuration for Nubabel Multi-Account System
+
+scrape_configs:
+  - job_name: "nubabel-multi-account"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["app.nubabel.com:3000"]
+
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "claude_.*"
+        action: keep
+
+# Metric Definitions
+
+## Account Pool Metrics
+# claude_account_requests_total{account_id, status}
+# Type: Counter
+# Description: Total number of requests routed to each Claude account
+# Labels:
+#   - account_id: Unique identifier for the Claude account
+#   - status: success, error, rate_limited, circuit_open
+# Example: claude_account_requests_total{account_id="acc-123",status="success"} 15420
+
+# claude_account_capacity_remaining{account_id, metric}
+# Type: Gauge
+# Description: Remaining capacity for each account
+# Labels:
+#   - account_id: Unique identifier for the Claude account
+#   - metric: requests_per_minute, tokens_per_day, cost_per_day
+# Example: claude_account_capacity_remaining{account_id="acc-123",metric="requests_per_minute"} 850000
+
+# claude_circuit_breaker_state{account_id, state}
+# Type: Gauge (0=closed, 1=open, 2=half_open)
+# Description: Current state of circuit breaker for each account
+# Labels:
+#   - account_id: Unique identifier for the Claude account
+#   - state: closed, open, half_open
+# Example: claude_circuit_breaker_state{account_id="acc-123",state="closed"} 0
+
+# claude_quota_percentage{account_id, threshold}
+# Type: Gauge
+# Description: Quota usage as percentage of limit
+# Labels:
+#   - account_id: Unique identifier for the Claude account
+#   - threshold: warning_80, critical_95, exceeded_100
+# Example: claude_quota_percentage{account_id="acc-123",threshold="warning_80"} 75.5
+
+## Performance Metrics
+# claude_request_duration_seconds
+# Type: Histogram
+# Description: Request duration in seconds
+# Buckets: 0.1, 0.5, 1, 2, 5, 10
+# Labels:
+#   - account_id: Unique identifier for the Claude account
+#   - model: claude-3-opus, claude-3-sonnet, claude-3-haiku
+# Example: claude_request_duration_seconds_bucket{account_id="acc-123",model="claude-3-sonnet",le="1"} 1250
+
+# claude_tokens_total{account_id, type}
+# Type: Counter
+# Description: Total tokens processed
+# Labels:
+#   - account_id: Unique identifier for the Claude account
+#   - type: input, output
+# Example: claude_tokens_total{account_id="acc-123",type="input"} 5420000
+
+## Selection Strategy Metrics
+# claude_account_selections_total{strategy}
+# Type: Counter
+# Description: Number of times each selection strategy was used
+# Labels:
+#   - strategy: round_robin, least_loaded, random, priority
+# Example: claude_account_selections_total{strategy="least_loaded"} 8540
+
+# claude_account_status{account_id, status}
+# Type: Gauge (0=inactive, 1=active)
+# Description: Current status of each account
+# Labels:
+#   - account_id: Unique identifier for the Claude account
+#   - status: active, inactive, exhausted, circuit_open
+# Example: claude_account_status{account_id="acc-123",status="active"} 1
+
+## Alert Rules
+alerting_rules:
+  - name: multi_account_alerts
+    rules:
+      - alert: HighQuotaUsage
+        expr: claude_quota_percentage > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Account {{ $labels.account_id }} quota usage above 80%"
+          description: "Quota usage is {{ $value }}%"
+
+      - alert: CriticalQuotaUsage
+        expr: claude_quota_percentage > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Account {{ $labels.account_id }} quota usage above 95%"
+          description: "Quota usage is {{ $value }}%. Immediate action required."
+
+      - alert: CircuitBreakerOpen
+        expr: claude_circuit_breaker_state{state="open"} == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker open for account {{ $labels.account_id }}"
+          description: "Account has been failing consistently"
+
+      - alert: NoActiveAccounts
+        expr: count(claude_account_status{status="active"} == 1) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No active Claude accounts available"
+          description: "All accounts are inactive or exhausted"
+
+      - alert: HighErrorRate
+        expr: rate(claude_account_requests_total{status="error"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate for account {{ $labels.account_id }}"
+          description: "Error rate is {{ $value }} req/s"
+
+## Recording Rules
+recording_rules:
+  - name: multi_account_aggregations
+    interval: 1m
+    rules:
+      - record: claude:requests:rate5m
+        expr: rate(claude_account_requests_total[5m])
+
+      - record: claude:capacity:total
+        expr: sum(claude_account_capacity_remaining) by (metric)
+
+      - record: claude:quota:avg_usage
+        expr: avg(claude_quota_percentage) by (threshold)
+
+      - record: claude:errors:rate5m
+        expr: rate(claude_account_requests_total{status="error"}[5m])

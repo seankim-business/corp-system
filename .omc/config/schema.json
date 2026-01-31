@@ -1,0 +1,134 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OMC Configuration Schema",
+  "description": "Schema for validating OMC configuration files",
+  "definitions": {
+    "tier": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH"]
+    },
+    "category": {
+      "type": "string",
+      "enum": ["ultrabrain", "visual-engineering", "artistry", "quick", "writing"]
+    },
+    "omcAgent": {
+      "type": "string",
+      "enum": [
+        "architect", "architect-low", "architect-medium",
+        "executor", "executor-low", "executor-high",
+        "explore", "explore-medium", "explore-high",
+        "researcher", "researcher-low", "researcher-high",
+        "designer", "designer-low", "designer-high",
+        "writer", "vision",
+        "planner", "critic", "analyst",
+        "qa-tester", "qa-tester-high",
+        "security-reviewer", "security-reviewer-low",
+        "build-fixer", "build-fixer-low",
+        "tdd-guide", "tdd-guide-low",
+        "code-reviewer", "code-reviewer-low",
+        "scientist", "scientist-low", "scientist-high"
+      ]
+    },
+    "nubabelAgent": {
+      "type": "string",
+      "enum": ["orchestrator", "data", "report", "comms", "search", "task", "approval", "analytics"]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "delegation-rules.yaml": {
+      "type": "object",
+      "required": ["version", "categories", "rules"],
+      "properties": {
+        "version": { "type": "string" },
+        "description": { "type": "string" },
+        "categories": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["tier", "temperature", "thinking_budget"],
+            "properties": {
+              "tier": { "$ref": "#/definitions/tier" },
+              "temperature": { "type": "number", "minimum": 0, "maximum": 1 },
+              "thinking_budget": { "type": "string", "enum": ["low", "medium", "high", "max"] },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pattern", "omc_agent", "tier"],
+            "properties": {
+              "pattern": { "type": "string" },
+              "omc_agent": { "$ref": "#/definitions/omcAgent" },
+              "nubabel_agent": { "$ref": "#/definitions/nubabelAgent" },
+              "tier": { "$ref": "#/definitions/tier" },
+              "category": { "$ref": "#/definitions/category" }
+            }
+          }
+        },
+        "default": {
+          "type": "object",
+          "properties": {
+            "omc_agent": { "$ref": "#/definitions/omcAgent" },
+            "nubabel_agent": { "$ref": "#/definitions/nubabelAgent" },
+            "tier": { "$ref": "#/definitions/tier" },
+            "category": { "$ref": "#/definitions/category" }
+          }
+        }
+      }
+    },
+    "approval-matrix.yaml": {
+      "type": "object",
+      "required": ["version", "tier_authority", "thresholds"],
+      "properties": {
+        "version": { "type": "string" },
+        "tier_authority": {
+          "type": "object",
+          "properties": {
+            "HIGH": { "type": "object" },
+            "MEDIUM": { "type": "object" },
+            "LOW": { "type": "object" }
+          }
+        },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "expense": { "type": "array" },
+            "content_publish": { "type": "array" },
+            "process_change": { "type": "array" },
+            "code_change": { "type": "array" }
+          }
+        },
+        "escalation": { "type": "object" },
+        "slack_integration": { "type": "object" }
+      }
+    },
+    "mcp-servers.yaml": {
+      "type": "object",
+      "required": ["version", "servers"],
+      "properties": {
+        "version": { "type": "string" },
+        "servers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["enabled", "priority"],
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "priority": { "type": "integer", "minimum": 1, "maximum": 10 },
+              "package": { "type": "string" },
+              "config": { "type": "object" },
+              "use_cases": { "type": "array", "items": { "type": "string" } },
+              "notes": { "type": "string" }
+            }
+          }
+        },
+        "selection_rules": { "type": "object" },
+        "health_check": { "type": "object" }
+      }
+    }
+  }
+}

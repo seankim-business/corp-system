@@ -1,0 +1,187 @@
+{
+  "dashboard": {
+    "title": "Nubabel Multi-Account System",
+    "tags": ["nubabel", "multi-account", "claude"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Claude Accounts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(claude_account_status{status=\"active\"})",
+            "legendFormat": "Active Accounts"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 1, "color": "yellow" },
+                { "value": 2, "color": "green" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Requests Per Account",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(claude_account_requests_total[5m])",
+            "legendFormat": "{{account_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth"
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Circuit Breaker Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "claude_circuit_breaker_state",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "account_id": "Account",
+                "state": "State",
+                "Value": "Status"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Quota Usage Percentage",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "claude_quota_percentage",
+            "legendFormat": "{{account_id}} - {{metric}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 80, "color": "yellow" },
+                { "value": 95, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Response Time (p95)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(claude_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{account_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line"
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Error Rate by Account",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(claude_account_requests_total{status=\"error\"}[5m])",
+            "legendFormat": "{{account_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "bars"
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Capacity Remaining",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "claude_account_capacity_remaining",
+            "legendFormat": "{{account_id}} - {{metric}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "percentage",
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 20, "color": "yellow" },
+                { "value": 50, "color": "green" }
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient"
+        }
+      },
+      {
+        "id": 8,
+        "title": "Account Selection Strategy Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (strategy) (increase(claude_account_selections_total[1h]))",
+            "legendFormat": "{{strategy}}"
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}

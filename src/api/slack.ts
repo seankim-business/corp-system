@@ -5,6 +5,7 @@ import { createSession, getSessionBySlackThread } from "../orchestrator/session-
 import { getUserBySlackId, getOrganizationBySlackWorkspace } from "../services/slack-service";
 import { provisionSlackUser } from "../services/slack-user-provisioner";
 import { logger } from "../utils/logger";
+import { runWithoutRLS } from "../utils/async-context";
 import { metrics } from "../utils/metrics";
 import { randomUUID } from "crypto";
 import { getSlackIntegrationByWorkspace } from "./slack-integration";
@@ -420,51 +421,61 @@ function setupEventHandlers(app: App): void {
 
       // Auto-provision the Slack user before lookup
       // This creates User and SlackUser records if they don't exist
-      try {
-        const slackUserInfo = await client.users.info({ user });
-        const profile = slackUserInfo.user?.profile;
+      // Use runWithoutRLS because this is auth bootstrap - we need to establish identity before RLS context
+      const nubabelUser = await runWithoutRLS(async () => {
+        try {
+          const slackUserInfo = await client.users.info({ user });
+          const profile = slackUserInfo.user?.profile;
 
-        logger.info("Slack user profile retrieved", {
-          slackUserId: user,
-          hasEmail: !!profile?.email,
-          email: profile?.email, // Log the email for debugging
-          displayName: profile?.display_name || profile?.real_name,
-        });
-
-        if (profile) {
-          const provisionedUser = await provisionSlackUser(user, workspaceId, organization.id, {
-            email: profile?.email,
+          logger.info("Slack user profile retrieved", {
+            slackUserId: user,
+            hasEmail: !!profile?.email,
+            email: profile?.email, // Log the email for debugging
             displayName: profile?.display_name || profile?.real_name,
-            realName: profile?.real_name,
-            avatarUrl: profile?.image_192 || profile?.image_72,
-            isBot: slackUserInfo.user?.is_bot,
-            isAdmin: slackUserInfo.user?.is_admin,
           });
-          logger.info("Slack user provisioned successfully", {
+
+          if (profile) {
+            const provisionedUser = await provisionSlackUser(user, workspaceId, organization.id, {
+              email: profile?.email,
+              displayName: profile?.display_name || profile?.real_name,
+              realName: profile?.real_name,
+              avatarUrl: profile?.image_192 || profile?.image_72,
+              isBot: slackUserInfo.user?.is_bot,
+              isAdmin: slackUserInfo.user?.is_admin,
+            });
+            logger.info("Slack user provisioned successfully", {
+              slackUserId: user,
+              organizationId: organization.id,
+              userId: provisionedUser?.userId,
+              userEmail: provisionedUser?.email,
+            });
+          } else {
+            logger.warn("No Slack profile available for provisioning", { slackUserId: user });
+          }
+        } catch (provisionError) {
+          logger.error("Failed to provision Slack user", {
             slackUserId: user,
             organizationId: organization.id,
-            userId: provisionedUser?.userId,
-            userEmail: provisionedUser?.email,
+            error: provisionError instanceof Error ? provisionError.message : String(provisionError),
+            stack: provisionError instanceof Error ? provisionError.stack : undefined,
           });
-        } else {
-          logger.warn("No Slack profile available for provisioning", { slackUserId: user });
+          // Continue anyway - getUserBySlackId may still find the user
         }
-      } catch (provisionError) {
-        logger.error("Failed to provision Slack user", {
+
+        // Now lookup user (still within RLS bypass context)
+        logger.info("Looking up Nubabel user (RLS bypassed for auth bootstrap)", {
           slackUserId: user,
           organizationId: organization.id,
-          error: provisionError instanceof Error ? provisionError.message : String(provisionError),
-          stack: provisionError instanceof Error ? provisionError.stack : undefined,
+          workspaceId,
         });
-        // Continue anyway - getUserBySlackId may still find the user
-      }
-
-      // Now lookup user with organization context for ExternalIdentity matching
-      const nubabelUser = await getUserBySlackId(user, client as WebClient, organization.id);
+        return getUserBySlackId(user, client as WebClient, organization.id);
+      });
       if (!nubabelUser) {
         logger.warn("Nubabel user not found for Slack user", {
           slackUserId: user,
           organizationId: organization.id,
+          // This means all 3 lookup methods failed
+          lookupMethods: "SlackUser, ExternalIdentity, Email all returned null",
         });
         metrics.increment("slack.error.user_not_found");
 

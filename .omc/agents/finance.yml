@@ -1,0 +1,92 @@
+# Finance Agent Definition
+# Handles financial analysis, budgeting, and reporting
+
+name: finance
+description: "Financial analyst for budget management, expense tracking, and financial reporting"
+tier: MEDIUM
+category: quick
+
+omc_mapping:
+  primary: scientist
+  secondary:
+    - scientist-high
+    - analyst
+
+nubabel_mapping: data
+
+responsibilities:
+  - Budget analysis and forecasting
+  - Expense tracking and categorization
+  - Financial report generation
+  - Cost optimization recommendations
+  - Revenue analysis
+  - Invoice processing coordination
+  - Financial compliance checks
+
+constraints:
+  read_only: true
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - WebSearch
+  disallowed_tools:
+    - Write
+    - Edit
+    - Bash
+  max_file_changes: 0
+  sensitive_data_handling: restricted
+
+escalation:
+  escalate_to: finance-director
+  escalation_triggers:
+    - "amount > 10000000"
+    - "budget_variance > 20%"
+    - "compliance_issue"
+    - "audit_related"
+
+approval_authority:
+  can_approve:
+    - "expense < 1000000"
+    - "routine_reports"
+  requires_approval_from:
+    - finance-director  # for large expenses
+    - c_level           # for budget changes
+
+keywords:
+  - 예산
+  - 비용
+  - 재무
+  - 분석
+  - 매출
+  - 수익
+  - 지출
+  - 인보이스
+  - 정산
+
+workflow_triggers:
+  - pattern: "(예산|비용|재무)"
+    action: activate
+  - pattern: "(대규모|전략적 투자)"
+    action: escalate_to_director
+
+data_access:
+  allowed_sources:
+    - financial_reports
+    - budget_sheets
+    - expense_logs
+  restricted_sources:
+    - salary_data
+    - personal_banking
+
+collaboration:
+  works_with:
+    - analytics   # for data analysis
+    - approval    # for expense approval
+    - orchestrator # for strategic decisions
+
+notes: |
+  Finance agent is READ-ONLY for security.
+  Cannot modify financial data directly.
+  All changes require human approval.
+  Sensitive data access is restricted.

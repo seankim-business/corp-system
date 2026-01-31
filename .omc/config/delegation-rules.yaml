@@ -1,0 +1,133 @@
+# OMC Delegation Rules for Nubabel
+# Maps task patterns to OMC agents with tier routing
+
+version: "1.0"
+description: "Task delegation rules based on OMC agent orchestration patterns"
+
+# Delegation Categories (from OMC)
+categories:
+  ultrabrain:
+    tier: HIGH
+    temperature: 0.3
+    thinking_budget: max
+    description: "Complex reasoning, architecture, deep debugging"
+
+  visual-engineering:
+    tier: HIGH
+    temperature: 0.7
+    thinking_budget: high
+    description: "UI/UX, frontend, design systems"
+
+  artistry:
+    tier: MEDIUM
+    temperature: 0.9
+    thinking_budget: medium
+    description: "Creative solutions, brainstorming"
+
+  quick:
+    tier: LOW
+    temperature: 0.1
+    thinking_budget: low
+    description: "Simple lookups, basic operations"
+
+  writing:
+    tier: MEDIUM
+    temperature: 0.5
+    thinking_budget: medium
+    description: "Documentation, technical writing"
+
+# Delegation Rules
+rules:
+  # Strategic/Complex Tasks -> HIGH tier
+  - pattern: "(전략|아키텍처|설계|리팩토링|복잡한|분석)"
+    omc_agent: architect
+    nubabel_agent: orchestrator
+    tier: HIGH
+    category: ultrabrain
+
+  - pattern: "(계획|프로젝트|로드맵|마일스톤)"
+    omc_agent: planner
+    nubabel_agent: orchestrator
+    tier: HIGH
+    category: ultrabrain
+
+  - pattern: "(캠페인|campaign).*(런칭|launch|시작)"
+    omc_agent: planner
+    nubabel_agent: orchestrator
+    tier: HIGH
+    category: artistry
+
+  - pattern: "(검토|리뷰|피드백|평가)"
+    omc_agent: critic
+    nubabel_agent: approval
+    tier: HIGH
+    category: ultrabrain
+
+  - pattern: "(보안|취약점|감사|audit)"
+    omc_agent: security-reviewer
+    nubabel_agent: orchestrator
+    tier: HIGH
+    category: ultrabrain
+
+  # Execution Tasks -> MEDIUM tier
+  - pattern: "(구현|개발|작성|만들어|빌드)"
+    omc_agent: executor
+    nubabel_agent: task
+    tier: MEDIUM
+    category: quick
+
+  - pattern: "(UI|UX|디자인|컴포넌트|스타일)"
+    omc_agent: designer
+    nubabel_agent: report
+    tier: MEDIUM
+    category: visual-engineering
+
+  - pattern: "(테스트|QA|검증|확인)"
+    omc_agent: qa-tester
+    nubabel_agent: approval
+    tier: MEDIUM
+    category: quick
+
+  - pattern: "(데이터|분석|통계|리포트)"
+    omc_agent: scientist
+    nubabel_agent: data
+    tier: MEDIUM
+    category: quick
+
+  - pattern: "(연구|조사|리서치|문서)"
+    omc_agent: researcher
+    nubabel_agent: data
+    tier: MEDIUM
+    category: writing
+
+  # Quick Tasks -> LOW tier
+  - pattern: "(찾아|검색|어디|위치)"
+    omc_agent: explore
+    nubabel_agent: search
+    tier: LOW
+    category: quick
+
+  - pattern: "(문서화|README|설명|주석)"
+    omc_agent: writer
+    nubabel_agent: report
+    tier: LOW
+    category: writing
+
+  - pattern: "(빌드 오류|컴파일|타입 에러)"
+    omc_agent: build-fixer
+    nubabel_agent: task
+    tier: MEDIUM
+    category: quick
+
+  - pattern: "(간단한|빠르게|확인만)"
+    omc_agent: executor-low
+    nubabel_agent: task
+    tier: LOW
+    category: quick
+
+# Default fallback
+default:
+  omc_agent: executor
+  nubabel_agent: task
+  tier: MEDIUM
+  category: quick

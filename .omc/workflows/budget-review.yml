@@ -1,0 +1,200 @@
+# Budget Review Workflow
+# Multi-agent orchestration for budget analysis and approval
+
+name: budget-review
+description: "Structured budget review workflow with financial analysis and approval chain"
+version: "1.0"
+
+# Workflow metadata
+metadata:
+  category: finance
+  estimated_duration: "1-2 hours"
+  requires_approval: true
+  slack_channel: "#finance"
+  sensitivity: high
+
+# Trigger conditions
+triggers:
+  keywords:
+    - 예산
+    - 예산 검토
+    - 비용 승인
+    - budget review
+    - expense approval
+  patterns:
+    - "(예산|budget).*(검토|review|승인)"
+    - "(비용|expense|cost).*(분석|analysis|검토)"
+
+# Input requirements
+inputs:
+  required:
+    - budget_amount: number
+    - budget_category: string
+    - requestor: string
+    - justification: string
+  optional:
+    - supporting_documents: array
+    - related_projects: array
+
+# Agent orchestration
+agents:
+  # Phase 1: Initial Analysis
+  - stage: analysis
+    agent: scientist
+    tier: MEDIUM
+    task: |
+      예산 요청 분석
+      - 과거 지출 패턴 분석
+      - 유사 예산 케이스 비교
+      - ROI 예측
+    timeout: 20m
+    inputs:
+      - budget_amount
+      - budget_category
+    outputs:
+      - historical_comparison
+      - roi_projection
+      - risk_assessment
+
+  # Phase 2: Compliance Check
+  - stage: compliance
+    agent: security-reviewer-low
+    tier: LOW
+    task: |
+      규정 준수 확인
+      - 예산 한도 확인
+      - 정책 준수 여부
+      - 필수 문서 확인
+    timeout: 10m
+    outputs:
+      - compliance_status
+      - missing_documents
+
+  # Phase 3: Impact Assessment
+  - stage: impact
+    agent: analyst
+    tier: HIGH
+    task: |
+      영향도 평가
+      - 현금흐름 영향
+      - 부서별 예산 배분 영향
+      - 연간 예산 대비 영향
+    timeout: 15m
+    outputs:
+      - impact_report
+      - recommendations
+
+  # Phase 4: Review Summary
+  - stage: summary
+    agent: writer
+    tier: LOW
+    task: |
+      검토 결과 요약 문서 작성
+      - 분석 결과 요약
+      - 승인/거부 권고 사항
+      - 조건부 승인 옵션
+    timeout: 15m
+    inputs:
+      - historical_comparison
+      - roi_projection
+      - compliance_status
+      - impact_report
+    outputs:
+      - review_summary
+
+  # Phase 5: Approval Chain (Amount-based)
+  - stage: approval
+    type: conditional_approval
+    conditions:
+      - condition: "amount < 1000000"
+        approvers: [team_lead]
+        timeout: 24h
+      - condition: "amount >= 1000000 AND amount < 5000000"
+        approvers: [team_lead, director]
+        timeout: 48h
+      - condition: "amount >= 5000000 AND amount < 10000000"
+        approvers: [director, finance_director]
+        timeout: 72h
+      - condition: "amount >= 10000000"
+        approvers: [finance_director, c_level]
+        timeout: 96h
+    escalation:
+      enabled: true
+      after_timeout: true
+      notify: "#finance-escalation"
+
+  # Phase 6: Execution
+  - stage: execution
+    agent: executor-low
+    tier: LOW
+    task: |
+      승인 후 처리
+      - 예산 시스템 업데이트
+      - 관련 부서 알림
+      - 문서 아카이빙
+    timeout: 15m
+    requires_approval: true
+
+# Approval matrix (from OMC pattern)
+approval_matrix:
+  thresholds:
+    - max: 1000000
+      level: self_approve
+      timeout_hours: 0
+    - min: 1000000
+      max: 5000000
+      level: team_lead
+      timeout_hours: 24
+    - min: 5000000
+      max: 10000000
+      level: director
+      timeout_hours: 48
+    - min: 10000000
+      level: c_level
+      timeout_hours: 72
+
+# Success criteria
+success_criteria:
+  - analysis_complete: true
+  - compliance_passed: true
+  - approval_obtained: true
+  - documentation_complete: true
+
+# Rollback procedure
+rollback:
+  on_rejection:
+    - notify_requestor: true
+    - archive_request: true
+    - allow_resubmission: true
+  on_timeout:
+    - escalate: true
+    - notify_manager: true
+
+# Audit trail
+audit:
+  enabled: true
+  log_location: ".omc/logs/budget-reviews/"
+  retention_days: 365
+  fields:
+    - timestamp
+    - requestor
+    - amount
+    - category
+    - approvers
+    - decision
+    - duration
+
+# Notifications
+notifications:
+  on_start:
+    slack: "#finance"
+    message: ":money_with_wings: 예산 검토 시작: {budget_category} - ₩{budget_amount:,.0f}"
+  on_approval_needed:
+    slack: "@{approver}"
+    message: ":bell: 예산 승인 요청: {budget_category} - ₩{budget_amount:,.0f}"
+  on_approved:
+    slack: "#finance"
+    message: ":white_check_mark: 예산 승인 완료: {budget_category}"
+  on_rejected:
+    slack: "#finance"
+    message: ":x: 예산 거부: {budget_category} - 사유: {rejection_reason}"

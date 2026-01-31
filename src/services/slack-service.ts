@@ -1,36 +1,46 @@
 import { db as prisma } from "../db/client";
 import { WebClient } from "@slack/web-api";
 import { logger } from "../utils/logger";
+import { runWithoutRLS } from "../utils/async-context";
 
 /**
  * Get Nubabel user by Slack ID using multiple lookup methods:
  * 1. First try SlackUser table (created by provisioner)
  * 2. Then try ExternalIdentity (linked identity) if organizationId is provided
  * 3. Fall back to email lookup from Slack profile
+ *
+ * Note: This function runs with RLS bypassed since it's always called during
+ * auth bootstrap (before organization context can be established).
  */
 export async function getUserBySlackId(
   slackUserId: string,
   client: WebClient,
   organizationId?: string,
 ) {
-  try {
-    logger.info("getUserBySlackId called", {
-      slackUserId,
-      organizationId,
-      hasOrganizationId: !!organizationId,
-    });
+  // Run with RLS bypass since this is auth bootstrap - we need to identify
+  // the user before we can establish organization context
+  return runWithoutRLS(async () => {
+    try {
+      logger.info("getUserBySlackId called (RLS bypassed for auth bootstrap)", {
+        slackUserId,
+        organizationId,
+        hasOrganizationId: !!organizationId,
+      });
 
-    // Method 1: Try SlackUser table lookup (created by provisionSlackUser)
-    const slackUserRecord = await prisma.slackUser.findUnique({
-      where: { slackUserId },
-      include: { user: true },
-    });
+      // Method 1: Try SlackUser table lookup (created by provisionSlackUser)
+      const slackUserRecord = await prisma.slackUser.findUnique({
+        where: { slackUserId },
+        include: { user: true },
+      });
 
     logger.info("Method 1 - SlackUser lookup result", {
       slackUserId,
       found: !!slackUserRecord,
       hasUser: !!slackUserRecord?.user,
       userId: slackUserRecord?.user?.id,
+      // Also log the raw userId field from SlackUser to detect broken FK
+      slackUserRecordUserId: slackUserRecord?.userId,
+      slackUserRecordEmail: slackUserRecord?.email,
     });
 
     if (slackUserRecord?.user) {
@@ -152,33 +162,37 @@ export async function getUserBySlackId(
     }
 
     return user;
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error("getUserBySlackId error", { slackUserId, error: errorMessage });
-    return null; // Return null instead of throwing to allow graceful handling
-  }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("getUserBySlackId error", { slackUserId, error: errorMessage });
+      return null; // Return null instead of throwing to allow graceful handling
+    }
+  }); // End of runWithoutRLS
 }
 
 export async function getOrganizationBySlackWorkspace(workspaceId: string) {
-  const integration = await prisma.slackIntegration.findUnique({
-    where: { workspaceId },
-    include: { organization: true },
-  });
+  // Run with RLS bypass since this is called during auth bootstrap
+  return runWithoutRLS(async () => {
+    const integration = await prisma.slackIntegration.findUnique({
+      where: { workspaceId },
+      include: { organization: true },
+    });
 
-  if (integration) {
-    return integration.organization;
-  }
+    if (integration) {
+      return integration.organization;
+    }
 
-  const org = await prisma.organization.findFirst({
-    where: {
-      settings: {
-        path: ["slackWorkspaceId"],
-        equals: workspaceId,
+    const org = await prisma.organization.findFirst({
+      where: {
+        settings: {
+          path: ["slackWorkspaceId"],
+          equals: workspaceId,
+        },
       },
-    },
-  });
+    });
 
-  return org;
+    return org;
+  });
 }
 
 export async function createOrUpdateSlackWorkspaceMapping(

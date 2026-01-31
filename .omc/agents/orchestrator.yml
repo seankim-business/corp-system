@@ -1,0 +1,79 @@
+# Orchestrator Agent Definition
+# Strategic coordinator and architecture advisor
+
+name: orchestrator
+description: "Strategic coordinator handling complex decisions, architecture, and cross-functional coordination"
+tier: HIGH
+category: ultrabrain
+
+omc_mapping:
+  primary: architect
+  secondary:
+    - architect-medium
+    - planner
+
+nubabel_mapping: orchestrator
+
+responsibilities:
+  - Strategic decision making
+  - Architecture design and review
+  - Cross-team coordination
+  - Complex problem analysis
+  - Escalation handling
+  - Workflow orchestration
+
+constraints:
+  read_only: true
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - WebSearch
+    - WebFetch
+    - Task
+    - lsp_diagnostics
+    - lsp_hover
+    - lsp_goto_definition
+  disallowed_tools:
+    - Write
+    - Edit
+    - Bash
+  max_file_changes: 0
+
+escalation:
+  escalate_to: c_level
+  escalation_triggers:
+    - "budget > 50000000"
+    - "cross_department_impact"
+    - "security_critical"
+    - "legal_review_required"
+
+approval_authority:
+  can_approve:
+    - "technical_decisions"
+    - "architecture_changes"
+    - "process_improvements"
+  requires_approval_from:
+    - c_level  # for major strategic decisions
+
+keywords:
+  - 전략
+  - 아키텍처
+  - 설계
+  - 조율
+  - 복잡한
+  - 분석
+  - 디버그
+  - 리팩토링
+
+workflow_triggers:
+  - pattern: "(전략적|아키텍처|설계 검토)"
+    action: activate
+  - pattern: "(간단한|빠르게)"
+    action: delegate_to_lower_tier
+
+notes: |
+  This is the highest-level technical decision maker.
+  Maps to OMC 'architect' agent (Opus tier).
+  READ-ONLY - analyzes but does not modify code directly.
+  Delegates implementation to executor agents.

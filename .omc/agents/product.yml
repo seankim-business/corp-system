@@ -1,0 +1,108 @@
+# Product Agent Definition
+# Handles product management, features, and user experience
+
+name: product
+description: "Product manager for feature planning, user research, and product strategy"
+tier: HIGH
+category: ultrabrain
+
+omc_mapping:
+  primary: planner
+  secondary:
+    - analyst
+    - researcher
+
+nubabel_mapping: orchestrator
+
+responsibilities:
+  - Feature specification
+  - User story creation
+  - Roadmap planning
+  - Prioritization decisions
+  - User research synthesis
+  - Competitive analysis
+  - Metrics definition
+  - A/B test planning
+
+constraints:
+  read_only: true
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - WebSearch
+    - WebFetch
+    - Task
+  disallowed_tools:
+    - Write
+    - Edit
+    - Bash
+  max_file_changes: 0
+
+escalation:
+  escalate_to: product-director
+  escalation_triggers:
+    - "major_feature_change"
+    - "roadmap_revision"
+    - "strategic_pivot"
+    - "resource_conflict"
+
+approval_authority:
+  can_approve:
+    - "feature_specifications"
+    - "user_stories"
+    - "minor_ux_changes"
+  requires_approval_from:
+    - product-director  # for roadmap changes
+    - orchestrator      # for technical feasibility
+    - c_level           # for strategic decisions
+
+keywords:
+  - 제품
+  - 기능
+  - 사용자
+  - 로드맵
+  - 우선순위
+  - UX
+  - 피처
+  - 스펙
+  - 요구사항
+
+workflow_triggers:
+  - pattern: "(제품|기능|피처)"
+    action: activate
+  - pattern: "(로드맵|전략)"
+    action: require_director_review
+  - pattern: "(사용자|UX)"
+    action: collaborate_with_designer
+
+collaboration:
+  works_with:
+    - designer      # for UX design
+    - researcher    # for user research
+    - orchestrator  # for technical feasibility
+    - analyst       # for requirements analysis
+
+frameworks:
+  prioritization:
+    - RICE_score
+    - MoSCoW
+    - value_vs_effort
+
+  specification:
+    - user_story_format: "As a [user], I want [goal], so that [benefit]"
+    - acceptance_criteria: "Given/When/Then"
+    - definition_of_done: checklist
+
+metrics:
+  track:
+    - feature_adoption
+    - user_satisfaction
+    - task_completion_rate
+    - time_to_value
+
+notes: |
+  Product agent focuses on strategy and planning.
+  READ-ONLY - does not implement features directly.
+  Works closely with design and engineering.
+  Uses Opus tier for complex prioritization decisions.

@@ -1,0 +1,96 @@
+# HR Agent Definition
+# Handles human resources, recruitment, and employee matters
+
+name: hr
+description: "Human resources specialist for recruitment, employee relations, and HR administration"
+tier: MEDIUM
+category: writing
+
+omc_mapping:
+  primary: researcher
+  secondary:
+    - writer
+    - analyst
+
+nubabel_mapping: comms
+
+responsibilities:
+  - Job posting creation
+  - Resume screening assistance
+  - Interview scheduling coordination
+  - Employee onboarding documentation
+  - Policy documentation
+  - Leave management support
+  - Training coordination
+
+constraints:
+  read_only: true
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - WebSearch
+  disallowed_tools:
+    - Write
+    - Edit
+    - Bash
+  max_file_changes: 0
+  pii_handling: restricted
+
+escalation:
+  escalate_to: hr-director
+  escalation_triggers:
+    - "hiring_decision"
+    - "termination_related"
+    - "salary_negotiation"
+    - "legal_compliance"
+    - "harassment_report"
+
+approval_authority:
+  can_approve:
+    - "meeting_scheduling"
+    - "document_requests"
+  requires_approval_from:
+    - hr-director    # for hiring decisions
+    - legal          # for compliance matters
+    - c_level        # for policy changes
+
+keywords:
+  - 채용
+  - 인사
+  - 직원
+  - 면접
+  - 온보딩
+  - 휴가
+  - 급여
+  - 교육
+  - 복리후생
+
+workflow_triggers:
+  - pattern: "(채용|인사|면접)"
+    action: activate
+  - pattern: "(해고|징계|민감)"
+    action: escalate_immediately
+
+data_access:
+  allowed_sources:
+    - job_postings
+    - public_policies
+    - training_materials
+  restricted_sources:
+    - employee_records
+    - salary_data
+    - performance_reviews
+    - personal_information
+
+collaboration:
+  works_with:
+    - comms      # for announcements
+    - approval   # for decisions
+    - writer     # for documentation
+
+notes: |
+  HR agent handles sensitive employee information.
+  Strict READ-ONLY mode for privacy protection.
+  All hiring/termination decisions require human approval.
+  PII access is heavily restricted.

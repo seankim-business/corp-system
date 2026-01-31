@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Multi-Account System Configuration for Claude API Management",
+
+  "accountSelection": {
+    "strategy": "least_loaded",
+    "fallbackStrategies": ["random", "round_robin"],
+    "retryOnFailure": true,
+    "maxRetries": 3
+  },
+
+  "capacityTracking": {
+    "enabled": true,
+    "syncIntervalSeconds": 60,
+    "redisKeyPrefix": "claude:capacity:",
+    "redisTTLSeconds": 300,
+    "trackMetrics": [
+      "requests_per_minute",
+      "tokens_per_minute",
+      "requests_per_day",
+      "tokens_per_day"
+    ]
+  },
+
+  "circuitBreaker": {
+    "enabled": true,
+    "failureThreshold": 5,
+    "successThreshold": 2,
+    "timeout": 60000,
+    "resetTimeoutSeconds": 300,
+    "halfOpenMaxAttempts": 3
+  },
+
+  "quotaAlerts": {
+    "enabled": true,
+    "thresholds": {
+      "warning": 80,
+      "critical": 95,
+      "emergency": 100
+    },
+    "channels": {
+      "slack": true,
+      "email": false,
+      "webhook": false
+    },
+    "slackChannels": {
+      "warning": "${SLACK_ACTIVITY_CHANNEL}",
+      "critical": "${SLACK_ALERT_CHANNEL}",
+      "emergency": "${SLACK_ALERT_CHANNEL}"
+    },
+    "throttling": {
+      "enabled": true,
+      "minIntervalMinutes": 15,
+      "maxAlertsPerHour": 4
+    }
+  },
+
+  "rateLimits": {
+    "default": {
+      "requestsPerMinute": 50,
+      "tokensPerMinute": 40000,
+      "requestsPerDay": 5000,
+      "tokensPerDay": 2500000
+    },
+    "tiers": {
+      "free": {
+        "requestsPerMinute": 5,
+        "tokensPerMinute": 4000,
+        "requestsPerDay": 500,
+        "tokensPerDay": 250000
+      },
+      "pro": {
+        "requestsPerMinute": 50,
+        "tokensPerMinute": 40000,
+        "requestsPerDay": 5000,
+        "tokensPerDay": 2500000
+      },
+      "enterprise": {
+        "requestsPerMinute": 1000,
+        "tokensPerMinute": 400000,
+        "requestsPerDay": 100000,
+        "tokensPerDay": 50000000
+      }
+    }
+  },
+
+  "healthCheck": {
+    "enabled": true,
+    "intervalSeconds": 300,
+    "endpoint": "https://api.anthropic.com/v1/messages",
+    "timeoutMs": 5000,
+    "failureThreshold": 3
+  },
+
+  "encryption": {
+    "algorithm": "aes-256-gcm",
+    "keyDerivation": "pbkdf2",
+    "iterations": 100000
+  },
+
+  "logging": {
+    "level": "info",
+    "logAccountSelection": true,
+    "logQuotaUpdates": true,
+    "logCircuitBreakerEvents": true
+  }
+}

@@ -1,0 +1,149 @@
+# MCP Server Configuration for Nubabel
+# Defines available MCP servers and their settings
+
+version: "1.0"
+description: "MCP server configuration for enhanced agent capabilities"
+
+# MCP Servers
+servers:
+  # Filesystem Access
+  filesystem:
+    enabled: true
+    priority: 1
+    package: "@anthropic/mcp-filesystem"
+    config:
+      allowed_paths:
+        - "/Users/sean/Documents/Kyndof/tools/nubabel"
+        - "/Users/sean/.claude"
+      operations:
+        - read
+        - write
+        - list
+        - search
+    use_cases:
+      - file_operations
+      - code_reading
+      - config_management
+
+  # GitHub Integration
+  github:
+    enabled: true
+    priority: 1
+    package: "@anthropic/mcp-github"
+    config:
+      owner: "kyndof"
+      repo: "nubabel"
+      permissions:
+        - create_branch
+        - create_pr
+        - list_commits
+        - get_file_contents
+        - search_code
+        - list_issues
+        - create_issue
+    use_cases:
+      - version_control
+      - pr_management
+      - code_search
+
+  # Chrome DevTools MCP (Existing - Priority)
+  chrome-devtools-mcp:
+    enabled: true
+    priority: 1
+    package: "mcp-devtools-server"
+    config:
+      node_version: "20.19+"
+      tools_count: 26
+    use_cases:
+      - browser_testing
+      - dom_inspection
+      - network_analysis
+      - console_access
+    notes: "Already configured in Nubabel - PRESERVE"
+
+  # Claude in Chrome (Alternative)
+  claude-in-chrome:
+    enabled: true
+    priority: 2
+    activation: "claude --chrome"
+    use_cases:
+      - browser_automation
+      - slack_interaction
+      - oauth_flows
+      - visual_testing
+    notes: "Official Chrome extension - use when DevTools MCP unavailable"
+
+  # Playwright MCP (Fallback)
+  playwright-mcp:
+    enabled: true
+    priority: 3
+    package: "@anthropic/mcp-playwright"
+    config:
+      browsers:
+        - chromium
+        - firefox
+      headless: true
+    use_cases:
+      - e2e_testing
+      - screenshot_capture
+      - cross_browser_testing
+    notes: "Fallback for headless testing"
+
+  # Context7 (Documentation)
+  context7:
+    enabled: true
+    priority: 1
+    package: "context7-mcp"
+    config:
+      cache_ttl: 3600
+    use_cases:
+      - documentation_lookup
+      - api_reference
+      - library_examples
+      - best_practices
+
+  # Memory/Notepad (Optional)
+  memory:
+    enabled: false
+    priority: 3
+    package: "@anthropic/mcp-memory"
+    config:
+      storage_path: ".omc/memory"
+    use_cases:
+      - conversation_memory
+      - context_persistence
+    notes: "Enable if long-term memory needed"
+
+# Server Selection Rules
+selection_rules:
+  browser_testing:
+    priority_order:
+      - chrome-devtools-mcp
+      - claude-in-chrome
+      - playwright-mcp
+    fallback_behavior: "try_next"
+
+  file_operations:
+    priority_order:
+      - filesystem
+    fallback_behavior: "error"
+
+  documentation:
+    priority_order:
+      - context7
+    fallback_behavior: "web_search"
+
+# Health Check Configuration
+health_check:
+  enabled: true
+  interval_minutes: 30
+  timeout_seconds: 10
+  on_failure: "mark_unavailable"
+
+  checks:
+    filesystem:
+      command: "ls /Users/sean/Documents/Kyndof/tools/nubabel"
+    github:
+      command: "gh auth status"
+    chrome-devtools-mcp:
+      command: "node --version"

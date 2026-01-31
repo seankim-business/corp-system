@@ -19,6 +19,7 @@ import { adminRevenueService } from "../services/revenue";
 import { adminSystemHealthService } from "../services/system-health";
 import { adminSupportService } from "../services/support";
 import { logger } from "../../utils/logger";
+import n8nInstancesRouter from "../../api/admin/n8n-instances";
 
 const router = Router();
 
@@ -599,5 +600,12 @@ router.get(
     }
   },
 );
+
+// ============================================================================
+// N8N INSTANCES
+// ============================================================================
+
+// Mount n8n instance management routes
+router.use("/n8n-instances", n8nInstancesRouter);
 
 export default router;

@@ -9,6 +9,8 @@ const ESSENTIAL_TABLES = [
   "memberships",
   "sessions",
   "approvals",
+  "external_identities",
+  "slack_users",
 ];
 
 async function main() {
@@ -110,6 +112,61 @@ async function main() {
             // Add indexes
             await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "approvals_organization_id_status_idx" ON "approvals"("organization_id", "status")`);
             await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "approvals_approver_id_status_idx" ON "approvals"("approver_id", "status")`);
+            console.log(`   ✓ ${table} created`);
+          } else if (table === "external_identities") {
+            await prisma.$executeRawUnsafe(`
+              CREATE TABLE IF NOT EXISTS "external_identities" (
+                "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+                "organization_id" UUID NOT NULL,
+                "user_id" UUID,
+                "provider" VARCHAR(50) NOT NULL,
+                "provider_user_id" VARCHAR(255) NOT NULL,
+                "provider_team_id" VARCHAR(255),
+                "email" VARCHAR(255),
+                "display_name" VARCHAR(255),
+                "real_name" VARCHAR(255),
+                "avatar_url" TEXT,
+                "metadata" JSONB NOT NULL DEFAULT '{}',
+                "link_status" VARCHAR(20) NOT NULL DEFAULT 'unlinked',
+                "link_method" VARCHAR(50),
+                "link_confidence" REAL,
+                "linked_at" TIMESTAMPTZ(6),
+                "linked_by" UUID,
+                "last_synced_at" TIMESTAMPTZ(6),
+                "sync_error" TEXT,
+                "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "external_identities_pkey" PRIMARY KEY ("id"),
+                CONSTRAINT "external_identities_org_provider_user_unique" UNIQUE ("organization_id", "provider", "provider_user_id")
+              )
+            `);
+            await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_external_identities_org" ON "external_identities"("organization_id")`);
+            await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_external_identities_org_user" ON "external_identities"("organization_id", "user_id")`);
+            await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "idx_external_identities_provider_user" ON "external_identities"("provider_user_id")`);
+            console.log(`   ✓ ${table} created`);
+          } else if (table === "slack_users") {
+            await prisma.$executeRawUnsafe(`
+              CREATE TABLE IF NOT EXISTS "slack_users" (
+                "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+                "slack_user_id" VARCHAR(50) NOT NULL,
+                "slack_team_id" VARCHAR(50) NOT NULL,
+                "user_id" UUID NOT NULL,
+                "organization_id" UUID NOT NULL,
+                "display_name" VARCHAR(255),
+                "real_name" VARCHAR(255),
+                "email" VARCHAR(255),
+                "avatar_url" TEXT,
+                "is_bot" BOOLEAN NOT NULL DEFAULT false,
+                "is_admin" BOOLEAN NOT NULL DEFAULT false,
+                "last_synced_at" TIMESTAMPTZ(6),
+                "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT "slack_users_pkey" PRIMARY KEY ("id"),
+                CONSTRAINT "slack_users_slack_user_id_key" UNIQUE ("slack_user_id")
+              )
+            `);
+            await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "slack_users_organization_id_idx" ON "slack_users"("organization_id")`);
+            await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "slack_users_user_id_idx" ON "slack_users"("user_id")`);
             console.log(`   ✓ ${table} created`);
           } else {
             console.log(`   ⚠ No SQL template for ${table}, trying db push...`);

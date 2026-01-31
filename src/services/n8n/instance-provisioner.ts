@@ -1,7 +1,11 @@
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { db } from "../../db/client";
 import { createN8nClient, N8nApiClient } from "./n8n-api-client";
 import { logger } from "../../utils/logger";
+
+// Local development mode detection
+const isLocalDev = process.env.NODE_ENV !== 'production';
+const LOCAL_N8N_URL = process.env.LOCAL_N8N_URL || 'http://localhost:5678';
 
 export interface ProvisioningConfig {
   organizationId: string;
@@ -69,8 +73,10 @@ export class N8nInstanceProvisioner {
       const encryptionKey = this.generateEncryptionKey();
       const apiKey = this.generateApiKey();
 
-      // Container URL (placeholder for now - in production would be dynamic)
-      const containerUrl = `https://${orgSlug}.workflows.nubabel.com`;
+      // Container URL - use local in dev, Railway in production
+      const containerUrl = isLocalDev
+        ? LOCAL_N8N_URL
+        : `https://${orgSlug}.workflows.nubabel.com`;
       const webhookBaseUrl = config.webhookBaseUrl || `${containerUrl}/webhook`;
 
       // Create instance record

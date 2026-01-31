@@ -1,0 +1,17 @@
+{
+  "active": true,
+  "goal_type": "interactive",
+  "goal_description": "Claude Connect Flow 6 - 시나리오 A-E 전체 검증",
+  "cycle": 1,
+  "max_cycles": 5,
+  "scenarios": {
+    "A_page_init": { "status": "pending", "tests": ["access_control", "quick_connect_tab", "manual_connect_tab"] },
+    "B_quick_connect": { "status": "pending", "tests": ["validation", "token_submit", "account_setup", "save_activate"] },
+    "C_manual_connect": { "status": "pending", "tests": ["session_code", "bookmarklet_copy", "console_script", "polling", "session_expiry"] },
+    "D_pool_management": { "status": "pending", "tests": ["account_list", "priority_change", "deactivate", "delete"] },
+    "E_usage_test": { "status": "pending", "tests": ["load_balancing", "realtime_status"] }
+  },
+  "failures": [],
+  "started_at": "2026-01-31T03:00:00Z",
+  "session_id": "flow6-ultraqa-001"
+}

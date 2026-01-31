@@ -1,0 +1,150 @@
+# Campaign Launch Workflow
+# Multi-agent orchestration for marketing campaign launches
+
+name: campaign-launch
+description: "End-to-end marketing campaign launch workflow with OMC agent coordination"
+version: "1.0"
+
+# Workflow metadata
+metadata:
+  category: marketing
+  estimated_duration: "2-4 hours"
+  requires_approval: true
+  slack_channel: "#marketing"
+
+# Trigger conditions
+triggers:
+  keywords:
+    - 캠페인
+    - 캠페인 런칭
+    - 마케팅 캠페인
+    - campaign launch
+    - marketing campaign
+  patterns:
+    - "(캠페인|campaign).*(런칭|launch|시작)"
+    - "(마케팅|marketing).*(계획|plan)"
+
+# Agent orchestration
+agents:
+  # Phase 1: Planning
+  - stage: planning
+    agent: planner
+    tier: HIGH
+    task: |
+      캠페인 목표, 타겟 오디언스, 핵심 메시지 정의
+      - 캠페인 목표 KPI 설정
+      - 타겟 세그먼트 정의
+      - 메시지 프레임워크 구성
+    timeout: 30m
+    outputs:
+      - campaign_brief
+      - target_segments
+      - kpi_targets
+
+  # Phase 2: Content Creation (Parallel)
+  - stage: content_creation
+    parallel: true
+    agents:
+      - agent: designer
+        tier: MEDIUM
+        task: "비주얼 에셋 제작 (배너, 소셜 이미지)"
+        timeout: 60m
+        outputs:
+          - visual_assets
+
+      - agent: writer
+        tier: LOW
+        task: "카피라이팅 (헤드라인, 본문, CTA)"
+        timeout: 45m
+        outputs:
+          - copy_assets
+
+      - agent: researcher
+        tier: MEDIUM
+        task: "경쟁사 분석 및 트렌드 리서치"
+        timeout: 30m
+        outputs:
+          - competitive_analysis
+
+  # Phase 3: Review
+  - stage: review
+    agent: critic
+    tier: HIGH
+    task: |
+      캠페인 자료 전체 검토
+      - 브랜드 일관성 확인
+      - 메시지 명확성 검증
+      - 법적/윤리적 이슈 체크
+    timeout: 20m
+    inputs:
+      - visual_assets
+      - copy_assets
+      - competitive_analysis
+    outputs:
+      - review_feedback
+
+  # Phase 4: Approval
+  - stage: approval
+    type: human_approval
+    approvers:
+      - marketing_director
+      - brand_manager
+    timeout: 48h
+    escalation:
+      after: 24h
+      to: c_level
+    slack_notification: true
+
+  # Phase 5: Execution
+  - stage: execution
+    agent: executor
+    tier: MEDIUM
+    task: |
+      캠페인 실행 준비
+      - 채널별 콘텐츠 배포 준비
+      - 스케줄링 설정
+      - 트래킹 코드 삽입
+    timeout: 60m
+    requires_approval: true
+
+  # Phase 6: Monitoring Setup
+  - stage: monitoring
+    agent: scientist
+    tier: MEDIUM
+    task: |
+      캠페인 모니터링 대시보드 설정
+      - KPI 트래킹 설정
+      - 알림 규칙 구성
+      - 리포트 자동화 설정
+    timeout: 30m
+
+# Success criteria
+success_criteria:
+  - all_stages_complete: true
+  - approval_obtained: true
+  - assets_delivered: true
+  - monitoring_active: true
+
+# Rollback procedure
+rollback:
+  on_failure:
+    - notify_team: "#marketing"
+    - save_progress: true
+    - create_incident: true
+  steps:
+    - "Pause campaign scheduling"
+    - "Notify stakeholders"
+    - "Archive current assets"
+    - "Document failure reason"
+
+# Notifications
+notifications:
+  on_start:
+    slack: "#marketing"
+    message: ":rocket: 캠페인 런칭 워크플로우 시작: {campaign_name}"
+  on_complete:
+    slack: "#marketing"
+    message: ":white_check_mark: 캠페인 런칭 완료: {campaign_name}"
+  on_failure:
+    slack: "#marketing"
+    message: ":x: 캠페인 런칭 실패: {campaign_name} - {error}"

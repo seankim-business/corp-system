@@ -64,6 +64,7 @@ const adminNavItems: NavItem[] = [
   { name: "Agent Monitor", path: "/admin/agent-monitor", icon: "🖥️" },
   { name: "Skills", path: "/admin/skills", icon: "⚡" },
   { name: "Claude Max", path: "/admin/claude-max-accounts", icon: "🧠" },
+  { name: "N8n Instances", path: "/admin/n8n-instances", icon: "🔄" },
   { name: "Optimization", path: "/admin/optimization", icon: "🔬" },
   { name: "Organizations", path: "/admin/organizations", icon: "🏢" },
   { name: "Billing", path: "/billing", icon: "💳" },

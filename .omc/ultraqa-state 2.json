@@ -1,0 +1,16 @@
+{
+  "active": true,
+  "goal_type": "interactive",
+  "goal_description": "UX 개선 검증: 브라우저(Claude in Chrome) + Slack #it-test @Nubabel",
+  "cycle": 1,
+  "max_cycles": 5,
+  "failures": [],
+  "started_at": "2026-01-29T21:00:00Z",
+  "test_cases": [
+    "onboarding_wizard",
+    "dashboard_components",
+    "chat_interface",
+    "sse_realtime",
+    "slack_integration"
+  ]
+}

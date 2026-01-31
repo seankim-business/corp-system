@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-01-30T16:48:46.317Z",
+  "trigger": "auto",
+  "active_modes": {
+    "autopilot": {
+      "phase": "unknown",
+      "originalIdea": ""
+    },
+    "ultrawork": {
+      "original_prompt": "Slack <> app.nubabel.com 에서 모든거 클릭하면서(Claude Chrome으로 직접 브라우저에서 유저처럼) 기능테스트 <> 슬랙 에이전트랑 모든기능 대화하면서(선빈으로서 대화를 @Nubabel 에게 시키며 테스트하는거임) 기능 전부 검증\n❯ 안되는거 있으면 니가 알아서 고쳐\n ❯ 계획 실행. 사용성 검증(QA/QC) 할땐, 브라우저는 claude in chrome 사용. 슬랙에서는 #it-test 에서 Nubabel 맨션으로 진행. 빌드는 railway cli로 진행사항 감시하고 테스트까지 연동. 모든 기능 전부다 잘 될 때까지 검증에 또검증 멈추지말것 ralph ulw autopilot yolo mode"
+    }
+  },
+  "todo_summary": {
+    "pending": 0,
+    "in_progress": 0,
+    "completed": 0
+  },
+  "wisdom_exported": true
+}

@@ -452,11 +452,11 @@ export default function MarketplacePage() {
             </div>
 
             {/* Tags from facets */}
-            {facets && facets.tags.length > 0 && (
+            {(facets?.tags?.length ?? 0) > 0 && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Popular Tags</h3>
                 <div className="flex flex-wrap gap-2">
-                  {facets.tags.slice(0, 10).map((tag) => (
+                  {facets?.tags?.slice(0, 10).map((tag) => (
                     <button
                       key={tag.name}
                       onClick={() => setSearchQuery(tag.name)}

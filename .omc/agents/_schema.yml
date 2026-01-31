@@ -1,0 +1,132 @@
+# Agent Definition Schema for Nubabel OMC Integration
+# All agent YAML files must conform to this schema
+
+version: "1.0"
+
+schema:
+  # Required fields
+  required:
+    - name
+    - description
+    - tier
+    - omc_mapping
+    - responsibilities
+
+  # Field definitions
+  fields:
+    name:
+      type: string
+      description: "Unique identifier for the agent"
+      pattern: "^[a-z][a-z0-9-]*$"
+
+    description:
+      type: string
+      description: "Human-readable description of agent's role"
+      max_length: 200
+
+    tier:
+      type: enum
+      values: [LOW, MEDIUM, HIGH]
+      description: "Model tier for this agent"
+
+    category:
+      type: enum
+      values: [ultrabrain, visual-engineering, artistry, quick, writing]
+      description: "Delegation category from OMC"
+
+    omc_mapping:
+      type: object
+      description: "Mapping to OMC agent definitions"
+      fields:
+        primary:
+          type: string
+          description: "Primary OMC agent this maps to"
+        secondary:
+          type: array
+          description: "Alternative OMC agents that can handle this role"
+
+    nubabel_mapping:
+      type: string
+      description: "Corresponding Nubabel agent type"
+      enum: [orchestrator, data, report, comms, search, task, approval, analytics]
+
+    responsibilities:
+      type: array
+      description: "List of tasks this agent handles"
+      items:
+        type: string
+
+    constraints:
+      type: object
+      description: "Operational constraints"
+      fields:
+        read_only:
+          type: boolean
+          default: false
+        allowed_tools:
+          type: array
+        disallowed_tools:
+          type: array
+        max_file_changes:
+          type: integer
+
+    escalation:
+      type: object
+      description: "Escalation rules"
+      fields:
+        escalate_to:
+          type: string
+          description: "Agent to escalate to"
+        escalation_triggers:
+          type: array
+          description: "Conditions that trigger escalation"
+
+    approval_authority:
+      type: object
+      description: "What this agent can approve"
+      fields:
+        can_approve:
+          type: array
+        requires_approval_from:
+          type: array
+
+    keywords:
+      type: array
+      description: "Keywords that trigger this agent"
+      items:
+        type: string
+
+# Example agent definition
+example:
+  name: finance-analyst
+  description: "Handles financial analysis and budget reviews"
+  tier: MEDIUM
+  category: quick
+  omc_mapping:
+    primary: scientist
+    secondary: [researcher, analyst]
+  nubabel_mapping: data
+  responsibilities:
+    - Budget analysis
+    - Financial reporting
+    - Cost optimization
+    - Revenue forecasting
+  constraints:
+    read_only: true
+    allowed_tools: [Read, Glob, Grep, WebSearch]
+    disallowed_tools: [Write, Edit, Bash]
+  escalation:
+    escalate_to: finance-director
+    escalation_triggers:
+      - "amount > 10000000"
+      - "requires_board_approval"
+  approval_authority:
+    can_approve:
+      - "expense < 1000000"
+    requires_approval_from:
+      - finance-director
+  keywords:
+    - 예산
+    - 비용
+    - 재무
+    - 분석

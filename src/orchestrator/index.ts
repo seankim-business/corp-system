@@ -757,3 +757,17 @@ export {
   type SpawnTreeNode,
   type TreeMetrics,
 } from "./spawn-tree-visualizer";
+
+// OMC Integration Bridge
+export {
+  loadOMCConfig,
+  shouldDelegateToOMC,
+  getOMCAgentForNubabel,
+  getApprovalThreshold,
+  getAvailableOMCAgents,
+  type OMCConfig,
+  type OMCTier,
+  type OMCDelegationRule,
+  type OMCRoutingResult,
+  type ApprovalThreshold as OMCApprovalThreshold,
+} from "./omc-bridge";

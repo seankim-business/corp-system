@@ -1,0 +1,723 @@
+openapi: 3.0.3
+info:
+  title: Claude Account Management API
+  description: Admin-only endpoints for managing Claude API accounts
+  version: 1.0.0
+  contact:
+    name: Nubabel Engineering
+    email: engineering@nubabel.com
+
+servers:
+  - url: https://auth.nubabel.com/api/admin
+    description: Production
+  - url: http://localhost:3000/api/admin
+    description: Development
+
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+
+paths:
+  /accounts:
+    get:
+      summary: List all Claude accounts
+      description: Returns all Claude accounts for the authenticated organization with health status
+      operationId: listAccounts
+      tags:
+        - Accounts
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AccountWithHealth"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Register new Claude account
+      description: Register a new Claude API account with encrypted API key storage
+      operationId: registerAccount
+      tags:
+        - Accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - apiKey
+                - name
+                - tier
+              properties:
+                apiKey:
+                  type: string
+                  description: Claude API key (will be encrypted)
+                  example: sk-ant-api03-...
+                name:
+                  type: string
+                  description: Human-readable account name
+                  example: Production Account
+                tier:
+                  type: string
+                  enum: [tier1, tier2, tier3, tier4]
+                  description: Claude API tier
+                  example: tier3
+                metadata:
+                  type: object
+                  description: Additional metadata
+                  example:
+                    requestLimit: 1000000
+                    tokenLimit: 5000000000
+      responses:
+        "201":
+          description: Account registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Account with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /accounts/{id}:
+    get:
+      summary: Get account details
+      description: Returns detailed information about a specific Claude account
+      operationId: getAccount
+      tags:
+        - Accounts
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/AccountWithHealth"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      summary: Update account
+      description: Update account properties (name, status, metadata)
+      operationId: updateAccount
+      tags:
+        - Accounts
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Updated Account Name
+                status:
+                  type: string
+                  enum: [active, disabled, exhausted]
+                  example: active
+                metadata:
+                  type: object
+                  example:
+                    priority: high
+                    tags: [production, critical]
+      responses:
+        "200":
+          description: Account updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Disable account
+      description: Soft delete account by setting status to disabled
+      operationId: disableAccount
+      tags:
+        - Accounts
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: Account disabled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        example: disabled
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /accounts/{id}/health:
+    get:
+      summary: Get account health metrics
+      description: Returns real-time health metrics including circuit breaker state, rate limits, and uptime
+      operationId: getAccountHealth
+      tags:
+        - Monitoring
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/AccountHealth"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /accounts/{id}/usage:
+    get:
+      summary: Get usage history
+      description: Returns usage statistics for the specified time period
+      operationId: getAccountUsage
+      tags:
+        - Monitoring
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - name: period
+          in: query
+          description: Time period for usage data
+          required: false
+          schema:
+            type: string
+            enum: [24h, 7d, 30d]
+            default: 24h
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UsageHistory"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /accounts/{id}/alerts:
+    get:
+      summary: Get quota alerts
+      description: Returns quota alerts for the account
+      operationId: getAccountAlerts
+      tags:
+        - Monitoring
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - name: includeResolved
+          in: query
+          description: Include resolved alerts
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/QuotaAlert"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /accounts/{id}/sync:
+    post:
+      summary: Trigger Admin API sync
+      description: Manually trigger usage sync from Claude Admin API
+      operationId: syncAccount
+      tags:
+        - Operations
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: Sync completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Account"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /accounts/{id}/reset-circuit:
+    post:
+      summary: Reset circuit breaker
+      description: Manually reset the circuit breaker for an account
+      operationId: resetCircuitBreaker
+      tags:
+        - Operations
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+      responses:
+        "200":
+          description: Circuit breaker reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      circuitState:
+                        type: string
+                        example: CLOSED
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimitExceeded"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+
+  parameters:
+    AccountId:
+      name: id
+      in: path
+      required: true
+      description: Account UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled, exhausted]
+        consecutiveFailures:
+          type: integer
+        halfOpenSuccesses:
+          type: integer
+        circuitOpensAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastFailureAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastFailureReason:
+          type: string
+          nullable: true
+        lastSuccessAt:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: object
+          properties:
+            apiKey:
+              type: string
+              example: "***ENCRYPTED***"
+            apiKeyId:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AccountWithHealth:
+      allOf:
+        - $ref: "#/components/schemas/Account"
+        - type: object
+          properties:
+            health:
+              $ref: "#/components/schemas/AccountHealth"
+
+    AccountHealth:
+      type: object
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        accountName:
+          type: string
+        status:
+          type: string
+        circuitState:
+          type: string
+          enum: [CLOSED, OPEN, HALF_OPEN]
+        currentLoad:
+          type: object
+          properties:
+            rpm:
+              $ref: "#/components/schemas/LoadMetric"
+            tpm:
+              $ref: "#/components/schemas/LoadMetric"
+            itpm:
+              $ref: "#/components/schemas/LoadMetric"
+        monthlyUsage:
+          type: object
+          properties:
+            requests:
+              type: integer
+            tokens:
+              type: integer
+            estimatedCost:
+              type: number
+        uptime:
+          type: object
+          properties:
+            consecutiveSuccesses:
+              type: integer
+            consecutiveFailures:
+              type: integer
+            lastSuccessAt:
+              type: string
+              format: date-time
+              nullable: true
+            lastFailureAt:
+              type: string
+              format: date-time
+              nullable: true
+            lastFailureReason:
+              type: string
+              nullable: true
+
+    LoadMetric:
+      type: object
+      properties:
+        current:
+          type: integer
+        limit:
+          type: integer
+        percentage:
+          type: number
+
+    UsageHistory:
+      type: object
+      properties:
+        period:
+          type: string
+          enum: [24h, 7d, 30d]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        requests:
+          type: integer
+        tokens:
+          type: integer
+        estimatedCost:
+          type: number
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    QuotaAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [approaching_limit, quota_exceeded]
+        severity:
+          type: string
+          enum: [warning, critical]
+        message:
+          type: string
+        currentValue:
+          type: integer
+        limit:
+          type: integer
+        percentage:
+          type: number
+        quotaType:
+          type: string
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: Missing required fields
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Authentication required
+
+    Forbidden:
+      description: Forbidden - Admin role required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: Admin role required
+
+    NotFound:
+      description: Account not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            success: false
+            error:
+              code: ACCOUNT_NOT_FOUND
+              message: Account not found
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            success: false
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: Too many account management requests
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            success: false
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred
+
+tags:
+  - name: Accounts
+    description: Claude account CRUD operations
+  - name: Monitoring
+    description: Health and usage monitoring
+  - name: Operations
+    description: Administrative operations
