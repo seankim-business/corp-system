@@ -38,6 +38,7 @@ export interface ARDepartmentCreateInput {
   description?: string;
   parentId?: string;
   headPositionId?: string;
+  budgetCents?: number;
   status?: DepartmentStatus;
   metadata?: Record<string, any>;
 }

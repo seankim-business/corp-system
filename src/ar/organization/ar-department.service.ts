@@ -117,6 +117,7 @@ export class ARDepartmentService {
           description: data.description,
           parentId: data.parentId,
           headAgentId: data.headPositionId, // Note: this maps to headAgentId in schema
+          budgetCents: data.budgetCents ?? 0,
           status: data.status || 'active',
           metadata: data.metadata || {},
         },

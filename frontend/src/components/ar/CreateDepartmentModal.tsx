@@ -39,8 +39,8 @@ export function CreateDepartmentModal({ departments, onClose, onSuccess }: Creat
         name: name.trim(),
         description: description.trim() || undefined,
         parentId: parentId || undefined,
+        budgetCents,
         status,
-        metadata: { budgetCents },
       });
       onSuccess();
     } catch (err) {

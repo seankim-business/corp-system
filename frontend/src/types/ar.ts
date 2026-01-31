@@ -29,6 +29,7 @@ export interface CreateDepartmentInput {
   description?: string;
   parentId?: string;
   headPositionId?: string;
+  budgetCents?: number;
   status?: DepartmentStatus;
   metadata?: Record<string, unknown>;
 }

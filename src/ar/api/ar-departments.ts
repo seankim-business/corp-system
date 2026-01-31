@@ -18,6 +18,7 @@ const createDepartmentSchema = z.object({
   description: z.string().optional().nullable(),
   parentId: z.string().uuid().optional().nullable(),
   headPositionId: z.string().uuid().optional().nullable(),
+  budgetCents: z.number().int().min(0).optional().default(0),
   status: z.enum(["active", "inactive", "archived"]).optional().default("active"),
   metadata: z.record(z.unknown()).optional(),
 });
@@ -106,6 +107,7 @@ router.post(
         description: data.description ?? undefined,
         parentId: data.parentId ?? undefined,
         headPositionId: data.headPositionId ?? undefined,
+        budgetCents: data.budgetCents ?? 0,
         status: data.status,
         metadata: data.metadata,
       });

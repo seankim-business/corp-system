@@ -16,8 +16,10 @@ import {
   useARPositions,
   useARDepartments,
   useDeletePosition,
+  useCreatePosition,
+  useUpdatePosition,
 } from "../../hooks/ar";
-import type { ARPosition, SkillLevel } from "../../types/ar";
+import type { ARPosition, SkillLevel, CreatePositionInput, RequiredSkill, PositionStatus } from "../../types/ar";
 
 const skillLevelColors: Record<SkillLevel, string> = {
   beginner: "bg-gray-100 text-gray-700",
@@ -34,7 +36,22 @@ export default function ARPositionsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<ARPosition | null>(null);
 
+  // Form state for create/edit
+  const [formData, setFormData] = useState<CreatePositionInput>({
+    title: "",
+    departmentId: "",
+    description: "",
+    requiredSkills: [],
+    minExperience: 0,
+    maxCapacity: 1,
+    status: "active",
+  });
+  const [newSkill, setNewSkill] = useState<RequiredSkill>({ name: "", level: "intermediate", weight: 50 });
+  const [formError, setFormError] = useState<string | null>(null);
+
   const { data: departmentsData } = useARDepartments({ status: "active" });
+  const createMutation = useCreatePosition();
+  const updateMutation = useUpdatePosition();
   const { data, isLoading } = useARPositions({
     status: statusFilter === "all" ? undefined : statusFilter,
     departmentId: departmentFilter === "all" ? undefined : departmentFilter,
@@ -60,6 +77,82 @@ export default function ARPositionsPage() {
     }
   };
 
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      departmentId: "",
+      description: "",
+      requiredSkills: [],
+      minExperience: 0,
+      maxCapacity: 1,
+      status: "active",
+    });
+    setNewSkill({ name: "", level: "intermediate", weight: 50 });
+    setFormError(null);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setIsCreateModalOpen(true);
+  };
+
+  const openEditModal = (position: ARPosition) => {
+    setFormData({
+      title: position.title,
+      departmentId: position.departmentId,
+      description: position.description || "",
+      requiredSkills: position.requiredSkills,
+      minExperience: position.minExperience,
+      maxCapacity: position.maxCapacity,
+      status: position.status,
+      reportsTo: position.reportsTo || undefined,
+    });
+    setEditingPosition(position);
+  };
+
+  const addSkill = () => {
+    if (!newSkill.name.trim()) return;
+    setFormData(prev => ({
+      ...prev,
+      requiredSkills: [...(prev.requiredSkills || []), newSkill],
+    }));
+    setNewSkill({ name: "", level: "intermediate", weight: 50 });
+  };
+
+  const removeSkill = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      requiredSkills: (prev.requiredSkills || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!formData.title.trim()) {
+      setFormError("Title is required");
+      return;
+    }
+    if (!formData.departmentId) {
+      setFormError("Department is required");
+      return;
+    }
+
+    try {
+      if (editingPosition) {
+        await updateMutation.mutateAsync({ id: editingPosition.id, ...formData });
+        setEditingPosition(null);
+      } else {
+        await createMutation.mutateAsync(formData);
+        setIsCreateModalOpen(false);
+      }
+      resetForm();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Failed to save position");
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -69,7 +162,7 @@ export default function ARPositionsPage() {
           <p className="text-gray-600">Define roles and skill requirements for agents</p>
         </div>
         <button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={openCreateModal}
           className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
         >
           <PlusIcon className="h-5 w-5" />
@@ -150,7 +243,7 @@ export default function ARPositionsPage() {
                     <BriefcaseIcon className="h-12 w-12 text-gray-300 mx-auto mb-2" />
                     <p className="text-gray-500">No positions found</p>
                     <button
-                      onClick={() => setIsCreateModalOpen(true)}
+                      onClick={openCreateModal}
                       className="mt-2 text-indigo-600 hover:text-indigo-800 text-sm"
                     >
                       Create your first position
@@ -191,7 +284,7 @@ export default function ARPositionsPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setEditingPosition(position);
+                          openEditModal(position);
                         }}
                         className="text-indigo-600 hover:text-indigo-900 mr-3"
                       >
@@ -267,7 +360,7 @@ export default function ARPositionsPage() {
 
               <div className="pt-4 flex gap-2">
                 <button
-                  onClick={() => setEditingPosition(selectedPosition)}
+                  onClick={() => openEditModal(selectedPosition)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   <PencilIcon className="h-4 w-4" />
@@ -294,33 +387,199 @@ export default function ARPositionsPage() {
         </div>
       </div>
 
-      {/* TODO: Add Create/Edit Position Modals */}
-      {isCreateModalOpen && (
+      {/* Create/Edit Position Modal */}
+      {(isCreateModalOpen || editingPosition) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-            <h2 className="text-lg font-semibold mb-4">Create Position</h2>
-            <p className="text-gray-500 text-sm mb-4">Position creation modal coming soon.</p>
-            <button
-              onClick={() => setIsCreateModalOpen(false)}
-              className="w-full px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">
+                {editingPosition ? `Edit Position: ${editingPosition.title}` : "Create Position"}
+              </h2>
+              <button
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setEditingPosition(null);
+                  resetForm();
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
 
-      {editingPosition && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-            <h2 className="text-lg font-semibold mb-4">Edit Position: {editingPosition.title}</h2>
-            <p className="text-gray-500 text-sm mb-4">Position editing modal coming soon.</p>
-            <button
-              onClick={() => setEditingPosition(null)}
-              className="w-full px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              Close
-            </button>
+            {formError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g., Senior Developer"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                />
+              </div>
+
+              {/* Department */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Department <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.departmentId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, departmentId: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                >
+                  <option value="">Select department...</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={formData.description || ""}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Position responsibilities..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Min Experience & Max Capacity */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Experience (years)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.minExperience || 0}
+                    onChange={(e) => setFormData(prev => ({ ...prev, minExperience: parseInt(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Capacity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.maxCapacity || 1}
+                    onChange={(e) => setFormData(prev => ({ ...prev, maxCapacity: parseInt(e.target.value) || 1 }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={formData.status || "active"}
+                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as PositionStatus }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+
+              {/* Required Skills */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Required Skills</label>
+
+                {/* Existing skills */}
+                {formData.requiredSkills && formData.requiredSkills.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {formData.requiredSkills.map((skill, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span className="text-sm font-medium">{skill.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 text-xs rounded ${skillLevelColors[skill.level]}`}>
+                            {skill.level}
+                          </span>
+                          <span className="text-xs text-gray-400">({skill.weight}%)</span>
+                          <button
+                            type="button"
+                            onClick={() => removeSkill(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new skill */}
+                <div className="grid grid-cols-4 gap-2">
+                  <input
+                    type="text"
+                    value={newSkill.name}
+                    onChange={(e) => setNewSkill(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Skill name"
+                    className="col-span-2 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <select
+                    value={newSkill.level}
+                    onChange={(e) => setNewSkill(prev => ({ ...prev, level: e.target.value as SkillLevel }))}
+                    className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                    <option value="expert">Expert</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={addSkill}
+                    className="px-2 py-1 text-sm bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setEditingPosition(null);
+                    resetForm();
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {createMutation.isPending || updateMutation.isPending
+                    ? "Saving..."
+                    : editingPosition
+                    ? "Update Position"
+                    : "Create Position"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

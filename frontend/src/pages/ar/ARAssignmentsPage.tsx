@@ -11,6 +11,7 @@ import {
   UserGroupIcon,
   ArrowPathIcon,
   XCircleIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { WorkloadBar } from "../../components/ar/WorkloadBar";
 import { AgentHealthBadge } from "../../components/ar/AgentHealthIndicator";
@@ -19,8 +20,10 @@ import {
   useARPositions,
   useUpdateAssignmentStatus,
   useTerminateAssignment,
+  useCreateAssignment,
 } from "../../hooks/ar";
-import type { AssignmentStatus } from "../../types/ar";
+import { useAgents } from "../../hooks/useAgents";
+import type { AssignmentStatus, AssignmentType, CreateAssignmentInput } from "../../types/ar";
 
 const statusColors: Record<AssignmentStatus, string> = {
   active: "bg-green-100 text-green-700",
@@ -43,6 +46,7 @@ export default function ARAssignmentsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const { data: positionsData } = useARPositions({ status: "active" });
+  const { data: agentsData } = useAgents();
   const { data, isLoading, refetch } = useARAssignments({
     status: statusFilter === "all" ? undefined : statusFilter,
     search: searchQuery || undefined,
@@ -50,10 +54,63 @@ export default function ARAssignmentsPage() {
 
   const updateStatusMutation = useUpdateAssignmentStatus();
   const terminateMutation = useTerminateAssignment();
+  const createMutation = useCreateAssignment();
+
+  // Form state
+  const [formData, setFormData] = useState<CreateAssignmentInput>({
+    agentId: "",
+    positionId: "",
+    humanSupervisor: "",
+    assignmentType: "permanent",
+    workload: 0,
+    status: "active",
+  });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const assignments = data?.assignments ?? [];
   const positions = positionsData?.positions ?? [];
+  const agents = agentsData?.agents ?? [];
   const selectedAssignment = assignments.find(a => a.id === selectedId);
+
+  const resetForm = () => {
+    setFormData({
+      agentId: "",
+      positionId: "",
+      humanSupervisor: "",
+      assignmentType: "permanent",
+      workload: 0,
+      status: "active",
+    });
+    setFormError(null);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setIsCreateModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!formData.agentId) {
+      setFormError("Please select an agent");
+      return;
+    }
+    if (!formData.positionId) {
+      setFormError("Please select a position");
+      return;
+    }
+
+    try {
+      await createMutation.mutateAsync(formData);
+      setIsCreateModalOpen(false);
+      resetForm();
+      refetch();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Failed to create assignment");
+    }
+  };
 
   const getPositionTitle = (posId: string) => {
     return positions.find(p => p.id === posId)?.title ?? "Unknown Position";
@@ -99,7 +156,7 @@ export default function ARAssignmentsPage() {
           <p className="text-gray-600">Manage agent-position relationships</p>
         </div>
         <button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={openCreateModal}
           className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
         >
           <PlusIcon className="h-5 w-5" />
@@ -349,18 +406,185 @@ export default function ARAssignmentsPage() {
         </div>
       </div>
 
-      {/* Create Modal Placeholder */}
+      {/* Create Assignment Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-            <h2 className="text-lg font-semibold mb-4">Create Assignment</h2>
-            <p className="text-gray-500 text-sm mb-4">Assignment creation modal coming soon.</p>
-            <button
-              onClick={() => setIsCreateModalOpen(false)}
-              className="w-full px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              Close
-            </button>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">Create Assignment</h2>
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                  {formError}
+                </div>
+              )}
+
+              {/* Agent Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Agent <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.agentId}
+                  onChange={(e) => setFormData({ ...formData, agentId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                >
+                  <option value="">Select an agent...</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.displayName || agent.name} ({agent.type})
+                    </option>
+                  ))}
+                </select>
+                {agents.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">No agents available. Create agents first.</p>
+                )}
+              </div>
+
+              {/* Position Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Position <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.positionId}
+                  onChange={(e) => setFormData({ ...formData, positionId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                >
+                  <option value="">Select a position...</option>
+                  {positions.map((pos) => (
+                    <option key={pos.id} value={pos.id}>
+                      {pos.title}
+                    </option>
+                  ))}
+                </select>
+                {positions.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">No positions available. Create positions first.</p>
+                )}
+              </div>
+
+              {/* Assignment Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assignment Type
+                </label>
+                <select
+                  value={formData.assignmentType}
+                  onChange={(e) => setFormData({ ...formData, assignmentType: e.target.value as AssignmentType })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="permanent">Permanent</option>
+                  <option value="temporary">Temporary</option>
+                  <option value="acting">Acting</option>
+                </select>
+              </div>
+
+              {/* Human Supervisor */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Human Supervisor (optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.humanSupervisor || ""}
+                  onChange={(e) => setFormData({ ...formData, humanSupervisor: e.target.value })}
+                  placeholder="Enter supervisor name or ID"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Initial Workload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Initial Workload: {Math.round((formData.workload || 0) * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={(formData.workload || 0) * 100}
+                  onChange={(e) => setFormData({ ...formData, workload: parseInt(e.target.value) / 100 })}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={formData.startDate || ""}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              {/* End Date (for temporary/acting) */}
+              {formData.assignmentType !== "permanent" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.endDate || ""}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              {/* Initial Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Initial Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as AssignmentStatus })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="on_leave">On Leave</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createMutation.isPending ? "Creating..." : "Create Assignment"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
