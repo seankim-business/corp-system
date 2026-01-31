@@ -843,17 +843,27 @@ router.post(
           logger.info("SlackUser updated via fix-link", { slackUserId, userId: targetUser.id });
         }
       } else {
-        // Create SlackUser entry if it doesn't exist
-        await db.slackUser.create({
-          data: {
-            slackUserId,
-            userId: targetUser.id,
-            organizationId,
-            email: targetUserEmail,
-            displayName: targetUser.displayName || targetUserEmail,
-          },
+        // Get slackTeamId from the organization's Slack workspace
+        const slackWorkspace = await db.slackWorkspace.findFirst({
+          where: { organizationId },
         });
-        logger.info("SlackUser created via fix-link", { slackUserId, userId: targetUser.id });
+
+        if (slackWorkspace) {
+          // Create SlackUser entry if it doesn't exist
+          await db.slackUser.create({
+            data: {
+              slackUserId,
+              slackTeamId: slackWorkspace.slackTeamId,
+              userId: targetUser.id,
+              organizationId,
+              email: targetUserEmail,
+              displayName: targetUser.displayName || targetUserEmail,
+            },
+          });
+          logger.info("SlackUser created via fix-link", { slackUserId, userId: targetUser.id, slackTeamId: slackWorkspace.slackTeamId });
+        } else {
+          logger.warn("No SlackWorkspace found for organization, skipping SlackUser creation", { organizationId });
+        }
       }
 
       return res.json({
