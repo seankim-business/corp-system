@@ -536,6 +536,125 @@ app.post("/health/reset-all", (_req, res) => {
   }
 });
 
+/**
+ * POST /health/sync-slack-users
+ * TEMPORARY: One-time sync endpoint for Slack users to ExternalIdentity
+ * Bypasses auth for emergency fix - remove after use
+ */
+app.post("/health/sync-slack-users", async (_req, res) => {
+  try {
+    const { db } = await import("./db/client");
+    const { WebClient } = await import("@slack/web-api");
+
+    logger.info("Starting emergency Slack user sync via health endpoint");
+
+    const org = await db.organization.findFirst({
+      where: { slackIntegrations: { some: { enabled: true } } },
+      include: { slackIntegrations: true },
+    });
+
+    if (!org) {
+      return res.status(404).json({ error: "No organization with Slack integration" });
+    }
+
+    const integration = org.slackIntegrations.find((i: any) => i.enabled && i.botToken);
+    if (!integration?.botToken) {
+      return res.status(404).json({ error: "No Slack bot token found" });
+    }
+
+    const slack = new WebClient(integration.botToken);
+    const workspaceId = integration.workspaceId;
+
+    let cursor: string | undefined;
+    const members: any[] = [];
+    do {
+      const r = await slack.users.list({ cursor, limit: 200 });
+      members.push(...(r.members || []));
+      cursor = r.response_metadata?.next_cursor;
+    } while (cursor);
+
+    const stats = { total: members.length, synced: 0, skipped: 0, errors: 0 };
+
+    for (const m of members) {
+      if (m.is_bot || m.deleted || m.id === "USLACKBOT") {
+        stats.skipped++;
+        continue;
+      }
+
+      const p = m.profile || {};
+      const email = p.email;
+      const name = p.display_name || p.real_name || m.name;
+
+      try {
+        const existing = await db.slackUser.findUnique({ where: { slackUserId: m.id } });
+        let userId: string;
+
+        if (existing) {
+          await db.slackUser.update({ where: { slackUserId: m.id }, data: { lastSyncedAt: new Date() } });
+          userId = existing.userId;
+        } else {
+          let user = email ? await db.user.findUnique({ where: { email } }) : null;
+          if (!user) {
+            user = await db.user.create({
+              data: { email: email || `slack+${m.id}@placeholder.nubabel.com`, displayName: name },
+            });
+          }
+          userId = user.id;
+          await db.slackUser.create({
+            data: {
+              slackUserId: m.id,
+              slackTeamId: workspaceId!,
+              userId,
+              organizationId: org.id,
+              displayName: name,
+              email,
+              lastSyncedAt: new Date(),
+            },
+          });
+        }
+
+        const extId = await db.externalIdentity.findFirst({
+          where: { organizationId: org.id, provider: "slack", providerUserId: m.id },
+        });
+        if (!extId) {
+          await db.externalIdentity.create({
+            data: {
+              organizationId: org.id,
+              provider: "slack",
+              providerUserId: m.id,
+              providerTeamId: workspaceId,
+              email,
+              displayName: name,
+              status: "linked",
+              userId,
+              autoLinkedAt: new Date(),
+              autoLinkMethod: "health_sync",
+            },
+          });
+        }
+
+        const mem = await db.membership.findUnique({
+          where: { organizationId_userId: { organizationId: org.id, userId } },
+        });
+        if (!mem) {
+          await db.membership.create({ data: { organizationId: org.id, userId, role: "member" } });
+        }
+
+        stats.synced++;
+      } catch (e) {
+        stats.errors++;
+        logger.error(`Failed to sync Slack user ${m.name}`, { error: e });
+      }
+    }
+
+    logger.info("Emergency Slack user sync completed", stats);
+    res.json({ success: true, stats, message: "Slack users synced successfully" });
+  } catch (error) {
+    logger.error("Failed to sync Slack users", { error });
+    res.status(500).json({ success: false, error: "Failed to sync Slack users" });
+  }
+});
+
 app.use("/auth", authRateLimiter, authRoutes);
 
 app.use("/api", webhookRateLimiter, webhooksRouter);
