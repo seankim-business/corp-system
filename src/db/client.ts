@@ -7,10 +7,10 @@ const DB_CIRCUIT_BREAKER_NAME = "postgresql";
 const DB_QUERY_TIMEOUT_MS = parseInt(process.env.DB_QUERY_TIMEOUT_MS || "30000", 10);
 
 const dbCircuitBreaker = getCircuitBreaker(DB_CIRCUIT_BREAKER_NAME, {
-  failureThreshold: 5,
+  failureThreshold: 10, // Increased from 5 to handle transient issues
   successThreshold: 2,
   timeout: DB_QUERY_TIMEOUT_MS,
-  resetTimeout: 60000,
+  resetTimeout: 30000, // Reduced from 60s to recover faster
 });
 
 function createPrismaClient(): PrismaClient {
