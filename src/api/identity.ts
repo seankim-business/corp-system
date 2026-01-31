@@ -740,7 +740,7 @@ router.post(
  */
 router.post(
   "/admin/identities/fix-link",
-  requirePermission(Permission.ADMIN_IDENTITIES_WRITE),
+  requirePermission(Permission.SETTINGS_UPDATE), // Admin permission - SETTINGS_UPDATE is available to admins
   async (req: Request, res: Response) => {
     try {
       const { organizationId, id: adminId } = req.user!;
