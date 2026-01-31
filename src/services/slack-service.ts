@@ -52,6 +52,25 @@ export async function getUserBySlackId(
       return slackUserRecord.user;
     }
 
+    // FALLBACK: If SlackUser exists but user relation is null, try direct User lookup
+    // This handles broken FK or missing include data scenarios
+    if (slackUserRecord && slackUserRecord.userId && !slackUserRecord.user) {
+      logger.warn("Method 1.5 - SlackUser found but user relation null, trying direct lookup", {
+        slackUserId,
+        userId: slackUserRecord.userId,
+      });
+      const directUser = await prisma.user.findUnique({
+        where: { id: slackUserRecord.userId },
+      });
+      if (directUser) {
+        logger.warn("User found via direct lookup (broken FK recovered)", {
+          slackUserId,
+          userId: directUser.id,
+        });
+        return directUser;
+      }
+    }
+
     // Method 2: Try ExternalIdentity lookup
     if (organizationId) {
       logger.warn("Method 2 - ExternalIdentity lookup starting", {
@@ -86,6 +105,25 @@ export async function getUserBySlackId(
           userId: externalIdentity.user.id,
         });
         return externalIdentity.user;
+      }
+
+      // FALLBACK: If ExternalIdentity exists but user relation is null, try direct lookup
+      if (externalIdentity && externalIdentity.userId && !externalIdentity.user) {
+        logger.warn("Method 2.5 - ExternalIdentity found but user relation null, trying direct lookup", {
+          slackUserId,
+          userId: externalIdentity.userId,
+          linkStatus: externalIdentity.linkStatus,
+        });
+        const directUser = await prisma.user.findUnique({
+          where: { id: externalIdentity.userId },
+        });
+        if (directUser) {
+          logger.warn("User found via direct lookup from ExternalIdentity (broken FK recovered)", {
+            slackUserId,
+            userId: directUser.id,
+          });
+          return directUser;
+        }
       }
     } else {
       logger.warn("Method 2 skipped - no organizationId provided", { slackUserId });
@@ -159,6 +197,18 @@ export async function getUserBySlackId(
         slackUserId,
         email: email.toLowerCase(),
         organizationId,
+      });
+    }
+
+    // Final summary logging before return
+    if (!user) {
+      logger.error("getUserBySlackId returning null - ALL METHODS FAILED", {
+        slackUserId,
+        organizationId,
+        method1_slackUser_found: !!slackUserRecord,
+        method1_slackUser_userId: slackUserRecord?.userId,
+        method1_slackUser_hasUser: !!slackUserRecord?.user,
+        method3_email: email?.toLowerCase(),
       });
     }
 
