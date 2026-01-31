@@ -59,9 +59,9 @@ export interface AIExecutionResult {
 }
 
 const CATEGORY_MODEL_MAP: Record<Category, string> = {
-  quick: "claude-3-5-haiku-20241022",
-  writing: "claude-3-5-haiku-20241022",
-  "unspecified-low": "claude-3-5-haiku-20241022",
+  quick: "claude-3-haiku-20240307",
+  writing: "claude-3-haiku-20240307",
+  "unspecified-low": "claude-3-haiku-20240307",
   artistry: "claude-sonnet-4-20250514",
   "visual-engineering": "claude-sonnet-4-20250514",
   "unspecified-high": "claude-sonnet-4-20250514",
@@ -69,7 +69,7 @@ const CATEGORY_MODEL_MAP: Record<Category, string> = {
 };
 
 const MODEL_COSTS_PER_1K: Record<string, { input: number; output: number }> = {
-  "claude-3-5-haiku-20241022": { input: 0.001, output: 0.005 },
+  "claude-3-haiku-20240307": { input: 0.00025, output: 0.00125 },
   "claude-sonnet-4-20250514": { input: 0.003, output: 0.015 },
   "claude-3-opus-20240229": { input: 0.015, output: 0.075 },
 };
