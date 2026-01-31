@@ -424,8 +424,15 @@ function setupEventHandlers(app: App): void {
         const slackUserInfo = await client.users.info({ user });
         const profile = slackUserInfo.user?.profile;
 
+        logger.info("Slack user profile retrieved", {
+          slackUserId: user,
+          hasEmail: !!profile?.email,
+          email: profile?.email, // Log the email for debugging
+          displayName: profile?.display_name || profile?.real_name,
+        });
+
         if (profile) {
-          await provisionSlackUser(user, workspaceId, organization.id, {
+          const provisionedUser = await provisionSlackUser(user, workspaceId, organization.id, {
             email: profile?.email,
             displayName: profile?.display_name || profile?.real_name,
             realName: profile?.real_name,
@@ -433,12 +440,21 @@ function setupEventHandlers(app: App): void {
             isBot: slackUserInfo.user?.is_bot,
             isAdmin: slackUserInfo.user?.is_admin,
           });
-          logger.debug("Slack user provisioned", { slackUserId: user, organizationId: organization.id });
+          logger.info("Slack user provisioned successfully", {
+            slackUserId: user,
+            organizationId: organization.id,
+            userId: provisionedUser?.userId,
+            userEmail: provisionedUser?.email,
+          });
+        } else {
+          logger.warn("No Slack profile available for provisioning", { slackUserId: user });
         }
       } catch (provisionError) {
-        logger.warn("Failed to provision Slack user (non-fatal)", {
+        logger.error("Failed to provision Slack user", {
           slackUserId: user,
+          organizationId: organization.id,
           error: provisionError instanceof Error ? provisionError.message : String(provisionError),
+          stack: provisionError instanceof Error ? provisionError.stack : undefined,
         });
         // Continue anyway - getUserBySlackId may still find the user
       }
