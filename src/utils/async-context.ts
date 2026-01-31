@@ -46,8 +46,15 @@ export function runWithContext<T>(context: OrganizationContext, fn: () => T): T 
  * Run a function without RLS context (bypass organization filtering)
  * Use this for system-level queries that need to bypass tenant isolation,
  * such as authentication lookups that need to establish the organization context.
+ *
+ * Important: This function awaits async operations INSIDE the AsyncLocalStorage context
+ * to ensure the bypass flag is propagated through Prisma's query execution.
  */
-export function runWithoutRLS<T>(fn: () => T): T {
-  // Run with bypass flag set to true
-  return asyncLocalStorage.run({ organizationId: null, bypass: true }, fn);
+export async function runWithoutRLS<T>(fn: () => T | Promise<T>): Promise<Awaited<T>> {
+  // Run with bypass flag set to true, awaiting inside the context to ensure
+  // the AsyncLocalStorage propagates through Prisma's query hooks
+  return asyncLocalStorage.run({ organizationId: null, bypass: true }, async () => {
+    const result = await fn();
+    return result as Awaited<T>;
+  }) as Promise<Awaited<T>>;
 }

@@ -11,6 +11,7 @@
 import { db as prisma } from "../db/client";
 import { metaAgent } from "../agents/meta-agent";
 import { logger } from "../utils/logger";
+import { runWithoutRLS } from "../utils/async-context";
 
 const ONE_MINUTE_MS = 60 * 1000;
 
@@ -62,10 +63,12 @@ async function processMetaAgentTasks(): Promise<void> {
   const minute = now.getMinutes();
   const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-  // Get all active organizations
-  const organizations = await prisma.organization.findMany({
-    select: { id: true },
-  });
+  // Get all active organizations - wrapped in runWithoutRLS for scheduled job
+  const organizations = await runWithoutRLS(() =>
+    prisma.organization.findMany({
+      select: { id: true },
+    })
+  );
 
   for (const org of organizations) {
     try {

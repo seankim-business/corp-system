@@ -75,7 +75,7 @@ async function countBelongingTo(model: CheckedModel, targetOrgId: string): Promi
  * Use this for system-level queries that need to bypass tenant isolation,
  * such as authentication lookups that need to establish the organization context.
  */
-export function runWithoutRLS<T>(fn: () => T): T {
+export async function runWithoutRLS<T>(fn: () => T | Promise<T>): Promise<Awaited<T>> {
   // Use the async-context based bypass which is what db/client.ts actually uses
   return asyncRunWithoutRLS(fn);
 }
