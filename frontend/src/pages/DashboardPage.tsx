@@ -3,34 +3,62 @@
  *
  * 기획:
  * - 로그인 후 첫 랜딩 페이지
- * - 현재는 단순 환영 메시지
- * - 향후: 최근 워크플로우 실행 현황, 통계 등
+ * - 최근 워크플로우 실행 현황, 통계 표시
  *
  * 구조:
  * DashboardPage
  * ├── WelcomeSection
  * │   ├── 제목
  * │   └── 설명
- * └── QuickStats (추후 구현)
+ * └── QuickStats
  *     ├── TotalWorkflows
  *     ├── RecentExecutions
- *     └── SuccessRate
+ *     ├── SuccessRate
+ *     └── ActiveIntegrations
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StatCard } from '../components/dashboard/StatCard';
 import { QuickActions } from '../components/dashboard/QuickActions';
 import { ActivityFeed } from '../components/dashboard/ActivityFeed';
 import { SkeletonStat } from '../components/ui/Skeleton';
-import { ChartBarIcon, UsersIcon, CurrencyDollarIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, UsersIcon, CurrencyDollarIcon, LinkIcon } from '@heroicons/react/24/outline';
+import { api } from '../api/client';
+
+interface DashboardStats {
+  totalWorkflows: number;
+  recentExecutions: number;
+  successRate: number;
+  activeIntegrations: string[];
+  pendingApprovals: number;
+}
 
 export default function DashboardPage() {
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [checklist, setChecklist] = useState({
     account: true,
     slack: false,
     workflow: false,
   });
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        setIsLoading(true);
+        const response = await api.get('/dashboard/stats');
+        setStats(response.data);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch dashboard stats:', err);
+        setError('Failed to load stats');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
 
   const handleChecklistToggle = (key: keyof typeof checklist) => {
     setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
@@ -55,33 +83,37 @@ export default function DashboardPage() {
             <SkeletonStat />
             <SkeletonStat />
           </>
+        ) : error ? (
+          <div className="col-span-4 text-center py-4 text-gray-500">
+            {error}
+          </div>
         ) : (
           <>
             <StatCard
-              title="Total Runs"
-              value="0"
+              title="Total Workflows"
+              value={String(stats?.totalWorkflows ?? 0)}
               icon={<ChartBarIcon className="h-5 w-5" />}
               trend="neutral"
               change={0}
             />
             <StatCard
-              title="Active Users"
-              value="1"
+              title="Recent Executions"
+              value={String(stats?.recentExecutions ?? 0)}
               icon={<UsersIcon className="h-5 w-5" />}
               trend="neutral"
               change={0}
             />
             <StatCard
-              title="Total Cost"
-              value="$0.00"
+              title="Success Rate"
+              value={`${stats?.successRate ?? 0}%`}
               icon={<CurrencyDollarIcon className="h-5 w-5" />}
               trend="neutral"
               change={0}
             />
             <StatCard
-              title="Errors"
-              value="0"
-              icon={<ExclamationTriangleIcon className="h-5 w-5" />}
+              title="Active Integrations"
+              value={String(stats?.activeIntegrations?.length ?? 0)}
+              icon={<LinkIcon className="h-5 w-5" />}
               trend="neutral"
               change={0}
             />
