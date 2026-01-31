@@ -14,14 +14,27 @@ export async function getUserBySlackId(
   organizationId?: string,
 ) {
   try {
+    logger.info("getUserBySlackId called", {
+      slackUserId,
+      organizationId,
+      hasOrganizationId: !!organizationId,
+    });
+
     // Method 1: Try SlackUser table lookup (created by provisionSlackUser)
     const slackUserRecord = await prisma.slackUser.findUnique({
       where: { slackUserId },
       include: { user: true },
     });
 
+    logger.info("Method 1 - SlackUser lookup result", {
+      slackUserId,
+      found: !!slackUserRecord,
+      hasUser: !!slackUserRecord?.user,
+      userId: slackUserRecord?.user?.id,
+    });
+
     if (slackUserRecord?.user) {
-      logger.debug("User found via SlackUser table", {
+      logger.info("User found via SlackUser table", {
         slackUserId,
         userId: slackUserRecord.user.id,
       });
@@ -30,6 +43,11 @@ export async function getUserBySlackId(
 
     // Method 2: Try ExternalIdentity lookup
     if (organizationId) {
+      logger.info("Method 2 - ExternalIdentity lookup starting", {
+        slackUserId,
+        organizationId,
+      });
+
       const externalIdentity = await prisma.externalIdentity.findUnique({
         where: {
           organizationId_provider_providerUserId: {
@@ -41,13 +59,25 @@ export async function getUserBySlackId(
         include: { user: true },
       });
 
+      logger.info("Method 2 - ExternalIdentity lookup result", {
+        slackUserId,
+        organizationId,
+        found: !!externalIdentity,
+        linkStatus: externalIdentity?.linkStatus,
+        userId: externalIdentity?.userId,
+        hasUser: !!externalIdentity?.user,
+        userEmail: externalIdentity?.user?.email,
+      });
+
       if (externalIdentity?.user) {
-        logger.debug("User found via ExternalIdentity", {
+        logger.info("User found via ExternalIdentity", {
           slackUserId,
           userId: externalIdentity.user.id,
         });
         return externalIdentity.user;
       }
+    } else {
+      logger.warn("Method 2 skipped - no organizationId provided", { slackUserId });
     }
 
     // Method 3: Fall back to email lookup from Slack API
