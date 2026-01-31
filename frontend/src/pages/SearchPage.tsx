@@ -17,6 +17,12 @@ import SearchResultCard, {
   SearchResult,
 } from "../components/search/SearchResultCard";
 
+// Helper to get CSRF token from cookie (matches api/client.ts implementation)
+function getCsrfToken(): string {
+  const match = document.cookie.match(/csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
 type SearchSource = "notion" | "drive" | "github" | "slack";
 
 interface SearchResponse {
@@ -69,7 +75,10 @@ export default function SearchPage() {
     try {
       const response = await fetch("/api/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": getCsrfToken(),
+        },
         credentials: "include",
         body: JSON.stringify({
           query: searchQuery,
@@ -110,7 +119,10 @@ export default function SearchPage() {
       try {
         await fetch("/api/search/analytics", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": getCsrfToken(),
+          },
           credentials: "include",
           body: JSON.stringify({
             analyticsId,
@@ -134,7 +146,10 @@ export default function SearchPage() {
       try {
         await fetch("/api/search/analytics", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": getCsrfToken(),
+          },
           credentials: "include",
           body: JSON.stringify({
             analyticsId,
