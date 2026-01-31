@@ -125,7 +125,7 @@ import { claudeConnectRouter, claudeConnectPublicRouter } from "./api/claude-con
 // NOTE: accounts.routes.ts removed - functionality migrated to user.routes.ts
 import { errorHandler } from "./middleware/error-handler";
 import { csrfProtection } from "./middleware/csrf.middleware";
-// import { createHealthDashboardRouter } from "./api/health-dashboard";
+import healthDashboardRouter from "./api/health-dashboard";
 import healthAnthropicRouter from "./api/health-anthropic";
 import mcpServersRouter from "./api/mcp-servers";
 
@@ -307,7 +307,7 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// app.use("/health", createHealthDashboardRouter());
+app.use("/health", healthDashboardRouter);
 app.use("/health", healthAnthropicRouter);
 
 if (process.env.NODE_ENV === "development") {
@@ -911,6 +911,24 @@ if (process.env.NODE_ENV === "production") {
 logger.info("Starting server", { port, host: "0.0.0.0" });
 
 const server = app.listen(port, "0.0.0.0", async () => {
+  // Reset all circuit breakers on startup to ensure clean state
+  try {
+    const allBreakers = getAllCircuitBreakers();
+    for (const [name, breaker] of allBreakers) {
+      breaker.reset();
+    }
+    // Also explicitly reset postgresql circuit breaker
+    const postgresqlBreaker = getCircuitBreaker("postgresql");
+    postgresqlBreaker.reset();
+    logger.info("✅ Circuit breakers reset on startup", {
+      breakerCount: allBreakers.size + 1,
+    });
+  } catch (error) {
+    logger.warn("⚠️  Failed to reset circuit breakers on startup", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   logger.info("✅ Server listening successfully", {
     port,
     environment: process.env.NODE_ENV || "development",
