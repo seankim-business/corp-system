@@ -50,6 +50,34 @@ export async function provisionSlackUser(
       include: { user: true },
     });
 
+    // Ensure user has membership in the organization (in case it was missing)
+    if (!updated.isBot) {
+      const existingMembership = await prisma.membership.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId,
+            userId: existing.userId,
+          },
+        },
+      });
+
+      if (!existingMembership) {
+        logger.info("Creating missing membership for existing SlackUser", {
+          slackUserId,
+          userId: existing.userId,
+          organizationId,
+        });
+
+        await prisma.membership.create({
+          data: {
+            organizationId,
+            userId: existing.userId,
+            role: "member",
+          },
+        });
+      }
+    }
+
     // Sync to ExternalIdentity for the unified identity system
     // This ensures ExternalIdentity records exist and enables auto-linking
     await syncToExternalIdentity(slackUserId, slackTeamId, organizationId, {
@@ -134,6 +162,34 @@ export async function provisionSlackUser(
     },
     include: { user: true },
   });
+
+  // Ensure user has membership in the organization (required for RLS and authorization)
+  if (!profile.isBot) {
+    const existingMembership = await prisma.membership.findUnique({
+      where: {
+        organizationId_userId: {
+          organizationId,
+          userId,
+        },
+      },
+    });
+
+    if (!existingMembership) {
+      logger.info("Creating membership for Slack-provisioned user", {
+        slackUserId,
+        userId,
+        organizationId,
+      });
+
+      await prisma.membership.create({
+        data: {
+          organizationId,
+          userId,
+          role: "member", // Default role for Slack-provisioned users
+        },
+      });
+    }
+  }
 
   // Also create/update ExternalIdentity for the unified identity system
   // This enables auto-linking and the admin dashboard
