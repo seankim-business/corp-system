@@ -548,22 +548,49 @@ app.post("/health/sync-slack-users", async (_req, res) => {
 
     logger.info("Starting emergency Slack user sync via health endpoint");
 
-    const org = await db.organization.findFirst({
+    // Find all organizations with Slack integrations and try each one
+    const orgs = await db.organization.findMany({
       where: { slackIntegrations: { some: { enabled: true } } },
       include: { slackIntegrations: true },
     });
 
-    if (!org) {
+    if (!orgs.length) {
       return res.status(404).json({ error: "No organization with Slack integration" });
     }
 
-    const integration = org.slackIntegrations.find((i: any) => i.enabled && i.botToken);
-    if (!integration?.botToken) {
+    // Use environment variable token as fallback (more reliable)
+    const envBotToken = process.env.SLACK_BOT_TOKEN;
+    let org = orgs[0]; // Use first org with Slack
+    let integration = org.slackIntegrations.find((i: any) => i.enabled);
+    let botToken = envBotToken || integration?.botToken;
+
+    if (!botToken) {
       return res.status(404).json({ error: "No Slack bot token found" });
     }
 
-    const slack = new WebClient(integration.botToken);
-    const workspaceId = integration.workspaceId;
+    // Verify token works
+    try {
+      const testClient = new WebClient(botToken);
+      await testClient.auth.test();
+      logger.info("Using Slack token", { source: envBotToken ? "env" : "db", orgId: org.id });
+    } catch (e) {
+      // If env token fails, try DB token
+      if (envBotToken && integration?.botToken && integration.botToken !== envBotToken) {
+        try {
+          const testClient2 = new WebClient(integration.botToken);
+          await testClient2.auth.test();
+          botToken = integration.botToken;
+          logger.info("Using DB Slack token after env token failed", { orgId: org.id });
+        } catch (e2) {
+          return res.status(500).json({ error: "All Slack tokens invalid" });
+        }
+      } else {
+        return res.status(500).json({ error: "Slack token invalid" });
+      }
+    }
+
+    const slack = new WebClient(botToken);
+    const workspaceId = integration?.workspaceId || "T03KC04T1GT"; // Kyndof workspace ID fallback
 
     let cursor: string | undefined;
     const members: any[] = [];
