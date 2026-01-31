@@ -4,8 +4,9 @@ import { logger } from "../utils/logger";
 
 /**
  * Get Nubabel user by Slack ID using multiple lookup methods:
- * 1. First try ExternalIdentity (linked identity) if organizationId is provided
- * 2. Fall back to email lookup from Slack profile
+ * 1. First try SlackUser table (created by provisioner)
+ * 2. Then try ExternalIdentity (linked identity) if organizationId is provided
+ * 3. Fall back to email lookup from Slack profile
  */
 export async function getUserBySlackId(
   slackUserId: string,
@@ -13,7 +14,21 @@ export async function getUserBySlackId(
   organizationId?: string,
 ) {
   try {
-    // Method 1: Try ExternalIdentity lookup (fastest, most reliable)
+    // Method 1: Try SlackUser table lookup (created by provisionSlackUser)
+    const slackUserRecord = await prisma.slackUser.findUnique({
+      where: { slackUserId },
+      include: { user: true },
+    });
+
+    if (slackUserRecord?.user) {
+      logger.debug("User found via SlackUser table", {
+        slackUserId,
+        userId: slackUserRecord.user.id,
+      });
+      return slackUserRecord.user;
+    }
+
+    // Method 2: Try ExternalIdentity lookup
     if (organizationId) {
       const externalIdentity = await prisma.externalIdentity.findUnique({
         where: {
@@ -35,7 +50,7 @@ export async function getUserBySlackId(
       }
     }
 
-    // Method 2: Fall back to email lookup from Slack API
+    // Method 3: Fall back to email lookup from Slack API
     const slackUser = await client.users.info({ user: slackUserId });
     const email = slackUser.user?.profile?.email;
 
@@ -47,12 +62,19 @@ export async function getUserBySlackId(
       return null;
     }
 
+    // Log the email lookup attempt
+    logger.info("Looking up Nubabel user by Slack email", {
+      slackUserId,
+      email: email.toLowerCase(),
+      organizationId,
+    });
+
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
 
     if (user) {
-      logger.debug("User found via email lookup", { slackUserId, email, userId: user.id });
+      logger.info("User found via email lookup", { slackUserId, email: email.toLowerCase(), userId: user.id });
 
       // Auto-create ExternalIdentity if org is known (for future fast lookup)
       if (organizationId) {
@@ -91,6 +113,12 @@ export async function getUserBySlackId(
           organizationId,
         });
       }
+    } else {
+      logger.warn("No Nubabel user found with Slack email", {
+        slackUserId,
+        email: email.toLowerCase(),
+        organizationId,
+      });
     }
 
     return user;
