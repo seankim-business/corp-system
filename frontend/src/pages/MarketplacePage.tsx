@@ -123,11 +123,11 @@ export default function MarketplacePage() {
 
   const fetchSuggestions = useCallback(async () => {
     try {
-      const result = await request<{ suggestions: SkillSuggestion[] }>({
+      const result = await request<{ success: boolean; data: SkillSuggestion[] }>({
         url: "/api/marketplace/suggestions",
         method: "GET",
       });
-      setSuggestions(result.suggestions || []);
+      setSuggestions(result.data || []);
     } catch {
       // Suggestions are optional - fail silently
     }
