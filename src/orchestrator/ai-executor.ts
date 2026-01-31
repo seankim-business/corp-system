@@ -59,18 +59,18 @@ export interface AIExecutionResult {
 }
 
 const CATEGORY_MODEL_MAP: Record<Category, string> = {
-  quick: "claude-3-5-haiku-20241022",
-  writing: "claude-3-5-haiku-20241022",
-  "unspecified-low": "claude-3-5-haiku-20241022",
-  artistry: "claude-3-5-sonnet-20241022",
-  "visual-engineering": "claude-3-5-sonnet-20241022",
-  "unspecified-high": "claude-3-5-sonnet-20241022",
-  ultrabrain: "claude-3-5-sonnet-20241022",
+  quick: "claude-haiku-4-20250514",
+  writing: "claude-haiku-4-20250514",
+  "unspecified-low": "claude-haiku-4-20250514",
+  artistry: "claude-sonnet-4-20250514",
+  "visual-engineering": "claude-sonnet-4-20250514",
+  "unspecified-high": "claude-sonnet-4-20250514",
+  ultrabrain: "claude-sonnet-4-20250514",
 };
 
 const MODEL_COSTS_PER_1K: Record<string, { input: number; output: number }> = {
-  "claude-3-5-haiku-20241022": { input: 0.001, output: 0.005 },
-  "claude-3-5-sonnet-20241022": { input: 0.003, output: 0.015 },
+  "claude-haiku-4-20250514": { input: 0.001, output: 0.005 },
+  "claude-sonnet-4-20250514": { input: 0.003, output: 0.015 },
   "claude-3-opus-20240229": { input: 0.015, output: 0.075 },
 };
 
@@ -937,7 +937,7 @@ export async function executeWithAI(params: AIExecutionParams): Promise<AIExecut
     "ai_executor.execute",
     async (span: Span): Promise<AIExecutionResult> => {
       const startTime = Date.now();
-      const model = CATEGORY_MODEL_MAP[params.category] || "claude-3-5-sonnet-20241022";
+      const model = CATEGORY_MODEL_MAP[params.category] || "claude-sonnet-4-20250514";
       const registrySkillPrompts = (params.context?.registrySkillPrompts as string[] | undefined);
       const threadContext = (params.context?.threadContext as string | undefined);
       let systemPrompt = buildSystemPrompt(params.skills, registrySkillPrompts, threadContext);
