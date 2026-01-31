@@ -22,6 +22,11 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
   }
 
   async process(job: Job<NotificationData>): Promise<void> {
+    logger.info(`NotificationWorker.process received job`, {
+      jobId: job.id,
+      eventId: job.data.eventId,
+      channel: job.data.channel,
+    });
     const { organizationId, userId } = job.data;
     return runWithContext({ organizationId, userId }, () => this.processWithContext(job));
   }

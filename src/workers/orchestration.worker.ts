@@ -234,6 +234,13 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         ? mcpProviders.find((p) => detectedProvider.toLowerCase().includes(p)) || "generating"
         : "generating";
 
+      logger.info(`Enqueueing notification for event ${eventId}`, {
+        channel: slackChannel,
+        threadTs: slackThreadTs,
+        outputLength: result.output?.length || 0,
+        agentType,
+      });
+
       await notificationQueue.enqueueNotification({
         channel: slackChannel,
         threadTs: slackThreadTs,
@@ -244,6 +251,8 @@ export class OrchestrationWorker extends BaseWorker<OrchestrationData> {
         eventId,
         agentType,
       });
+
+      logger.info(`Notification enqueued successfully for event ${eventId}`);
 
       await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);
       await emitJobProgress(

@@ -1,4 +1,5 @@
 import { BaseQueue } from "./base.queue";
+import { logger } from "../utils/logger";
 
 export interface NotificationData {
   channel: string;
@@ -32,9 +33,17 @@ export class NotificationQueue extends BaseQueue<NotificationData> {
   }
 
   async enqueueNotification(data: NotificationData): Promise<void> {
-    await this.add("send-notification", data, {
-      jobId: `notif-${data.eventId}-${Date.now()}`,
+    const jobId = `notif-${data.eventId}-${Date.now()}`;
+    logger.info(`NotificationQueue.enqueueNotification called`, {
+      eventId: data.eventId,
+      channel: data.channel,
+      textLength: data.text?.length || 0,
+      jobId,
     });
+    await this.add("send-notification", data, {
+      jobId,
+    });
+    logger.info(`NotificationQueue.add completed`, { jobId, eventId: data.eventId });
   }
 }
 
