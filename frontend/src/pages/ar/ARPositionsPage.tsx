@@ -19,13 +19,21 @@ import {
   useCreatePosition,
   useUpdatePosition,
 } from "../../hooks/ar";
-import type { ARPosition, SkillLevel, CreatePositionInput, RequiredSkill, PositionStatus } from "../../types/ar";
+import type { ARPosition, SkillLevel, CreatePositionInput, RequiredSkill, PositionStatus, PositionLevel } from "../../types/ar";
 
 const skillLevelColors: Record<SkillLevel, string> = {
   beginner: "bg-gray-100 text-gray-700",
   intermediate: "bg-blue-100 text-blue-700",
   advanced: "bg-purple-100 text-purple-700",
   expert: "bg-orange-100 text-orange-700",
+};
+
+const positionLevelLabels: Record<PositionLevel, string> = {
+  1: "Entry Level",
+  2: "Junior",
+  3: "Mid-Level",
+  4: "Senior",
+  5: "Director/Head",
 };
 
 export default function ARPositionsPage() {
@@ -40,6 +48,7 @@ export default function ARPositionsPage() {
   const [formData, setFormData] = useState<CreatePositionInput>({
     title: "",
     departmentId: "",
+    level: 3, // Default to mid-level (3)
     description: "",
     requiredSkills: [],
     minExperience: 0,
@@ -81,6 +90,7 @@ export default function ARPositionsPage() {
     setFormData({
       title: "",
       departmentId: "",
+      level: 3,
       description: "",
       requiredSkills: [],
       minExperience: 0,
@@ -100,6 +110,7 @@ export default function ARPositionsPage() {
     setFormData({
       title: position.title,
       departmentId: position.departmentId,
+      level: position.level || 3,
       description: position.description || "",
       requiredSkills: position.requiredSkills,
       minExperience: position.minExperience,
@@ -443,6 +454,23 @@ export default function ARPositionsPage() {
                   <option value="">Select department...</option>
                   {departments.map(dept => (
                     <option key={dept.id} value={dept.id}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Level */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Position Level <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.level}
+                  onChange={(e) => setFormData(prev => ({ ...prev, level: parseInt(e.target.value) as PositionLevel }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                >
+                  {([1, 2, 3, 4, 5] as PositionLevel[]).map(level => (
+                    <option key={level} value={level}>{positionLevelLabels[level]}</option>
                   ))}
                 </select>
               </div>

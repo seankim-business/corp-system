@@ -18,8 +18,18 @@ const createPositionSchema = z.object({
   departmentId: z.string().uuid(),
   title: z.string().min(1).max(255),
   level: z.number().int().min(1).max(5),
+  description: z.string().optional().nullable(),
   reportsToId: z.string().uuid().optional().nullable(),
+  reportsTo: z.string().uuid().optional().nullable(), // Alias for reportsToId from frontend
   requiredCapabilities: z.array(z.string()).optional().default([]),
+  requiredSkills: z.array(z.object({
+    name: z.string(),
+    level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
+    weight: z.number(),
+  })).optional(), // Accept frontend requiredSkills format
+  minExperience: z.number().int().min(0).optional(),
+  maxCapacity: z.number().int().min(1).optional(),
+  status: z.enum(['active', 'inactive', 'archived']).optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -100,10 +110,27 @@ router.post(
       const { organizationId, id: userId } = req.user!;
       const data = req.body as z.infer<typeof createPositionSchema>;
 
+      // Convert requiredSkills to requiredCapabilities (skill names)
+      const requiredCapabilities = data.requiredCapabilities ||
+        (data.requiredSkills?.map(s => s.name) || []);
+
+      // Support both reportsTo and reportsToId from frontend
+      const reportsToId = data.reportsToId ?? data.reportsTo ?? undefined;
+
       const position = await arPositionService.create(organizationId, {
-        ...data,
+        departmentId: data.departmentId,
+        title: data.title,
         level: data.level as PositionLevel,
-        reportsToId: data.reportsToId ?? undefined,
+        reportsToId: reportsToId || undefined,
+        requiredCapabilities,
+        metadata: {
+          ...(data.metadata || {}),
+          description: data.description,
+          minExperience: data.minExperience,
+          maxCapacity: data.maxCapacity,
+          status: data.status,
+          requiredSkills: data.requiredSkills, // Store full skill details in metadata
+        },
       }, userId);
 
       return res.status(201).json({ position });

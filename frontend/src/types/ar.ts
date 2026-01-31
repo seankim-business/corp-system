@@ -49,6 +49,7 @@ export interface UpdateDepartmentInput {
 
 export type PositionStatus = 'active' | 'inactive' | 'archived';
 export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+export type PositionLevel = 1 | 2 | 3 | 4 | 5;
 
 export interface RequiredSkill {
   name: string;
@@ -62,6 +63,7 @@ export interface ARPosition {
   departmentId: string;
   title: string;
   description?: string | null;
+  level: PositionLevel;
   requiredSkills: RequiredSkill[];
   minExperience: number;
   maxCapacity: number;
@@ -76,6 +78,7 @@ export interface ARPosition {
 export interface CreatePositionInput {
   title: string;
   departmentId: string;
+  level: PositionLevel;
   description?: string;
   requiredSkills?: RequiredSkill[];
   minExperience?: number;
@@ -88,6 +91,7 @@ export interface CreatePositionInput {
 export interface UpdatePositionInput {
   title?: string;
   departmentId?: string;
+  level?: PositionLevel;
   description?: string | null;
   requiredSkills?: RequiredSkill[];
   minExperience?: number;
