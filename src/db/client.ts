@@ -4,13 +4,14 @@ import { logger } from "../utils/logger";
 import { getCircuitBreaker, CircuitBreakerError } from "../utils/circuit-breaker";
 
 const DB_CIRCUIT_BREAKER_NAME = "postgresql";
-const DB_QUERY_TIMEOUT_MS = parseInt(process.env.DB_QUERY_TIMEOUT_MS || "30000", 10);
+// Increase timeout to 60s to handle slow queries during AI processing
+const DB_QUERY_TIMEOUT_MS = parseInt(process.env.DB_QUERY_TIMEOUT_MS || "60000", 10);
 
 const dbCircuitBreaker = getCircuitBreaker(DB_CIRCUIT_BREAKER_NAME, {
-  failureThreshold: 50, // High threshold - orchestration makes 10+ queries per request
-  successThreshold: 3,
+  failureThreshold: 100, // Very high threshold - AI orchestration makes 50+ queries per request
+  successThreshold: 2,
   timeout: DB_QUERY_TIMEOUT_MS,
-  resetTimeout: 60000, // 60s to let database recover
+  resetTimeout: 30000, // 30s reset to recover faster
 });
 
 function createPrismaClient(): PrismaClient {
@@ -36,13 +37,17 @@ function createPrismaClient(): PrismaClient {
             return query(args);
           }
 
-          // Skip RLS if bypass flag is set (used for system queries during authentication)
+          // Skip RLS AND circuit breaker if bypass flag is set
+          // This is critical for auth bootstrap - these queries must succeed even when
+          // the circuit breaker is OPEN (e.g., during user identity resolution in Slack)
           if (isRLSBypassed()) {
-            logger.debug("RLS bypass active - skipping context check", {
+            logger.debug("RLS bypass active - skipping context check and circuit breaker", {
               operation,
               model,
             });
-            return dbCircuitBreaker.execute(() => query(args));
+            // Skip circuit breaker for auth operations to prevent auth failures
+            // when circuit breaker trips due to other query failures
+            return query(args);
           }
 
           const context = getOrganizationContext();
