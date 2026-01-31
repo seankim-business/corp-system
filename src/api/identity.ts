@@ -14,6 +14,7 @@ import { logger } from "../utils/logger";
 import { WebClient } from "@slack/web-api";
 import { getSlackIntegrationByOrg } from "./slack-integration";
 import { provisionSlackUser } from "../services/slack-user-provisioner";
+import { runWithoutRLS } from "../utils/async-context";
 
 const router = Router();
 
@@ -760,122 +761,149 @@ router.post(
         organizationId,
       });
 
-      // Find the target Nubabel user
-      const targetUser = await db.user.findFirst({
-        where: {
-          email: targetUserEmail.toLowerCase(),
-          memberships: {
-            some: { organizationId },
-          },
-        },
-      });
-
-      if (!targetUser) {
-        return res.status(404).json({
-          error: "Target user not found",
-          email: targetUserEmail,
-        });
-      }
-
-      // Check if ExternalIdentity already exists
-      const existingIdentity = await db.externalIdentity.findUnique({
-        where: {
-          organizationId_provider_providerUserId: {
-            organizationId,
-            provider: "slack",
-            providerUserId: slackUserId,
-          },
-        },
-      });
-
-      let identity;
-      if (existingIdentity) {
-        // Update existing identity
-        identity = await db.externalIdentity.update({
-          where: { id: existingIdentity.id },
-          data: {
-            userId: targetUser.id,
-            linkStatus: "linked",
-            linkMethod: "admin",
-            linkedAt: new Date(),
-            lastSyncedAt: new Date(),
-          },
-        });
-        logger.info("ExternalIdentity updated via fix-link", {
-          identityId: identity.id,
-          slackUserId,
-          userId: targetUser.id,
-        });
-      } else {
-        // Create new identity
-        identity = await db.externalIdentity.create({
-          data: {
-            organizationId,
-            provider: "slack",
-            providerUserId: slackUserId,
+      // Run without RLS to ensure correct user lookup (bypass circuit breaker + RLS)
+      const result = await runWithoutRLS(async () => {
+        // Find the target Nubabel user by email (NOT the admin making the request)
+        const targetUser = await db.user.findFirst({
+          where: {
             email: targetUserEmail.toLowerCase(),
-            displayName: targetUser.displayName || targetUserEmail,
-            userId: targetUser.id,
-            linkStatus: "linked",
-            linkMethod: "admin",
-            linkedAt: new Date(),
-            lastSyncedAt: new Date(),
+            memberships: {
+              some: { organizationId },
+            },
           },
         });
-        logger.info("ExternalIdentity created via fix-link", {
-          identityId: identity.id,
-          slackUserId,
-          userId: targetUser.id,
-        });
-      }
 
-      // Also create or update SlackUser
-      const slackUser = await db.slackUser.findUnique({
-        where: { slackUserId },
-      });
-
-      if (slackUser) {
-        if (slackUser.userId !== targetUser.id) {
-          await db.slackUser.update({
-            where: { slackUserId },
-            data: { userId: targetUser.id },
-          });
-          logger.info("SlackUser updated via fix-link", { slackUserId, userId: targetUser.id });
+        if (!targetUser) {
+          return { error: "Target user not found", email: targetUserEmail };
         }
-      } else {
-        // Get slackTeamId from the organization's Slack workspace
-        const slackWorkspace = await db.slackWorkspace.findFirst({
-          where: { organizationId },
+
+        // CRITICAL: Log the found user to verify correct lookup
+        logger.info("fix-link: Target user found", {
+          targetUserId: targetUser.id,
+          targetUserEmail: targetUser.email,
+          targetUserDisplayName: targetUser.displayName,
+          adminId,
+          isAdminSelf: targetUser.id === adminId,
         });
 
-        if (slackWorkspace) {
-          // Create SlackUser entry if it doesn't exist
-          await db.slackUser.create({
-            data: {
-              slackUserId,
-              slackTeamId: slackWorkspace.slackTeamId,
-              userId: targetUser.id,
+        // Check if ExternalIdentity already exists
+        const existingIdentity = await db.externalIdentity.findUnique({
+          where: {
+            organizationId_provider_providerUserId: {
               organizationId,
-              email: targetUserEmail,
-              displayName: targetUser.displayName || targetUserEmail,
+              provider: "slack",
+              providerUserId: slackUserId,
+            },
+          },
+        });
+
+        let identity;
+        if (existingIdentity) {
+          // Update existing identity
+          identity = await db.externalIdentity.update({
+            where: { id: existingIdentity.id },
+            data: {
+              userId: targetUser.id,
+              linkStatus: "linked",
+              linkMethod: "admin",
+              linkedAt: new Date(),
+              lastSyncedAt: new Date(),
             },
           });
-          logger.info("SlackUser created via fix-link", { slackUserId, userId: targetUser.id, slackTeamId: slackWorkspace.slackTeamId });
+          logger.info("ExternalIdentity updated via fix-link", {
+            identityId: identity.id,
+            slackUserId,
+            userId: targetUser.id,
+            userEmail: targetUser.email,
+          });
         } else {
-          logger.warn("No SlackWorkspace found for organization, skipping SlackUser creation", { organizationId });
+          // Create new identity
+          identity = await db.externalIdentity.create({
+            data: {
+              organizationId,
+              provider: "slack",
+              providerUserId: slackUserId,
+              email: targetUserEmail.toLowerCase(),
+              displayName: targetUser.displayName || targetUserEmail,
+              userId: targetUser.id,
+              linkStatus: "linked",
+              linkMethod: "admin",
+              linkedAt: new Date(),
+              lastSyncedAt: new Date(),
+            },
+          });
+          logger.info("ExternalIdentity created via fix-link", {
+            identityId: identity.id,
+            slackUserId,
+            userId: targetUser.id,
+            userEmail: targetUser.email,
+          });
         }
+
+        // Also create or update SlackUser
+        const slackUser = await db.slackUser.findUnique({
+          where: { slackUserId },
+        });
+
+        if (slackUser) {
+          if (slackUser.userId !== targetUser.id) {
+            await db.slackUser.update({
+              where: { slackUserId },
+              data: { userId: targetUser.id },
+            });
+            logger.info("SlackUser updated via fix-link", { slackUserId, userId: targetUser.id });
+          } else {
+            logger.info("SlackUser already has correct userId", { slackUserId, userId: targetUser.id });
+          }
+        } else {
+          // Get slackTeamId from SlackIntegration (workspaceId field)
+          const slackIntegration = await db.slackIntegration.findFirst({
+            where: { organizationId },
+          });
+
+          if (slackIntegration?.workspaceId) {
+            // Create SlackUser entry if it doesn't exist
+            await db.slackUser.create({
+              data: {
+                slackUserId,
+                slackTeamId: slackIntegration.workspaceId,
+                userId: targetUser.id,
+                organizationId,
+                email: targetUserEmail,
+                displayName: targetUser.displayName || targetUserEmail,
+              },
+            });
+            logger.info("SlackUser created via fix-link", {
+              slackUserId,
+              userId: targetUser.id,
+              slackTeamId: slackIntegration.workspaceId,
+            });
+          } else {
+            logger.warn("No SlackIntegration.workspaceId found for organization, skipping SlackUser creation", {
+              organizationId,
+              hasIntegration: !!slackIntegration,
+            });
+          }
+        }
+
+        return {
+          success: true,
+          message: existingIdentity ? "Identity updated and linked" : "Identity created and linked",
+          identity: formatIdentityResponse(identity),
+          targetUser: {
+            id: targetUser.id,
+            email: targetUser.email,
+            displayName: targetUser.displayName,
+          },
+        };
+      });
+
+      // Handle error from runWithoutRLS
+      if ("error" in result) {
+        return res.status(404).json(result);
       }
 
-      return res.json({
-        success: true,
-        message: existingIdentity ? "Identity updated and linked" : "Identity created and linked",
-        identity: formatIdentityResponse(identity),
-        targetUser: {
-          id: targetUser.id,
-          email: targetUser.email,
-          displayName: targetUser.displayName,
-        },
-      });
+      return res.json(result);
     } catch (error) {
       logger.error("Failed to fix-link identity", { error });
       return res.status(500).json({ error: "Failed to fix-link identity" });

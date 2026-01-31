@@ -1,69 +1,71 @@
 {
   "active": true,
   "goal_type": "interactive",
-  "goal_description": "Marketplace Flow 5 - Extension discovery, installation, management across WebUI and Slack",
-  "mode": "ralph-yolo",
-  "cycle": 2,
+  "goal_description": "Slack @Nubabel agent full flow test - mentions, identity resolution, AI responses",
+  "mode": "ralph-ultraqa-yolo",
+  "cycle": 3,
   "max_cycles": 5,
   "scenarios": {
-    "A_extension_browsing": {
-      "status": "passed",
-      "items": ["page_load", "featured_extensions", "categories", "filters", "search"],
-      "notes": "MarketplacePage loads correctly with 3 featured extensions, category sidebar, search"
+    "A_circuit_breaker_fix": {
+      "status": "verified_healthy",
+      "items": ["circuit_breaker_bypass", "scheduled_jobs_fix", "startup_reset"],
+      "notes": "Circuit breaker is HEALTHY - no errors in logs. Warnings still appear for RLS context but circuit breaker is not tripping"
     },
-    "B_extension_detail": {
-      "status": "passed",
-      "items": ["detail_page", "install_button", "version_info", "reviews", "tabs"],
-      "notes": "ExtensionDetailPage displays full extension info: name, publisher, rating, downloads, description, permissions, version history"
+    "B_slack_mention_flow": {
+      "status": "ready_for_test",
+      "items": ["app_mention_event", "user_lookup", "ai_response"],
+      "notes": "Server healthy, circuit breaker working. Manual test needed: Send @Nubabel message in #it-test"
     },
-    "C_installation_flow": {
-      "status": "blocked",
-      "items": ["install", "configure", "disable", "uninstall"],
-      "blocker": "Browser automation tab focus issues preventing click testing"
-    },
-    "D_slack_mcp_commands": {
-      "status": "blocked",
-      "items": ["mcp_list", "mcp_search", "mcp_info", "mcp_install"],
-      "blocker": "Slash command /nubabel not registered in Slack app"
-    },
-    "E_edge_cases": {
+    "C_agent_activity_monitoring": {
       "status": "pending",
-      "items": ["network_error", "permissions", "compatibility"],
-      "blocker": "Core flows first"
+      "items": ["sse_connection", "realtime_events", "activity_page"],
+      "notes": "Will test after Slack flow is verified"
     }
   },
-  "failures": [
+  "fixes_applied": [
     {
-      "cycle": 1,
-      "scenario": "A_extension_browsing",
-      "issue": "MarketplacePage crash - Cannot read properties of undefined (reading 'length')",
-      "root_cause": "API response format mismatch - expected suggestions but got data",
-      "files_affected": ["frontend/src/pages/MarketplacePage.tsx"],
-      "fixed": true
+      "commit": "7bd748f",
+      "issue": "Circuit breaker blocking RLS-bypassed auth queries",
+      "fix": "Skip circuit breaker for RLS-bypassed queries in db/client.ts",
+      "status": "deployed"
     },
     {
-      "cycle": 1,
-      "scenario": "B_extension_detail",
-      "issue": "ExtensionDetailPage showing infinite loading spinner",
-      "root_cause": "Route param mismatch - App.tsx used :extensionId but component used useParams<{slug}>",
-      "files_affected": ["frontend/src/App.tsx"],
-      "fixed": true
+      "commit": "e5cac84",
+      "issue": "Session operations failing with RLS errors during Slack auth",
+      "fix": "Wrapped session operations in runWithoutRLS()",
+      "status": "deployed"
     },
     {
-      "cycle": 1,
-      "scenario": "D_slack_mcp_commands",
-      "issue": "/nubabel slash command not recognized by Slack",
-      "root_cause": "Slash command may not be registered in Slack app manifest",
-      "files_affected": ["Slack app configuration"],
-      "fixed": false
+      "commit": "a0fc1ab",
+      "issue": "Fallback user lookup triggering circuit breaker OPEN error",
+      "fix": "Wrapped prisma.user.findFirst in runWithoutRLS()",
+      "status": "deployed"
+    },
+    {
+      "commit": "aa50df2",
+      "issue": "Scheduled jobs tripping circuit breaker every minute",
+      "fix": "Wrapped queries in runWithoutRLS: daily-briefing, scheduler, ar-auto-escalation",
+      "status": "deployed"
+    },
+    {
+      "commit": "29baae8",
+      "issue": "Circuit breaker state management on startup",
+      "fix": "Reset circuit breakers on server startup + enable health dashboard",
+      "status": "deployed"
     }
   ],
-  "fixes_applied": [
-    "MarketplacePage.tsx - suggestions API response format (result.data instead of result.suggestions)",
-    "ExtensionDetailPage.tsx - multiple API endpoint fixes",
-    "marketplace.ts - added SAMPLE_EXTENSIONS data for featured extensions",
-    "App.tsx - route param fix (:extensionId -> :slug)"
-  ],
-  "started_at": "2026-01-31T04:00:00Z",
-  "last_update": "2026-01-31T05:30:00Z"
+  "verification_status": {
+    "circuit_breaker_healthy": true,
+    "slack_worker_active": true,
+    "no_circuit_breaker_errors": true,
+    "awaiting_manual_test": true
+  },
+  "manual_test_instructions": {
+    "step_1": "Go to Slack #it-test channel",
+    "step_2": "Send message: @Nubabel Who am I? What can you do?",
+    "step_3": "Wait for Nubabel to respond (should take 5-15 seconds)",
+    "step_4": "Check if Nubabel identifies the user correctly",
+    "step_5": "Check Railway logs for 'getUserBySlackId' and 'Resolving user' logs"
+  },
+  "last_updated": "2026-01-31T07:35:00Z"
 }

@@ -72,6 +72,147 @@ async function decodeState(
   }
 }
 
+// Get current user's Slack identity/connection status
+slackIntegrationRouter.get(
+  "/slack/my-identity",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: userId, organizationId } = req.user!;
+
+      // Check SlackUser record
+      const slackUser = await prisma.slackUser.findFirst({
+        where: {
+          userId,
+          organizationId,
+        },
+      });
+
+      // Also check ExternalIdentity
+      const externalIdentity = await prisma.externalIdentity.findFirst({
+        where: {
+          provider: "slack",
+          userId,
+          organizationId,
+          linkStatus: "linked",
+        },
+      });
+
+      if (!slackUser && !externalIdentity) {
+        return res.json({ linked: false });
+      }
+
+      // Prefer SlackUser data if available, fallback to ExternalIdentity
+      const identityData = slackUser || externalIdentity;
+
+      return res.json({
+        linked: true,
+        slackUserId: slackUser?.slackUserId || externalIdentity?.providerUserId,
+        displayName: identityData?.displayName,
+        email: identityData?.email,
+        avatarUrl: identityData?.avatarUrl,
+        workspaceId: slackUser?.slackTeamId || externalIdentity?.providerTeamId,
+        lastSyncedAt: slackUser?.lastSyncedAt,
+      });
+    } catch (error) {
+      logger.error("Get my Slack identity error", {
+        error: error instanceof Error ? error.message : error,
+      });
+      return res.status(500).json({ error: "Failed to fetch Slack identity" });
+    }
+  },
+);
+
+// Sync current user's Slack profile
+slackIntegrationRouter.post(
+  "/slack/sync-my-identity",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: userId, organizationId } = req.user!;
+
+      // Find SlackUser for current user
+      const slackUser = await prisma.slackUser.findFirst({
+        where: {
+          userId,
+          organizationId,
+        },
+      });
+
+      if (!slackUser) {
+        return res.status(404).json({ error: "Slack identity not found" });
+      }
+
+      // Get organization's Slack integration to access bot token
+      const integration = await prisma.slackIntegration.findUnique({
+        where: { organizationId },
+      });
+
+      if (!integration || !integration.botToken) {
+        return res.status(400).json({ error: "Slack integration not configured" });
+      }
+
+      const botToken = decrypt(integration.botToken);
+      const client = new WebClient(botToken);
+
+      // Fetch fresh profile from Slack API
+      const userInfo = await client.users.info({
+        user: slackUser.slackUserId,
+      });
+
+      if (!userInfo.ok || !userInfo.user) {
+        return res.status(400).json({ error: "Failed to fetch Slack profile" });
+      }
+
+      const profile = userInfo.user.profile;
+      const displayName = userInfo.user.real_name || userInfo.user.name || null;
+      const email = profile?.email || null;
+      const avatarUrl = profile?.image_192 || profile?.image_72 || null;
+
+      // Update SlackUser
+      const updatedSlackUser = await prisma.slackUser.update({
+        where: { id: slackUser.id },
+        data: {
+          displayName,
+          email,
+          avatarUrl,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      // Update related User record if needed
+      if (displayName || email || avatarUrl) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            ...(displayName && { name: displayName }),
+            ...(email && { email }),
+            ...(avatarUrl && { avatar: avatarUrl }),
+          },
+        });
+      }
+
+      logger.info(`Slack profile synced: user=${userId}, slackUserId=${slackUser.slackUserId}`);
+
+      return res.json({
+        success: true,
+        linked: true,
+        slackUserId: updatedSlackUser.slackUserId,
+        displayName: updatedSlackUser.displayName,
+        email: updatedSlackUser.email,
+        avatarUrl: updatedSlackUser.avatarUrl,
+        workspaceId: updatedSlackUser.slackTeamId,
+        lastSyncedAt: updatedSlackUser.lastSyncedAt,
+      });
+    } catch (error) {
+      logger.error("Sync Slack identity error", {
+        error: error instanceof Error ? error.message : error,
+      });
+      return res.status(500).json({ error: "Failed to sync Slack profile" });
+    }
+  },
+);
+
 // Save Slack App credentials (BYOA)
 slackIntegrationRouter.post(
   "/slack/credentials",

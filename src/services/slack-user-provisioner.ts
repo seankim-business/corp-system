@@ -207,6 +207,7 @@ export async function provisionSlackUser(
 /**
  * Sync Slack user to ExternalIdentity system.
  * This creates the ExternalIdentity record and attempts auto-linking.
+ * Uses retry logic for transient failures (e.g., circuit breaker).
  */
 async function syncToExternalIdentity(
   slackUserId: string,
@@ -220,39 +221,80 @@ async function syncToExternalIdentity(
     return;
   }
 
-  try {
-    const identityProfile: ExternalIdentityProfile = {
-      provider: "slack",
-      providerUserId: slackUserId,
-      providerTeamId: slackTeamId,
-      email: profile.email,
-      displayName: profile.displayName,
-      realName: profile.realName,
-      avatarUrl: profile.avatarUrl,
-      metadata: {
-        isBot: profile.isBot ?? false,
-        isAdmin: profile.isAdmin ?? false,
-      },
-    };
+  const identityProfile: ExternalIdentityProfile = {
+    provider: "slack",
+    providerUserId: slackUserId,
+    providerTeamId: slackTeamId,
+    email: profile.email,
+    displayName: profile.displayName,
+    realName: profile.realName,
+    avatarUrl: profile.avatarUrl,
+    metadata: {
+      isBot: profile.isBot ?? false,
+      isAdmin: profile.isAdmin ?? false,
+    },
+  };
 
-    const result = await identityResolver.resolveIdentity(identityProfile, {
-      organizationId,
-      performedBy: undefined, // System action
-    });
+  // Retry configuration for transient failures
+  const maxRetries = 3;
+  const baseDelayMs = 500;
+  let lastError: Error | null = null;
 
-    logger.info("ExternalIdentity sync completed", {
-      slackUserId,
-      action: result.action,
-      linkedUserId: result.linkedUserId,
-      externalIdentityId: result.externalIdentityId,
-    });
-  } catch (error) {
-    // Log but don't fail the main provisioning operation
-    logger.error("Failed to sync to ExternalIdentity (non-fatal)", {
-      slackUserId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await identityResolver.resolveIdentity(identityProfile, {
+        organizationId,
+        performedBy: undefined, // System action
+      });
+
+      logger.info("ExternalIdentity sync completed", {
+        slackUserId,
+        action: result.action,
+        linkedUserId: result.linkedUserId,
+        externalIdentityId: result.externalIdentityId,
+        attempt,
+      });
+      return; // Success - exit function
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = lastError.message.toLowerCase();
+
+      // Check if this is a transient error worth retrying
+      const isTransientError =
+        errorMessage.includes("circuit breaker") ||
+        errorMessage.includes("connection") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("econnrefused") ||
+        errorMessage.includes("temporarily unavailable");
+
+      if (isTransientError && attempt < maxRetries) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt - 1); // Exponential backoff
+        logger.warn("ExternalIdentity sync failed (transient), retrying...", {
+          slackUserId,
+          attempt,
+          maxRetries,
+          delayMs,
+          error: lastError.message,
+        });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else if (!isTransientError) {
+        // Non-transient error - log and exit without retrying
+        logger.error("Failed to sync to ExternalIdentity (non-transient)", {
+          slackUserId,
+          error: lastError.message,
+        });
+        return;
+      }
+    }
   }
+
+  // All retries exhausted - log at error level for visibility
+  logger.error("Failed to sync to ExternalIdentity after all retries", {
+    slackUserId,
+    maxRetries,
+    error: lastError?.message,
+    hint: "Run 'SYNC SLACK USERS' from Admin > Identities to manually sync",
+  });
 }
 
 /**

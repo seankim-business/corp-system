@@ -24,7 +24,7 @@
  *     └── Logout All Devices Button
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ApiError, request } from "../api/client";
 import { useAuthStore } from "../stores/authStore";
 
@@ -32,6 +32,17 @@ export default function SettingsPage() {
   const { user, currentOrganization } = useAuthStore();
   const [name, setName] = useState(user?.name || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [slackIdentity, setSlackIdentity] = useState<{
+    linked: boolean;
+    slackUserId?: string;
+    displayName?: string;
+    email?: string;
+    avatarUrl?: string;
+    workspaceId?: string;
+    lastSyncedAt?: string;
+  } | null>(null);
+  const [isLoadingSlack, setIsLoadingSlack] = useState(true);
+  const [isSyncingSlack, setIsSyncingSlack] = useState(false);
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
@@ -75,6 +86,69 @@ export default function SettingsPage() {
         error instanceof ApiError ? error.message : "Failed to logout from all devices";
       console.error("Logout all failed:", error);
       alert(message);
+    }
+  };
+
+  useEffect(() => {
+    const fetchSlackIdentity = async () => {
+      try {
+        interface SlackIdentityResponse {
+          linked: boolean;
+          slackUserId?: string;
+          displayName?: string;
+          email?: string;
+          avatarUrl?: string;
+          workspaceId?: string;
+          lastSyncedAt?: string;
+        }
+        const data = await request<SlackIdentityResponse>({
+          url: "/api/slack/my-identity",
+          method: "GET",
+        });
+        setSlackIdentity(data);
+      } catch (error) {
+        console.error("Failed to fetch Slack identity:", error);
+        setSlackIdentity({ linked: false });
+      } finally {
+        setIsLoadingSlack(false);
+      }
+    };
+
+    fetchSlackIdentity();
+  }, []);
+
+  const handleSyncSlack = async () => {
+    setIsSyncingSlack(true);
+    try {
+      interface SyncResponse {
+        success: boolean;
+        slackUserId?: string;
+        displayName?: string;
+        email?: string;
+        avatarUrl?: string;
+        lastSyncedAt?: string;
+      }
+      const data = await request<SyncResponse>({
+        url: "/api/slack/sync-my-identity",
+        method: "POST",
+      });
+
+      if (data.success) {
+        setSlackIdentity(prev => prev ? {
+          ...prev,
+          displayName: data.displayName,
+          email: data.email,
+          avatarUrl: data.avatarUrl,
+          lastSyncedAt: data.lastSyncedAt,
+        } : prev);
+        alert("Slack profile synced successfully");
+      }
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Failed to sync Slack profile";
+      console.error("Sync failed:", error);
+      alert(message);
+    } finally {
+      setIsSyncingSlack(false);
     }
   };
 
@@ -195,6 +269,80 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Slack Connection */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Slack Connection</h2>
+
+          {isLoadingSlack ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : slackIdentity?.linked ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                {slackIdentity.avatarUrl ? (
+                  <img
+                    src={slackIdentity.avatarUrl}
+                    alt={slackIdentity.displayName || "Slack avatar"}
+                    className="w-12 h-12 rounded-full"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center">
+                    <span className="text-white text-xl font-medium">
+                      {(slackIdentity.displayName || slackIdentity.email || "S").charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">
+                    {slackIdentity.displayName || "Slack User"}
+                  </p>
+                  <p className="text-sm text-gray-500">{slackIdentity.email}</p>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                  Connected
+                </span>
+              </div>
+
+              {slackIdentity.lastSyncedAt && (
+                <p className="text-sm text-gray-500">
+                  Last synced: {new Date(slackIdentity.lastSyncedAt).toLocaleString()}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSyncSlack}
+                  disabled={isSyncingSlack}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSyncingSlack ? "Syncing..." : "Sync Profile"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zm2.521-10.122a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.835a2.528 2.528 0 0 1 2.522-2.52h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.835a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.835zm-1.27 0a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.165 0a2.528 2.528 0 0 1 2.521 2.522v6.313zm-2.521 10.122a2.528 2.528 0 0 1 2.521 2.522A2.528 2.528 0 0 1 15.165 24a2.528 2.528 0 0 1-2.521-2.522v-2.522h2.521zm0-1.27a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.313A2.528 2.528 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.521h-6.313z"/>
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Your Slack</h3>
+              <p className="text-gray-500 mb-4 max-w-sm mx-auto">
+                Link your Slack account to use @Nubabel in your workspace
+              </p>
+              <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600 max-w-md mx-auto">
+                <p className="font-medium mb-2">How to connect:</p>
+                <ol className="list-decimal list-inside space-y-1 text-left">
+                  <li>Go to your Slack workspace</li>
+                  <li>Mention <code className="bg-gray-200 px-1 rounded">@Nubabel</code> in any channel</li>
+                  <li>Click the "Link My Account" button that appears</li>
+                </ol>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
