@@ -344,7 +344,8 @@ function setupEventHandlers(app: App): void {
 
       await redis.set(dedupeKey, "1", 300);
 
-      logger.info("Slack mention received", {
+      // Use WARN level to ensure these diagnostic logs appear in production (LOG_LEVEL=warn)
+      logger.warn("Slack mention received (WARN for visibility)", {
         user,
         channel,
         hasThread: !!thread_ts,
@@ -427,10 +428,10 @@ function setupEventHandlers(app: App): void {
           const slackUserInfo = await client.users.info({ user });
           const profile = slackUserInfo.user?.profile;
 
-          logger.info("Slack user profile retrieved", {
+          logger.warn("Slack user profile retrieved (WARN for visibility)", {
             slackUserId: user,
             hasEmail: !!profile?.email,
-            email: profile?.email, // Log the email for debugging
+            email: profile?.email,
             displayName: profile?.display_name || profile?.real_name,
           });
 
@@ -443,7 +444,7 @@ function setupEventHandlers(app: App): void {
               isBot: slackUserInfo.user?.is_bot,
               isAdmin: slackUserInfo.user?.is_admin,
             });
-            logger.info("Slack user provisioned successfully", {
+            logger.warn("Slack user provisioned successfully (WARN for visibility)", {
               slackUserId: user,
               organizationId: organization.id,
               userId: provisionedUser?.userId,
@@ -463,7 +464,7 @@ function setupEventHandlers(app: App): void {
         }
 
         // Now lookup user (still within RLS bypass context)
-        logger.info("Looking up Nubabel user (RLS bypassed for auth bootstrap)", {
+        logger.warn("Looking up Nubabel user (RLS bypassed for auth bootstrap) - WARN for visibility", {
           slackUserId: user,
           organizationId: organization.id,
           workspaceId,
