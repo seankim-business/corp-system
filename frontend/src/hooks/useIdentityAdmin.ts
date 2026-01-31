@@ -5,6 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../api/client";
 
 // =============================================================================
 // Types
@@ -372,18 +373,7 @@ export function useSyncSlackIdentities() {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/admin/identities/sync-slack", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to sync Slack identities");
-      }
-
-      return response.json() as Promise<{
+      const response = await api.post<{
         success: boolean;
         message: string;
         stats: {
@@ -394,7 +384,9 @@ export function useSyncSlackIdentities() {
           suggested: number;
           errors: number;
         };
-      }>;
+      }>("admin/identities/sync-slack");
+
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "identities"] });
