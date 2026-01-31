@@ -11,15 +11,22 @@ import { runWithoutRLS } from "../utils/async-context";
  *
  * Note: This function runs with RLS bypassed since it's always called during
  * auth bootstrap (before organization context can be established).
+ *
+ * Includes retry logic to handle race conditions where user is being
+ * provisioned by a concurrent request.
  */
 export async function getUserBySlackId(
   slackUserId: string,
   client: WebClient,
   organizationId?: string,
-) {
+  retryCount: number = 0,
+): Promise<any> {
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY_MS = 500;
+
   // Run with RLS bypass since this is auth bootstrap - we need to identify
   // the user before we can establish organization context
-  return runWithoutRLS(async () => {
+  const result = await runWithoutRLS(async () => {
     try {
       // Using WARN level to ensure these diagnostic logs appear in production
       logger.warn("getUserBySlackId called (RLS bypassed for auth bootstrap)", {
@@ -202,23 +209,39 @@ export async function getUserBySlackId(
 
     // Final summary logging before return
     if (!user) {
-      logger.error("getUserBySlackId returning null - ALL METHODS FAILED", {
+      logger.warn("getUserBySlackId returning null - ALL METHODS FAILED", {
         slackUserId,
         organizationId,
         method1_slackUser_found: !!slackUserRecord,
         method1_slackUser_userId: slackUserRecord?.userId,
         method1_slackUser_hasUser: !!slackUserRecord?.user,
         method3_email: email?.toLowerCase(),
+        retryCount,
       });
     }
 
     return user;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error("getUserBySlackId error", { slackUserId, error: errorMessage });
+      logger.error("getUserBySlackId error", { slackUserId, error: errorMessage, retryCount });
       return null; // Return null instead of throwing to allow graceful handling
     }
   }); // End of runWithoutRLS
+
+  // Retry logic to handle race conditions where user is being provisioned concurrently
+  if (!result && retryCount < MAX_RETRIES) {
+    logger.warn("getUserBySlackId retrying due to null result (possible race condition)", {
+      slackUserId,
+      organizationId,
+      retryCount: retryCount + 1,
+      maxRetries: MAX_RETRIES,
+      delayMs: RETRY_DELAY_MS,
+    });
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    return getUserBySlackId(slackUserId, client, organizationId, retryCount + 1);
+  }
+
+  return result;
 }
 
 export async function getOrganizationBySlackWorkspace(workspaceId: string) {
