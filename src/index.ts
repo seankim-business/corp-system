@@ -568,25 +568,45 @@ app.post("/health/sync-slack-users", async (_req, res) => {
       return res.status(404).json({ error: "No Slack bot token found" });
     }
 
-    // Verify token works
-    try {
-      const testClient = new WebClient(botToken);
-      await testClient.auth.test();
-      logger.info("Using Slack token", { source: envBotToken ? "env" : "db", orgId: org.id });
-    } catch (e) {
-      // If env token fails, try DB token
-      if (envBotToken && integration?.botToken && integration.botToken !== envBotToken) {
-        try {
-          const testClient2 = new WebClient(integration.botToken);
-          await testClient2.auth.test();
-          botToken = integration.botToken;
-          logger.info("Using DB Slack token after env token failed", { orgId: org.id });
-        } catch (e2) {
-          return res.status(500).json({ error: "All Slack tokens invalid" });
-        }
-      } else {
-        return res.status(500).json({ error: "Slack token invalid" });
+    // Verify token works - try all available tokens
+    const tokenSources = [
+      { name: "env", token: envBotToken },
+      { name: "db", token: integration?.botToken },
+    ].filter(t => t.token);
+
+    let workingToken: string | null = null;
+    const tokenErrors: any[] = [];
+
+    for (const source of tokenSources) {
+      try {
+        const testClient = new WebClient(source.token);
+        const authResult = await testClient.auth.test();
+        logger.info("Slack token valid", {
+          source: source.name,
+          team: authResult.team,
+          botId: authResult.bot_id,
+        });
+        workingToken = source.token!;
+        botToken = workingToken;
+        break;
+      } catch (e: any) {
+        const errorInfo = {
+          source: source.name,
+          tokenPrefix: source.token?.substring(0, 25) + "...",
+          error: e.data?.error || e.message,
+        };
+        tokenErrors.push(errorInfo);
+        logger.warn("Slack token invalid", errorInfo);
       }
+    }
+
+    if (!workingToken) {
+      logger.error("All Slack tokens invalid - user needs to reconnect Slack", { tokenErrors });
+      return res.status(500).json({
+        error: "Slack bot token is invalid or expired",
+        hint: "Please reconnect Slack: Settings > Integrations > Disconnect Slack, then Connect again",
+        details: tokenErrors,
+      });
     }
 
     const slack = new WebClient(botToken);
