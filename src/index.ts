@@ -571,8 +571,8 @@ app.post("/health/sync-slack-users", async (_req, res) => {
     // Verify token works - try all available tokens
     const tokenSources = [
       { name: "env", token: envBotToken },
-      { name: "db", token: integration?.botToken },
-    ].filter(t => t.token);
+      { name: "db", token: integration?.botToken ?? undefined },
+    ].filter((t): t is { name: string; token: string } => !!t.token);
 
     let workingToken: string | null = null;
     const tokenErrors: any[] = [];
@@ -672,10 +672,9 @@ app.post("/health/sync-slack-users", async (_req, res) => {
               providerTeamId: workspaceId,
               email,
               displayName: name,
-              status: "linked",
               userId,
-              autoLinkedAt: new Date(),
-              autoLinkMethod: "health_sync",
+              linkedAt: new Date(),
+              linkMethod: "health_sync",
             },
           });
         }
@@ -695,10 +694,10 @@ app.post("/health/sync-slack-users", async (_req, res) => {
     }
 
     logger.info("Emergency Slack user sync completed", stats);
-    res.json({ success: true, stats, message: "Slack users synced successfully" });
+    return res.json({ success: true, stats, message: "Slack users synced successfully" });
   } catch (error) {
     logger.error("Failed to sync Slack users", { error });
-    res.status(500).json({ success: false, error: "Failed to sync Slack users" });
+    return res.status(500).json({ success: false, error: "Failed to sync Slack users" });
   }
 });
 
@@ -934,7 +933,7 @@ const server = app.listen(port, "::", async () => {
   // Reset all circuit breakers on startup to ensure clean state
   try {
     const allBreakers = getAllCircuitBreakers();
-    for (const [name, breaker] of allBreakers) {
+    for (const [_name, breaker] of allBreakers) {
       breaker.reset();
     }
     // Also explicitly reset postgresql circuit breaker
