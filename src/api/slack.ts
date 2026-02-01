@@ -628,6 +628,16 @@ function setupEventHandlers(app: App): void {
 
       const cleanedText = text.replace(/<@[A-Z0-9]+>/g, "").trim();
 
+      // Handle empty message (user just mentioned @Nubabel without any text)
+      if (!cleanedText) {
+        await say({
+          text: "👋 Hi! I'm Nubabel. How can I help you? Just mention me with your request, like: `@Nubabel what's my schedule today?`",
+          thread_ts: thread_ts || ts,
+        });
+        await sequence.complete();
+        return;
+      }
+
       const eventId = randomUUID();
 
       // Store Slack context for dynamic status updates

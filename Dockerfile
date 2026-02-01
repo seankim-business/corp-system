@@ -34,6 +34,18 @@ COPY src ./src
 RUN npm run build
 
 # ============================================================================
+# Stage 1.5: Frontend Builder
+# ============================================================================
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+# Ensure .env.production is used
+COPY frontend/.env.production .
+RUN npm run build
+
+# ============================================================================
 # Stage 2: Production Runtime
 # ============================================================================
 FROM node:20-alpine AS runtime
@@ -66,8 +78,8 @@ RUN npx prisma generate
 # Copy built application from backend-builder
 COPY --from=backend-builder /app/dist ./dist
 
-# Copy pre-built frontend (committed to git)
-COPY frontend/dist ./frontend/dist
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Copy landing page
 COPY landing ./landing

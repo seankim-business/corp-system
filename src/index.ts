@@ -928,9 +928,9 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-logger.info("Starting server", { port, host: "0.0.0.0" });
+logger.info("Starting server", { port, host: "::" });
 
-const server = app.listen(port, "0.0.0.0", async () => {
+const server = app.listen(port, "::", async () => {
   // Reset all circuit breakers on startup to ensure clean state
   try {
     const allBreakers = getAllCircuitBreakers();
