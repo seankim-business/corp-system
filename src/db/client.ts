@@ -1,18 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { getOrganizationContext, isRLSBypassed } from "../utils/async-context";
 import { logger } from "../utils/logger";
-import { getCircuitBreaker, CircuitBreakerError } from "../utils/circuit-breaker";
 
-const DB_CIRCUIT_BREAKER_NAME = "postgresql";
-// Increase timeout to 60s to handle slow queries during AI processing
-const DB_QUERY_TIMEOUT_MS = parseInt(process.env.DB_QUERY_TIMEOUT_MS || "60000", 10);
-
-const dbCircuitBreaker = getCircuitBreaker(DB_CIRCUIT_BREAKER_NAME, {
-  failureThreshold: 100, // Very high threshold - AI orchestration makes 50+ queries per request
-  successThreshold: 2,
-  timeout: DB_QUERY_TIMEOUT_MS,
-  resetTimeout: 30000, // 30s reset to recover faster
-});
+// Circuit breaker permanently disabled - was causing more problems than it solved
+// DB is managed by Railway with auto-failover, circuit breaker just blocked legitimate requests
 
 function createPrismaClient(): PrismaClient {
   const baseClient = new PrismaClient({
@@ -80,7 +71,7 @@ function createPrismaClient(): PrismaClient {
             });
           }
 
-          return dbCircuitBreaker.execute(() => query(args));
+          return query(args);
         },
       },
     },
@@ -88,10 +79,13 @@ function createPrismaClient(): PrismaClient {
 }
 
 export function getDatabaseCircuitBreakerStats() {
-  return dbCircuitBreaker.getStats();
+  // Circuit breaker disabled - return static "disabled" status for health dashboard compatibility
+  return {
+    state: "DISABLED" as const,
+    failureCount: 0,
+    successCount: 0,
+  };
 }
-
-export { CircuitBreakerError };
 
 let prisma: PrismaClient;
 
