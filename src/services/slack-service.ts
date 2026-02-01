@@ -21,8 +21,8 @@ export async function getUserBySlackId(
   organizationId?: string,
   retryCount: number = 0,
 ): Promise<any> {
-  const MAX_RETRIES = 2;
-  const RETRY_DELAY_MS = 500;
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
 
   // Run with RLS bypass since this is auth bootstrap - we need to identify
   // the user before we can establish organization context
