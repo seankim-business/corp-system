@@ -594,9 +594,16 @@ slackIntegrationRouter.delete(
 );
 
 export async function getSlackIntegrationByWorkspace(workspaceId: string) {
-  const integration = await prisma.slackIntegration.findUnique({
-    where: { workspaceId },
-  });
+  // Run with RLS bypass - this is called during Slack auth bootstrap
+  // before any organization context is established, and must succeed even
+  // when circuit breaker is OPEN due to other query failures
+  const { runWithoutRLS } = await import("../utils/async-context");
+
+  const integration = await runWithoutRLS(() =>
+    prisma.slackIntegration.findUnique({
+      where: { workspaceId },
+    })
+  );
 
   if (!integration || !integration.botToken) {
     return null;
@@ -611,9 +618,15 @@ export async function getSlackIntegrationByWorkspace(workspaceId: string) {
 }
 
 export async function getSlackIntegrationByOrg(organizationId: string) {
-  const integration = await prisma.slackIntegration.findFirst({
-    where: { organizationId },
-  });
+  // Run with RLS bypass - this is called from notification worker and other
+  // contexts where circuit breaker bypass is needed for reliable delivery
+  const { runWithoutRLS } = await import("../utils/async-context");
+
+  const integration = await runWithoutRLS(() =>
+    prisma.slackIntegration.findFirst({
+      where: { organizationId },
+    })
+  );
 
   if (!integration || !integration.botToken) {
     return null;
