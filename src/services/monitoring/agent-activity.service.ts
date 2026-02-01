@@ -3,6 +3,7 @@ import { Response } from "express";
 import { db as prisma } from "../../db/client";
 import { logger } from "../../utils/logger";
 import { sseManager } from "../../api/sse";
+import { runWithoutRLS } from "../../utils/async-context";
 
 interface SSEClient {
   id: string;
@@ -67,18 +68,22 @@ class AgentActivityService extends EventEmitter {
   }
 
   async trackStart(params: TrackStartParams): Promise<string> {
-    const activity = await prisma.agentActivity.create({
-      data: {
-        organizationId: params.organizationId,
-        sessionId: params.sessionId,
-        agentType: params.agentType,
-        agentName: params.agentName,
-        category: params.category,
-        status: "running",
-        inputData: (params.inputData || {}) as any,
-        metadata: (params.metadata || {}) as any,
-      },
-    });
+    // Run with RLS bypass - this is called from orchestration workers where
+    // circuit breaker bypass is needed for reliable activity tracking
+    const activity = await runWithoutRLS(() =>
+      prisma.agentActivity.create({
+        data: {
+          organizationId: params.organizationId,
+          sessionId: params.sessionId,
+          agentType: params.agentType,
+          agentName: params.agentName,
+          category: params.category,
+          status: "running",
+          inputData: (params.inputData || {}) as any,
+          metadata: (params.metadata || {}) as any,
+        },
+      })
+    );
 
     const event: ActivityEvent = {
       type: "agent_started",
@@ -107,26 +112,31 @@ class AgentActivityService extends EventEmitter {
   }
 
   async trackProgress(activityId: string, update: ProgressUpdate): Promise<void> {
-    const activity = await prisma.agentActivity.findUnique({
-      where: { id: activityId },
-    });
+    // Run with RLS bypass for circuit breaker bypass
+    const activity = await runWithoutRLS(() =>
+      prisma.agentActivity.findUnique({
+        where: { id: activityId },
+      })
+    );
 
     if (!activity) {
       logger.warn("Activity not found for progress update", { activityId });
       return;
     }
 
-    await prisma.agentActivity.update({
-      where: { id: activityId },
-      data: {
-        metadata: {
-          ...(activity.metadata as Record<string, unknown>),
-          ...update.metadata,
-          lastProgress: update.message,
-          progressPercent: update.progress,
+    await runWithoutRLS(() =>
+      prisma.agentActivity.update({
+        where: { id: activityId },
+        data: {
+          metadata: {
+            ...(activity.metadata as Record<string, unknown>),
+            ...update.metadata,
+            lastProgress: update.message,
+            progressPercent: update.progress,
+          },
         },
-      },
-    });
+      })
+    );
 
     const event: ActivityEvent = {
       type: "agent_progress",
@@ -154,9 +164,12 @@ class AgentActivityService extends EventEmitter {
   }
 
   async trackComplete(activityId: string, result: CompletionResult): Promise<void> {
-    const activity = await prisma.agentActivity.findUnique({
-      where: { id: activityId },
-    });
+    // Run with RLS bypass for circuit breaker bypass
+    const activity = await runWithoutRLS(() =>
+      prisma.agentActivity.findUnique({
+        where: { id: activityId },
+      })
+    );
 
     if (!activity) {
       logger.warn("Activity not found for completion", { activityId });
@@ -169,20 +182,22 @@ class AgentActivityService extends EventEmitter {
       : 0;
     const status = result.errorMessage ? "failed" : "completed";
 
-    await prisma.agentActivity.update({
-      where: { id: activityId },
-      data: {
-        status,
-        completedAt,
-        durationMs,
-        outputData: (result.outputData || {}) as any,
-        errorMessage: result.errorMessage,
-        metadata: {
-          ...(activity.metadata as Record<string, unknown>),
-          ...result.metadata,
-        } as any,
-      },
-    });
+    await runWithoutRLS(() =>
+      prisma.agentActivity.update({
+        where: { id: activityId },
+        data: {
+          status,
+          completedAt,
+          durationMs,
+          outputData: (result.outputData || {}) as any,
+          errorMessage: result.errorMessage,
+          metadata: {
+            ...(activity.metadata as Record<string, unknown>),
+            ...result.metadata,
+          } as any,
+        },
+      })
+    );
 
     const event: ActivityEvent = {
       type: result.errorMessage ? "agent_failed" : "agent_completed",
@@ -211,20 +226,23 @@ class AgentActivityService extends EventEmitter {
   }
 
   async trackDelegation(parentActivityId: string, childParams: TrackStartParams): Promise<string> {
-    const childActivity = await prisma.agentActivity.create({
-      data: {
-        organizationId: childParams.organizationId,
-        sessionId: childParams.sessionId,
-        agentType: childParams.agentType,
-        agentName: childParams.agentName,
-        category: childParams.category,
-        parentActivityId: parentActivityId,
-        status: "running",
-        startedAt: new Date(),
-        inputData: (childParams.inputData || {}) as any,
-        metadata: (childParams.metadata || {}) as any,
-      },
-    });
+    // Run with RLS bypass for circuit breaker bypass
+    const childActivity = await runWithoutRLS(() =>
+      prisma.agentActivity.create({
+        data: {
+          organizationId: childParams.organizationId,
+          sessionId: childParams.sessionId,
+          agentType: childParams.agentType,
+          agentName: childParams.agentName,
+          category: childParams.category,
+          parentActivityId: parentActivityId,
+          status: "running",
+          startedAt: new Date(),
+          inputData: (childParams.inputData || {}) as any,
+          metadata: (childParams.metadata || {}) as any,
+        },
+      })
+    );
 
     const event: ActivityEvent = {
       type: "agent_delegated",
@@ -320,26 +338,35 @@ class AgentActivityService extends EventEmitter {
   }
 
   async getRecent(organizationId: string, limit = 50): Promise<unknown[]> {
-    const activities = await prisma.agentActivity.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
+    // Run with RLS bypass for circuit breaker bypass
+    const activities = await runWithoutRLS(() =>
+      prisma.agentActivity.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      })
+    );
 
     return activities;
   }
 
   async getById(activityId: string): Promise<unknown | null> {
-    return await prisma.agentActivity.findUnique({
-      where: { id: activityId },
-    });
+    // Run with RLS bypass for circuit breaker bypass
+    return await runWithoutRLS(() =>
+      prisma.agentActivity.findUnique({
+        where: { id: activityId },
+      })
+    );
   }
 
   async getBySession(sessionId: string): Promise<unknown[]> {
-    return await prisma.agentActivity.findMany({
-      where: { sessionId },
-      orderBy: { createdAt: "asc" },
-    });
+    // Run with RLS bypass for circuit breaker bypass
+    return await runWithoutRLS(() =>
+      prisma.agentActivity.findMany({
+        where: { sessionId },
+        orderBy: { createdAt: "asc" },
+      })
+    );
   }
 
   sendHeartbeat(): void {
