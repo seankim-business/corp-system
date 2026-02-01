@@ -10,7 +10,7 @@ interface QuickAction {
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'new-workflow', label: 'New Workflow', icon: <PlusIcon className="h-5 w-5" />, shortcut: 'N', path: '/workflows/new' },
+  { id: 'new-workflow', label: 'New Workflow', icon: <PlusIcon className="h-5 w-5" />, shortcut: 'N', path: '/workflows?create=true' },
   { id: 'run-workflow', label: 'Run Workflow', icon: <PlayIcon className="h-5 w-5" />, shortcut: 'R', path: '/workflows' },
   { id: 'settings', label: 'Settings', icon: <Cog6ToothIcon className="h-5 w-5" />, shortcut: 'S', path: '/settings' },
   { id: 'help', label: 'Help & Docs', icon: <QuestionMarkCircleIcon className="h-5 w-5" />, shortcut: '?', path: '/help' },

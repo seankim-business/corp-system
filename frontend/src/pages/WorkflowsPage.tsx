@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import WorkflowCard from "../components/WorkflowCard";
 import ExecuteWorkflowModal from "../components/ExecuteWorkflowModal";
 import { ApiError, request } from "../api/client";
@@ -146,6 +147,7 @@ function CreateWorkflowModal({ isOpen, onClose, onSuccess }: CreateWorkflowModal
 }
 
 export default function WorkflowsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +173,14 @@ export default function WorkflowsPage() {
   useEffect(() => {
     fetchWorkflows();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('create') === 'true') {
+      setIsCreateModalOpen(true);
+      searchParams.delete('create');
+      setSearchParams(searchParams);
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleExecute = (workflowId: string) => {
     const workflow = workflows.find((w) => w.id === workflowId);
