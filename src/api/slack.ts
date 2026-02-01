@@ -319,14 +319,27 @@ function setupEventHandlers(app: App): void {
   app.event("app_mention", async ({ event, say, client }) => {
     const startTime = Date.now();
 
+    // CRITICAL: Log at entry point BEFORE any async operations
+    // This helps diagnose if events reach the handler at all
+    const { user, text, channel, thread_ts, ts } = event;
+    logger.warn("app_mention ENTRY (before any async)", {
+      user,
+      channel,
+      ts,
+      hasThread: !!thread_ts,
+      textPreview: text?.substring(0, 50),
+    });
+
     let dedupeKey: string | null = null;
 
     try {
-      const { user, text, channel, thread_ts, ts } = event;
 
       // Create reaction sequence for better feedback
+      // Fire-and-forget: don't block message processing on reaction API
       const sequence = createReactionSequence(client as WebClient, channel, ts);
-      await sequence.start();
+      sequence.start().catch((err) => {
+        logger.debug("Reaction sequence start failed (non-blocking)", { error: String(err) });
+      });
 
       // messageTs is for thread context (reply in same thread)
       const messageTs = thread_ts || ts;
