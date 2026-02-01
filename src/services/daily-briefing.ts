@@ -513,10 +513,13 @@ export async function sendDailyBriefing(
   organizationId: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, displayName: true },
-    });
+    // Wrap in runWithoutRLS since this is called from scheduled job
+    const user = await runWithoutRLS(() =>
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, displayName: true },
+      })
+    );
 
     if (!user) {
       return { success: false, error: "User not found" };

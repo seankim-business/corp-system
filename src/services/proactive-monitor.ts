@@ -5,6 +5,7 @@ import { metrics } from "../utils/metrics";
 import { db as prisma } from "../db/client";
 import { getSlackIntegrationByOrg } from "../api/slack-integration";
 import { emitOrgEvent } from "./sse-service";
+import { runWithoutRLS } from "../utils/async-context";
 
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
@@ -132,23 +133,28 @@ async function runMonitorChecks(): Promise<void> {
 }
 
 async function getActiveOrganizations(): Promise<string[]> {
-  const orgs = await prisma.organization.findMany({
-    select: { id: true },
-  });
+  // Bypass RLS since this is a system job querying all organizations
+  const orgs = await runWithoutRLS(() =>
+    prisma.organization.findMany({
+      select: { id: true },
+    })
+  );
   return orgs.map((org: { id: string }) => org.id);
 }
 
 async function checkBudgetWarnings(organizationId: string): Promise<ProactiveAlert[]> {
   const alerts: ProactiveAlert[] = [];
 
-  const org = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: {
-      name: true,
-      monthlyBudgetCents: true,
-      currentMonthSpendCents: true,
-    },
-  });
+  const org = await runWithoutRLS(() =>
+    prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        name: true,
+        monthlyBudgetCents: true,
+        currentMonthSpendCents: true,
+      },
+    })
+  );
 
   if (!org) return alerts;
 
@@ -194,20 +200,22 @@ async function checkOverdueTasks(organizationId: string): Promise<ProactiveAlert
   const overdueThreshold = new Date();
   overdueThreshold.setHours(overdueThreshold.getHours() - config.overdueTaskThresholdHours);
 
-  const overdueTasks = await prisma.task.findMany({
-    where: {
-      organizationId,
-      status: { not: "5_Done" },
-      dueDate: { lt: new Date() },
-    },
-    select: {
-      id: true,
-      name: true,
-      dueDate: true,
-      status: true,
-    },
-    take: 10,
-  });
+  const overdueTasks = await runWithoutRLS(() =>
+    prisma.task.findMany({
+      where: {
+        organizationId,
+        status: { not: "5_Done" },
+        dueDate: { lt: new Date() },
+      },
+      select: {
+        id: true,
+        name: true,
+        dueDate: true,
+        status: true,
+      },
+      take: 10,
+    })
+  );
 
   if (overdueTasks.length > 0) {
     alerts.push({
@@ -246,20 +254,22 @@ async function checkPendingApprovals(organizationId: string): Promise<ProactiveA
   const approvalThreshold = new Date();
   approvalThreshold.setHours(approvalThreshold.getHours() - config.approvalPendingThresholdHours);
 
-  const pendingApprovals = await prisma.approval.findMany({
-    where: {
-      organizationId,
-      status: "pending",
-      createdAt: { lt: approvalThreshold },
-    },
-    select: {
-      id: true,
-      title: true,
-      type: true,
-      createdAt: true,
-    },
-    take: 10,
-  });
+  const pendingApprovals = await runWithoutRLS(() =>
+    prisma.approval.findMany({
+      where: {
+        organizationId,
+        status: "pending",
+        createdAt: { lt: approvalThreshold },
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        createdAt: true,
+      },
+      take: 10,
+    })
+  );
 
   if (pendingApprovals.length > 0) {
     alerts.push({
@@ -295,18 +305,20 @@ async function checkPendingApprovals(organizationId: string): Promise<ProactiveA
 async function checkIntegrationHealth(organizationId: string): Promise<ProactiveAlert[]> {
   const alerts: ProactiveAlert[] = [];
 
-  const recentFailures = await prisma.orchestratorExecution.findMany({
-    where: {
-      organizationId,
-      status: "failed",
-      createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
-    },
-    select: {
-      id: true,
-      errorMessage: true,
-      metadata: true,
-    },
-  });
+  const recentFailures = await runWithoutRLS(() =>
+    prisma.orchestratorExecution.findMany({
+      where: {
+        organizationId,
+        status: "failed",
+        createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+      select: {
+        id: true,
+        errorMessage: true,
+        metadata: true,
+      },
+    })
+  );
 
   const failuresByType = new Map<string, number>();
   for (const failure of recentFailures) {
@@ -441,10 +453,12 @@ async function deliverViaSlack(alert: ProactiveAlert): Promise<void> {
       return;
     }
 
-    const org = await prisma.organization.findUnique({
-      where: { id: alert.organizationId },
-      select: { settings: true },
-    });
+    const org = await runWithoutRLS(() =>
+      prisma.organization.findUnique({
+        where: { id: alert.organizationId },
+        select: { settings: true },
+      })
+    );
     const orgSettings = org?.settings as Record<string, unknown> | null;
     const adminChannel = (orgSettings?.slackAlertChannel as string) || "#nubabel-alerts";
 
@@ -509,10 +523,12 @@ async function deliverViaSlack(alert: ProactiveAlert): Promise<void> {
 
 async function deliverViaWebhook(alert: ProactiveAlert): Promise<void> {
   try {
-    const org = await prisma.organization.findUnique({
-      where: { id: alert.organizationId },
-      select: { settings: true },
-    });
+    const org = await runWithoutRLS(() =>
+      prisma.organization.findUnique({
+        where: { id: alert.organizationId },
+        select: { settings: true },
+      })
+    );
 
     const settings = org?.settings as Record<string, unknown> | null;
     const webhookUrl = settings?.alertWebhookUrl as string | undefined;

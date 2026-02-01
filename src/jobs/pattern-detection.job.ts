@@ -7,6 +7,7 @@
 import { db } from "../db/client";
 import { patternDetector } from "../services/pattern-detector";
 import { logger } from "../utils/logger";
+import { runWithoutRLS } from "../utils/async-context";
 
 // Job configuration
 const LOOKBACK_DAYS = 30;
@@ -27,10 +28,12 @@ export async function runPatternDetection(): Promise<{
   logger.info("Starting scheduled pattern detection job");
 
   try {
-    // Get all active organizations
-    const organizations = await db.organization.findMany({
-      select: { id: true, name: true },
-    });
+    // Get all active organizations - bypass RLS since this is a system job
+    const organizations = await runWithoutRLS(() =>
+      db.organization.findMany({
+        select: { id: true, name: true },
+      })
+    );
 
     logger.info(`Processing ${organizations.length} organizations`);
 
