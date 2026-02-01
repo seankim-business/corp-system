@@ -278,30 +278,41 @@ async function searchSlack(
 
     const client = new WebClient(decrypt(integration.botToken));
 
-    const response = await client.search.messages({
-      query,
-      count: limit,
-      sort: "timestamp",
-      sort_dir: "desc",
-    });
+    try {
+      const response = await client.search.messages({
+        query,
+        count: limit,
+        sort: "timestamp",
+        sort_dir: "desc",
+      });
 
-    if (!response.ok || !response.messages?.matches) {
-      return [];
+      if (!response.ok || !response.messages?.matches) {
+        return [];
+      }
+
+      return response.messages.matches.map((match) => ({
+        source: "slack" as SearchSource,
+        title: `#${match.channel?.name || "unknown"}: ${match.username || "Unknown User"}`,
+        snippet: match.text?.substring(0, 200) || "",
+        url: match.permalink || "",
+        score: 0.75,
+        metadata: {
+          channel: match.channel?.name,
+          channelId: match.channel?.id,
+          username: match.username,
+          timestamp: match.ts,
+        },
+      }));
+    } catch (apiError: any) {
+      if (apiError?.data?.error === "not_allowed_token_type") {
+        logger.warn(
+          "Slack search unavailable: bot token provided, but search.messages requires a user token",
+          { organizationId },
+        );
+        return [];
+      }
+      throw apiError;
     }
-
-    return response.messages.matches.map((match) => ({
-      source: "slack" as SearchSource,
-      title: `#${match.channel?.name || "unknown"}: ${match.username || "Unknown User"}`,
-      snippet: match.text?.substring(0, 200) || "",
-      url: match.permalink || "",
-      score: 0.75,
-      metadata: {
-        channel: match.channel?.name,
-        channelId: match.channel?.id,
-        username: match.username,
-        timestamp: match.ts,
-      },
-    }));
   } catch (error) {
     logger.error("Slack search error", { organizationId, error: String(error) });
     return [];
