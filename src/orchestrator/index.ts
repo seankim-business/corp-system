@@ -30,6 +30,7 @@ import type { SkillOutput } from '../services/skill-runtime/types';
 import { ExperienceTracker } from '../services/skill-learning';
 import { recordSkillExecution, registerSkillInIndex } from '../services/skill-performance';
 import { getRedisConnection } from '../db/redis';
+import { runWithoutRLS } from '../utils/async-context';
 
 const tracer = trace.getTracer("orchestrator");
 
@@ -57,13 +58,16 @@ export async function orchestrate(request: OrchestrationRequest): Promise<Orches
       });
 
       // Load user details for context (needed for "Who am I?" type questions)
-      const currentUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-        },
+      // Use runWithoutRLS to bypass circuit breaker - user lookup is critical for operation
+      const currentUser = await runWithoutRLS(async () => {
+        return prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+          },
+        });
       });
 
       if (!currentUser) {

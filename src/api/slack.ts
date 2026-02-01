@@ -743,6 +743,10 @@ function setupEventHandlers(app: App): void {
 
       if (!msg.user || !msg.text) return;
 
+      // After guard, these are guaranteed to be defined
+      const slackUserId = msg.user;
+      const messageText = msg.text;
+
       // Create reaction sequence for better feedback
       const sequence = createReactionSequence(client as WebClient, msg.channel, msg.ts);
       await sequence.start();
@@ -760,33 +764,7 @@ function setupEventHandlers(app: App): void {
       await redis.set(dedupeKey, "1", 300);
 
       try {
-        // Check for native commands BEFORE processing
-        if (isNativeCommand(msg.text)) {
-          logger.debug("Detected native command in DM, executing directly");
-          try {
-            await executeNativeCommand(msg.text, {
-              client: client as WebClient,
-              channelId: msg.channel,
-              threadTs: msg.ts,
-              userId: msg.user,
-              say,
-            });
-            await sequence.complete();
-            return;
-          } catch (error) {
-            logger.error("Native command execution failed in DM", {}, error instanceof Error ? error : new Error(String(error)));
-            await sequence.error();
-            return;
-          }
-        }
-
-        const nubabelUser = await getUserBySlackId(msg.user, client as WebClient);
-        if (!nubabelUser) {
-          await say("Please login at https://nubabel.com first!");
-          await sequence.error();
-          return;
-        }
-
+        // Get workspace info first (needed for org lookup and provisioning)
         const slackWorkspace = await client.team.info();
         const workspaceId = slackWorkspace.team?.id;
 
@@ -803,6 +781,70 @@ function setupEventHandlers(app: App): void {
           return;
         }
 
+        // Check for native commands BEFORE processing
+        if (isNativeCommand(messageText)) {
+          logger.debug("Detected native command in DM, executing directly");
+          try {
+            await executeNativeCommand(messageText, {
+              client: client as WebClient,
+              channelId: msg.channel,
+              threadTs: msg.ts,
+              userId: slackUserId,
+              say,
+            });
+            await sequence.complete();
+            return;
+          } catch (error) {
+            logger.error("Native command execution failed in DM", {}, error instanceof Error ? error : new Error(String(error)));
+            await sequence.error();
+            return;
+          }
+        }
+
+        // Auto-provision the Slack user before lookup (same as app_mention handler)
+        // This creates User and SlackUser records if they don't exist
+        const nubabelUser = await runWithoutRLS(async () => {
+          try {
+            const slackUserInfo = await client.users.info({ user: slackUserId });
+            const profile = slackUserInfo.user?.profile;
+
+            if (profile) {
+              const provisionedSlackUser = await provisionSlackUser(slackUserId, workspaceId, organization.id, {
+                email: profile?.email,
+                displayName: profile?.display_name || profile?.real_name,
+                realName: profile?.real_name,
+                avatarUrl: profile?.image_192 || profile?.image_72,
+                isBot: slackUserInfo.user?.is_bot,
+                isAdmin: slackUserInfo.user?.is_admin,
+              });
+
+              // Use the user from provisioning directly to avoid race conditions
+              if (provisionedSlackUser?.user) {
+                logger.debug("DM: Using provisioned user directly", {
+                  slackUserId,
+                  userId: provisionedSlackUser.user.id,
+                });
+                return provisionedSlackUser.user;
+              }
+            }
+          } catch (provisionError) {
+            logger.error("Failed to provision Slack user in DM", {
+              slackUserId,
+              organizationId: organization.id,
+              error: provisionError instanceof Error ? provisionError.message : String(provisionError),
+            });
+          }
+
+          // Fallback: lookup user if provisioning didn't return a user
+          return getUserBySlackId(slackUserId, client as WebClient, organization.id);
+        });
+
+        if (!nubabelUser) {
+          await say("Please login at https://nubabel.com first!");
+          await sequence.error();
+          return;
+        }
+
         let session = await getSessionBySlackThread(msg.channel);
         if (!session) {
           session = await createSession({
@@ -811,7 +853,7 @@ function setupEventHandlers(app: App): void {
             source: "slack",
             metadata: {
               slackChannelId: msg.channel,
-              slackUserId: msg.user,
+              slackUserId,
             },
           });
         }
@@ -834,7 +876,7 @@ function setupEventHandlers(app: App): void {
             msg.channel,
             msg.thread_ts,
             msg.ts,
-            msg.user,
+            slackUserId,
           );
           threadContextPrompt = buildSlackContextPrompt(slackContext);
         } catch (error) {
@@ -864,8 +906,8 @@ function setupEventHandlers(app: App): void {
         await slackEventQueue.enqueueEvent({
           type: "direct_message",
           channel: msg.channel,
-          user: msg.user,
-          text: msg.text,
+          user: slackUserId,
+          text: messageText,
           ts: msg.ts,
           organizationId: organization.id,
           userId: nubabelUser.id,
@@ -908,15 +950,51 @@ function setupEventHandlers(app: App): void {
     try {
       const { user_id, text, channel_id, team_id } = command;
 
-      const nubabelUser = await getUserBySlackId(user_id, client as WebClient);
-      if (!nubabelUser) {
-        await say("Please login at https://nubabel.com first!");
-        return;
-      }
-
       const organization = await getOrganizationBySlackWorkspace(team_id);
       if (!organization) {
         await say("Organization not found. Please connect your Slack workspace in Settings.");
+        return;
+      }
+
+      // Auto-provision the Slack user before lookup (same as app_mention handler)
+      const nubabelUser = await runWithoutRLS(async () => {
+        try {
+          const slackUserInfo = await client.users.info({ user: user_id });
+          const profile = slackUserInfo.user?.profile;
+
+          if (profile) {
+            const provisionedSlackUser = await provisionSlackUser(user_id, team_id, organization.id, {
+              email: profile?.email,
+              displayName: profile?.display_name || profile?.real_name,
+              realName: profile?.real_name,
+              avatarUrl: profile?.image_192 || profile?.image_72,
+              isBot: slackUserInfo.user?.is_bot,
+              isAdmin: slackUserInfo.user?.is_admin,
+            });
+
+            // Use the user from provisioning directly to avoid race conditions
+            if (provisionedSlackUser?.user) {
+              logger.debug("/nubabel: Using provisioned user directly", {
+                slackUserId: user_id,
+                userId: provisionedSlackUser.user.id,
+              });
+              return provisionedSlackUser.user;
+            }
+          }
+        } catch (provisionError) {
+          logger.error("Failed to provision Slack user in /nubabel", {
+            slackUserId: user_id,
+            organizationId: organization.id,
+            error: provisionError instanceof Error ? provisionError.message : String(provisionError),
+          });
+        }
+
+        // Fallback: lookup user if provisioning didn't return a user
+        return getUserBySlackId(user_id, client as WebClient, organization.id);
+      });
+
+      if (!nubabelUser) {
+        await say("Please login at https://nubabel.com first!");
         return;
       }
 
@@ -979,15 +1057,49 @@ function setupEventHandlers(app: App): void {
     try {
       const { user_id, text, team_id } = command;
 
-      const nubabelUser = await getUserBySlackId(user_id, client as WebClient);
-      if (!nubabelUser) {
-        await say("Please login at https://nubabel.com first!");
-        return;
-      }
-
       const organization = await getOrganizationBySlackWorkspace(team_id);
       if (!organization) {
         await say("Organization not found. Please connect your Slack workspace in Settings.");
+        return;
+      }
+
+      // Auto-provision the Slack user before lookup (same as app_mention handler)
+      const nubabelUser = await runWithoutRLS(async () => {
+        try {
+          const slackUserInfo = await client.users.info({ user: user_id });
+          const profile = slackUserInfo.user?.profile;
+
+          if (profile) {
+            const provisionedSlackUser = await provisionSlackUser(user_id, team_id, organization.id, {
+              email: profile?.email,
+              displayName: profile?.display_name || profile?.real_name,
+              realName: profile?.real_name,
+              avatarUrl: profile?.image_192 || profile?.image_72,
+              isBot: slackUserInfo.user?.is_bot,
+              isAdmin: slackUserInfo.user?.is_admin,
+            });
+
+            if (provisionedSlackUser?.user) {
+              logger.debug("/schedule: Using provisioned user directly", {
+                slackUserId: user_id,
+                userId: provisionedSlackUser.user.id,
+              });
+              return provisionedSlackUser.user;
+            }
+          }
+        } catch (provisionError) {
+          logger.error("Failed to provision Slack user in /schedule", {
+            slackUserId: user_id,
+            organizationId: organization.id,
+            error: provisionError instanceof Error ? provisionError.message : String(provisionError),
+          });
+        }
+
+        return getUserBySlackId(user_id, client as WebClient, organization.id);
+      });
+
+      if (!nubabelUser) {
+        await say("Please login at https://nubabel.com first!");
         return;
       }
 
