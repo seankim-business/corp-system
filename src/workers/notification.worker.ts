@@ -13,6 +13,7 @@ import { clearAgentStatus } from "../utils/slack-agent-status";
 import { appendFeedbackBlocks } from "../utils/slack-feedback-blocks";
 import { getAgentIdentity } from "../config/agent-identities";
 import { getCompletion, getErrorMessage } from "../config/bot-personality";
+import { redis } from "../db/redis";
 
 export class NotificationWorker extends BaseWorker<NotificationData> {
   constructor() {
@@ -33,6 +34,21 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
 
   private async processWithContext(job: Job<NotificationData>): Promise<void> {
     const { channel, threadTs, text, eventId, organizationId } = job.data;
+
+    // Deduplication: Check if a notification was already sent for this event
+    // This prevents duplicate messages from stale queue jobs or retries
+    const dedupeKey = `notification:sent:${eventId}`;
+    const alreadySent = await redis.get(dedupeKey);
+    if (alreadySent) {
+      logger.warn("Skipping duplicate notification for event", {
+        eventId,
+        jobId: job.id,
+        previousJobId: alreadySent,
+      });
+      // Mark as complete without sending
+      await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);
+      return;
+    }
 
     await job.updateProgress(PROGRESS_PERCENTAGES.STARTED);
     await emitJobProgress(job.id || "", PROGRESS_STAGES.STARTED, PROGRESS_PERCENTAGES.STARTED, {
@@ -206,6 +222,9 @@ export class NotificationWorker extends BaseWorker<NotificationData> {
       // Clean up indicator type Redis keys
       await redis.del(`slack:indicator_type:${eventId}`);
       await redis.del(`slack:thread_ts:${eventId}`);
+
+      // Mark notification as sent for deduplication (5 minute TTL)
+      await redis.set(`notification:sent:${eventId}`, job.id || "sent", 300);
 
       await job.updateProgress(PROGRESS_PERCENTAGES.COMPLETED);
       await emitJobProgress(

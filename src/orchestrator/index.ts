@@ -749,25 +749,35 @@ function parseMultiAgentTasks(userRequest: string): string[] {
 }
 
 async function saveExecution(data: any) {
-  await prisma.orchestratorExecution.create({
-    data: {
+  try {
+    await prisma.orchestratorExecution.create({
+      data: {
+        organizationId: data.organizationId,
+        userId: data.userId,
+        sessionId: data.sessionId,
+        category: data.category,
+        skills: Array.isArray(data.skills) ? data.skills : [],
+        status: data.status,
+        duration: typeof data.duration === "number" ? data.duration : 0,
+        inputData: {
+          prompt: data.prompt,
+        },
+        outputData: {
+          result: data.result,
+        },
+        errorMessage: data.error,
+        metadata: data.metadata || {},
+      },
+    });
+  } catch (error) {
+    // Log but don't throw - execution tracking should not break user-facing operations
+    logger.error("Failed to save orchestrator execution", {
+      error: error instanceof Error ? error.message : String(error),
       organizationId: data.organizationId,
-      userId: data.userId,
       sessionId: data.sessionId,
       category: data.category,
-      skills: Array.isArray(data.skills) ? data.skills : [],
-      status: data.status,
-      duration: typeof data.duration === "number" ? data.duration : 0,
-      inputData: {
-        prompt: data.prompt,
-      },
-      outputData: {
-        result: data.result,
-      },
-      errorMessage: data.error,
-      metadata: data.metadata || {},
-    },
-  });
+    });
+  }
 }
 
 // Export sub-agent spawning functionality (Phase 3 Intelligence Layer - E2-T1)
